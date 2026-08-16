@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>고요한 밤 — 손으로 지휘하기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width:100%; height:100%; background:#05070f; color:#fff; overflow:hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Helvetica Neue", sans-serif; }
+
+  #video { position:fixed; inset:0; width:100%; height:100%; object-fit:cover;
+    transform:scaleX(-1); filter:brightness(0.32) saturate(0.5) contrast(1.05); }
+  #canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+
+  /* ---- 상단 컨트롤 (테스트용. 현장 설치 시 전부 제거) ---- */
+  #bar { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:12;
+    display:flex; gap:18px; align-items:center; padding:9px 16px; border-radius:30px;
+    background:rgba(10,14,26,0.72); backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.10); font-size:13px; }
+  #bar .grp { display:flex; gap:6px; align-items:center; }
+  #bar .lbl { opacity:0.5; font-size:11.5px; letter-spacing:0.5px; }
+  .pbtn { width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.18);
+    background:transparent; color:#fff; cursor:pointer; font-size:13px; transition:all .15s; }
+  .pbtn:hover { border-color:rgba(255,255,255,0.5); }
+  .pbtn.on { background:#ffd88a; color:#05070f; border-color:#ffd88a; font-weight:600; }
+  #sens { width:96px; accent-color:#ffd88a; }
+  #reset { background:transparent; border:1px solid rgba(255,255,255,0.18); color:#fff;
+    padding:6px 13px; border-radius:16px; cursor:pointer; font-size:12px; }
+  #reset:hover { border-color:rgba(255,255,255,0.5); }
+
+  /* ---- 시작 화면 ---- */
+  #start { position:fixed; inset:0; z-index:20; background:rgba(5,7,15,0.96);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px; }
+  #start h1 { font-size:38px; font-weight:200; letter-spacing:8px; }
+  #start .sub { opacity:0.55; font-size:14px; line-height:2; text-align:center; letter-spacing:0.5px; }
+  #start .verse { opacity:0.38; font-size:12.5px; letter-spacing:1px; margin-top:4px; }
+  #go { padding:15px 52px; font-size:17px; border:none; border-radius:40px;
+    background:#ffd88a; color:#05070f; cursor:pointer; font-weight:600; letter-spacing:2px;
+    transition:transform .15s; }
+  #go:hover { transform:scale(1.05); }
+  #go:disabled { opacity:0.45; cursor:wait; transform:none; }
+  #err { color:#ff8a8a; font-size:13px; max-width:440px; text-align:center; line-height:1.7; display:none; }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+
+<div id="bar">
+  <div class="grp"><span class="lbl">인원</span>
+    <button class="pbtn on" data-n="1">1</button>
+    <button class="pbtn" data-n="2">2</button>
+    <button class="pbtn" data-n="3">3</button>
+    <button class="pbtn" data-n="4">4</button>
+  </div>
+  <div class="grp"><span class="lbl">감도</span>
+    <input type="range" id="sens" min="1" max="5" step="1" value="3">
+  </div>
+  <button id="reset">처음부터</button>
+</div>
+
+<div id="start">
+  <h1>고요한 밤</h1>
+  <p class="sub">
+    지휘하듯 <b>손을 아래로 내리면</b> 다음 음이 울립니다.<br>
+    음정은 저절로 맞으니, 박자만 만들어 주세요.
+  </p>
+  <p class="verse">눅 2:13 — 홀연히 수많은 천군이 천사와 함께 하나님을 찬송하니</p>
+  <button id="go">시작하기</button>
+  <p id="err"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<script>
+/* ============================================================
+   고요한 밤 — 손으로 지휘하는 캐롤 (프로토타입)
+   핵심 원리: 음정은 배열에 박아두고, 사용자는 "박자"만 만든다.
+             → 틀린 음이 구조적으로 불가능하다.
+   ============================================================ */
+
+// ---------- 곡 데이터 (C장조) ----------
+// 리듬 값이 없다는 점이 핵심. 음 길이는 "다음 지휘"까지의 시간이 정한다.
+// 다른 캐롤로 바꾸려면 이 배열만 갈아끼우면 된다.
+const PHRASES = [
+  { lyric:'고요한 밤',      chord:'C',  notes:[67,69,67,64] },
+  { lyric:'거룩한 밤',      chord:'C',  notes:[67,69,67,64] },
+  { lyric:'어둠에',        chord:'G7', notes:[74,74,71] },
+  { lyric:'묻힌 밤',       chord:'C',  notes:[72,72,67] },
+  { lyric:'주의 부모',      chord:'F',  notes:[69,69,72,71,69] },
+  { lyric:'앉아서',        chord:'C',  notes:[67,69,67,64] },
+  { lyric:'감사 기도',      chord:'F',  notes:[69,69,72,71,69] },
+  { lyric:'드릴 때',       chord:'C',  notes:[67,69,67,64] },
+  { lyric:'아기 잘도 잔다', chord:'G7', notes:[74,74,77,74,71] },
+  { lyric:'아기 잘도 잔다', chord:'C',  notes:[72,76,72,67,64,60] },
+];
+
+const SEQ = [];
+PHRASES.forEach((ph, pi) => ph.notes.forEach(m => SEQ.push({ m, p: pi })));
+
+const CHORDS = {
+  C:  { bass:36, tones:[60,64,67] },
+  F:  { bass:41, tones:[60,65,69] },
+  G7: { bass:43, tones:[62,67,71] },
+};
+
+// ---------- 파트 ----------
+const ROLES = [
+  { key:'melody',  name:'멜로디', sub:'노래를 이끕니다', color:'#ffd88a', rgb:'255,216,138' },
+  { key:'bass',    name:'베이스', sub:'낮은 울림',      color:'#7ea8ff', rgb:'126,168,255' },
+  { key:'harmony', name:'화음',   sub:'포근한 화음',    color:'#c99cff', rgb:'201,156,255' },
+  { key:'bell',    name:'종',     sub:'반짝이는 소리',  color:'#8ef0d0', rgb:'142,240,208' },
+];
+
+// ---------- 상태 ----------
+const video  = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const startScreen = document.getElementById('start');
+const goBtn  = document.getElementById('go');
+const errEl  = document.getElementById('err');
+const sensEl = document.getElementById('sens');
+
+let playerCount = 1;
+let seqIdx = 0;
+let curChord = 'C';
+let curLyric = '';
+let curNote  = '';
+let lastPlayAt = 0;
+let bassAlt = 0, bellStep = 0;
+
+const SENS_TABLE = [0.024, 0.017, 0.012, 0.009, 0.006]; // 1(둔감) → 5(민감)
+const COOLDOWN = 200;   // ms, 한 동작이 여러 음을 쏘는 채터링 방지
+const IDLE_RESET = 25000;
+
+const lanes = ROLES.map(() => ({ y:null, vy:0, last:0, present:false, flash:0, cx:0, cy:0 }));
+const sparks = [];
+const stars  = [];
+
+// ---------- 오디오 ----------
+let reverb, melSynth, bassSynth, harmSynth, bellSynth;
+function initAudio() {
+  reverb = new Tone.Freeverb({ roomSize:0.88, dampening:1700, wet:0.30 }).toDestination();
+
+  melSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:'triangle' },
+    envelope:{ attack:0.008, decay:0.35, sustain:0.22, release:1.5 },
+  }).connect(reverb);
+  melSynth.volume.value = -5;
+
+  bassSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:'sine' },
+    envelope:{ attack:0.02, decay:0.6, sustain:0.15, release:1.8 },
+  }).connect(reverb);
+  bassSynth.volume.value = -3;
+
+  harmSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:'triangle' },
+    envelope:{ attack:0.12, decay:0.8, sustain:0.30, release:2.2 },
+  }).connect(reverb);
+  harmSynth.volume.value = -16;
+
+  bellSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:'sine' },
+    envelope:{ attack:0.001, decay:1.7, sustain:0, release:1.2 },
+  }).connect(reverb);
+  bellSynth.volume.value = -11;
+}
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const f = m => 440 * Math.pow(2, (m - 69) / 12);
+const nm = m => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+
+// ---------- 파트별 발음 ----------
+// 멜로디만 곡을 진행시킨다. 나머지 파트는 "현재 화음" 안에서만 소리 내므로
+// 서로 박자가 어긋나도 불협화음이 되지 않는다. (하모니 잠금)
+function playMelody() {
+  const it = SEQ[seqIdx];
+  melSynth.triggerAttackRelease(f(it.m), 1.1);
+  curChord = PHRASES[it.p].chord;
+  curLyric = PHRASES[it.p].lyric;
+  curNote  = nm(it.m);
+  seqIdx = (seqIdx + 1) % SEQ.length;
+}
+function playBass() {
+  const c = CHORDS[curChord];
+  const n = bassAlt++ % 2 === 0 ? c.bass : c.bass + 7;
+  bassSynth.triggerAttackRelease(f(n), 1.6);
+}
+function playHarmony() {
+  const c = CHORDS[curChord];
+  harmSynth.triggerAttackRelease(c.tones.map(f), 2.0);
+}
+function playBell() {
+  const c = CHORDS[curChord];
+  const t = c.tones[bellStep++ % c.tones.length];
+  bellSynth.triggerAttackRelease([f(t + 24), f(t + 31)], 1.8);
+}
+const FIRE = { melody:playMelody, bass:playBass, harmony:playHarmony, bell:playBell };
+
+// ---------- 지휘 동작 감지 ----------
+// 손이 "내려갔다가 방향을 바꾸는 최저점"을 비트로 잡는다.
+// 완전한 반전(vy<=0)까지 기다리면 소리가 늦게 느껴지므로,
+// 감속이 시작되는 순간(vy < prevVy*0.35)에 발사한다.
+function detectBeat(s, yRaw, now) {
+  if (s.y === null) { s.y = yRaw; s.vy = 0; return false; }
+  const y  = s.y + (yRaw - s.y) * 0.5;   // EMA — 손떨림 제거
+  const vy = y - s.y;
+  const sens = SENS_TABLE[parseInt(sensEl.value, 10) - 1];
+  const fired = s.vy > sens && vy < s.vy * 0.35 && (now - s.last) > COOLDOWN;
+  s.y = y; s.vy = vy;
+  if (fired) { s.last = now; return true; }
+  return false;
+}
+
+// ---------- 메인 루프 ----------
+function onResults(res) {
+  const W = canvas.width  = window.innerWidth;
+  const H = canvas.height = window.innerHeight;
+  const now = performance.now();
+  const N = playerCount;
+  ctx.clearRect(0, 0, W, H);
+
+  // 손 → 레인 배정 (사람은 제자리에 서 있으므로 위치 기반이 안정적이다)
+  const hands = res.multiHandLandmarks || [];
+  const pick = new Array(N).fill(null);
+  for (const lm of hands) {
+    const p = lm[9];                      // 손바닥 중심 — 손끝보다 흔들림이 적다
+    const sx = 1 - p.x;
+    const li = Math.max(0, Math.min(N - 1, Math.floor(sx * N)));
+    const d = Math.abs(sx - (li + 0.5) / N);
+    if (!pick[li] || d < pick[li].d) pick[li] = { d, sx, sy: p.y };
+  }
+
+  for (let i = 0; i < ROLES.length; i++) {
+    const s = lanes[i];
+    if (i >= N || !pick[i]) { s.present = false; s.y = null; s.vy = 0; continue; }
+    s.present = true;
+    s.cx = pick[i].sx * W;
+    s.cy = pick[i].sy * H;
+    if (detectBeat(s, pick[i].sy, now)) {
+      FIRE[ROLES[i].key]();
+      s.flash = 1;
+      lastPlayAt = now;
+      burst(s.cx, s.cy, ROLES[i].rgb);
+    }
+  }
+
+  if (lastPlayAt && now - lastPlayAt > IDLE_RESET) { seqIdx = 0; lastPlayAt = 0; }
+
+  draw(W, H, N, now);
+}
+
+// ---------- 그리기 ----------
+function burst(x, y, rgb) {
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 4.5;
+    sparks.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 1, life:1, rgb });
+  }
+}
+
+function draw(W, H, N, now) {
+  // 밤하늘
+  if (stars.length === 0)
+    for (let i = 0; i < 140; i++)
+      stars.push({ x:Math.random(), y:Math.random(), r:Math.random()*1.4+0.3, ph:Math.random()*6.3 });
+  for (const st of stars) {
+    const tw = 0.35 + 0.4 * Math.sin(now / 900 + st.ph);
+    ctx.fillStyle = `rgba(255,250,230,${tw})`;
+    ctx.beginPath(); ctx.arc(st.x*W, st.y*H, st.r, 0, 6.3); ctx.fill();
+  }
+
+  const lw = W / N;
+
+  for (let i = 0; i < N; i++) {
+    const R = ROLES[i], s = lanes[i];
+    const x0 = i * lw, cx = x0 + lw / 2;
+    s.flash *= 0.90;
+
+    // 레인 경계
+    if (i > 0) {
+      const g = ctx.createLinearGradient(x0, 0, x0, H);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.13)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0, H); ctx.stroke();
+    }
+
+    // 비트 시 레인 전체가 은은하게 빛남
+    if (s.flash > 0.01) {
+      ctx.fillStyle = `rgba(${R.rgb},${s.flash * 0.13})`;
+      ctx.fillRect(x0, 0, lw, H);
+    }
+
+    // 파트 이름
+    ctx.textAlign = 'center';
+    ctx.fillStyle = s.present ? R.color : 'rgba(255,255,255,0.28)';
+    ctx.font = '600 ' + (N > 2 ? 17 : 21) + 'px -apple-system, sans-serif';
+    ctx.fillText(R.name, cx, 126);
+    ctx.fillStyle = s.present ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.16)';
+    ctx.font = (N > 2 ? 11.5 : 13) + 'px -apple-system, sans-serif';
+    ctx.fillText(R.sub, cx, 148);
+
+    // 별 — 비트마다 커진다
+    const baseR = Math.min(lw * 0.13, 52);
+    const rr = baseR * (1 + s.flash * 0.7);
+    const gy = H * 0.44;
+    if (s.present) {
+      const gl = ctx.createRadialGradient(cx, gy, 0, cx, gy, rr * 3.4);
+      gl.addColorStop(0, `rgba(${R.rgb},${0.30 + s.flash * 0.5})`);
+      gl.addColorStop(1, `rgba(${R.rgb},0)`);
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(cx, gy, rr * 3.4, 0, 6.3); ctx.fill();
+    }
+    star(cx, gy, rr, s.present ? R.color : 'rgba(255,255,255,0.13)');
+
+    // 안내 / 커서
+    if (!s.present) {
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.font = '13px -apple-system, sans-serif';
+      ctx.fillText('여기에 서서 손을 들어주세요', cx, gy + baseR * 2.6);
+    } else {
+      ctx.strokeStyle = `rgba(${R.rgb},0.85)`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.cx, s.cy, 15, 0, 6.3); ctx.stroke();
+      ctx.fillStyle = `rgba(${R.rgb},0.30)`;
+      ctx.beginPath(); ctx.arc(s.cx, s.cy, 15, 0, 6.3); ctx.fill();
+    }
+  }
+
+  // 가사 + 음이름 (멜로디 주자용)
+  if (curLyric) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.90)';
+    ctx.font = '300 40px -apple-system, sans-serif';
+    ctx.fillText(curLyric, W / 2, H - 132);
+    ctx.fillStyle = 'rgba(255,216,138,0.55)';
+    ctx.font = '600 15px -apple-system, sans-serif';
+    ctx.fillText(curNote + '   ·   ' + curChord, W / 2, H - 104);
+  }
+
+  // 진행 막대
+  const bw = Math.min(W * 0.55, 620), bx = (W - bw) / 2, by = H - 72;
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.fillRect(bx, by, bw, 3);
+  ctx.fillStyle = 'rgba(255,216,138,0.85)';
+  ctx.fillRect(bx, by, bw * (seqIdx / SEQ.length), 3);
+
+  // 반짝임
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.16; p.life -= 0.024;
+    if (p.life <= 0) { sparks.splice(i, 1); continue; }
+    ctx.fillStyle = `rgba(${p.rgb},${p.life})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.life * 3.2, 0, 6.3); ctx.fill();
+  }
+  ctx.textAlign = 'left';
+}
+
+function star(cx, cy, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.42;
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// ---------- 컨트롤 ----------
+document.querySelectorAll('.pbtn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.pbtn').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  playerCount = parseInt(b.dataset.n, 10);
+  lanes.forEach(s => { s.y = null; s.vy = 0; s.present = false; });
+}));
+document.getElementById('reset').addEventListener('click', () => {
+  seqIdx = 0; curLyric = ''; curNote = ''; curChord = 'C';
+});
+
+// ---------- 시작 ----------
+async function start() {
+  goBtn.disabled = true; goBtn.textContent = '불러오는 중...'; errEl.style.display = 'none';
+  try {
+    if (typeof Hands === 'undefined' || typeof Tone === 'undefined')
+      throw new Error('라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+
+    await Tone.start();
+    initAudio();
+
+    const hands = new Hands({
+      locateFile: fl => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${fl}`,
+    });
+    hands.setOptions({
+      maxNumHands: 4,
+      modelComplexity: 0,        // 지휘 동작은 정밀도보다 속도가 중요하다
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.5,
+    });
+    hands.onResults(onResults);
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:1280, height:720, facingMode:'user' }, audio:false,
+    });
+    video.srcObject = stream;
+    await new Promise(r => (video.onloadedmetadata = r));
+    await video.play();
+
+    new Camera(video, {
+      onFrame: async () => { await hands.send({ image: video }); },
+      width: 1280, height: 720,
+    }).start();
+
+    startScreen.style.display = 'none';
+  } catch (e) {
+    console.error(e);
+    goBtn.disabled = false; goBtn.textContent = '다시 시도';
+    errEl.style.display = 'block';
+    errEl.textContent = e.message + '\n(카메라 권한이 필요하며, http://localhost 로 열어야 합니다)';
+  }
+}
+goBtn.addEventListener('click', start);
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+});
+</script>
+</body>
+</html>

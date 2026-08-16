@@ -13,6 +13,8 @@ Product Discovery → Creative Direction → Figma Visual R&D → Prototype Spec
 
 - [`docs/PRODUCT-DIRECTION.md`](docs/PRODUCT-DIRECTION.md) — 레퍼런스 해체 분석, 6개 콘셉트, 가중 스코어카드,
   최종 방향(**AFTERGLOW**), 음악 지능 모델, 협업 모델, 모션 스펙, 기술 아키텍처, Vertical Slice 정의
+- [`prototypes/silent-night-conductor.html`](prototypes/silent-night-conductor.html) — 최초 인터랙션 가설 프로토타입.
+  문서 4장에서 라인 단위로 분석합니다 (버그 7건 + 구조적 문제 6건, 살릴 것/버릴 것 포함)
 
 ## Figma
 
