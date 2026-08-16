@@ -1,0 +1,32 @@
+# super-rockin-fun-christmas
+
+인터랙티브 음악 설치 + 개인용 웹 경험을 위한 Product Discovery / Creative Direction 저장소.
+
+Christmas installation은 **첫 번째 use case**일 뿐이며, 제품의 정체성이 아닙니다.
+
+## 현재 단계
+
+Product Discovery → Creative Direction → Figma Visual R&D → Prototype Specification
+(아직 완제품 구현 단계가 아닙니다.)
+
+## 문서
+
+- [`docs/PRODUCT-DIRECTION.md`](docs/PRODUCT-DIRECTION.md) — 레퍼런스 해체 분석, 6개 콘셉트, 가중 스코어카드,
+  최종 방향(**AFTERGLOW**), 음악 지능 모델, 협업 모델, 모션 스펙, 기술 아키텍처, Vertical Slice 정의
+
+## Figma
+
+**[AFTERGLOW — Interactive Music Installation (Visual R&D)](https://www.figma.com/design/Tzvtju8lcgmHKIGzLigpYu)**
+
+| 페이지 | 내용 |
+| --- | --- |
+| `01 · Visual Directions` | EMBER / VELLUM / AURORA 3개 방향 |
+| `02 · Media Wall — States` | 8개 설치 상태 (3840×1080) |
+| `03 · Aspect Ratios` | 16:9 / 21:9 / 32:9 구성 비교 |
+| `04 · Personal Mode` | 랜딩 · 권한 · 플레이 · 월드선택 · 모바일 · 키프세이크 |
+| `05 · Design System` | 3모드 토큰, 흑체 참가자 스케일, 타입 램프 |
+
+## 한 줄 요약
+
+> 당신의 움직임은 사라지지 않는다. 빛이 되어 남고, 박자에 맞춰 스스로 노래하며,
+> 다른 사람의 빛과 만나 합주가 된다.
