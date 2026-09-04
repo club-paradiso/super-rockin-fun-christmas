@@ -44,3 +44,12 @@ Product Discovery → Creative Direction → Figma Visual R&D → Prototype Spec
 
 > 당신의 움직임은 사라지지 않는다. 빛이 되어 남고, 박자에 맞춰 스스로 노래하며,
 > 다른 사람의 빛과 만나 합주가 된다.
+
+## 테스트
+
+```bash
+node prototypes/beat-detector.test.js
+```
+
+지휘 비트 검출기를 카메라 없이 검증합니다 — 프레임레이트 독립성, 40~150BPM,
+손떨림 배제, 중복 발사, 발사 시점까지 24개 항목. 검출기를 수정하면 먼저 이걸 돌리세요.
