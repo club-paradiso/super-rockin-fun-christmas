@@ -26,3 +26,4 @@ blob-report/
 
 # local photo store (Phase 1) — guest photos, never commit
 .data/
+.data-e2e/

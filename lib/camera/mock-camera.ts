@@ -123,10 +123,11 @@ export class MockCamera implements CameraProvider {
     ctx.arc(lx, ly, h * 0.08, 0, Math.PI * 2);
     ctx.fill();
 
-    // Orientation marker: an "L" in the top-left corner. Mirrored output puts it top-right.
+    // Orientation marker: an "L" top-left, inside the 4:3 center crop. Mirrored output shows
+    // it top-right and reversed.
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(w * 0.06, h * 0.08, w * 0.02, h * 0.2);
-    ctx.fillRect(w * 0.06, h * 0.26, w * 0.08, h * 0.02);
+    ctx.fillRect(w * 0.18, h * 0.1, w * 0.02, h * 0.2);
+    ctx.fillRect(w * 0.18, h * 0.28, w * 0.08, h * 0.02);
 
     ctx.fillStyle = "#f6e7c8";
     ctx.font = `700 ${Math.round(h * 0.16)}px ${FONT_STACK}`;

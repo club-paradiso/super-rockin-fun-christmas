@@ -22,5 +22,6 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
+    env: { FTL_DATA_DIR: ".data-e2e", NEXT_TELEMETRY_DISABLED: "1" },
   },
 });
