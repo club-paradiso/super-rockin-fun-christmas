@@ -1,0 +1,97 @@
+// @vitest-environment node
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createLocalBackend, forgetLocalBackendsForTests } from "@/lib/storage/local-backend";
+import { createMemoryBackend } from "@/lib/storage/memory-backend";
+import { PhotoService } from "@/lib/storage/photo-service";
+import { isWellFormedToken, newToken } from "@/lib/storage/token";
+import { photoServiceContract } from "../helpers/photo-contract";
+import { JPEG, SESSION } from "../helpers/images";
+
+/**
+ * PhotoService contract. Runs against every backend available without network. The Supabase
+ * backend runs the same contract in tests/integration (needs a local Supabase stack).
+ */
+const KIOSK = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+let tmp: string;
+beforeEach(async () => {
+  tmp = await mkdtemp(path.join(os.tmpdir(), "ftl-svc-"));
+});
+afterEach(() => rm(tmp, { recursive: true, force: true }));
+
+describe("tokens", () => {
+  it("are 192-bit, URL-safe, unique", () => {
+    const tokens = new Set(Array.from({ length: 500 }, newToken));
+    expect(tokens.size).toBe(500);
+    for (const t of tokens) expect(isWellFormedToken(t)).toBe(true);
+    expect(Buffer.from([...tokens][0]!, "base64url")).toHaveLength(24);
+    expect(isWellFormedToken("../../etc/passwd")).toBe(false);
+  });
+});
+
+photoServiceContract("memory", async () => ({
+  backend: createMemoryBackend(),
+  kioskId: KIOSK,
+  otherKioskId: null,
+}));
+photoServiceContract("local files", async () => ({
+  backend: createLocalBackend(tmp),
+  kioskId: KIOSK,
+  otherKioskId: null,
+}));
+
+describe("retention failure is retried safely", () => {
+  it("leaves the row untouched when object deletion fails, then succeeds next run", async () => {
+    const backend = createMemoryBackend();
+    let now = new Date("2026-12-24T10:00:00Z");
+    const svc = new PhotoService(backend, { linkTtlHours: 72, retentionDays: 1, now: () => now });
+    await svc.put({
+      sessionId: SESSION,
+      kioskId: null,
+      frameId: "starlight-strip",
+      mime: "image/jpeg",
+      data: JPEG,
+    });
+    now = new Date("2026-12-26T00:00:00Z");
+    backend.objects.failRemove = true;
+    expect(await svc.purgeRetention()).toEqual({ examined: 1, deleted: 0, failed: 1 });
+    expect([...backend.photos.rows.values()][0]!.deletedAt).toBeNull();
+    backend.objects.failRemove = false;
+    expect(await svc.purgeRetention()).toEqual({ examined: 1, deleted: 1, failed: 0 });
+  });
+});
+
+describe("local backend persistence", () => {
+  const opts = { linkTtlHours: 72, retentionDays: 30 };
+  const input = {
+    sessionId: SESSION,
+    kioskId: null,
+    frameId: "starlight-strip",
+    mime: "image/jpeg" as const,
+    data: JPEG,
+  };
+
+  it("survives a process restart", async () => {
+    const { token } = await new PhotoService(createLocalBackend(tmp), opts).put(input);
+    forgetLocalBackendsForTests();
+    expect((await new PhotoService(createLocalBackend(tmp), opts).resolve(token)).ok).toBe(true);
+  });
+
+  it("instances created by different route bundles share one view of the data", async () => {
+    // Regression: each Next route bundle builds its own backend. A kiosk enrolled through the
+    // API route must be visible to the /kiosk page immediately.
+    const a = createLocalBackend(tmp);
+    const b = createLocalBackend(tmp);
+    await b.kiosks.list(); // b loads first, like a page rendered before enrollment
+    await a.kiosks.insert({
+      id: "k1",
+      label: "x",
+      createdAt: "t",
+      revokedAt: null,
+      lastSeenAt: null,
+    });
+    expect(await b.kiosks.get("k1")).not.toBeNull();
+  });
+});

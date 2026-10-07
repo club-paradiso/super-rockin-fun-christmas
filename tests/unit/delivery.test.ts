@@ -1,53 +1,71 @@
 import { describe, expect, it, vi } from "vitest";
-import { uploadFinalImage } from "@/lib/kiosk/delivery";
-import { buildDownloadUrl, makeQrSvg, publicOrigin } from "@/lib/qr";
+import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { makeQrSvg } from "@/lib/qr";
+import { JPEG, SESSION } from "../helpers/images";
 
-const input = () => ({
-  blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }),
-  sessionId: "11111111-2222-4333-8444-555555555555",
+const entry = {
+  sessionId: SESSION,
   frameId: "starlight-strip",
-});
-const ok = { token: "t", path: "/p/t", expiresAt: "e", duplicate: false };
-const noSleep = () => Promise.resolve();
+  mime: "image/jpeg" as const,
+  data: JPEG.buffer,
+};
+const respond = (status: number, body: unknown = {}) =>
+  vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status }));
 
-describe("uploadFinalImage", () => {
-  it("retries network errors with the same session id", async () => {
+describe("uploadOnce", () => {
+  it("sends the session id as idempotency key and no secrets", async () => {
+    const fetchImpl = respond(201, {
+      token: "t",
+      url: "https://x/p/t",
+      expiresAt: "e",
+      duplicate: false,
+    });
+    const outcome = await uploadOnce(entry, 2, fetchImpl);
+    expect(outcome).toMatchObject({ ok: true, result: { url: "https://x/p/t" } });
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit & { headers: Record<string, string> };
+    expect(init.headers["x-session-id"]).toBe(SESSION);
+    expect(init.headers["x-queue-depth"]).toBe("2");
+    expect(init.credentials).toBe("same-origin");
+    expect(Object.keys(init.headers).join()).not.toMatch(/auth|secret|key/i);
+  });
+
+  it.each([
+    [401, "auth"],
+    [409, "conflict"],
+    [400, "rejected"],
+    [413, "rejected"],
+    [415, "rejected"],
+    [429, "server"],
+    [502, "server"],
+  ])("maps HTTP %i to %s", async (status, kind) => {
+    expect(await uploadOnce(entry, 0, respond(status))).toMatchObject({ ok: false, kind });
+  });
+
+  it("maps a thrown fetch to network", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await uploadOnce(entry, 0, fetchImpl)).toMatchObject({ ok: false, kind: "network" });
+  });
+});
+
+describe("sendWallConsent", () => {
+  const noSleep = () => Promise.resolve();
+  it("retries transient failures", async () => {
     const fetchImpl = vi
       .fn()
-      .mockRejectedValueOnce(new TypeError("network down"))
-      .mockResolvedValueOnce(new Response(JSON.stringify(ok), { status: 201 }));
-    await expect(uploadFinalImage(input(), fetchImpl, noSleep)).resolves.toEqual(ok);
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    expect(await sendWallConsent("t", true, fetchImpl, noSleep)).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    const ids = fetchImpl.mock.calls.map(
-      (c) => (c[1] as RequestInit & { headers: Record<string, string> }).headers["x-session-id"],
-    );
-    expect(new Set(ids).size).toBe(1);
   });
-
   it("does not retry a 4xx", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(new Response("{}", { status: 400 }));
-    await expect(uploadFinalImage(input(), fetchImpl, noSleep)).rejects.toThrow("400");
+    const fetchImpl = respond(404);
+    expect(await sendWallConsent("t", true, fetchImpl, noSleep)).toBe(false);
     expect(fetchImpl).toHaveBeenCalledOnce();
-  });
-
-  it("gives up after three attempts", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(new Response("", { status: 503 }));
-    await expect(uploadFinalImage(input(), fetchImpl, noSleep)).rejects.toThrow("503");
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 });
 
 describe("QR", () => {
-  it("builds the download URL from the public origin", () => {
-    expect(buildDownloadUrl("https://lights.example.org", "abc_-")).toBe(
-      "https://lights.example.org/p/abc_-",
-    );
-    expect(publicOrigin("", "http://kiosk.local:3000")).toBe("http://kiosk.local:3000");
-    expect(publicOrigin(" https://a.b ", "x")).toBe("https://a.b");
-  });
-
   it("renders an SVG", async () => {
-    const svg = await makeQrSvg("https://lights.example.org/p/abc");
-    expect(svg.startsWith("<svg")).toBe(true);
+    expect((await makeQrSvg("https://lights.example.org/p/abc")).startsWith("<svg")).toBe(true);
   });
 });
