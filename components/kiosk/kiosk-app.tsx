@@ -1,0 +1,818 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/config/frames";
+import { KIOSK_CONFIG } from "@/config/kiosk";
+import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
+import {
+  CameraError,
+  createCamera,
+  type CameraDevice,
+  type CameraErrorKind,
+  type CameraMode,
+  type CameraProvider,
+  type CapturedFrame,
+} from "@/lib/camera";
+import { composeFrame, formatDateLabel } from "@/lib/compositor";
+import {
+  capturedCount,
+  createInitialState,
+  isShooting,
+  kioskReducer,
+  needsCamera,
+  type KioskAction,
+  type KioskState,
+} from "@/lib/kiosk/machine";
+import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
+import { uploadFinalImage, sendWallConsent } from "@/lib/kiosk/delivery";
+import { buildDownloadUrl, makeQrSvg, publicOrigin } from "@/lib/qr";
+import { CameraPreview, Lead, ShotProgress, Stage, Title } from "./ui";
+
+export interface Shot {
+  frame: CapturedFrame;
+  url: string;
+}
+
+interface FinalImage {
+  frameId: string;
+  blob: Blob;
+  url: string;
+  width: number;
+  height: number;
+}
+
+type State = KioskState<Shot>;
+type Action = KioskAction<Shot>;
+
+const DEVICE_KEY = "ftl.cameraDeviceId";
+
+function readStoredDevice(): string | undefined {
+  try {
+    return localStorage.getItem(DEVICE_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
+  const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
+    createInitialState<Shot>({
+      shotCount: KIOSK_CONFIG.shotsPerSession,
+      countdownSeconds: KIOSK_CONFIG.countdownSeconds,
+      frameId: DEFAULT_FRAME_ID,
+    }),
+  );
+
+  const cameraRef = useRef<CameraProvider | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [devices, setDevices] = useState<CameraDevice[]>([]);
+  const [deviceId, setDeviceId] = useState<string | undefined>(readStoredDevice);
+  const urlsRef = useRef(new Set<string>());
+  const [flash, setFlash] = useState(0);
+  const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  const online = useOnline();
+
+  const trackUrl = (url: string) => {
+    urlsRef.current.add(url);
+    return url;
+  };
+
+  // ── Mount: create the camera provider once ──────────────────────────────────────────────
+  useEffect(() => {
+    cameraRef.current = createCamera(cameraMode);
+    const off = cameraRef.current.onDisconnect(() => {
+      setStream(null);
+      dispatch({ type: "CAMERA_FAILED", kind: "missing" });
+    });
+    const urls = urlsRef.current;
+    return () => {
+      off();
+      cameraRef.current?.stop();
+      releaseUrls(urls);
+    };
+  }, [cameraMode]);
+
+  const reset = useCallback(() => {
+    cameraRef.current?.stop();
+    setStream(null);
+    releaseUrls(urlsRef.current);
+    urlsRef.current.clear();
+    setFinalImage(null);
+    setQrSvg(null);
+    dispatch({ type: "RESET" });
+  }, []);
+
+  // ── Camera lifecycle ─────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (state.phase !== "camera" || !cameraRef.current) return;
+    let cancelled = false;
+    const camera = cameraRef.current;
+    camera
+      .start(deviceId)
+      .then(async () => {
+        if (cancelled) return;
+        setStream(camera.getStream());
+        setDevices(await camera.listDevices());
+        dispatch({ type: "CAMERA_READY" });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const kind: CameraErrorKind = err instanceof CameraError ? err.kind : "failed";
+        // A remembered device that is gone: forget it and fall back to the default camera.
+        if (kind === "missing" && deviceId) {
+          try {
+            localStorage.removeItem(DEVICE_KEY);
+          } catch {}
+          setDeviceId(undefined);
+          return;
+        }
+        dispatch({ type: "CAMERA_FAILED", kind });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.phase, deviceId]);
+
+  // Camera off whenever it is not needed for shooting or a quick retake.
+  useEffect(() => {
+    if (!needsCamera(state.phase) && state.phase !== "review") cameraRef.current?.stop();
+  }, [state.phase]);
+
+  // ── Countdown ────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (state.phase !== "countdown") return;
+    const timer = setTimeout(() => dispatch({ type: "TICK" }), 1000);
+    return () => clearTimeout(timer);
+  }, [state.phase, state.remaining, state.shotIndex]);
+
+  // ── Capture ──────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (state.phase !== "capturing" || !cameraRef.current) return;
+    let cancelled = false;
+    const camera = cameraRef.current;
+    setFlash((n) => n + 1);
+    (async () => {
+      try {
+        if (!camera.isActive()) {
+          await camera.start(deviceId);
+          setStream(camera.getStream());
+        }
+        const frame = await camera.capture({
+          aspect: KIOSK_CONFIG.captureAspect,
+          mirror: KIOSK_CONFIG.mirror,
+          maxWidth: KIOSK_CONFIG.captureMaxWidth,
+        });
+        const blob = await canvasToBlob(frame.canvas as HTMLCanvasElement, "image/jpeg", 0.9);
+        if (cancelled) return;
+        dispatch({
+          type: "SHOT_CAPTURED",
+          shot: { frame, url: trackUrl(URL.createObjectURL(blob)) },
+        });
+      } catch {
+        if (!cancelled) dispatch({ type: "CAPTURE_FAILED" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.phase, state.shotIndex, deviceId]);
+
+  const images = useMemo(
+    () =>
+      state.shots.every((s) => s !== null)
+        ? state.shots.map((s) => ({
+            source: s!.frame.canvas as HTMLCanvasElement,
+            width: s!.frame.width,
+            height: s!.frame.height,
+          }))
+        : null,
+    [state.shots],
+  );
+
+  // ── Frame picker thumbnails: the guest's real photos in every frame ──────────────────────
+  const showThumbs = state.phase === "frame";
+  const thumbs = useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!showThumbs || !images) return out;
+    const dateLabel = formatDateLabel(new Date());
+    for (const frame of FRAMES) {
+      const canvas = composeFrame(frame, images, {
+        createCanvas: createDomCanvas,
+        context: { dateLabel },
+        scale: 0.2,
+      }) as HTMLCanvasElement;
+      out[frame.id] = canvas.toDataURL("image/jpeg", 0.8);
+    }
+    return out;
+  }, [showThumbs, images]);
+
+  // ── Final composite ──────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (state.phase !== "final" || !images) return;
+    if (finalImage?.frameId === state.frameId) return;
+    let cancelled = false;
+    const frame = getFrame(state.frameId);
+    const canvas = composeFrame(frame, images, {
+      createCanvas: createDomCanvas,
+      context: { dateLabel: formatDateLabel(new Date()) },
+    }) as HTMLCanvasElement;
+    canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality).then((blob) => {
+      if (cancelled) return;
+      setFinalImage({
+        frameId: frame.id,
+        blob,
+        url: trackUrl(URL.createObjectURL(blob)),
+        width: canvas.width,
+        height: canvas.height,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.phase, state.frameId, images, finalImage?.frameId]);
+
+  // ── Phone delivery ───────────────────────────────────────────────────────────────────────
+  const deliveringRef = useRef(false);
+  const deliver = useCallback(async () => {
+    if (!finalImage || deliveringRef.current) return;
+    deliveringRef.current = true;
+    dispatch({ type: "DELIVERY_STARTED" });
+    try {
+      const result = await uploadFinalImage({
+        blob: finalImage.blob,
+        sessionId: state.sessionId,
+        frameId: finalImage.frameId,
+      });
+      const url = buildDownloadUrl(
+        publicOrigin(process.env.NEXT_PUBLIC_PUBLIC_BASE_URL, window.location.origin),
+        result.token,
+      );
+      setQrSvg(await makeQrSvg(url));
+      dispatch({
+        type: "DELIVERY_SUCCEEDED",
+        token: result.token,
+        url,
+        expiresAt: result.expiresAt,
+      });
+    } catch (err) {
+      dispatch({
+        type: "DELIVERY_FAILED",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      deliveringRef.current = false;
+    }
+  }, [finalImage, state.sessionId]);
+
+  const requestDelivery = () => {
+    dispatch({ type: "REQUEST_DELIVERY" });
+    // Already delivered (guest came back from consent): keep the same link.
+    if (state.delivery.status !== "ready") void deliver();
+  };
+
+  const chooseConsent = (consent: "yes" | "no") => {
+    if (state.delivery.status === "ready") {
+      // Best effort. Failure here never affects the guest's own download link.
+      void sendWallConsent(state.delivery.token, consent === "yes").catch(() => undefined);
+    }
+    dispatch({ type: "SET_CONSENT", consent });
+  };
+
+  // ── Resets ───────────────────────────────────────────────────────────────────────────────
+  useIdleReset(
+    state.phase !== "welcome" && !isShooting(state.phase) && state.phase !== "complete",
+    KIOSK_CONFIG.idleResetSeconds,
+    reset,
+  );
+
+  const selectDevice = (id: string) => {
+    try {
+      localStorage.setItem(DEVICE_KEY, id);
+    } catch {}
+    setDeviceId(id);
+    cameraRef.current?.stop();
+    setStream(null);
+    dispatch({ type: "CAMERA_RESTART" });
+  };
+
+  return (
+    <main className="relative min-h-dvh select-none overflow-hidden" data-phase={state.phase}>
+      <Screen
+        state={state}
+        dispatch={dispatch}
+        stream={stream}
+        devices={devices}
+        deviceId={deviceId}
+        onSelectDevice={selectDevice}
+        thumbs={thumbs}
+        finalImage={finalImage}
+        qrSvg={qrSvg}
+        onRetryDelivery={deliver}
+        onConsent={chooseConsent}
+        onReset={reset}
+        onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
+        onRequestDelivery={requestDelivery}
+      />
+      {flash > 0 && state.phase === "capturing" && (
+        <div
+          key={flash}
+          className="capture-flash pointer-events-none fixed inset-0 bg-cream"
+          aria-hidden
+        />
+      )}
+      <StatusBadges cameraMode={cameraMode} online={online} />
+    </main>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+interface ScreenProps {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+  stream: MediaStream | null;
+  devices: CameraDevice[];
+  deviceId: string | undefined;
+  onSelectDevice: (id: string) => void;
+  thumbs: Record<string, string>;
+  finalImage: FinalImage | null;
+  qrSvg: string | null;
+  onRetryDelivery: () => void;
+  onConsent: (c: "yes" | "no") => void;
+  onReset: () => void;
+  onStart: () => void;
+  onRequestDelivery: () => void;
+}
+
+const CAMERA_ERROR_COPY: Record<CameraErrorKind, { title: string; lead: string }> = {
+  denied: {
+    title: "카메라 사용이 허용되지 않았어요",
+    lead: "도우미에게 알려 주세요. 브라우저 설정에서 카메라를 허용해야 해요.",
+  },
+  missing: {
+    title: "카메라를 찾을 수 없어요",
+    lead: "카메라 연결을 확인한 뒤 다시 시도해 주세요.",
+  },
+  unsupported: {
+    title: "이 화면에서는 카메라를 쓸 수 없어요",
+    lead: "HTTPS 주소 또는 지원되는 브라우저에서 열어야 해요. 도우미에게 알려 주세요.",
+  },
+  failed: { title: "카메라가 잠시 멈췄어요", lead: "다시 시도를 눌러 주세요." },
+};
+
+function Screen(p: ScreenProps) {
+  const { state, dispatch } = p;
+  const total = state.shotCount;
+  const aspect = KIOSK_CONFIG.captureAspect;
+
+  switch (state.phase) {
+    case "welcome":
+      return (
+        <Stage testId="screen-welcome">
+          <p className="text-xl tracking-[0.4em] text-amber">CHRISTMAS VILLAGE 2026</p>
+          <Title>
+            <span className="block text-6xl tracking-[0.08em] md:text-7xl">FOLLOW THE LIGHTS</span>
+          </Title>
+          <Lead>한 사람의 순간이 모여, 공동체의 크리스마스 풍경이 됩니다.</Lead>
+          <button type="button" className="btn-primary min-w-80" onClick={p.onStart}>
+            네컷 찍기 시작
+          </button>
+          <p className="text-lg text-mist">
+            사진은 QR로 내 휴대폰에 저장해요 · 이름이나 연락처는 묻지 않아요
+          </p>
+        </Stage>
+      );
+
+    case "camera":
+      return (
+        <Stage testId="screen-camera">
+          <Title>카메라를 켜고 있어요</Title>
+          <Lead>허용을 묻는 창이 뜨면 &lsquo;허용&rsquo;을 눌러 주세요.</Lead>
+        </Stage>
+      );
+
+    case "camera-error": {
+      const copy = CAMERA_ERROR_COPY[state.cameraError ?? "failed"];
+      return (
+        <Stage testId="screen-camera-error">
+          <Title>{copy.title}</Title>
+          <Lead>{copy.lead}</Lead>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => dispatch({ type: "CAMERA_RETRY" })}
+            >
+              다시 시도
+            </button>
+            <button type="button" className="btn-secondary" onClick={p.onReset}>
+              처음으로
+            </button>
+          </div>
+        </Stage>
+      );
+    }
+
+    case "ready":
+      return (
+        <Stage testId="screen-ready" className="gap-6">
+          <ShotProgress done={capturedCount(state)} total={total} />
+          <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror} />
+          <p className="text-2xl text-mist">
+            {total}번 찍어요. 매번 {state.countdownSeconds}초를 셀게요.
+          </p>
+          <button
+            type="button"
+            className="btn-primary min-w-80"
+            onClick={() => dispatch({ type: "BEGIN_SHOOTING" })}
+          >
+            촬영 시작
+          </button>
+          {p.devices.length > 1 && (
+            <label className="flex items-center gap-3 text-base text-mist">
+              카메라
+              <select
+                className="rounded-lg bg-night px-3 py-2 text-cream"
+                value={p.deviceId ?? ""}
+                onChange={(e) => p.onSelectDevice(e.target.value)}
+              >
+                <option value="">기본 카메라</option>
+                {p.devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </Stage>
+      );
+
+    case "countdown":
+    case "capturing":
+      return (
+        <Stage testId="screen-shooting" className="gap-6">
+          <ShotProgress done={capturedCount(state)} total={total} />
+          <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              {state.phase === "countdown" ? (
+                <span
+                  key={`${state.shotIndex}-${state.remaining}`}
+                  data-testid="countdown-number"
+                  className="countdown-pop text-[10rem] font-bold leading-none text-cream drop-shadow-[0_0_30px_rgba(0,0,0,0.6)]"
+                >
+                  {state.remaining}
+                </span>
+              ) : null}
+            </div>
+          </CameraPreview>
+          <p className="text-3xl font-semibold text-cream">
+            {state.retakeIndex !== null
+              ? `${state.shotIndex + 1}번째 사진 다시 찍기`
+              : `${state.shotIndex + 1}번째 사진`}
+          </p>
+        </Stage>
+      );
+
+    case "review":
+      return (
+        <Stage testId="screen-review" className="gap-6">
+          <Title>잘 나왔나요?</Title>
+          <p className="text-xl text-mist">마음에 들지 않는 사진을 누르면 그 사진만 다시 찍어요.</p>
+          <div className="grid w-full max-w-4xl grid-cols-2 gap-4">
+            {state.shots.map((shot, i) => (
+              <button
+                type="button"
+                key={i}
+                data-testid={`review-shot-${i}`}
+                onClick={() => dispatch({ type: "RETAKE", index: i })}
+                className="group relative overflow-hidden rounded-2xl border-2 border-cream/20 active:border-amber"
+                style={{ aspectRatio: String(aspect) }}
+                aria-label={`${i + 1}번째 사진 다시 찍기`}
+              >
+                {shot && (
+                  // eslint-disable-next-line @next/next/no-img-element -- local object URL
+                  <img src={shot.url} alt="" className="h-full w-full object-cover" />
+                )}
+                <span className="absolute bottom-2 right-2 rounded-lg bg-ink/75 px-3 py-1 text-lg text-cream">
+                  {i + 1} · 다시 찍기
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              className="btn-primary min-w-72"
+              onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
+            >
+              이대로 좋아요
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => dispatch({ type: "RETAKE_ALL" })}
+            >
+              전부 다시 찍기
+            </button>
+          </div>
+        </Stage>
+      );
+
+    case "frame":
+      return (
+        <Stage testId="screen-frame" className="gap-6">
+          <Title>프레임을 골라 주세요</Title>
+          <div className="flex w-full max-w-5xl flex-wrap items-end justify-center gap-6">
+            {FRAMES.map((frame) => {
+              const selected = frame.id === state.frameId;
+              return (
+                <button
+                  type="button"
+                  key={frame.id}
+                  data-testid={`frame-option-${frame.id}`}
+                  aria-pressed={selected}
+                  onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
+                  className={`flex flex-col items-center gap-3 rounded-2xl border-4 p-3 transition ${
+                    selected ? "border-amber bg-amber/10" : "border-transparent"
+                  }`}
+                >
+                  <div className="flex h-[44dvh] items-center">
+                    {p.thumbs[frame.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- generated data URL
+                      <img
+                        src={p.thumbs[frame.id]}
+                        alt=""
+                        className="max-h-full w-auto rounded-md"
+                      />
+                    ) : (
+                      <div className="h-full w-40 animate-pulse rounded-md bg-dusk" />
+                    )}
+                  </div>
+                  <span className="text-2xl font-semibold text-cream">{frame.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="btn-primary min-w-80"
+            onClick={() => dispatch({ type: "CONFIRM_FRAME" })}
+          >
+            이 프레임으로 할게요
+          </button>
+        </Stage>
+      );
+
+    case "final":
+      return (
+        <Stage testId="screen-final" className="gap-6">
+          <Title>완성됐어요!</Title>
+          <div className="flex h-[58dvh] items-center">
+            {p.finalImage?.frameId === state.frameId ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local object URL
+              <img
+                src={p.finalImage.url}
+                alt="완성된 네컷 사진"
+                data-testid="final-image"
+                data-width={p.finalImage.width}
+                data-height={p.finalImage.height}
+                className="max-h-full w-auto rounded-lg shadow-[0_0_60px_rgba(255,207,138,0.2)]"
+              />
+            ) : (
+              <p className="text-2xl text-mist">사진을 만들고 있어요…</p>
+            )}
+          </div>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              className="btn-primary min-w-80"
+              disabled={!p.finalImage}
+              onClick={p.onRequestDelivery}
+            >
+              휴대폰으로 받기
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
+            >
+              프레임 바꾸기
+            </button>
+          </div>
+          {p.finalImage && (
+            <a
+              href={p.finalImage.url}
+              download={`follow-the-lights-${state.sessionId.slice(0, 8)}.jpg`}
+              className="btn-quiet"
+              data-testid="local-download"
+            >
+              이 기기에 파일로 저장
+            </a>
+          )}
+        </Stage>
+      );
+
+    case "delivery": {
+      const d = state.delivery;
+      return (
+        <Stage testId="screen-delivery" className="gap-6">
+          {d.status === "ready" && p.qrSvg ? (
+            <>
+              <Title>휴대폰 카메라로 QR을 비춰 주세요</Title>
+              <div
+                data-testid="qr-code"
+                data-url={d.url}
+                className="w-[min(44dvh,80vw)] rounded-2xl bg-white p-4"
+                // QR markup comes from the qrcode library, generated locally from our own URL.
+                dangerouslySetInnerHTML={{ __html: p.qrSvg }}
+              />
+              <Lead>로그인이나 전화번호 없이 바로 저장할 수 있어요.</Lead>
+              <button
+                type="button"
+                className="btn-primary min-w-80"
+                onClick={() => dispatch({ type: "TO_CONSENT" })}
+              >
+                다 받았어요
+              </button>
+            </>
+          ) : d.status === "failed" ? (
+            <>
+              <Title>지금은 사진을 보내기 어려워요</Title>
+              <Lead>인터넷 연결이 불안정해요. 잠시 후 다시 시도해 주세요.</Lead>
+              <div className="flex flex-wrap justify-center gap-4">
+                <button type="button" className="btn-primary" onClick={p.onRetryDelivery}>
+                  다시 시도
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => dispatch({ type: "FINISH" })}
+                >
+                  그만하기
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Title>사진을 준비하고 있어요</Title>
+              <Lead>잠시만 기다려 주세요.</Lead>
+            </>
+          )}
+        </Stage>
+      );
+    }
+
+    case "consent":
+      return (
+        <Stage testId="screen-consent" className="gap-8">
+          <Title>
+            내 사진을 Christmas Village
+            <br />
+            미디어월에도 보여줄까요?
+          </Title>
+          <Lead>
+            운영진이 확인한 사진만 보여져요. 어떤 선택을 해도 내 휴대폰 사진에는 영향이 없어요.
+          </Lead>
+          {/* Equal size and weight on purpose: neither answer is the "right" one. */}
+          <div className="grid w-full max-w-3xl grid-cols-1 gap-5 md:grid-cols-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              data-testid="consent-yes"
+              onClick={() => p.onConsent("yes")}
+            >
+              네, 함께 보여주세요
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              data-testid="consent-no"
+              onClick={() => p.onConsent("no")}
+            >
+              아니요, 사진만 저장할게요
+            </button>
+          </div>
+        </Stage>
+      );
+
+    case "complete":
+      return (
+        <Stage testId="screen-complete">
+          <Title>함께해 주셔서 고마워요</Title>
+          <Lead>
+            {state.consent === "yes"
+              ? "확인이 끝나면 마을의 밤 풍경 속에 사진이 나타나요."
+              : "메리 크리스마스! 따뜻한 밤 보내세요."}
+          </Lead>
+          {state.delivery.status === "ready" && p.qrSvg && (
+            <div className="flex items-center gap-5 rounded-2xl bg-night/70 p-4">
+              <div
+                className="w-36 rounded-lg bg-white p-2"
+                dangerouslySetInnerHTML={{ __html: p.qrSvg }}
+              />
+              <p className="max-w-56 text-left text-lg text-mist">
+                아직 못 받으셨다면 지금 QR을 비춰 주세요.
+              </p>
+            </div>
+          )}
+          <button type="button" className="btn-primary min-w-72" onClick={p.onReset}>
+            처음으로
+          </button>
+          <CompleteCountdown seconds={KIOSK_CONFIG.completeResetSeconds} onDone={p.onReset} />
+        </Stage>
+      );
+  }
+}
+
+/** Mounted fresh on the complete screen, so its timer always starts from the full count. */
+function CompleteCountdown({ seconds, onDone }: { seconds: number; onDone: () => void }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const remaining = seconds - Math.floor((Date.now() - started) / 1000);
+      setLeft(Math.max(0, remaining));
+      if (remaining <= 0) {
+        clearInterval(timer);
+        onDone();
+      }
+    }, 250);
+    return () => clearInterval(timer);
+  }, [seconds, onDone]);
+  return (
+    <p className="text-lg text-mist" data-testid="complete-countdown">
+      {left}초 후 처음 화면으로 돌아가요
+    </p>
+  );
+}
+
+function StatusBadges({ cameraMode, online }: { cameraMode: CameraMode; online: boolean }) {
+  return (
+    <div className="pointer-events-none fixed right-4 top-4 flex gap-2 text-sm">
+      {cameraMode === "mock" && (
+        <span
+          data-testid="mock-badge"
+          className="rounded-full bg-ember/90 px-3 py-1 font-semibold text-ink"
+        >
+          MOCK CAMERA
+        </span>
+      )}
+      {!online && (
+        <span
+          data-testid="offline-badge"
+          className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink"
+        >
+          오프라인
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Hooks ──────────────────────────────────────────────────────────────────────────────────
+
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
+
+function useOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
+}
+
+/** Reset an abandoned session after `seconds` with no touch. */
+function useIdleReset(enabled: boolean, seconds: number, onIdle: () => void) {
+  useEffect(() => {
+    if (!enabled || !(seconds > 0)) return;
+    let timer = setTimeout(onIdle, seconds * 1000);
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(onIdle, seconds * 1000);
+    };
+    window.addEventListener("pointerdown", bump);
+    window.addEventListener("keydown", bump);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", bump);
+      window.removeEventListener("keydown", bump);
+    };
+  }, [enabled, seconds, onIdle]);
+}
