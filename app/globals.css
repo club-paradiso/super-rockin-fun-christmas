@@ -10,6 +10,7 @@
   --color-cream: #f7efe0;
   --color-mist: #aeb5c7;
   --color-alert: #ff8f7a;
+  --color-pine: #3f7d5c;
   --font-sans:
     "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
 }
@@ -41,6 +42,28 @@ body {
   }
   .btn-secondary {
     @apply inline-flex min-h-20 items-center justify-center rounded-2xl border-2 border-cream/40 px-10 text-2xl font-semibold text-cream transition active:scale-[0.98] active:bg-cream/10 disabled:opacity-50;
+  }
+  /* Staff control panel: big, obvious, touch-friendly (desktop, tablet, phone). */
+  .admin-btn {
+    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-xl px-5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-50;
+  }
+  .admin-btn-primary {
+    @apply bg-amber text-ink;
+  }
+  .admin-btn-approve {
+    @apply bg-pine text-cream;
+  }
+  .admin-btn-danger {
+    @apply bg-alert text-ink;
+  }
+  .admin-btn-quiet {
+    @apply border border-cream/30 text-cream active:bg-cream/10;
+  }
+  .admin-card {
+    @apply rounded-2xl border border-cream/10 bg-night;
+  }
+  .admin-input {
+    @apply min-h-14 rounded-xl border border-cream/20 bg-ink px-4 text-lg text-cream placeholder:text-mist/60;
   }
   .btn-quiet {
     @apply inline-flex min-h-14 items-center justify-center rounded-xl px-6 text-lg text-mist underline-offset-4 active:underline;
