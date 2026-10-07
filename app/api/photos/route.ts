@@ -1,55 +1,97 @@
 import { NextResponse } from "next/server";
 import { FRAMES } from "@/config/frames";
-import { MAX_UPLOAD_BYTES, getPhotoStore } from "@/lib/storage/server";
+import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { getServerConfig } from "@/lib/server/env";
+import { NO_STORE, jsonError, route } from "@/lib/server/http";
+import { logEvent } from "@/lib/server/log";
+import { guestUrl, publicOrigin } from "@/lib/server/public-url";
+import { limiters } from "@/lib/server/rate-limit";
+import {
+  BodyTooLargeError,
+  hasImageSignature,
+  isSameOrigin,
+  readBodyLimited,
+} from "@/lib/server/request";
+import { DuplicateSessionError } from "@/lib/storage/photo-service";
+import { getBackend, getPhotoService } from "@/lib/storage/server";
 import { SESSION_ID_PATTERN } from "@/lib/storage/token";
+import type { PhotoMime } from "@/lib/storage/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_MIME = new Set(["image/jpeg", "image/png"]);
+const ALLOWED_MIME = new Set<PhotoMime>(["image/jpeg", "image/png"]);
 
 /**
- * Kiosk → server upload of a finished four-cut image.
- * Body: raw image bytes. Headers: content-type, x-session-id (UUID, idempotency key), x-frame-id.
- * Returns the public token; the storage path is never exposed.
+ * Enrolled kiosk → finished four-cut image.
+ * Body: raw image bytes. Headers: content-type, x-session-id (UUID; idempotency key),
+ * x-frame-id, optional x-queue-depth (kiosk offline queue size, for logs).
+ * Returns the guest URL. Storage locations are never returned.
  */
-export async function POST(request: Request) {
-  const mime = request.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+export const POST = route("upload", async (request: Request) => {
+  const config = getServerConfig();
+  if (!isSameOrigin(request, [config.publicBaseUrl]))
+    return jsonError(403, "cross-origin request refused");
+
+  const auth = await authenticateKioskRequest(request);
+  if (!auth.ok) return jsonError(401, "kiosk not enrolled");
+  if (!limiters.upload.take(auth.kioskId ?? "dev")) return jsonError(429, "too many uploads");
+
+  const mime = (request.headers.get("content-type")?.split(";")[0]?.trim() ?? "") as PhotoMime;
   const sessionId = request.headers.get("x-session-id") ?? "";
   const frameId = request.headers.get("x-frame-id") ?? "";
+  if (!ALLOWED_MIME.has(mime)) return jsonError(415, "unsupported image type");
+  if (!SESSION_ID_PATTERN.test(sessionId)) return jsonError(400, "invalid session id");
+  if (!FRAMES.some((f) => f.id === frameId)) return jsonError(400, "unknown frame");
 
-  if (!ALLOWED_MIME.has(mime)) return error(415, "unsupported image type");
-  if (!SESSION_ID_PATTERN.test(sessionId)) return error(400, "invalid session id");
-  if (!FRAMES.some((f) => f.id === frameId)) return error(400, "unknown frame");
+  let data: Uint8Array;
+  try {
+    data = await readBodyLimited(request, config.maxUploadBytes);
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) return jsonError(413, "image too large");
+    throw err;
+  }
+  if (data.byteLength === 0) return jsonError(400, "empty body");
+  if (!hasImageSignature(data, mime))
+    return jsonError(400, "body is not a valid image of the declared type");
 
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_UPLOAD_BYTES) return error(413, "image too large");
-  const data = new Uint8Array(await request.arrayBuffer());
-  if (data.byteLength === 0) return error(400, "empty body");
-  if (data.byteLength > MAX_UPLOAD_BYTES) return error(413, "image too large");
-  if (!hasImageSignature(data, mime)) return error(400, "body is not the declared image type");
+  const service = getPhotoService();
+  let result;
+  try {
+    result = await service.put({ sessionId, kioskId: auth.kioskId, frameId, mime, data });
+  } catch (err) {
+    if (err instanceof DuplicateSessionError) return jsonError(409, "session already closed");
+    logEvent(
+      "upload_storage_failed",
+      { kioskId: auth.kioskId, message: (err as Error).message },
+      "error",
+    );
+    return jsonError(502, "storage unavailable");
+  }
 
-  const { token, record, duplicate } = await getPhotoStore().put({
-    sessionId,
-    frameId,
-    mime: mime as "image/jpeg" | "image/png",
-    data,
+  logEvent("upload_ok", {
+    kioskId: auth.kioskId,
+    photoId: result.photo.id,
+    bytes: data.byteLength,
+    duplicate: result.duplicate,
+    queueDepth: Number(request.headers.get("x-queue-depth") ?? 0) || 0,
+    backend: service.backendName,
   });
-  return NextResponse.json(
-    { token, path: `/p/${token}`, expiresAt: record.expiresAt, duplicate },
-    { status: duplicate ? 200 : 201, headers: { "cache-control": "no-store" } },
-  );
-}
+  if (auth.kioskId) {
+    await getBackend()
+      .kiosks.touch(auth.kioskId, new Date().toISOString())
+      .catch(() => undefined);
+  }
 
-function hasImageSignature(data: Uint8Array, mime: string): boolean {
-  if (mime === "image/jpeg") return data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
-  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  return png.every((b, i) => data[i] === b);
-}
-
-function error(status: number, message: string) {
+  const headers: Record<string, string> = { ...NO_STORE };
+  if (auth.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, auth.renewCookie);
   return NextResponse.json(
-    { error: message },
-    { status, headers: { "cache-control": "no-store" } },
+    {
+      token: result.token,
+      url: guestUrl(publicOrigin(config, request), result.token),
+      expiresAt: result.photo.tokenExpiresAt,
+      duplicate: result.duplicate,
+    },
+    { status: result.duplicate ? 200 : 201, headers },
   );
-}
+});
