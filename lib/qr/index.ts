@@ -1,17 +1,10 @@
 import QRCode from "qrcode";
 
-/** Public download page for a token. `origin` has no trailing slash requirements. */
-export function buildDownloadUrl(origin: string, token: string): string {
-  return new URL(`/p/${encodeURIComponent(token)}`, origin).toString();
-}
-
-/** Base for QR links: the configured public origin, else the kiosk's own origin. */
-export function publicOrigin(configured: string | undefined, fallback: string): string {
-  const value = configured?.trim();
-  return value ? value : fallback;
-}
-
-/** Inline SVG markup for a QR code. Quiet zone included; scales crisply at any size. */
+/**
+ * Inline SVG markup for a QR code. The URL itself always comes from the server (built from
+ * PUBLIC_BASE_URL), never from the kiosk's own location, so a kiosk on a LAN address cannot
+ * print an unreachable link.
+ */
 export function makeQrSvg(text: string): Promise<string> {
   return QRCode.toString(text, { type: "svg", errorCorrectionLevel: "M", margin: 2 });
 }
