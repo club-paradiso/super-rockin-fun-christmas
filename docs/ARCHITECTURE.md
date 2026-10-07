@@ -1,73 +1,111 @@
 # Architecture
 
-One Next.js application serves all surfaces. No microservices.
+One Next.js application serves every surface, and there are no microservices. In deployment it
+runs on Vercel. Supabase provides Postgres and a private Storage bucket and is reached only from
+the Next.js server.
 
 ```
- ┌──────────── Kiosk browser (/kiosk) ─────────────┐
- │ CameraProvider ─► grabFrame (crop+mirror)       │
- │        │                                         │
- │ kioskReducer (pure) ◄── KioskApp effects         │
- │        │                                         │
- │ composeFrame(FrameDefinition, 4 images) ─► JPEG  │
- │        │  POST /api/photos (x-session-id)        │
- └────────┼─────────────────────────────────────────┘
+ ┌─────────────── Kiosk browser (/kiosk, enrolled) ───────────────┐
+ │ CameraProvider ─► grabFrame (crop+mirror)                       │
+ │ kioskReducer (pure) ◄── KioskApp effects                        │
+ │ composeFrame(FrameDefinition, 4 images) ─► JPEG                 │
+ │        │                                                        │
+ │ UploadQueue ── IndexedDB (JPEG + session id, survives reload)   │
+ │        │ POST /api/photos   cookie: ftl_kiosk (HttpOnly)        │
+ └────────┼────────────────────────────────────────────────────────┘
           ▼
- ┌──────────── Next.js server ─────────────────────┐
- │ /api/photos        → PhotoStore.put  → token     │
- │ /api/photos/consent→ PhotoStore.setWallConsent   │
- │ /p/[token]         → mobile page                 │
- │ /p/[token]/image   → image bytes (no-store)      │
- │ PhotoStore: LocalPhotoStore (P1) | Supabase (P2) │
- └──────────────────────────────────────────────────┘
-          ▲ QR
-     Guest phone
+ ┌─────────────── Next.js server (trusted boundary) ───────────────┐
+ │ env.ts validation · kiosk auth · Origin check · rate limit      │
+ │ PhotoService (all rules) ──► StorageBackend                     │
+ │     memory (tests) │ local files (dev) │ Supabase (deployment)  │
+ │ /p/[token] page · /p/[token]/image (bytes from private bucket)  │
+ │ /api/cron/retention (Vercel Cron, Bearer CRON_SECRET)           │
+ └────────┼────────────────────────────────────────────────────────┘
+          ▼  service_role (server only)
+ ┌──────── Supabase ────────┐            Guest phone (any network)
+ │ photos, kiosks (RLS on)  │            scans QR → https://PUBLIC_BASE_URL/p/<token>
+ │ bucket "photos" private  │
+ └──────────────────────────┘
 ```
 
-## Kiosk
+## Kiosk (unchanged from Phase 1 except delivery)
 
-- **`lib/kiosk/machine.ts`** — pure reducer for the whole session. Rules live here (exactly four
-  shots, stray frames ignored, retake one/all, three capture failures → camera error, reset,
-  consent independent of delivery). No timers, no DOM.
-- **`components/kiosk/kiosk-app.tsx`** — runs side effects keyed on phase: start/stop camera,
-  1 s countdown ticks, capture, compose, upload. Dispatches results back.
-- Camera is stopped on welcome and after review, so the camera light is off when idle.
-- Object URLs for shots and the final image are revoked on reset.
+- `lib/kiosk/machine.ts`: pure reducer. Phase 2 adds `delivery.status = "queued"` (reason
+  `network | auth`). A queued or late failure can never replace a QR that is already ready.
+- `components/kiosk/kiosk-app.tsx`: effects only. Delivery goes through the queue (below), and
+  the QR is rendered from the **server-returned URL**.
+- `/kiosk` is a server component that first validates the config and the kiosk session. On
+  failure it renders a staff screen and never starts the guest flow.
 
-## Camera
+## Offline queue (`lib/offline`)
 
-`CameraProvider` (`lib/camera/types.ts`): `start(deviceId?)`, `stop`, `isActive`, `getStream`,
-`capture(options)`, `listDevices`, `onDisconnect`.
+- `IndexedDbQueueStore` (`follow-the-lights` / `uploads`, key `sessionId`) stores the JPEG as an
+  ArrayBuffer plus frame, mime, createdAt, attempts, nextAttemptAt, lastError, and state.
+- `UploadQueue`:
+  1. `enqueue` persists first.
+  2. `deliverNow` makes one attempt. At most one is in flight per session.
+  3. Outcomes:
+     - success → delete the entry and emit `uploaded`
+     - network/5xx/429 → back off 2 s, 5 s, 15 s, 30 s, then 60 s
+     - 401 → `auth` state, retried every 60 s
+     - 400/403/413/415/409 → drop (it can never succeed)
+  4. `processDue` runs on start, every 5 s, and on `online` (forced).
+- The QR appears only on `uploaded` for the **current** session. A previous guest's photo that
+  finishes later is uploaded silently and never shown to the next guest.
+- Falls back to memory when IndexedDB is unavailable (staff badge `임시 저장소`).
 
-- `BrowserCamera` — `getUserMedia` (ideal 1920×1080, user-facing or a chosen device),
-  error mapping to `denied | missing | unsupported | failed`, track-ended → disconnect.
-  Capture uses a private `<video>` so it does not depend on the preview being mounted.
-- `MockCamera` — draws a generated 16:9 scene on a canvas; streams it via `captureStream`
-  when available. Selected by `?camera=mock` or `NEXT_PUBLIC_CAMERA_MODE=mock`.
-- `grabFrame` — the single crop/mirror implementation used by both. The preview uses the same
-  aspect box with `object-fit: cover` and the same mirror flag.
+## Server
 
-## Compositor
+- `lib/server/env.ts` parses and validates every setting once. _Strict_ (production) mode requires
+  an https, public `PUBLIC_BASE_URL`, strong secrets, enabled kiosk auth and `CRON_SECRET`.
+  `FTL_ALLOW_LOCAL_ORIGIN=1` relaxes this for the E2E production build and is ignored on Vercel.
+- `lib/kiosk-auth`: signed cookie `v1.<kioskId>.<iat>.<exp>.<hmac>`. Verification also requires a
+  live `kiosks` row. See `docs/SECURITY.md`.
+- `lib/server/request.ts`: `isSameOrigin`, `readBodyLimited` (hard cap while streaming),
+  `hasImageSignature` (JPEG SOI+EOI, PNG signature), `safeEqual`.
+- `lib/server/rate-limit.ts`: fixed-window, in-process counters. Limits are per instance on
+  serverless (documented).
+- `lib/server/log.ts`: JSON lines. Keys that look like tokens or secrets are redacted.
 
-`composeFrame(frame, images, { createCanvas, context, scale })`: background → each photo
-cover-cropped and clipped into its slot (rounded corners, optional border) → decorations
-(`text` with `{date}`, seeded `stars`, `lights` strands, `rect`). Throws unless the image count
-equals the slot count. `scale` renders frame-picker thumbnails from the same code.
+## Storage (`lib/storage`)
 
-Canvas access goes through `CanvasFactory` so unit tests use a recording fake.
+- `PhotoService` holds every rule:
+  - **put**: object first, then row. On a duplicate session (same kiosk, still active) it keeps
+    the row and object and rotates the token; on a race it deletes its own object and reissues.
+  - **resolve/read**: by `sha256(token)`; unknown, malformed, expired and deleted all count as
+    unavailable.
+  - **setWallConsent**: `NONE ⇄ PENDING` only, and only by the uploading kiosk.
+  - **purgeRetention**: remove the object, then mark `DELETED`. Idempotent.
+- Backends implement only `PhotoRepository`, `ObjectStorage` and `KioskRepository`:
+  - `memory-backend.ts` for tests
+  - `local-backend.ts`: one JSON DB per process plus object files, for dev or a single PC
+  - `supabase-backend.ts`: supabase-js with the service role, `server-only`
+- `guest.ts` is the only lookup guest routes use, so the "unavailable" cases look identical.
+- Tokens are 192-bit, base64url (32 chars). Only the SHA-256 hex is stored.
 
-## Delivery and storage
+## Guest phone page
 
-- Upload: raw JPEG body; headers `x-session-id` (UUID, idempotency key) and `x-frame-id`.
-  Validated: MIME, magic bytes, size ≤ 15 MB, known frame.
-- Token: 192 random bits, base64url. Stored only as SHA-256; files are named by hash.
-- `LocalPhotoStore` writes atomically to `FTL_DATA_DIR` (default `.data/`).
-- Client retries network/5xx up to three times; 4xx is final. The same session id makes
-  retries return the same token.
-- Consent: `none ⇄ PENDING`; moderation states are reserved for the admin surface.
+- `/p/[token]`: server-rendered. `notFound()` gives an identical 404 for every unavailable case.
+  `noindex`, `no-referrer`.
+- `/p/[token]/image`: streams bytes read server-side. Headers: `private, no-store` and `nosniff`.
+  `?download=1` sets an attachment disposition.
+- **사진 저장하기** prefetches the file (Safari only allows `share()` right after a tap). It opens
+  the share sheet with the file when `navigator.canShare({files})` is supported (iPhone → 이미지
+  저장) and otherwise downloads. There is also a **파일로 받기** link and long-press guidance.
+  JavaScript cannot save straight to the iOS Photos library.
 
-## Known Phase 1 limits
+## Retention
 
-- Upload API is unauthenticated. Run Phase 1 only on a trusted network.
-- Local store is not reachable from guest phones on the public internet.
-- Retention cleanup job is not implemented yet (expired links already return 404).
-- If the kiosk reloads mid-session, that session is lost (no local persistence yet).
+`vercel.json` cron calls `/api/cron/retention` daily at 03:17 KST, using `Authorization: Bearer
+$CRON_SECRET`. Each run handles up to 5 batches of 200. Failures stay unmarked and are retried
+the next day.
+
+## Known limitations
+
+- Rate limiting is per serverless instance.
+- A guest who leaves while their photo is still queued gets no QR. The photo uploads later and
+  can only be re-shown by a Phase 3 admin tool.
+- The queue assumes one kiosk tab per device. Two tabs cannot duplicate a photo (the server is
+  idempotent), but the second tab's response would rotate the first tab's token.
+- Queue entries are never expired client-side. Staff see the count and can clear site data if
+  they really must.

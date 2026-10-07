@@ -32,8 +32,10 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
-import { uploadFinalImage, sendWallConsent } from "@/lib/kiosk/delivery";
-import { buildDownloadUrl, makeQrSvg, publicOrigin } from "@/lib/qr";
+import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { openQueueStore } from "@/lib/offline/queue-store";
+import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
+import { makeQrSvg } from "@/lib/qr";
 import { CameraPreview, Lead, ShotProgress, Stage, Title } from "./ui";
 
 export interface Shot {
@@ -240,36 +242,83 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
     };
   }, [state.phase, state.frameId, images, finalImage?.frameId]);
 
-  // ── Phone delivery ───────────────────────────────────────────────────────────────────────
-  const deliveringRef = useRef(false);
+  // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
+  // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
+  // a finished photo. The QR appears only once the server has issued a real token.
+  const queueRef = useRef<Promise<UploadQueue> | null>(null);
+  const sessionRef = useRef(state.sessionId);
+  const [queueStatus, setQueueStatus] = useState({ depth: 0, authBlocked: false, durable: true });
+
+  useEffect(() => {
+    sessionRef.current = state.sessionId;
+  }, [state.sessionId]);
+
+  const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
+    if (sessionId !== sessionRef.current) return; // a previous guest's queued photo finished
+    const svg = await makeQrSvg(result.url);
+    if (sessionId !== sessionRef.current) return;
+    setQrSvg(svg);
+    dispatch({
+      type: "DELIVERY_SUCCEEDED",
+      token: result.token,
+      url: result.url,
+      expiresAt: result.expiresAt,
+    });
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let unsubscribe = () => {};
+    const ready = openQueueStore().then(({ store, durable }) => {
+      const queue = new UploadQueue(store, uploadOnce);
+      unsubscribe = queue.subscribe((event) => {
+        if (event.type === "status") {
+          setQueueStatus({ depth: event.depth, authBlocked: event.authBlocked, durable });
+        } else if (event.type === "uploaded") {
+          void showQr(event.sessionId, event.result);
+        }
+      });
+      void queue.emitStatus();
+      void queue.processDue(); // entries left over from before a reload / restart
+      timer = setInterval(() => void queue.processDue(), 5_000);
+      return queue;
+    });
+    queueRef.current = ready;
+    const onOnline = () => void ready.then((q) => q.processDue(true));
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+      window.removeEventListener("online", onOnline);
+    };
+  }, [showQr]);
+
   const deliver = useCallback(async () => {
-    if (!finalImage || deliveringRef.current) return;
-    deliveringRef.current = true;
+    if (!finalImage || !queueRef.current) return;
+    const sessionId = state.sessionId;
     dispatch({ type: "DELIVERY_STARTED" });
     try {
-      const result = await uploadFinalImage({
-        blob: finalImage.blob,
-        sessionId: state.sessionId,
+      const queue = await queueRef.current;
+      await queue.enqueue({
+        sessionId,
         frameId: finalImage.frameId,
+        mime: finalImage.blob.type === "image/png" ? "image/png" : "image/jpeg",
+        data: await finalImage.blob.arrayBuffer(),
       });
-      const url = buildDownloadUrl(
-        publicOrigin(process.env.NEXT_PUBLIC_PUBLIC_BASE_URL, window.location.origin),
-        result.token,
-      );
-      setQrSvg(await makeQrSvg(url));
-      dispatch({
-        type: "DELIVERY_SUCCEEDED",
-        token: result.token,
-        url,
-        expiresAt: result.expiresAt,
-      });
+      const outcome = await queue.deliverNow(sessionId);
+      if (outcome.ok) return; // the "uploaded" event shows the QR
+      if (outcome.kind === "network" || outcome.kind === "server") {
+        dispatch({ type: "DELIVERY_QUEUED", reason: "network" });
+      } else if (outcome.kind === "auth") {
+        dispatch({ type: "DELIVERY_QUEUED", reason: "auth" });
+      } else {
+        dispatch({ type: "DELIVERY_FAILED", message: outcome.message });
+      }
     } catch (err) {
       dispatch({
         type: "DELIVERY_FAILED",
         message: err instanceof Error ? err.message : String(err),
       });
-    } finally {
-      deliveringRef.current = false;
     }
   }, [finalImage, state.sessionId]);
 
@@ -282,7 +331,7 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
   const chooseConsent = (consent: "yes" | "no") => {
     if (state.delivery.status === "ready") {
       // Best effort. Failure here never affects the guest's own download link.
-      void sendWallConsent(state.delivery.token, consent === "yes").catch(() => undefined);
+      void sendWallConsent(state.delivery.token, consent === "yes");
     }
     dispatch({ type: "SET_CONSENT", consent });
   };
@@ -329,7 +378,7 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
           aria-hidden
         />
       )}
-      <StatusBadges cameraMode={cameraMode} online={online} />
+      <StatusBadges cameraMode={cameraMode} online={online} queue={queueStatus} />
     </main>
   );
 }
@@ -628,6 +677,9 @@ function Screen(p: ScreenProps) {
         <Stage testId="screen-delivery" className="gap-6">
           {d.status === "ready" && p.qrSvg ? (
             <>
+              <p className="text-xl font-semibold text-amber" data-testid="delivery-ready">
+                사진 준비 완료
+              </p>
               <Title>휴대폰 카메라로 QR을 비춰 주세요</Title>
               <div
                 data-testid="qr-code"
@@ -645,10 +697,16 @@ function Screen(p: ScreenProps) {
                 다 받았어요
               </button>
             </>
-          ) : d.status === "failed" ? (
-            <>
-              <Title>지금은 사진을 보내기 어려워요</Title>
-              <Lead>인터넷 연결이 불안정해요. 잠시 후 다시 시도해 주세요.</Lead>
+          ) : d.status === "queued" ? (
+            <div data-testid="delivery-queued" className="flex flex-col items-center gap-8">
+              <Title>
+                {d.reason === "auth" ? "도우미를 불러 주세요" : "네트워크 연결을 확인하고 있어요"}
+              </Title>
+              <Lead>
+                {d.reason === "auth"
+                  ? "이 기기 등록이 필요해요. 사진은 이 기기에 안전하게 보관 중이에요."
+                  : "사진은 이 기기에 안전하게 저장했어요. 연결되면 자동으로 보내고 QR을 보여 드릴게요."}
+              </Lead>
               <div className="flex flex-wrap justify-center gap-4">
                 <button type="button" className="btn-primary" onClick={p.onRetryDelivery}>
                   다시 시도
@@ -661,10 +719,24 @@ function Screen(p: ScreenProps) {
                   그만하기
                 </button>
               </div>
+            </div>
+          ) : d.status === "failed" ? (
+            <>
+              <Title>사진을 보내지 못했어요</Title>
+              <Lead>도우미에게 알려 주세요.</Lead>
+              <div className="flex flex-wrap justify-center gap-4">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => dispatch({ type: "FINISH" })}
+                >
+                  그만하기
+                </button>
+              </div>
             </>
           ) : (
             <>
-              <Title>사진을 준비하고 있어요</Title>
+              <Title>사진을 보내고 있어요</Title>
               <Lead>잠시만 기다려 주세요.</Lead>
             </>
           )}
@@ -756,7 +828,15 @@ function CompleteCountdown({ seconds, onDone }: { seconds: number; onDone: () =>
   );
 }
 
-function StatusBadges({ cameraMode, online }: { cameraMode: CameraMode; online: boolean }) {
+function StatusBadges({
+  cameraMode,
+  online,
+  queue,
+}: {
+  cameraMode: CameraMode;
+  online: boolean;
+  queue: { depth: number; authBlocked: boolean; durable: boolean };
+}) {
   return (
     <div className="pointer-events-none fixed right-4 top-4 flex gap-2 text-sm">
       {cameraMode === "mock" && (
@@ -773,6 +853,28 @@ function StatusBadges({ cameraMode, online }: { cameraMode: CameraMode; online: 
           className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink"
         >
           오프라인
+        </span>
+      )}
+      {/* Staff indicators: photos saved on this kiosk that have not reached the server yet. */}
+      {queue.depth > 0 && (
+        <span
+          data-testid="queue-badge"
+          className="rounded-full bg-cream/90 px-3 py-1 font-semibold text-ink"
+        >
+          전송 대기 {queue.depth}건
+        </span>
+      )}
+      {queue.authBlocked && (
+        <span
+          data-testid="auth-badge"
+          className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink"
+        >
+          기기 등록 필요
+        </span>
+      )}
+      {!queue.durable && (
+        <span className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink">
+          임시 저장소
         </span>
       )}
     </div>

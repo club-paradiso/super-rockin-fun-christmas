@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { enrollKiosk } from "./helpers";
 
 // Exercises the real BrowserCamera (getUserMedia) against Chromium's built-in fake webcam.
 // This proves the browser code path, not any particular physical camera.
@@ -8,6 +9,7 @@ test.use({
 });
 
 test("getUserMedia path reaches review with four captures", async ({ page }) => {
+  await enrollKiosk(page);
   await page.goto("/kiosk");
   await expect(page.getByTestId("mock-badge")).toHaveCount(0);
   await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
@@ -25,6 +27,7 @@ test("getUserMedia path reaches review with four captures", async ({ page }) => 
 test("camera permission denied shows a clear error and a way back", async ({ browser }) => {
   const context = await browser.newContext({ permissions: [] });
   const page = await context.newPage();
+  await enrollKiosk(page);
   // Force a denial regardless of browser flags.
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () =>

@@ -2,7 +2,7 @@
   "name": "follow-the-lights",
   "version": "0.1.0",
   "private": true,
-  "description": "FOLLOW THE LIGHTS — four-cut photo booth and participatory media wall for Christmas Village 2026",
+  "description": "FOLLOW THE LIGHTS \u2014 four-cut photo booth and participatory media wall for Christmas Village 2026",
   "engines": {
     "node": ">=20.9"
   },
@@ -17,9 +17,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "test:supabase": "bash scripts/test-supabase.sh"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
     "next": "^16.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
@@ -33,13 +35,16 @@
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
+    "pg": "^8.23.1",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",

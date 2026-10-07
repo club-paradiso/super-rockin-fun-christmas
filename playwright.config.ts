@@ -1,11 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
-
-const PORT = Number(process.env.E2E_PORT ?? 3100);
+import { E2E_ENV, PORT } from "./e2e/env";
 
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
   retries: 0,
+  // One server-side store shared by all specs; keep row-count assertions deterministic.
+  workers: 1,
   reporter: [["list"]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
@@ -18,10 +19,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run build && npx next start -p ${PORT} -H 127.0.0.1`,
-    url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    command: `rm -rf .data-e2e && npm run build && npx next start -p ${PORT} -H 127.0.0.1`,
+    url: `http://127.0.0.1:${PORT}/kiosk/enroll`,
+    reuseExistingServer: false,
     timeout: 240_000,
-    env: { FTL_DATA_DIR: ".data-e2e", NEXT_TELEMETRY_DISABLED: "1" },
+    env: E2E_ENV,
   },
 });

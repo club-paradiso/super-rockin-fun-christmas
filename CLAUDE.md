@@ -15,22 +15,37 @@ Next.js 16 (App Router) · TypeScript strict · Tailwind 4 · Vitest · Playwrig
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor.
+- **No secrets in the browser.** Never add `NEXT_PUBLIC_` to a secret. Kiosk auth is the
+  HttpOnly cookie from `/kiosk/enroll`; the browser never talks to Supabase.
+- **Private photos.** Bucket stays private; guests only ever see `/p/[token]` and
+  `/p/[token]/image`. Never return `objectPath`, `tokenHash` or signed storage URLs to clients.
+- **Raw tokens are never stored or logged.** Only `sha256(token)`. Unknown/expired/deleted all
+  return the same 404.
+- **No fake QR.** A QR is shown only after the server returned a real token.
+- **Schema changes are migrations** in `supabase/migrations/`, never console clicks.
 
 ## Layout
 
 ```
-app/kiosk          booth (client component in components/kiosk)
-app/p/[token]      phone download page + image route
-app/api/photos     upload (idempotent per session) and consent
-app/wall, admin    placeholders until Phase 3/4
-lib/camera         CameraProvider: BrowserCamera, MockCamera, shared grabFrame
-lib/compositor     FrameDefinition types, coverCrop, composeFrame
-lib/kiosk          pure state machine, session helpers, delivery client
-lib/storage        PhotoStore port, LocalPhotoStore, token utils
-lib/qr             download URL + QR SVG
-config/            kiosk knobs and frame definitions
-tests/unit         Vitest (jsdom; FakeCanvas helper records 2D calls)
-e2e/               Playwright happy paths
+app/kiosk              booth (server gate: config + enrollment) → components/kiosk
+app/kiosk/enroll       staff device enrollment
+app/p/[token]          phone download page + image route (server reads private bucket)
+app/api/photos         upload (kiosk auth, idempotent per session) and consent
+app/api/kiosk          enroll / signout · app/api/operator/kiosks: list / revoke
+app/api/cron/retention retention cleanup (Bearer CRON_SECRET, Vercel Cron)
+app/wall, admin        placeholders until Phase 3/4
+lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
+lib/compositor         FrameDefinition types, coverCrop, composeFrame
+lib/kiosk              pure state machine, session helpers, upload/consent client
+lib/offline            IndexedDB queue store + UploadQueue (retry, dedupe, reload-safe)
+lib/kiosk-auth         signed kiosk session cookie, enrollment, verification
+lib/server             env validation, logging, rate limits, request helpers
+lib/storage            PhotoService (all rules) + backends: memory, local files, Supabase
+supabase/migrations    schema, RLS, private bucket
+config/                kiosk knobs and frame definitions
+tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
+tests/integration      real Supabase (npm run test:supabase)
+e2e/                   Playwright (kiosk auth on; E2E_STORE=supabase optional)
 ```
 
 ## Working rules
@@ -39,7 +54,11 @@ e2e/               Playwright happy paths
   run effects and dispatch.
 - Anything touching canvas takes a `CanvasFactory` so it is testable with `tests/helpers/fake-canvas.ts`.
 - Kiosk copy: short Korean, large touch targets (`btn-primary`/`btn-secondary` are ≥ 80px tall).
-- Before committing: `npm run check`. Before claiming a flow works: `npm run test:e2e`.
+- Storage rules live in `lib/storage/photo-service.ts`; backends stay dumb. New backend behaviour
+  must pass `tests/helpers/photo-contract.ts`.
+- Before committing: `npm run check`. Before claiming a flow works: `npm run test:e2e`. Touching
+  Supabase code or migrations: also `npm run test:supabase`.
+- Never claim the real-phone cellular test passed unless a human did it (see DEPLOYMENT).
 - Develop without a camera via `/kiosk?camera=mock`.
 - Never commit `.env*.local`, `.data/`, or guest photos.
 - Don't call anything "production ready" without real-device verification (see ROADMAP).

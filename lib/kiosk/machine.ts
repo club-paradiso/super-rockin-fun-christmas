@@ -26,6 +26,8 @@ export type KioskPhase =
 export type DeliveryState =
   | { status: "idle" }
   | { status: "uploading" }
+  /** Saved on the kiosk and waiting to reach the server. No QR until a real token exists. */
+  | { status: "queued"; reason: "network" | "auth" }
   | { status: "ready"; token: string; url: string; expiresAt: string }
   | { status: "failed"; message: string };
 
@@ -70,6 +72,7 @@ export type KioskAction<Shot> =
   | { type: "REQUEST_DELIVERY" }
   | { type: "DELIVERY_STARTED" }
   | { type: "DELIVERY_SUCCEEDED"; token: string; url: string; expiresAt: string }
+  | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
   | { type: "TO_CONSENT" }
   | { type: "SET_CONSENT"; consent: Exclude<WallConsent, null> }
@@ -230,7 +233,9 @@ export function kioskReducer<Shot>(
         : state;
 
     case "DELIVERY_STARTED":
-      return state.phase === "delivery" ? { ...state, delivery: { status: "uploading" } } : state;
+      return state.phase === "delivery" && state.delivery.status !== "ready"
+        ? { ...state, delivery: { status: "uploading" } }
+        : state;
 
     case "DELIVERY_SUCCEEDED":
       if (state.phase !== "delivery") return state;
@@ -243,6 +248,11 @@ export function kioskReducer<Shot>(
           expiresAt: action.expiresAt,
         },
       };
+
+    case "DELIVERY_QUEUED":
+      return state.phase === "delivery" && state.delivery.status !== "ready"
+        ? { ...state, delivery: { status: "queued", reason: action.reason } }
+        : state;
 
     case "DELIVERY_FAILED":
       return state.phase === "delivery"

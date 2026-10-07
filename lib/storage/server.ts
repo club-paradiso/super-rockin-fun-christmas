@@ -1,26 +1,40 @@
 import "server-only";
 import path from "node:path";
-import { LocalPhotoStore } from "./local-store";
-import type { PhotoStore } from "./types";
+import { getServerConfig } from "@/lib/server/env";
+import { createLocalBackend } from "./local-backend";
+import { PhotoService } from "./photo-service";
+import { createSupabaseBackend } from "./supabase-backend";
+import type { StorageBackend } from "./types";
 
-let store: PhotoStore | null = null;
+let backend: StorageBackend | null = null;
+let service: PhotoService | null = null;
 
-export function linkTtlHours(): number {
-  const n = Number(process.env.PHOTO_LINK_TTL_HOURS ?? 72);
-  return Number.isFinite(n) && n > 0 ? n : 72;
+/** The configured backend (Supabase in deployment, local files otherwise). */
+export function getBackend(): StorageBackend {
+  if (backend) return backend;
+  const config = getServerConfig();
+  backend =
+    config.store === "supabase" && config.supabase
+      ? createSupabaseBackend(config.supabase)
+      : createLocalBackend(
+          // The hint stops Turbopack from tracing the whole project into the server bundle.
+          path.resolve(/* turbopackIgnore: true */ process.cwd(), config.localDataDir),
+        );
+  return backend;
 }
 
-/** The configured PhotoStore. Phase 2 switches to Supabase when its env vars are present. */
-export function getPhotoStore(): PhotoStore {
-  store ??= new LocalPhotoStore({
-    // The hint stops Turbopack from tracing the whole project into the server bundle.
-    rootDir: path.resolve(
-      /* turbopackIgnore: true */ process.cwd(),
-      process.env.FTL_DATA_DIR ?? ".data",
-    ),
-    linkTtlHours: linkTtlHours(),
+export function getPhotoService(): PhotoService {
+  if (service) return service;
+  const config = getServerConfig();
+  service = new PhotoService(getBackend(), {
+    linkTtlHours: config.linkTtlHours,
+    retentionDays: config.retentionDays,
   });
-  return store;
+  return service;
 }
 
-export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+/** For tests only. */
+export function resetStorageForTests() {
+  backend = null;
+  service = null;
+}
