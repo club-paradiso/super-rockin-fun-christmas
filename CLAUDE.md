@@ -23,6 +23,16 @@ Next.js 16 (App Router) · TypeScript strict · Tailwind 4 · Vitest · Playwrig
   return the same 404.
 - **No fake QR.** A QR is shown only after the server returned a real token.
 - **Schema changes are migrations** in `supabase/migrations/`, never console clicks.
+- **Staff = Supabase Auth identity + active `staff_members` row**, checked server-side on every
+  page (`requireStaff`) and API (`staffRoute`). A Supabase user alone is nothing. No signups.
+- **Kiosk and staff auth never substitute for each other.** Kiosk APIs read only the kiosk
+  cookie; staff APIs read only the Supabase session.
+- **Every state change is audited atomically**: moderation, deletion, token rotation, kiosk
+  rename/revoke, enrollment codes, settings, staff changes go through ONE backend call (a SQL
+  `ftl_*` function on Supabase). Never update those columns directly.
+- **Moderation rules live in `lib/ops/moderation.ts`.** APPROVED requires wall consent; DELETED is
+  terminal and removes the image. No AI moderation, no face anything.
+- **PAUSE SUBMISSIONS never blocks photography or QR delivery** — only new wall consent.
 
 ## Layout
 
@@ -33,7 +43,15 @@ app/p/[token]          phone download page + image route (server reads private b
 app/api/photos         upload (kiosk auth, idempotent per session) and consent
 app/api/kiosk          enroll / signout · app/api/operator/kiosks: list / revoke
 app/api/cron/retention retention cleanup (Bearer CRON_SECRET, Vercel Cron)
-app/wall, admin        placeholders until Phase 3/4
+app/admin              staff control panel: login, (staff)/ pages (overview, moderation,
+                       sessions, photos, kiosks, settings, audit)
+app/api/admin          staff APIs (staffRoute: Supabase session + allowlist + CSRF)
+app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
+app/wall               placeholder until Phase 4
+lib/ops                moderation rules, enrollment codes, kiosk health, staff read models
+lib/staff-auth         Supabase Auth (@supabase/ssr) server clients + allowlist check
+proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
+components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
 lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/kiosk              pure state machine, session helpers, upload/consent client
@@ -54,8 +72,10 @@ e2e/                   Playwright (kiosk auth on; E2E_STORE=supabase optional)
   run effects and dispatch.
 - Anything touching canvas takes a `CanvasFactory` so it is testable with `tests/helpers/fake-canvas.ts`.
 - Kiosk copy: short Korean, large touch targets (`btn-primary`/`btn-secondary` are ≥ 80px tall).
-- Storage rules live in `lib/storage/photo-service.ts`; backends stay dumb. New backend behaviour
-  must pass `tests/helpers/photo-contract.ts`.
+- Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
+  backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
+- Staff features need the Supabase backend. Local dev auth: `npx supabase start`, codes in Mailpit
+  (`http://127.0.0.1:54324`). Admin E2E: `E2E_STORE=supabase` (see docs/ADMIN.md).
 - Before committing: `npm run check`. Before claiming a flow works: `npm run test:e2e`. Touching
   Supabase code or migrations: also `npm run test:supabase`.
 - Never claim the real-phone cellular test passed unless a human did it (see DEPLOYMENT).
