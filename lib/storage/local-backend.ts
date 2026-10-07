@@ -1,47 +1,89 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { MemoryKioskRepository, MemoryPhotoRepository } from "./memory-backend";
-import type { KioskRow, ObjectStorage, PhotoRow, StorageBackend } from "./types";
+import { createMemoryBackend, type MemoryBackend } from "./memory-backend";
+import type {
+  AuditEvent,
+  EnrollmentCodeRow,
+  EventSettings,
+  KioskRow,
+  ObjectStorage,
+  PhotoRow,
+  RetentionRun,
+  StaffMember,
+  StorageBackend,
+} from "./types";
 
 /**
  * Files on disk, for development and a single self-hosted kiosk PC (PATH A on a LAN).
  *
- *   <root>/db.json            photo + kiosk rows (written atomically)
- *   <root>/objects/<path>     image bytes, private (served only through /p/[token]/image)
+ *   <root>/db.json            all rows (written atomically after every write)
+ *   <root>/objects/<path>     image bytes, private (served only through the server)
  *
- * Single-process only. Not for serverless (Vercel's filesystem is ephemeral).
+ * Wraps the memory backend: one serialized operation = one audited mutation + one save, so a
+ * change and its audit event are persisted together. Single-process only; not for serverless.
  */
 interface DbFile {
-  version: 2;
+  version: 3;
   photos: PhotoRow[];
   kiosks: KioskRow[];
+  enrollmentCodes: EnrollmentCodeRow[];
+  settings: EventSettings | null;
+  staff: StaffMember[];
+  audit: AuditEvent[];
+  retentionRuns: RetentionRun[];
 }
 
 class FileDb {
   private loaded: Promise<void> | null = null;
   private queue: Promise<unknown> = Promise.resolve();
-  readonly photos = new MemoryPhotoRepository();
-  readonly kiosks = new MemoryKioskRepository();
+  readonly mem: MemoryBackend = createMemoryBackend();
 
   constructor(private readonly file: string) {}
 
   private async load() {
+    let db: Partial<Omit<DbFile, "version">> & { version?: number };
     try {
-      const db = JSON.parse(await readFile(this.file, "utf8")) as DbFile;
-      if (db.version === 2) {
-        for (const p of db.photos) this.photos.rows.set(p.id, p);
-        for (const k of db.kiosks) this.kiosks.rows.set(k.id, k);
-      }
+      db = JSON.parse(await readFile(this.file, "utf8"));
     } catch {
-      // Missing or pre-Phase-2 file: start empty.
+      return; // missing file: start empty
     }
+    if (db.version !== 2 && db.version !== 3) return;
+    // Phase 2 files (version 2) lack the Phase 3 fields; fill safe defaults.
+    for (const p of db.photos ?? []) {
+      this.mem.photos.rows.set(p.id, {
+        ...p,
+        thumbPath: p.thumbPath ?? null,
+        objectDeletedAt: p.objectDeletedAt ?? null,
+      });
+    }
+    for (const k of db.kiosks ?? []) {
+      this.mem.kiosks.rows.set(k.id, {
+        ...k,
+        heartbeatAt: k.heartbeatAt ?? null,
+        queueDepth: k.queueDepth ?? null,
+        cameraState: k.cameraState ?? null,
+        appBuild: k.appBuild ?? null,
+        enrolledVia: k.enrolledVia ?? "secret",
+      });
+    }
+    for (const c of db.enrollmentCodes ?? []) this.mem.enrollmentCodes.rows.set(c.id, c);
+    if (db.settings) this.mem.settings.value = db.settings;
+    for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
+    this.mem.audit.load(db.audit ?? []);
+    this.mem.retentionRuns.runs.push(...(db.retentionRuns ?? []));
   }
 
   private async save() {
+    const m = this.mem;
     const db: DbFile = {
-      version: 2,
-      photos: [...this.photos.rows.values()],
-      kiosks: [...this.kiosks.rows.values()],
+      version: 3,
+      photos: [...m.photos.rows.values()],
+      kiosks: [...m.kiosks.rows.values()],
+      enrollmentCodes: [...m.enrollmentCodes.rows.values()],
+      settings: m.settings.value,
+      staff: [...m.staff.rows.values()],
+      audit: m.audit.events,
+      retentionRuns: m.retentionRuns.runs,
     };
     await mkdir(path.dirname(this.file), { recursive: true });
     const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`;
@@ -96,6 +138,22 @@ class FileObjectStorage implements ObjectStorage {
 const registry = ((globalThis as { __ftlFileDbs?: Map<string, FileDb> }).__ftlFileDbs ??=
   new Map());
 
+/** Wrap every method of a repository so it runs serialized; listed methods also persist. */
+function wrap<T extends object>(db: FileDb, repo: T, writes: (keyof T)[]): T {
+  const out = {} as Record<string, unknown>;
+  for (const key of Object.getOwnPropertyNames(Object.getPrototypeOf(repo)) as (keyof T &
+    string)[]) {
+    const fn = repo[key];
+    if (key === "constructor" || typeof fn !== "function") continue;
+    out[key] = (...args: unknown[]) =>
+      db.run(
+        () => (fn as (...a: unknown[]) => Promise<unknown>).apply(repo, args),
+        writes.includes(key),
+      );
+  }
+  return out as T;
+}
+
 export function createLocalBackend(rootDir: string): StorageBackend {
   const file = path.resolve(rootDir, "db.json");
   let db = registry.get(file);
@@ -103,33 +161,24 @@ export function createLocalBackend(rootDir: string): StorageBackend {
     db = new FileDb(file);
     registry.set(file, db);
   }
-  const read =
-    <A extends unknown[], R>(fn: (...a: A) => Promise<R>) =>
-    (...a: A) =>
-      db.run(() => fn(...a), false);
-  const write =
-    <A extends unknown[], R>(fn: (...a: A) => Promise<R>) =>
-    (...a: A) =>
-      db.run(() => fn(...a), true);
-  const p = db.photos;
-  const k = db.kiosks;
+  const m = db.mem;
   return {
     name: "local",
-    photos: {
-      findBySessionId: read(p.findBySessionId.bind(p)),
-      findByTokenHash: read(p.findByTokenHash.bind(p)),
-      insert: write(p.insert.bind(p)),
-      update: write(p.update.bind(p)),
-      listRetentionDue: read(p.listRetentionDue.bind(p)),
-    },
+    photos: wrap(db, m.photos, [
+      "insert",
+      "update",
+      "transition",
+      "rotateToken",
+      "setThumbPath",
+      "markObjectsDeleted",
+    ]),
     objects: new FileObjectStorage(path.join(rootDir, "objects")),
-    kiosks: {
-      insert: write(k.insert.bind(k)),
-      get: read(k.get.bind(k)),
-      revoke: write(k.revoke.bind(k)),
-      touch: write(k.touch.bind(k)),
-      list: read(k.list.bind(k)),
-    },
+    kiosks: wrap(db, m.kiosks, ["insert", "revoke", "touch", "heartbeat", "update"]),
+    enrollmentCodes: wrap(db, m.enrollmentCodes, ["create", "consume"]),
+    settings: wrap(db, m.settings, ["update"]),
+    staff: wrap(db, m.staff, ["upsert"]),
+    audit: wrap(db, m.audit, []),
+    retentionRuns: wrap(db, m.retentionRuns, ["record"]),
   };
 }
 
