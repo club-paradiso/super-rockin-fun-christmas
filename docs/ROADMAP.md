@@ -2,48 +2,50 @@
 
 ## Phase 0 — repository rebuild ✅
 
-AFTERGLOW archived on `archive/afterglow-2026-10-07`; Next.js + TS + Tailwind, ESLint,
-Prettier, Vitest, Playwright, env template, docs.
+AFTERGLOW archived on `archive/afterglow-2026-10-07`. Next.js + TS + Tailwind, ESLint,
+Prettier, Vitest, Playwright.
 
-## Phase 1 — first vertical slice ✅ (verified in headless Chromium only)
+## Phase 1 — first vertical slice ✅ (headless Chromium only)
 
-Mock/real camera → countdown → four captures → review/retake → frame → final composite →
-local download → QR → phone page → consent → complete → reset.
+Mock/real camera → countdown → 4 captures → review/retake → frame → composite → local
+download → QR → phone page → consent → reset.
 
-## Phase 2 — public phone delivery (next)
+## Phase 2 — secure public photo delivery ✅ software · ❌ real phone not verified
 
-1. `SupabasePhotoStore` implementing `PhotoStore` (private bucket, rows keyed by token hash,
-   short-lived signed URLs served through `/p/[token]/image`, never raw bucket paths).
-2. Kiosk authentication for uploads (per-device secret held server-side, or a signed kiosk
-   session) — required before the API is public.
-3. Retention job deleting expired photos (`PHOTO_RETENTION_DAYS`).
-4. Offline resilience, kept small: queue the final JPEG in IndexedDB when upload fails, retry in
-   the background, and let staff see "N pending uploads". Same session id → no duplicates.
-5. Deploy (e.g. Vercel + Supabase) and test QR from real phones on cellular data.
+- Kiosk enrollment: HttpOnly signed session, revocable, sliding; operator list/revoke API.
+- Supabase backend: private bucket, `photos`/`kiosks` with RLS and no policies, migrations.
+- Upload hardening: auth, Origin, 4 MB streaming cap, MIME and magic bytes, UUID/frame checks,
+  idempotency, rate limits.
+- Public `/p/[token]` built from a validated `PUBLIC_BASE_URL`, identical 404s, save/share flow.
+- IndexedDB offline queue with reload recovery; no fake QR.
+- Retention cron; structured logs; CI (quality, E2E, Supabase integration).
+- **Open gate:** deploy a preview and run the real-phone cellular test (`docs/DEPLOYMENT.md` §4).
 
-## Phase 3 — moderation (`/admin`)
+## Phase 3 — moderation and staff (`/admin`) — next
 
-Staff auth (Supabase Auth, staff-only), pending queue, approve/reject/hide/restore/delete,
-recent sessions, kiosk/wall/storage health, emergency switches (pause submissions, pause
-wall, holding screen) stored as one settings row.
+1. **Staff authentication first**: Supabase Auth (email magic link or passkey) for a small
+   allowlisted staff list, kept separate from the kiosk session. Retire the enrollment secret as
+   the operator key.
+2. Moderation queue: `PENDING` photos (wall_consent = true) with approve, reject, hide, restore and
+   delete. Every transition is server-side and audited (who and when, in a `moderation_events`
+   table). Delete removes the object immediately.
+3. Kiosk management: list, revoke and rename kiosks; last seen; enroll via one-time codes instead of
+   a shared secret.
+4. Health: kiosk heartbeat (queue depth, auth state), storage usage, last retention run.
+5. Emergency switches in one `settings` row: PAUSE SUBMISSIONS (consent screen hidden), PAUSE
+   MEDIA WALL, SHOW HOLDING SCREEN.
+6. "Show QR again" for a recent session: rotate its token and display a new QR on the admin
+   device, which covers guests who left while their photo was queued.
+7. Image delivery for staff via short-lived signed URLs from the server (never public).
 
 ## Phase 4 — media wall (`/wall`)
 
-Night-village scene; approved photos arrive in lit windows (`ENTER → VISIBLE → EXIT →
-COOLDOWN`), fair rotation, BOOT/EMPTY/OFFLINE/MAINTENANCE states, polling or Realtime, cached
-last-known set for offline.
+Night-village scene, `APPROVED AND wall_consent` only, `ENTER → VISIBLE → EXIT → COOLDOWN`,
+polling or Realtime through a server endpoint (not anon table access), offline cache, and
+BOOT/EMPTY/OFFLINE/MAINTENANCE states.
 
-## Before the event (must verify on real hardware)
+## Before the event (real hardware)
 
-- Real USB webcam: resolution, exposure under booth light, mirror expectation with guests.
-- Tablet/iPad Safari: `getUserMedia`, full-screen/kiosk mode, auto start, sleep prevention.
-- MY4CUT Mini: browser availability, camera access, kiosk mode, auto start, export.
-- Venue Wi-Fi failure drill; QR scanning distance and lighting; accessibility with older adults.
-
-## Order review
-
-The suggested order (QR delivery → Supabase → consent → moderation → wall) is kept with one
-change: **consent UI already exists and records `PENDING`, so the real next step is Supabase
-storage + kiosk upload auth together**, because QR delivery is only useful once phones can reach
-the photos from the internet, and an open upload endpoint cannot go public. Moderation must ship
-before the wall shows anything, so Phase 3 strictly precedes Phase 4.
+Real webcam under booth light; iPad/Safari kiosk (camera, full screen, sleep); MY4CUT Mini
+(browser, camera, kiosk mode, auto start); phone matrix (iPhone Safari, Android Chrome, KakaoTalk
+and Naver in-app browsers) on cellular; venue Wi-Fi failure drill.
