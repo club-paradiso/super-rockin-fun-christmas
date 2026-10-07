@@ -17,10 +17,15 @@ export function clientIp(request: Request): string {
  */
 export function isSameOrigin(request: Request, allowed: (URL | null)[] = []): boolean {
   const origin = request.headers.get("origin");
+  const site = request.headers.get("sec-fetch-site");
+  if (origin === "null") {
+    // Opaque origin (e.g. a form POST under a no-referrer policy). Trust only the browser's own
+    // fetch-metadata header, which page scripts cannot set.
+    return site === "same-origin";
+  }
   if (!origin) {
     // Non-browser clients and some same-origin navigations omit Origin. Fetch metadata, when
     // present, still lets us refuse an explicit cross-site request.
-    const site = request.headers.get("sec-fetch-site");
     return site === null || site === "same-origin" || site === "none";
   }
   const self = new URL(request.url).origin;
