@@ -75,11 +75,14 @@ branch is a repository setting that must be changed by an owner.
 
 # Phase 2 decisions (2026-10-07)
 
-## D16 · Phase 2 branched from the PR #3 head, not main
+## D16 · Phase 2 branched from the PR #3 head, not main _(historical)_
+_Historical record. As written on 2026-10-07:_ PR #3 (Phase 1) was not merged and `main` was still
+the AFTERGLOW commit, so Phase 2 was built on `claude/follow-the-lights-phase-2`, branched from the
+exact PR #3 head (`12f14e6`), and PR #4 initially targeted the Phase 1 branch.
 
-PR #3 (Phase 1) was not merged. `main` is still the AFTERGLOW commit. Phase 2 is on
-`claude/follow-the-lights-phase-2`, branched from the exact PR #3 head (`12f14e6`), and its PR
-targets the Phase 1 branch. Once #3 merges, retarget it to `main`.
+**Resolved (2026-10-07):** PR #3 merged into `main` (merge commit `5140395`), PR #4 was retargeted
+to `main` and merged (merge commit `7fda0eb`). `main` now contains Phase 1 and Phase 2. All later
+work branches from `origin/main` explicitly (the GitHub default branch setting may lag).
 
 ## D17 · Kiosk auth = enrollment secret typed by staff → HttpOnly signed session + revocable row
 
