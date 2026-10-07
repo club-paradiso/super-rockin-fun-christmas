@@ -18,10 +18,13 @@ test("a browser that is not enrolled cannot use the kiosk or upload", async ({ p
 
 test("wrong enrollment secret is refused", async ({ page }) => {
   await page.goto("/kiosk/enroll");
+  await page.getByText("공유 비밀번호로 등록 (구버전)").click();
   await page.getByLabel("기기 이름").fill("intruder");
   await page.getByLabel("등록 비밀번호").fill("guess-guess-guess");
-  await page.getByRole("button", { name: "이 기기 등록" }).click();
-  await expect(page.getByText("등록 비밀번호가 맞지 않아요.")).toBeVisible();
+  await page.getByRole("button", { name: "비밀번호로 등록" }).click();
+  await expect(
+    page.getByText("등록 코드가 맞지 않거나, 이미 사용됐거나, 만료됐어요."),
+  ).toBeVisible();
   const cookies = await page.context().cookies();
   expect(cookies.find((c) => c.name === "ftl_kiosk")).toBeUndefined();
 });

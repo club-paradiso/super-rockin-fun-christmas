@@ -7,6 +7,7 @@
 export const PORT = Number(process.env.E2E_PORT ?? 3100);
 export const ENROLL_SECRET = "e2e-enroll-secret-not-for-production";
 export const USE_SUPABASE = process.env.E2E_STORE === "supabase";
+export const MAILPIT_URL = process.env.SUPABASE_TEST_MAILPIT_URL ?? "http://127.0.0.1:54324";
 
 export const E2E_ENV: Record<string, string> = {
   NEXT_TELEMETRY_DISABLED: "1",
@@ -21,6 +22,8 @@ export const E2E_ENV: Record<string, string> = {
         PHOTO_STORE: "supabase",
         SUPABASE_URL: process.env.SUPABASE_TEST_URL ?? "",
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_TEST_SERVICE_ROLE_KEY ?? "",
+        // Server-only: used by the Next.js server for staff login (Supabase Auth).
+        SUPABASE_ANON_KEY: process.env.SUPABASE_TEST_ANON_KEY ?? "",
       }
     : { PHOTO_STORE: "local", FTL_DATA_DIR: ".data-e2e" }),
 };

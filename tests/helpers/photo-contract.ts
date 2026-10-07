@@ -114,15 +114,18 @@ export function photoServiceContract(
     it("consent YES → PENDING, NO → NONE, download unaffected, never APPROVED", async () => {
       const { token } = await put();
       expect(await svc.setWallConsent(token, true, KIOSK)).toEqual({
+        ok: true,
         wallConsent: true,
         moderationStatus: "PENDING",
       });
       expect(await svc.setWallConsent(token, true, KIOSK)).toEqual({
+        ok: true,
         wallConsent: true,
         moderationStatus: "PENDING",
       });
       expect("data" in (await svc.read(token))).toBe(true);
       expect(await svc.setWallConsent(token, false, KIOSK)).toEqual({
+        ok: true,
         wallConsent: false,
         moderationStatus: "NONE",
       });
@@ -131,7 +134,10 @@ export function photoServiceContract(
 
     it("consent can only be set by the kiosk that took the photo", async () => {
       const { token } = await put();
-      expect(await svc.setWallConsent(token, true, OTHER ?? uuid())).toBeNull();
+      expect(await svc.setWallConsent(token, true, OTHER ?? uuid())).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
     });
 
     it("retention cleanup deletes the object, marks the row, and is idempotent", async () => {
