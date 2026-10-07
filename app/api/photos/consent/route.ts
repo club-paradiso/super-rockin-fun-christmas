@@ -5,7 +5,7 @@ import { NO_STORE, jsonError, route } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
 import { limiters } from "@/lib/server/rate-limit";
 import { isSameOrigin } from "@/lib/server/request";
-import { getPhotoService } from "@/lib/storage/server";
+import { getBackend, getPhotoService } from "@/lib/storage/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 /**
  * Record the guest's media-wall choice, from the kiosk that took the photo. Independent of
  * delivery: the guest link works the same whatever is sent here. YES → PENDING human review.
+ * YES is refused (409) while staff have paused wall submissions.
  */
 export const POST = route("consent", async (request: Request) => {
   const config = getServerConfig();
@@ -35,8 +36,18 @@ export const POST = route("consent", async (request: Request) => {
   if (typeof token !== "string" || typeof consent !== "boolean") {
     return jsonError(400, "token and consent are required");
   }
-  const result = await getPhotoService().setWallConsent(token, consent, auth.kioskId);
-  if (!result) return jsonError(404, "not found");
+  // PAUSE SUBMISSIONS stops new wall submissions only; "NO" and the photo link keep working.
+  const settings = await getBackend().settings.get();
+  const result = await getPhotoService().setWallConsent(token, consent, auth.kioskId, {
+    submissionsPaused: settings.pauseSubmissions,
+  });
+  if (!result.ok) {
+    if (result.reason === "paused") return jsonError(409, "wall submissions paused");
+    return jsonError(404, "not found");
+  }
   logEvent("wall_consent", { kioskId: auth.kioskId, consent, moderation: result.moderationStatus });
-  return NextResponse.json(result, { headers: NO_STORE });
+  return NextResponse.json(
+    { wallConsent: result.wallConsent, moderationStatus: result.moderationStatus },
+    { headers: NO_STORE },
+  );
 });

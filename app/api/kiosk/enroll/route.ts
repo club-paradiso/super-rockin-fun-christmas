@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { enrollKiosk, kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { enrollKiosk, enrollKioskWithCode, kioskCookieHeader } from "@/lib/kiosk-auth/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route, seeOther } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
@@ -10,8 +10,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Operator enrolls this browser as a kiosk by typing the enrollment secret on /kiosk/enroll.
- * The secret is only ever typed by staff and compared on the server; it is never in any bundle.
+ * Enroll this browser as a kiosk. Two ways:
+ *  - `code`: a one-time code a staff member generated in /admin (preferred; expires, single use).
+ *  - `secret` + `label`: the Phase 2 shared secret, only when KIOSK_ENROLL_SECRET is set (legacy).
  * Success sets an HttpOnly kiosk session cookie and returns to /kiosk.
  */
 export const POST = route("enroll", async (request: Request) => {
@@ -32,32 +33,45 @@ export const POST = route("enroll", async (request: Request) => {
     return fail(429, "too many attempts");
   }
 
-  let secret = "";
-  let label = "";
+  let fields: Record<string, string> = {};
   if (isForm) {
     const form = await request.formData();
-    secret = String(form.get("secret") ?? "");
-    label = String(form.get("label") ?? "");
+    for (const k of ["code", "secret", "label"]) fields[k] = String(form.get(k) ?? "");
   } else {
-    const body = (await request.json().catch(() => ({}))) as { secret?: unknown; label?: unknown };
-    secret = typeof body.secret === "string" ? body.secret : "";
-    label = typeof body.label === "string" ? body.label : "";
-  }
-  label =
-    label
-      .replace(/[^\p{L}\p{N} _.-]/gu, "")
-      .trim()
-      .slice(0, 40) || "kiosk";
-
-  if (!safeEqual(secret, config.kioskAuth.enrollSecret)) {
-    logEvent("kiosk_enroll_denied", { ip }, "warn");
-    return fail(401, "wrong enrollment secret");
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    fields = Object.fromEntries(
+      ["code", "secret", "label"].map((k) => [
+        k,
+        typeof body[k] === "string" ? (body[k] as string) : "",
+      ]),
+    );
   }
 
-  const { kioskId, cookieValue } = await enrollKiosk(label);
-  const headers = { ...NO_STORE, "set-cookie": kioskCookieHeader(request, cookieValue) };
-  if (isForm) {
-    return seeOther("/kiosk", { "set-cookie": headers["set-cookie"] });
+  let enrolled: { kioskId: string; label: string; cookieValue: string } | null = null;
+  if (fields.code) {
+    enrolled = await enrollKioskWithCode(fields.code);
+    if (!enrolled) {
+      logEvent("kiosk_enroll_denied", { ip, via: "code" }, "warn");
+      return fail(401, "invalid, used or expired code");
+    }
+  } else {
+    if (!config.kioskAuth.enrollSecret) return fail(401, "enrollment code required");
+    if (!safeEqual(fields.secret ?? "", config.kioskAuth.enrollSecret)) {
+      logEvent("kiosk_enroll_denied", { ip, via: "secret" }, "warn");
+      return fail(401, "wrong enrollment secret");
+    }
+    const label =
+      (fields.label ?? "")
+        .replace(/[^\p{L}\p{N} _.-]/gu, "")
+        .trim()
+        .slice(0, 40) || "kiosk";
+    enrolled = { ...(await enrollKiosk(label)), label };
   }
-  return NextResponse.json({ kioskId, label }, { status: 201, headers });
+
+  const cookie = kioskCookieHeader(request, enrolled.cookieValue);
+  if (isForm) return seeOther("/kiosk", { "set-cookie": cookie });
+  return NextResponse.json(
+    { kioskId: enrolled.kioskId, label: enrolled.label },
+    { status: 201, headers: { ...NO_STORE, "set-cookie": cookie } },
+  );
 });

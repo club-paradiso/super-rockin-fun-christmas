@@ -36,6 +36,7 @@ import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
+import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { CameraPreview, Lead, ShotProgress, Stage, Title } from "./ui";
 
 export interface Shot {
@@ -64,7 +65,14 @@ function readStoredDevice(): string | undefined {
   }
 }
 
-export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
+export function KioskApp({
+  cameraMode,
+  initialWallSubmissions = "open",
+}: {
+  cameraMode: CameraMode;
+  /** From event settings at page load; refreshed by heartbeats and upload responses. */
+  initialWallSubmissions?: "open" | "paused";
+}) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
       shotCount: KIOSK_CONFIG.shotsPerSession,
@@ -253,7 +261,10 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
     sessionRef.current = state.sessionId;
   }, [state.sessionId]);
 
+  const [wallSubmissions, setWallSubmissions] = useState(initialWallSubmissions);
+
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
+    if (result.wallSubmissions) setWallSubmissions(result.wallSubmissions);
     if (sessionId !== sessionRef.current) return; // a previous guest's queued photo finished
     const svg = await makeQrSvg(result.url);
     if (sessionId !== sessionRef.current) return;
@@ -353,8 +364,47 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
     dispatch({ type: "CAMERA_RESTART" });
   };
 
+  // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
+  const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
+  useEffect(() => {
+    heartbeatRef.current = {
+      queueDepth: queueStatus.depth,
+      camera:
+        state.phase === "camera-error" ? "error" : stream ? "ok" : heartbeatRef.current.camera,
+    };
+  }, [queueStatus.depth, state.phase, stream]);
+  useEffect(() => {
+    let stopped = false;
+    const beat = async () => {
+      try {
+        const res = await fetch("/api/kiosk/heartbeat", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(heartbeatRef.current),
+        });
+        if (!stopped && res.ok) {
+          const data = (await res.json()) as { wallSubmissions?: "open" | "paused" };
+          if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
+        }
+      } catch {
+        // Offline: the queue badge already tells staff; the next beat will retry.
+      }
+    };
+    void beat();
+    const timer = setInterval(beat, HEARTBEAT_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   return (
-    <main className="relative min-h-dvh select-none overflow-hidden" data-phase={state.phase}>
+    <main
+      className="relative min-h-dvh select-none overflow-hidden"
+      data-phase={state.phase}
+      data-wall-submissions={wallSubmissions}
+    >
       <Screen
         state={state}
         dispatch={dispatch}
@@ -370,6 +420,7 @@ export function KioskApp({ cameraMode }: { cameraMode: CameraMode }) {
         onReset={reset}
         onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
         onRequestDelivery={requestDelivery}
+        wallSubmissionsOpen={wallSubmissions === "open"}
       />
       {flash > 0 && state.phase === "capturing" && (
         <div
@@ -400,6 +451,8 @@ interface ScreenProps {
   onReset: () => void;
   onStart: () => void;
   onRequestDelivery: () => void;
+  /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
+  wallSubmissionsOpen: boolean;
 }
 
 const CAMERA_ERROR_COPY: Record<CameraErrorKind, { title: string; lead: string }> = {
@@ -692,10 +745,16 @@ function Screen(p: ScreenProps) {
               <button
                 type="button"
                 className="btn-primary min-w-80"
-                onClick={() => dispatch({ type: "TO_CONSENT" })}
+                onClick={() =>
+                  dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
+                }
               >
                 다 받았어요
               </button>
+              {/* Small reference staff can look up in /admin → 최근 세션 if the QR gets lost. */}
+              <p className="font-mono text-base text-mist/70" data-testid="session-code">
+                세션 {state.sessionId.slice(0, 8)}
+              </p>
             </>
           ) : d.status === "queued" ? (
             <div data-testid="delivery-queued" className="flex flex-col items-center gap-8">

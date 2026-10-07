@@ -7,6 +7,7 @@ import { authenticateKiosk } from "@/lib/kiosk-auth/server";
 import { KIOSK_COOKIE } from "@/lib/kiosk-auth/session";
 import { ConfigError, getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
+import { getBackend } from "@/lib/storage/server";
 
 export const dynamic = "force-dynamic";
 
@@ -54,5 +55,11 @@ export default async function KioskPage({
     typeof camera === "string" ? camera : undefined,
     process.env.NEXT_PUBLIC_CAMERA_MODE,
   );
-  return <KioskApp cameraMode={cameraMode} />;
+  const settings = await getBackend().settings.get();
+  return (
+    <KioskApp
+      cameraMode={cameraMode}
+      initialWallSubmissions={settings.pauseSubmissions ? "paused" : "open"}
+    />
+  );
 }

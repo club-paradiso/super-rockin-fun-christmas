@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
  */
 function authorized(request: Request): boolean {
   const config = getServerConfig();
-  if (config.kioskAuth.mode !== "required") return false;
+  // Legacy Phase 2 operator API: only while the shared secret is configured. Use /admin instead.
+  if (config.kioskAuth.mode !== "required" || !config.kioskAuth.enrollSecret) return false;
   const given = bearer(request);
   return !!given && safeEqual(given, config.kioskAuth.enrollSecret);
 }
