@@ -13,11 +13,21 @@ export interface ServerConfig {
   publicBaseUrl: URL | null;
   store: StoreBackend;
   supabase: { url: string; serviceRoleKey: string; bucket: string } | null;
+  /** Supabase Auth for staff. Null = /admin unavailable (needs the Supabase backend). */
+  staffAuth: { url: string; anonKey: string } | null;
+  /** Build identifier reported by kiosk heartbeats. */
+  appBuild: string;
   localDataDir: string;
   linkTtlHours: number;
   retentionDays: number;
   kioskAuth:
-    | { mode: "required"; sessionSecret: string; enrollSecret: string; sessionDays: number }
+    | {
+        mode: "required";
+        sessionSecret: string;
+        /** Phase 2 shared secret (legacy). Null = only one-time staff codes can enroll kiosks. */
+        enrollSecret: string | null;
+        sessionDays: number;
+      }
     | { mode: "disabled" };
   cronSecret: string | null;
   maxUploadBytes: number;
@@ -137,14 +147,14 @@ export function parseServerConfig(env: Env): ServerConfig {
     kioskAuth = { mode: "disabled" };
   } else {
     const sessionSecret = env.KIOSK_SESSION_SECRET ?? "";
-    const enrollSecret = env.KIOSK_ENROLL_SECRET ?? "";
+    const enrollSecret = env.KIOSK_ENROLL_SECRET?.trim() || null;
     if (sessionSecret.length < 32) {
       problems.push(
         "KIOSK_SESSION_SECRET must be at least 32 characters (openssl rand -base64 48)",
       );
     }
-    if (enrollSecret.length < 20) {
-      problems.push("KIOSK_ENROLL_SECRET must be at least 20 characters");
+    if (enrollSecret !== null && enrollSecret.length < 20) {
+      problems.push("KIOSK_ENROLL_SECRET must be at least 20 characters (or unset it)");
     }
     if (sessionSecret && sessionSecret === enrollSecret) {
       problems.push("KIOSK_SESSION_SECRET and KIOSK_ENROLL_SECRET must differ");
@@ -155,6 +165,17 @@ export function parseServerConfig(env: Env): ServerConfig {
       enrollSecret,
       sessionDays: positiveNumber(env, "KIOSK_SESSION_DAYS", 90, problems),
     };
+  }
+
+  // Staff login uses Supabase Auth with the anon/publishable key — server-side only (no
+  // NEXT_PUBLIC_): the browser never talks to Supabase. Being a Supabase user grants nothing;
+  // authorization is the staff_members allowlist.
+  const anonKey = env.SUPABASE_ANON_KEY?.trim();
+  let staffAuth: ServerConfig["staffAuth"] = null;
+  if (store === "supabase" && supabase && anonKey) {
+    staffAuth = { url: supabase.url, anonKey };
+  } else if (strict && store === "supabase") {
+    problems.push("SUPABASE_ANON_KEY is required for staff login (/admin) in production");
   }
 
   const cronSecret = env.CRON_SECRET?.trim() || null;
@@ -174,6 +195,8 @@ export function parseServerConfig(env: Env): ServerConfig {
     linkTtlHours,
     retentionDays,
     kioskAuth,
+    staffAuth,
+    appBuild: (env.VERCEL_GIT_COMMIT_SHA || env.FTL_APP_BUILD || "dev").slice(0, 12),
     cronSecret,
     // Vercel functions accept at most 4.5 MB request bodies; a final four-cut JPEG is ~0.3–1.5 MB.
     maxUploadBytes: 4 * 1024 * 1024,
