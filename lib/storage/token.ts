@@ -12,8 +12,8 @@ export function isWellFormedToken(token: string): boolean {
 }
 
 /**
- * Tokens are only stored hashed, so a leaked data directory or file listing does not reveal
- * working download links.
+ * Tokens are only stored hashed, so a leaked database or file listing does not reveal working
+ * download links. SHA-256 without salt is fine here: the input already has 192 bits of entropy.
  */
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
