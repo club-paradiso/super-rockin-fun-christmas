@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 # No production secrets anywhere in this file. Tests use the local file store, a mock camera,
-# Chromium's fake webcam, and (integration job) a throwaway local Supabase stack.
+# Chromium's fake webcam, and a throwaway local Supabase stack (Docker) for integration and E2E.
 env:
   NEXT_TELEMETRY_DISABLED: "1"
 
@@ -36,9 +36,9 @@ jobs:
       - run: npm run build
 
   e2e:
-    name: Playwright E2E
+    name: Playwright E2E (local store + local Supabase)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,7 +56,22 @@ jobs:
         run: npx playwright install --with-deps chromium
       - if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run test:e2e
+      - name: E2E — local file store (staff specs skip)
+        run: npm run test:e2e
+        env:
+          CI: "true"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase (migrations, Auth, Storage, Mailpit)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
+      - name: E2E — local Supabase (kiosk + staff admin flows)
+        run: |
+          eval "$(supabase status -o env | sed 's/^/export SB_/')"
+          export E2E_STORE=supabase
+          export SUPABASE_TEST_URL="$SB_API_URL" SUPABASE_TEST_SERVICE_ROLE_KEY="$SB_SERVICE_ROLE_KEY"
+          export SUPABASE_TEST_ANON_KEY="$SB_ANON_KEY" SUPABASE_TEST_MAILPIT_URL="${SB_MAILPIT_URL:-$SB_INBUCKET_URL}"
+          npm run test:e2e
         env:
           CI: "true"
       - if: failure()
@@ -80,7 +95,7 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      - name: Start Supabase (applies supabase/migrations)
-        run: supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
-      - name: Integration tests (adapter contract, RLS, private bucket, constraints)
+      - name: Start Supabase (applies supabase/migrations; Mailpit for staff OTP)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
+      - name: Integration tests (contracts, RLS, audit, staff auth, admin + kiosk APIs)
         run: npm run test:supabase

@@ -272,3 +272,76 @@ describe("wall consent", () => {
     expect((await image(token)).status).toBe(200);
   });
 });
+
+describe("Phase 3 kiosk APIs on the local backend", () => {
+  it("one-time code enrollment works once; heartbeat reports state; pause blocks only wall consent", async () => {
+    const { getBackend } = await import("@/lib/storage/server");
+    const { generateEnrollmentCode, hashEnrollmentCode, normalizeEnrollmentCode } =
+      await import("@/lib/ops/enrollment-code");
+    const backend = getBackend();
+    const staffId = uuid();
+    const code = generateEnrollmentCode();
+    await backend.enrollmentCodes.create({
+      id: uuid(),
+      codeHash: hashEnrollmentCode(normalizeEnrollmentCode(code)!),
+      label: "로컬 키오스크",
+      createdBy: staffId,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const { POST: enrollPost } = await api.enroll();
+    const enrollReq = () =>
+      enrollPost(
+        new Request("https://lights.example.org/api/kiosk/enroll", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://lights.example.org" },
+          body: JSON.stringify({ code: code.toLowerCase() }),
+        }),
+      );
+    const first = await enrollReq();
+    expect(first.status).toBe(201);
+    const cookie = first.headers.get("set-cookie")!.split(";")[0]!;
+    expect((await enrollReq()).status).toBe(401);
+
+    const { POST: heartbeat } = await import("@/app/api/kiosk/heartbeat/route");
+    const beat = await heartbeat(
+      new Request("https://lights.example.org/api/kiosk/heartbeat", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ queueDepth: 4, camera: "error" }),
+      }),
+    );
+    expect(await beat.json()).toEqual({ wallSubmissions: "open" });
+    const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;
+    expect(kiosk).toMatchObject({ queueDepth: 4, cameraState: "error", enrolledVia: "code" });
+
+    await backend.settings.update({ pauseSubmissions: true }, staffId);
+    const up = await upload(cookie);
+    const { token, wallSubmissions } = (await up.json()) as {
+      token: string;
+      wallSubmissions: string;
+    };
+    expect(wallSubmissions).toBe("paused");
+    const { POST: consent } = await api.consent();
+    const send = (c: boolean) =>
+      consent(
+        new Request("https://lights.example.org/api/photos/consent", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({ token, consent: c }),
+        }),
+      );
+    expect((await send(true)).status).toBe(409);
+    expect((await send(false)).status).toBe(200);
+    expect((await image(token)).status).toBe(200);
+    await backend.settings.update({ pauseSubmissions: false }, staffId);
+  });
+
+  it("staff APIs are unavailable without Supabase Auth, and never fall open", async () => {
+    const { GET } = await import("@/app/api/admin/overview/route");
+    const res = await GET(new Request("https://lights.example.org/api/admin/overview"), {
+      params: Promise.resolve({}),
+    });
+    expect(res.status).toBe(503);
+  });
+});

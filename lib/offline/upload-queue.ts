@@ -5,6 +5,8 @@ export interface UploadSuccess {
   url: string;
   expiresAt: string;
   duplicate: boolean;
+  /** Whether staff currently accept new media-wall submissions. */
+  wallSubmissions?: "open" | "paused";
 }
 
 export type UploadOutcome =

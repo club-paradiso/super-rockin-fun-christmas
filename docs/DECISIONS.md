@@ -75,11 +75,15 @@ branch is a repository setting that must be changed by an owner.
 
 # Phase 2 decisions (2026-10-07)
 
-## D16 · Phase 2 branched from the PR #3 head, not main
+## D16 · Phase 2 branched from the PR #3 head, not main _(historical)_
 
-PR #3 (Phase 1) was not merged. `main` is still the AFTERGLOW commit. Phase 2 is on
-`claude/follow-the-lights-phase-2`, branched from the exact PR #3 head (`12f14e6`), and its PR
-targets the Phase 1 branch. Once #3 merges, retarget it to `main`.
+_Historical record. As written on 2026-10-07:_ PR #3 (Phase 1) was not merged and `main` was still
+the AFTERGLOW commit, so Phase 2 was built on `claude/follow-the-lights-phase-2`, branched from the
+exact PR #3 head (`12f14e6`), and PR #4 initially targeted the Phase 1 branch.
+
+**Resolved (2026-10-07):** PR #3 merged into `main` (merge commit `5140395`), PR #4 was retargeted
+to `main` and merged (merge commit `7fda0eb`). `main` now contains Phase 1 and Phase 2. All later
+work branches from `origin/main` explicitly (the GitHub default branch setting may lag).
 
 ## D17 · Kiosk auth = enrollment secret typed by staff → HttpOnly signed session + revocable row
 
@@ -136,3 +140,59 @@ security does not depend on them.
 Strict mode rejects localhost/LAN/http QR origins, weak secrets and disabled auth. The kiosk
 shows a staff error screen and the boot log says `config_invalid`. `FTL_ALLOW_LOCAL_ORIGIN` exists
 only for the E2E production build and is ignored on Vercel.
+
+---
+
+# Phase 3 decisions (2026-10-07)
+
+## D27 · Staff = Supabase Auth email OTP + server-side allowlist
+
+Email codes are typed (not magic links), so they work when the email opens on a different
+device than the admin screen. `enable_signup = false` plus `shouldCreateUser: false` means
+accounts only come from `npm run staff:add` or **설정 → 스태프 추가**. Authorization is an active
+`staff_members` row checked on every request; a valid Supabase session alone grants nothing.
+There is one role (`role` column reserved for later).
+
+## D28 · Codes are sent only to active staff; responses never differ
+
+This prevents account enumeration. The OTP endpoint is rate-limited per IP and per email.
+
+## D29 · Audited mutations are SQL functions
+
+`ftl_photo_transition`, `ftl_photo_rotate_token`, `ftl_kiosk_update`,
+`ftl_enrollment_code_create/consume`, `ftl_settings_update` and `ftl_staff_upsert` each change
+state and append to `audit_events` in one transaction. The audit log is append-only (trigger + no
+UPDATE/DELETE grant). Memory and local backends mirror this with one serialized operation. One
+generic `audit_events` table (subject_type photo/kiosk/enrollment_code/settings/staff) replaces
+separate per-domain tables; moderation history is its `subject_type = 'photo'` rows.
+
+## D30 · Rules in TypeScript, invariants also in the database
+
+The transition table lives in `lib/ops/moderation.ts`. The database independently refuses
+APPROVED without consent and any change out of DELETED.
+
+## D31 · Delete = tombstone first, then remove bytes
+
+The row becomes DELETED first, so the guest link dies even if storage is briefly down. Then the
+objects are removed and `object_deleted_at` is set; retention retries leftovers. The row stays as
+an audit tombstone with no image and no working token.
+
+## D32 · Staff images through a server proxy, thumbnails via sharp
+
+No signed URLs reach browsers. Review thumbnails (~640px JPEG) are made at upload, or lazily for
+Phase 2 photos, so grids load tens of KB per photo instead of ~1 MB.
+
+## D33 · One-time kiosk enrollment codes replace the shared secret
+
+8 symbols from a 31-letter alphabet (~40 bits), 15 min, single use, SHA-256 stored, rate-limited.
+`KIOSK_ENROLL_SECRET` is now optional legacy (leave empty in production).
+
+## D34 · Heartbeat carries the pause flag back
+
+The kiosk learns `pause_submissions` from page load, heartbeats (45 s) and every upload
+response. The server enforces it regardless (consent YES → 409).
+
+## D35 · Recent sessions are time-boxed
+
+The default view is 6 h (max 24 h on that page), found by time, kiosk or the 8-character session
+code shown on the kiosk. This is recovery, not browsing; there is no face or person search.

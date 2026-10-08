@@ -1,18 +1,30 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { ENROLL_SECRET, USE_SUPABASE } from "./env";
 
 export const SHOOT_TIMEOUT = 30_000;
 
-/** Staff enrollment through the real UI. The secret is typed, never in page JavaScript. */
+let enrolledCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | null = null;
+
+/**
+ * Staff enrollment through the real UI (legacy shared-secret form). The first call per worker
+ * enrolls for real; later calls reuse that kiosk session, so the suite stays under the
+ * production enrollment rate limit (10 / 15 min / IP). The secret is typed, never in page JS.
+ */
 export async function enrollKiosk(page: Page, label = "E2E kiosk") {
+  if (enrolledCookies) {
+    await page.context().addCookies(enrolledCookies);
+    return;
+  }
   await page.goto("/kiosk/enroll");
+  await page.getByText("공유 비밀번호로 등록 (구버전)").click();
   await page.getByLabel("기기 이름").fill(label);
   await page.getByLabel("등록 비밀번호").fill(ENROLL_SECRET);
-  await page.getByRole("button", { name: "이 기기 등록" }).click();
+  await page.getByRole("button", { name: "비밀번호로 등록" }).click();
   await expect(page).toHaveURL(/\/kiosk$/);
+  enrolledCookies = (await page.context().cookies()).filter((c) => c.name === "ftl_kiosk");
 }
 
 export async function shootFourWithMock(page: Page) {

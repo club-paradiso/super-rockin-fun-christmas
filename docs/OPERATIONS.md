@@ -1,10 +1,15 @@
 # Operations (event day)
 
+Day-to-day staff work happens in **/admin** — see [`ADMIN.md`](ADMIN.md). This page is the
+technical runbook.
+
 ## Before doors open
 
 - [ ] `/kiosk` shows the welcome screen, not "등록되지 않았어요" or "서버 설정 오류".
 - [ ] One full test session, scanned on a phone **on cellular data**.
 - [ ] No "전송 대기" badge in the top-right corner.
+- [ ] `/admin` → 키오스크 shows every kiosk **온라인**; 개요 shows no red emergency banner (unless intended).
+- [ ] At least two staff can log in to `/admin` (codes arrive by email within a minute).
 - [ ] Kiosk browser in full screen; screen sleep disabled; camera permission granted for the site.
 
 ## Kiosk badges (top-right, for staff)
@@ -17,18 +22,15 @@
 | `임시 저장소`    | IndexedDB is unavailable (private browsing?)                               | Use a normal browser window, or queued photos will not survive a reload                                                            |
 
 If a guest's photo is stuck in the queue, they won't get a QR on the spot (the kiosk never shows a
-fake QR). The photo is kept and uploaded later. Showing it again to that guest is a Phase 3 admin
-feature.
+fake QR). The photo is kept and uploaded later; staff can then find it in **/admin → 최근 세션**
+(by time, kiosk, or the session code) and use **QR 다시 보여주기**.
 
 ## Revoke a lost device
 
-```bash
-curl -H "Authorization: Bearer $KIOSK_ENROLL_SECRET" https://<origin>/api/operator/kiosks
-curl -X POST -H "Authorization: Bearer $KIOSK_ENROLL_SECRET" -H 'content-type: application/json' \
-  -d '{"action":"revoke","kioskId":"<id>"}' https://<origin>/api/operator/kiosks
-```
-
-To revoke every kiosk at once, rotate `KIOSK_SESSION_SECRET` in Vercel and redeploy.
+**/admin → 키오스크 → 등록 해제.** It takes effect immediately and is audited. To revoke every
+kiosk at once, rotate `KIOSK_SESSION_SECRET` in Vercel and redeploy.
+(The Phase 2 operator API `POST /api/operator/kiosks` still works only while the legacy
+`KIOSK_ENROLL_SECRET` is set.)
 
 ## Logs (Vercel → Logs; one JSON line per event)
 

@@ -21,24 +21,28 @@ download → QR → phone page → consent → reset.
 - Retention cron; structured logs; CI (quality, E2E, Supabase integration).
 - **Open gate:** deploy a preview and run the real-phone cellular test (`docs/DEPLOYMENT.md` §4).
 
-## Phase 3 — moderation and staff (`/admin`) — next
+## Phase 3 — staff operations (`/admin`) ✅ software · ❌ real staff devices not verified
 
-1. **Staff authentication first**: Supabase Auth (email magic link or passkey) for a small
-   allowlisted staff list, kept separate from the kiosk session. Retire the enrollment secret as
-   the operator key.
-2. Moderation queue: `PENDING` photos (wall_consent = true) with approve, reject, hide, restore and
-   delete. Every transition is server-side and audited (who and when, in a `moderation_events`
-   table). Delete removes the object immediately.
-3. Kiosk management: list, revoke and rename kiosks; last seen; enroll via one-time codes instead of
-   a shared secret.
-4. Health: kiosk heartbeat (queue depth, auth state), storage usage, last retention run.
-5. Emergency switches in one `settings` row: PAUSE SUBMISSIONS (consent screen hidden), PAUSE
-   MEDIA WALL, SHOW HOLDING SCREEN.
-6. "Show QR again" for a recent session: rotate its token and display a new QR on the admin
-   device, which covers guests who left while their photo was queued.
-7. Image delivery for staff via short-lived signed URLs from the server (never public).
+- Staff login: Supabase Auth email OTP + `staff_members` allowlist; no signups; deactivation is
+  immediate.
+- Moderation queue (consented + pending, oldest first), photo library with filters, a strict
+  server-side state machine, atomic append-only audit.
+- Delete: removes the image and thumbnail, kills the guest link, terminal and idempotent.
+- Recent sessions (≤ 24 h) and "QR 다시 보여주기" (audited token rotation).
+- Kiosks: one-time enrollment codes (15 min, single use, hashed), rename and revoke (audited),
+  heartbeat with online/stale/offline, queue depth.
+- Emergency switches: pause submissions (enforced now), pause wall and holding screen (stored for
+  Phase 4). Health overview shows measured values only.
+- Staff image proxy with `sharp` review thumbnails; RLS still denies anon/authenticated
+  everything.
+- CI: staff auth, admin APIs and admin E2E run against a local Supabase (Auth + Mailpit) in
+  Docker.
 
-## Phase 4 — media wall (`/wall`)
+## Phase 4 — media wall (`/wall`) — next
+
+Consume `wall_eligible_photos` through a server endpoint (no anon table access). Respect
+`pause_wall` and `show_holding_screen`. Wall display auth: probably a kiosk-like enrolled display
+device rather than staff login.
 
 Night-village scene, `APPROVED AND wall_consent` only, `ENTER → VISIBLE → EXIT → COOLDOWN`,
 polling or Realtime through a server endpoint (not anon table access), offline cache, and

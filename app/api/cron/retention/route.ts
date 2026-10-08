@@ -3,7 +3,7 @@ import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
 import { bearer, safeEqual } from "@/lib/server/request";
-import { getPhotoService } from "@/lib/storage/server";
+import { getBackend, getPhotoService } from "@/lib/storage/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,11 @@ async function handle(request: Request) {
     if (r.examined < 200 || r.deleted === 0) break;
   }
   logEvent("retention_cleanup", total, total.failed ? "warn" : "info");
+  await getBackend()
+    .retentionRuns.record({ ranAt: new Date().toISOString(), ...total })
+    .catch((err: Error) =>
+      logEvent("retention_run_record_failed", { message: err.message }, "warn"),
+    );
   return NextResponse.json(total, { headers: NO_STORE });
 }
 

@@ -10,45 +10,56 @@ Christmas Village media wall after staff review. There is **no printing**.
 
 ## Status
 
-**Phase 2: secure public photo delivery is implemented and tested in software. It has not been
-verified on a real phone or real hardware, and it is not production-ready.**
+**Phase 3 is done: staff operations (authentication, moderation, kiosk management, emergency
+controls). It is tested in software against a local Supabase stack. It has not been deployed or
+tried on real devices, and it is not production-ready.**
 
-| Area                                                        | State                                              |
-| ----------------------------------------------------------- | -------------------------------------------------- |
-| Kiosk: camera → countdown → 4 shots → review/retake → frame | ✅ Phase 1                                         |
-| Kiosk device enrollment (HttpOnly session, revocable)       | ✅ Phase 2                                         |
-| Upload → private Supabase Storage + Postgres metadata       | ✅ Phase 2 (tested against a local Supabase stack) |
-| QR → `/p/[token]` public phone page, save/share             | ✅ Phase 2                                         |
-| Offline upload queue (IndexedDB), reload recovery           | ✅ Phase 2                                         |
-| Retention cleanup (Vercel Cron)                             | ✅ Phase 2                                         |
-| Wall consent → `PENDING` (human moderation only)            | ✅ consent recorded; moderation UI is Phase 3      |
-| `/admin` moderation, `/wall` media wall                     | ⏳ placeholders (Phase 3 / 4)                      |
-| Real phone on cellular data, real camera, iPad, MY4CUT      | ❌ **not verified**                                |
+| Area                                                                        | State                                              |
+| --------------------------------------------------------------------------- | -------------------------------------------------- |
+| Kiosk: camera → countdown → 4 shots → review/retake → frame                 | ✅ Phase 1                                         |
+| Secure upload, private storage, QR → `/p/[token]`, offline queue, retention | ✅ Phase 2                                         |
+| Staff login (Supabase Auth email code + allowlist)                          | ✅ Phase 3                                         |
+| Moderation queue, photo library, audited state machine                      | ✅ Phase 3                                         |
+| Recent sessions + "QR 다시 보여주기" (token rotation)                       | ✅ Phase 3                                         |
+| Kiosk management: one-time enrollment codes, heartbeat, revoke              | ✅ Phase 3                                         |
+| Emergency switches (pause submissions / wall / holding screen)              | ✅ Phase 3 (wall switches are consumed in Phase 4) |
+| `/wall` media wall                                                          | ⏳ Phase 4 (placeholder)                           |
+| Real phones, real staff devices, real camera, iPad, MY4CUT                  | ❌ **not verified**                                |
 
 ## Surfaces
 
-| Route           | Who          | What                                                        |
-| --------------- | ------------ | ----------------------------------------------------------- |
-| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device |
-| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk (once per device)            |
-| `/p/[token]`    | Guest phones | Download page opened from the QR code                       |
-| `/wall`         | Display      | Media wall (placeholder)                                    |
-| `/admin`        | Staff        | Moderation (placeholder)                                    |
+| Route           | Who          | What                                                                                                 |
+| --------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device                                          |
+| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                  |
+| `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                |
+| `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, emergency, audit — see [`docs/ADMIN.md`](docs/ADMIN.md) |
+| `/wall`         | Display      | Media wall (placeholder until Phase 4)                                                               |
 
 ## Quick start (development)
 
+Kiosk only (local file store, no Docker):
+
 ```bash
 npm install
-cp .env.example .env.local      # then set KIOSK_SESSION_SECRET and KIOSK_ENROLL_SECRET
+cp .env.example .env.local      # set KIOSK_SESSION_SECRET (and KIOSK_ENROLL_SECRET for local enrollment)
 npm run dev
-# 1. http://localhost:3000/kiosk/enroll  → type KIOSK_ENROLL_SECRET once
-# 2. http://localhost:3000/kiosk?camera=mock   (no webcam)  or  /kiosk  (real webcam)
+# http://localhost:3000/kiosk/enroll  → "공유 비밀번호로 등록" with KIOSK_ENROLL_SECRET
+# http://localhost:3000/kiosk?camera=mock   (no webcam)  or  /kiosk  (real webcam)
 ```
 
-Development stores photos in `.data/` (local backend). To skip enrollment while you develop,
-set `KIOSK_AUTH_DISABLED=1`. The server refuses this setting in production.
+With staff admin (local Supabase in Docker: Postgres, Auth, Storage, Mailpit):
 
-For deployment (Vercel + Supabase), see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+```bash
+npx supabase start
+eval "$(npx supabase status -o env | sed 's/^/export SB_/')"
+SUPABASE_URL=$SB_API_URL SUPABASE_SERVICE_ROLE_KEY=$SB_SERVICE_ROLE_KEY npm run staff:add -- me@example.org "나"
+# .env.local: PHOTO_STORE=supabase, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
+npm run dev   # → /admin/login; the 6-digit code arrives in Mailpit: http://127.0.0.1:54324
+```
+
+To skip kiosk enrollment while developing, set `KIOSK_AUTH_DISABLED=1`. The server refuses this
+in production. Deployment (Vercel + Supabase) is described in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Scripts
 
@@ -74,6 +85,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request, with no
 ## Docs
 
 - [`docs/PRD.md`](docs/PRD.md) — product requirements
+- [`docs/ADMIN.md`](docs/ADMIN.md) — staff guide for `/admin`
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how it fits together
 - [`docs/SECURITY.md`](docs/SECURITY.md) — threat model, kiosk auth, private delivery
 - [`docs/SUPABASE.md`](docs/SUPABASE.md) — schema, bucket, RLS, migrations

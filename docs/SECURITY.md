@@ -1,4 +1,4 @@
-# Security model (Phase 2)
+# Security model (Phase 2 + 3)
 
 Scope: a church Christmas event with one to a few kiosks, guest phones on any network, and a few
 volunteer staff. The goal is proportionate protection for guests' photos, not enterprise
@@ -48,14 +48,35 @@ sliding renewal: a fresh cookie when < 1/3 of lifetime remains
 Guests never see any of this. On an expired or revoked device, `/kiosk` shows a staff screen, and
 uploads already queued wait in IndexedDB ("기기 등록 필요") until the device is enrolled again.
 
+## Staff (Phase 3)
+
+| Threat                                      | Mitigation                                                                                                                                                                                                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anyone with a Supabase account opens /admin | Authorization requires an **active `staff_members` row**, checked server-side on every page and API. Public signup is disabled and OTP uses `shouldCreateUser: false`. A non-staff login is signed out and its cookies expired in the same response. |
+| Discovering who is staff                    | The OTP endpoint answers identically for every email and only sends codes to active staff.                                                                                                                                                           |
+| OTP guessing                                | 6-digit codes expire in 10 min. Supabase Auth limits verification, and our endpoints add per-IP / per-email limits.                                                                                                                                  |
+| Ex-staff keeps access                       | Deactivation is checked on the next request (tested), not at token expiry.                                                                                                                                                                           |
+| Stolen staff session cookie                 | Cookies are HttpOnly, SameSite=Lax and Secure. Sessions refresh via `proxy.ts`. Sign-out revokes the refresh token.                                                                                                                                  |
+| CSRF on staff actions                       | Every staff mutation requires same-origin + `application/json` (forces a preflight that is never approved).                                                                                                                                          |
+| Kiosk ⇄ staff confusion                     | Staff APIs ignore the kiosk cookie, and kiosk APIs ignore the staff session (both tested).                                                                                                                                                           |
+| Silent, unaccountable changes               | Audited mutations commit with their `audit_events` row in one SQL transaction. The log is append-only (trigger + grants). Actors are stored as ids, not names.                                                                                       |
+| Deleted photo lingers                       | Tombstone first (link dead), then bytes removed. The retention job retries leftovers. DELETED is terminal in app and DB.                                                                                                                             |
+| Staff images leak                           | Server proxy after the staff check; `private, no-store`; thumbnails are private objects too. No storage URL ever reaches a browser.                                                                                                                  |
+| Enrollment code reuse / guessing            | One-time, 15 min, SHA-256 stored, atomic consume, rate-limited per IP, ~40-bit space.                                                                                                                                                                |
+| Supabase user JWT used against PostgREST    | RLS on every table with no policies, and privileges revoked from `authenticated` (tested with a real user JWT).                                                                                                                                      |
+
 ## Accepted limitations
 
 - **Rate limits are per server instance** (in memory). On Vercel each instance counts separately
   and resets on cold start. The real protections are kiosk auth, 192-bit tokens and a long
   enrollment secret. If abuse is ever observed, move the limiter to a Postgres table; Redis is not
   needed.
-- **The enrollment secret doubles as the operator API key** until Phase 3 adds staff accounts.
-  Keep it with the event lead only and rotate it after the event.
+- **Legacy shared enrollment secret** (`KIOSK_ENROLL_SECRET`) still works if set, and also
+  enables the old operator API. Leave it **empty** in production and use one-time codes.
+- **One staff role.** Every active staff member can do everything in /admin, including adding and
+  deactivating other staff. Keep the list short.
+- **Email is the staff login factor.** Whoever controls a staff mailbox can log in. Use personal
+  mailboxes, not shared ones.
 - **Anyone holding a guest link can view the photo** until it expires. That is the product: the
   link is the credential. Default lifetime is 72 hours.
 - **The kiosk device itself is trusted.** Someone with the unlocked kiosk can upload. Physical

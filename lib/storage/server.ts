@@ -3,6 +3,7 @@ import path from "node:path";
 import { getServerConfig } from "@/lib/server/env";
 import { createLocalBackend } from "./local-backend";
 import { PhotoService } from "./photo-service";
+import { makeThumbnail } from "./thumbnail";
 import { createSupabaseBackend } from "./supabase-backend";
 import type { StorageBackend } from "./types";
 
@@ -29,6 +30,7 @@ export function getPhotoService(): PhotoService {
   service = new PhotoService(getBackend(), {
     linkTtlHours: config.linkTtlHours,
     retentionDays: config.retentionDays,
+    thumbnailer: makeThumbnail,
   });
   return service;
 }

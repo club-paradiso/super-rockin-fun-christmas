@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
+import { hashEnrollmentCode, normalizeEnrollmentCode } from "@/lib/ops/enrollment-code";
+import { newKioskRow } from "@/lib/storage/rows";
 import { getBackend } from "@/lib/storage/server";
 import { KIOSK_COOKIE, signKioskSession, verifyKioskSession } from "./session";
 
@@ -73,15 +75,28 @@ export async function enrollKiosk(
   label: string,
 ): Promise<{ kioskId: string; cookieValue: string }> {
   const kioskId = randomUUID();
-  await getBackend().kiosks.insert({
-    id: kioskId,
-    label,
-    createdAt: new Date().toISOString(),
-    revokedAt: null,
-    lastSeenAt: null,
-  });
-  logEvent("kiosk_enrolled", { kioskId, label });
+  await getBackend().kiosks.insert(newKioskRow(kioskId, label, "secret"));
+  logEvent("kiosk_enrolled", { kioskId, label, via: "secret" });
   return { kioskId, cookieValue: issueSessionValue(kioskId) };
+}
+
+/**
+ * Exchange a one-time staff-issued enrollment code for a kiosk session. Null when the code is
+ * unknown, already used or expired (indistinguishable to the caller).
+ */
+export async function enrollKioskWithCode(
+  code: string,
+): Promise<{ kioskId: string; label: string; cookieValue: string } | null> {
+  const normalized = normalizeEnrollmentCode(code);
+  if (!normalized) return null;
+  const kiosk = await getBackend().enrollmentCodes.consume(
+    hashEnrollmentCode(normalized),
+    randomUUID(),
+    new Date().toISOString(),
+  );
+  if (!kiosk) return null;
+  logEvent("kiosk_enrolled", { kioskId: kiosk.id, label: kiosk.label, via: "code" });
+  return { kioskId: kiosk.id, label: kiosk.label, cookieValue: issueSessionValue(kiosk.id) };
 }
 
 /** Set-Cookie header value for a kiosk session (or a clearing cookie when value is null). */

@@ -13,6 +13,7 @@ const PROD = {
   PUBLIC_BASE_URL: "https://lights.example.org",
   SUPABASE_URL: "https://abc.supabase.co",
   SUPABASE_SERVICE_ROLE_KEY: "service-role",
+  SUPABASE_ANON_KEY: "anon",
 };
 
 const problems = (env: Record<string, string | undefined>) => {

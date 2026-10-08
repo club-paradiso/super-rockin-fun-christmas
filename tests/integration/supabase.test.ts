@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { newKioskRow } from "@/lib/storage/rows";
 import { createClient } from "@supabase/supabase-js";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -6,6 +7,7 @@ import { PhotoService } from "@/lib/storage/photo-service";
 import { createSupabaseBackend } from "@/lib/storage/supabase-backend";
 import type { StorageBackend } from "@/lib/storage/types";
 import { JPEG, uuid } from "../helpers/images";
+import { opsContract } from "../helpers/ops-contract";
 import { photoServiceContract } from "../helpers/photo-contract";
 
 /**
@@ -26,13 +28,7 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
   beforeAll(async () => {
     backend = createSupabaseBackend({ url: URL_!, serviceRoleKey: SERVICE!, bucket: "photos" });
     for (const id of [kioskA, kioskB]) {
-      await backend.kiosks.insert({
-        id,
-        label: "integration",
-        createdAt: new Date().toISOString(),
-        revokedAt: null,
-        lastSeenAt: null,
-      });
+      await backend.kiosks.insert(newKioskRow(id, "integration", "secret"));
     }
   });
 
@@ -42,16 +38,24 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
     otherKioskId: kioskB,
   }));
 
+  const service = () => createClient(URL_!, SERVICE!, { auth: { persistSession: false } });
+  const newAuthUser = async () => {
+    const email = `staff-${uuid()}@example.org`;
+    const { data, error } = await service().auth.admin.createUser({ email, email_confirm: true });
+    if (error) throw error;
+    return { id: data.user.id, email };
+  };
+  opsContract("supabase", async () => ({
+    backend,
+    staffId: (await newAuthUser()).id,
+    newUser: newAuthUser,
+    objectExists: async (path) => !(await service().storage.from("photos").download(path)).error,
+  }));
+
   describe("kiosk registry", () => {
     it("revokes and reports unknown kiosks", async () => {
       const id = uuid();
-      await backend.kiosks.insert({
-        id,
-        label: "revoke me",
-        createdAt: new Date().toISOString(),
-        revokedAt: null,
-        lastSeenAt: null,
-      });
+      await backend.kiosks.insert(newKioskRow(id, "revoke me", "secret"));
       expect(await backend.kiosks.revoke(id, new Date().toISOString())).toBe(true);
       expect((await backend.kiosks.get(id))!.revokedAt).not.toBeNull();
       expect(await backend.kiosks.revoke(uuid(), new Date().toISOString())).toBe(false);
@@ -170,25 +174,81 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
       await expect(insert(over)).rejects.toThrow();
     });
 
-    it("authenticated role has no table privileges either", async () => {
-      await client.query("begin");
-      try {
-        await client.query("set local role authenticated");
-        await expect(client.query("select 1 from public.photos limit 1")).rejects.toThrow(
-          /permission denied/,
-        );
-      } finally {
-        await client.query("rollback");
-      }
+    const PRIVATE_TABLES = [
+      "photos",
+      "kiosks",
+      "staff_members",
+      "audit_events",
+      "kiosk_enrollment_codes",
+      "event_settings",
+      "retention_runs",
+      "wall_eligible_photos",
+    ];
+
+    it.each(["anon", "authenticated"])(
+      "%s role has no access to any FOLLOW THE LIGHTS table",
+      async (role) => {
+        for (const table of PRIVATE_TABLES) {
+          await client.query("begin");
+          try {
+            await client.query(`set local role ${role}`);
+            await expect(client.query(`select 1 from public.${table} limit 1`)).rejects.toThrow(
+              /permission denied/,
+            );
+          } finally {
+            await client.query("rollback");
+          }
+        }
+      },
+    );
+
+    it.each(["anon", "authenticated"])(
+      "%s role cannot call the audited mutation functions",
+      async (role) => {
+        await client.query("begin");
+        try {
+          await client.query(`set local role ${role}`);
+          await expect(
+            client.query("select public.ftl_settings_update(true, null, null, gen_random_uuid())"),
+          ).rejects.toThrow(/permission denied/);
+        } finally {
+          await client.query("rollback");
+        }
+      },
+    );
+
+    it("audit_events is append-only, even for the database owner", async () => {
+      const { rows } = await client.query("select id from public.audit_events limit 1");
+      expect(rows.length).toBe(1);
+      await expect(
+        client.query("update public.audit_events set note = 'x' where id = $1", [rows[0].id]),
+      ).rejects.toThrow(/append-only/);
+      await expect(
+        client.query("delete from public.audit_events where id = $1", [rows[0].id]),
+      ).rejects.toThrow(/append-only/);
     });
 
-    it("migration is re-runnable", async () => {
-      const fs = await import("node:fs/promises");
-      const sql = await fs.readFile(
-        "supabase/migrations/20261007120000_phase2_photo_delivery.sql",
-        "utf8",
+    it("DELETED is terminal at the database level", async () => {
+      const session = uuid();
+      await insert({ session_id: session });
+      await client.query(
+        "update public.photos set moderation_status = 'DELETED', deleted_at = now() where session_id = $1",
+        [session],
       );
-      await expect(client.query(sql)).resolves.toBeDefined();
+      await expect(
+        client.query(
+          "update public.photos set moderation_status = 'PENDING' where session_id = $1",
+          [session],
+        ),
+      ).rejects.toThrow(/terminal/);
+    });
+
+    it("migrations are re-runnable", async () => {
+      const fs = await import("node:fs/promises");
+      for (const file of (await fs.readdir("supabase/migrations")).sort()) {
+        const sql = await fs.readFile(`supabase/migrations/${file}`, "utf8");
+        await expect(client.query(sql)).resolves.toBeDefined();
+      }
     });
   });
 });

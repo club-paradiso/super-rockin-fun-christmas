@@ -100,11 +100,65 @@ the Next.js server.
 $CRON_SECRET`. Each run handles up to 5 batches of 200. Failures stay unmarked and are retried
 the next day.
 
+## Staff operations (Phase 3)
+
+```
+staff browser ──HttpOnly sb-* cookies──► Next.js (/admin pages, /api/admin/*)
+                                            │ 1. Supabase Auth getUser()  (identity)
+                                            │ 2. staff_members active row (authorization)
+                                            │ 3. mutations: same-origin + JSON (CSRF)
+                                            ▼
+                                 PhotoService / lib/ops  ──service_role──► Supabase
+                                                          audited SQL functions (ftl_*)
+```
+
+- **Auth:** `lib/staff-auth/server.ts` creates `@supabase/ssr` server clients with the anon key.
+  Cookies are forced to HttpOnly, SameSite=Lax, Secure (in production). Login:
+  - `POST /api/admin/auth/otp` emails a code, but only to active staff; the response is identical
+    otherwise. `shouldCreateUser: false`, and signups are disabled project-wide.
+  - `POST /api/admin/auth/verify` sets the session, then re-checks the allowlist. A non-staff
+    session is expired immediately.
+- **Authorization** runs on every request, in `staffRoute` (APIs) and `requireStaff` (pages; the
+  layout is not re-rendered per navigation, so pages check too). `proxy.ts` only refreshes tokens.
+- **Moderation** (`lib/ops/moderation.ts`) is a pure transition table. `PhotoService.moderate`
+  plans the change, then applies it as a compare-and-set (`ftl_photo_transition`): the status
+  update and its `audit_events` row commit together, or neither does. A concurrent change → 409.
+- **Delete:**
+  1. Mark the row DELETED (`deleted_at`), which kills the guest link.
+  2. Remove the image and thumbnail objects.
+  3. Set `object_deleted_at`.
+     If storage removal fails, the retention job finishes it (`listObjectCleanupDue`).
+     The DB trigger makes DELETED terminal.
+- **Token rotation** (`ftl_photo_rotate_token`) writes a new hash and expiry, capped at retention,
+  and audits it. It only happens on the explicit POST.
+- **Staff images:** `GET /api/admin/photos/:id/image?variant=thumb|full` reads the private bucket
+  on the server after the staff check.
+  - Thumbnails are ~640px JPEGs made with `sharp` at upload (or lazily for older photos), stored
+    as `…​.thumb.jpg`.
+  - Grids never download originals, and no storage URL ever reaches the browser.
+- **Lists** are bounded (≤ 200 rows), newest first, using one photo query plus one kiosk-label
+  query. There are no N+1 calls; `ftl_photo_stats()` returns the dashboard counts in one round trip.
+- **Kiosks:**
+  - One-time enrollment codes: 8 symbols, 15 minutes, stored as SHA-256 only. Consumed atomically
+    by `ftl_enrollment_code_consume`, which creates the kiosk and audits it.
+  - Heartbeat: `POST /api/kiosk/heartbeat` every 45 s with queue depth, camera state and build;
+    the response returns the PAUSE SUBMISSIONS state.
+  - Health: online ≤ 2 min, stale ≤ 15 min, otherwise offline.
+- **Emergency settings:** singleton `event_settings`, updated through `ftl_settings_update`
+  (audited).
+  - `pause_submissions` is enforced by the consent API (409 for YES) and the kiosk (skips the
+    consent screen).
+  - `pause_wall` and `show_holding_screen` are stored for Phase 4.
+- **Phase 4 source of truth:** the `wall_eligible_photos` view (APPROVED ∧ wall_consent ∧ not
+  deleted, service_role only) and `isWallEligible()`.
+
 ## Known limitations
 
 - Rate limiting is per serverless instance.
-- A guest who leaves while their photo is still queued gets no QR. The photo uploads later and
-  can only be re-shown by a Phase 3 admin tool.
+- Staff features require the Supabase backend; with the local file store `/admin` reports
+  "not configured" (503 on staff APIs) instead of falling open.
+- A guest who leaves while their photo is still queued gets no QR on the spot. Staff can find the
+  session later (최근 세션) and show a new QR with "QR 다시 보여주기".
 - The queue assumes one kiosk tab per device. Two tabs cannot duplicate a photo (the server is
   idempotent), but the second tab's response would rotate the first tab's token.
 - Queue entries are never expired client-side. Staff see the count and can clear site data if

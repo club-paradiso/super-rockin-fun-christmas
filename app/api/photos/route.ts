@@ -91,6 +91,8 @@ export const POST = route("upload", async (request: Request) => {
       url: guestUrl(publicOrigin(config, request), result.token),
       expiresAt: result.photo.tokenExpiresAt,
       duplicate: result.duplicate,
+      // Freshest moment for the kiosk to learn whether the wall consent step should be offered.
+      wallSubmissions: (await getBackend().settings.get()).pauseSubmissions ? "paused" : "open",
     },
     { status: result.duplicate ? 200 : 201, headers },
   );

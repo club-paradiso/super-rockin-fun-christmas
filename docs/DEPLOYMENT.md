@@ -14,8 +14,16 @@ Next.js server is the only thing that talks to Supabase.
    ```
 3. Check in the dashboard: Storage → `photos` is **not public**; Table editor → `photos` and
    `kiosks` show "RLS enabled".
-4. Copy the **Project URL** and the **service_role** key (Settings → API). Do not use the anon
-   key anywhere.
+4. Copy the **Project URL**, the **service_role** key and the **anon** key (Settings → API).
+   All three go only into server-side env vars.
+5. Auth settings (Authentication → Providers / Templates), to match `supabase/config.toml`:
+   - **disable new user signups**;
+   - Email provider on, OTP length 6, expiry 600 s;
+   - "Magic Link" email template: subject `FOLLOW THE LIGHTS 스태프 로그인 코드`, body from
+     `supabase/templates/staff-login.html` (it must contain `{{ .Token }}`);
+   - configure **custom SMTP**. Supabase's built-in mailer is rate-limited and meant for testing.
+     (`npx supabase config push` can apply the `[auth]` section from `config.toml`.)
+6. First staff member: `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run staff:add -- lead@example.org "책임자"`.
 
 ## 2. Vercel
 
@@ -52,9 +60,9 @@ Limits to know: Vercel functions accept ≤ 4.5 MB request bodies, which is why 
 
 ## 3. Enroll the kiosk
 
-On the kiosk device's browser: open `https://<origin>/kiosk/enroll`, enter a device name and
-`KIOSK_ENROLL_SECRET`, then press **이 기기 등록**. Then open `/kiosk`, put it in full screen, and
-allow the camera.
+1. Staff: `/admin` → 키오스크 → name → **일회용 등록 코드 만들기**.
+2. Kiosk device: open `https://<origin>/kiosk/enroll`, type the code, then press **이 기기 등록**.
+3. Open `/kiosk` in full screen and allow the camera. In /admin the kiosk turns **온라인**.
 
 ## 4. REAL-PHONE CELLULAR TEST (the Phase 2 gate)
 
@@ -82,3 +90,15 @@ Record the device models, OS versions and results in the PR. Until this is done,
 `PHOTO_STORE=local` stores photos on the kiosk PC's disk. Phones can only reach it if that PC is
 published at a public https origin (for example a tunnel). The server refuses private-network
 `PUBLIC_BASE_URL` values in production. Vercel + Supabase is the supported path.
+
+## 5. REAL STAFF DEVICE TEST (the Phase 3 gate)
+
+Before the event, a person must do this on the actual staff phone or tablet:
+
+- log in with an emailed code;
+- approve, reject and delete a photo from a real kiosk;
+- use QR 다시 보여주기 and scan the new QR on a phone (old QR must fail);
+- toggle PAUSE SUBMISSIONS and confirm the kiosk skips the wall question while QR still works;
+- revoke and re-enroll a kiosk with a one-time code.
+
+Until then: `REAL_STAFF_DEVICE_TEST: NOT VERIFIED`.
