@@ -23,7 +23,8 @@ export default async function EnrollPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
+  const toWall = next === "wall";
   const config = getServerConfig();
   const legacySecret = config.kioskAuth.mode === "required" && !!config.kioskAuth.enrollSecret;
   const auth = await authenticateKiosk((await cookies()).get(KIOSK_COOKIE)?.value ?? null);
@@ -33,10 +34,13 @@ export default async function EnrollPage({
       <div className="mx-auto flex max-w-xl flex-col gap-8">
         <header>
           <p className="text-sm tracking-[0.3em] text-amber">STAFF · FOLLOW THE LIGHTS</p>
-          <h1 className="mt-2 text-3xl font-bold">키오스크 기기 등록</h1>
+          <h1 className="mt-2 text-3xl font-bold">
+            {toWall ? "미디어월 화면 등록" : "키오스크 기기 등록"}
+          </h1>
           <p className="mt-3 text-mist">
-            이 브라우저를 촬영 키오스크로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를
-            다시 켜도 유지돼요.
+            {toWall
+              ? "이 브라우저를 미디어월 화면으로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."
+              : "이 브라우저를 촬영 키오스크로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."}
           </p>
         </header>
 
@@ -46,8 +50,8 @@ export default async function EnrollPage({
               등록됨: <strong>{auth.label}</strong>
             </p>
             <div className="mt-6 flex flex-wrap gap-4">
-              <a href="/kiosk" className="btn-primary">
-                키오스크 열기
+              <a href={toWall ? "/wall" : "/kiosk"} className="btn-primary">
+                {toWall ? "미디어월 열기" : "키오스크 열기"}
               </a>
               <form method="post" action="/api/kiosk/signout">
                 <button type="submit" className="btn-secondary">
@@ -64,6 +68,7 @@ export default async function EnrollPage({
               className="flex flex-col gap-5"
               data-testid="enroll-code-form"
             >
+              {toWall && <input type="hidden" name="next" value="wall" />}
               <label className="flex flex-col gap-2 text-lg">
                 등록 코드
                 <input
@@ -102,6 +107,7 @@ export default async function EnrollPage({
                   className="mt-4 flex flex-col gap-5"
                   data-testid="enroll-form"
                 >
+                  {toWall && <input type="hidden" name="next" value="wall" />}
                   <label className="flex flex-col gap-2 text-lg">
                     기기 이름
                     <input
