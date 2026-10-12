@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { enrollKiosk } from "./helpers";
 
-// Local store: no staff, so nothing is ever approved. The approve → wall → hide flow runs in
-// admin.spec.ts against local Supabase.
+// The local store has no approved photos, but Supabase E2E is shared with admin.spec.ts.
+// That suite approves photos earlier, so the wall must reflect its actual feed state.
 
 test("an unenrolled screen never shows the wall and points staff to display enrollment", async ({
   page,
@@ -17,19 +17,24 @@ test("an unenrolled screen never shows the wall and points staff to display enro
   await expect(page.getByRole("heading", { name: "미디어월 화면 등록" })).toBeVisible();
 });
 
-test("an enrolled display with nothing approved shows the EMPTY village, no photos", async ({
+test("an enrolled display reflects its actual approved feed (EMPTY or ACTIVE)", async ({
   page,
 }) => {
   await enrollKiosk(page);
   await page.goto("/wall");
   const wall = page.getByTestId("wall");
-  await expect(wall).toHaveAttribute("data-wall-state", "EMPTY");
   await expect(wall).toHaveAttribute("data-wall-mode", "live");
-  await expect(page.getByTestId("wall-empty")).toBeVisible();
-  await expect(page.getByTestId("wall-photo")).toHaveCount(0);
   const body = (await (await page.request.get("/api/wall/feed")).json()) as {
     mode: string;
     photos: unknown[];
   };
-  expect(body).toEqual({ mode: "live", photos: [] });
+  expect(body.mode).toBe("live");
+  await expect(wall).toHaveAttribute(
+    "data-wall-state",
+    body.photos.length === 0 ? "EMPTY" : "ACTIVE",
+  );
+  if (body.photos.length === 0) {
+    await expect(page.getByTestId("wall-empty")).toBeVisible();
+    await expect(page.getByTestId("wall-photo")).toHaveCount(0);
+  }
 });
