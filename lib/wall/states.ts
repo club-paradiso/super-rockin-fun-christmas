@@ -1,6 +1,6 @@
 /**
- * Media-wall state model (Phase 4). Defined now so the kiosk, admin and wall agree on names;
- * the renderer that uses it is not built yet.
+ * Media-wall state model. Shared by the wall renderer (components/wall), the feed endpoint and
+ * the scheduler (lib/wall/scheduler.ts).
  */
 
 export type WallScreenState = "BOOT" | "EMPTY" | "ACTIVE" | "OFFLINE" | "MAINTENANCE";
@@ -25,4 +25,15 @@ export function wallScreenState(input: {
   if (input.maintenance) return "MAINTENANCE";
   if (!input.online) return "OFFLINE";
   return input.approvedCount > 0 ? "ACTIVE" : "EMPTY";
+}
+
+/**
+ * What the server lets the wall do right now. `holding` (SHOW HOLDING SCREEN) wins over `paused`
+ * (PAUSE MEDIA WALL); both send no photos at all.
+ */
+export type WallFeedMode = "live" | "paused" | "holding";
+
+export interface WallFeed {
+  mode: WallFeedMode;
+  photos: { id: string; frameId: string; createdAt: string }[];
 }
