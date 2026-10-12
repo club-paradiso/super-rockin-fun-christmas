@@ -364,6 +364,21 @@ export class PhotoService {
 
   // ── media wall ───────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Staff "지금 띄우기": put an approved, consented photo on the wall next (audited). Refused for
+   * anything the wall may not show.
+   */
+  async requestShowNow(
+    photoId: string,
+    staffUserId: string,
+  ): Promise<{ ok: true } | { ok: false; reason: "not_found" | "not_on_wall" }> {
+    const row = await this.backend.photos.getById(photoId);
+    if (!row || isGone(row)) return { ok: false, reason: "not_found" };
+    if (!isWallEligible(row)) return { ok: false, reason: "not_on_wall" };
+    await this.backend.wall.requestShowNow(photoId, staffUserId);
+    return { ok: true };
+  }
+
   /** Photos the wall may show right now, newest first. Ids and frames only — no paths. */
   async wallPhotos(limit: number): Promise<WallPhoto[]> {
     const rows = await this.backend.photos.listWallEligible(limit);

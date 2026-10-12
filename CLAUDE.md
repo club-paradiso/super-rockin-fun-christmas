@@ -47,6 +47,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **The wall only ever receives `wall_eligible_photos` ids**, through `/api/wall/feed`. PAUSE WALL
   and SHOW HOLDING SCREEN are applied on the server. Never give the wall anon database access,
   tokens or storage URLs.
+- **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
+  wall only picks the first usable id. Changing rotation means keeping F1–F6
+  (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
 
 ## Layout
 
@@ -62,8 +65,8 @@ app/admin              staff control panel: login, (staff)/ pages (overview, mod
 app/api/admin          staff APIs (staffRoute: Supabase session + allowlist + CSRF)
 app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
 app/wall               media wall (server gate: config + enrolled display) → components/wall
-app/api/wall           wall feed (eligible ids only) + image proxy (kiosk cookie)
-lib/wall               wall states, pure scheduler, server feed (applies emergency switches)
+app/api/wall           wall feed (ordered eligible ids) + exposure report + image proxy (kiosk cookie)
+lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models
 lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)

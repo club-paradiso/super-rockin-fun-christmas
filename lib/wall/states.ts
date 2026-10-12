@@ -35,5 +35,12 @@ export type WallFeedMode = "live" | "paused" | "holding";
 
 export interface WallFeed {
   mode: WallFeedMode;
+  /**
+   * `fair`: photos are in rotation order (lib/wall/rotation.ts); the wall takes the first usable
+   * one. `newest`: newest first, no server-side exposure history (cloud fallback, D52).
+   */
+  ordering: "fair" | "newest";
   photos: { id: string; frameId: string; createdAt: string }[];
+  /** Staff asked for these now: the wall makes room for them at once. */
+  showNow: string[];
 }

@@ -269,6 +269,39 @@ export interface RetentionRunRepository {
   latest(): Promise<RetentionRun | null>;
 }
 
+/** How often a wall-eligible photo has been on the wall. Reported by the wall display. */
+export interface WallExposure {
+  photoId: string;
+  shownCount: number;
+  firstShownAt: string;
+  lastShownAt: string;
+}
+
+/** A staff request to put a photo on the wall now (the "find yourself" moment). */
+export interface WallShowNow {
+  photoId: string;
+  requestedAt: string;
+  requestedBy: string;
+}
+
+/**
+ * Wall rotation state (docs/ARCHITECTURE.md 1.7). Lives on the hub; the Supabase backend does not
+ * persist it (`exposures()` returns null) and the wall falls back to newest-first there (D52).
+ */
+export interface WallRepository {
+  /** All exposure records, or null when this backend does not keep them. */
+  exposures(): Promise<WallExposure[] | null>;
+  /**
+   * The wall put these photos up (`shown`, one entry per appearance) and is showing `onWall` right
+   * now. Counts exposures and fulfils show-now requests for anything shown or on the wall.
+   * Not audited: it is display telemetry, not a staff decision.
+   */
+  report(input: { shown: string[]; onWall: string[]; at: string }): Promise<void>;
+  /** Audited (`wall_show_now`). Re-requesting keeps the original request time. */
+  requestShowNow(photoId: string, staffUserId: string): Promise<WallShowNow>;
+  showNowQueue(): Promise<WallShowNow[]>;
+}
+
 export interface StorageBackend {
   name: "memory" | "local" | "supabase";
   photos: PhotoRepository;
@@ -279,6 +312,7 @@ export interface StorageBackend {
   staff: StaffRepository;
   audit: AuditRepository;
   retentionRuns: RetentionRunRepository;
+  wall: WallRepository;
 }
 
 /** What the media wall may know about a photo. No object path, no token, no kiosk. */

@@ -473,10 +473,18 @@ describe("media wall API on the local backend", () => {
 
     // Emergency switches send no photos at all, and images are refused.
     await backend.settings.update({ pauseWall: true }, staffId);
-    expect(await (await getFeed(display)).json()).toEqual({ mode: "paused", photos: [] });
+    expect(await (await getFeed(display)).json()).toMatchObject({
+      mode: "paused",
+      photos: [],
+      showNow: [],
+    });
     expect((await getImage(display, approved)).status).toBe(404);
     await backend.settings.update({ showHoldingScreen: true }, staffId);
-    expect(await (await getFeed(display)).json()).toEqual({ mode: "holding", photos: [] });
+    expect(await (await getFeed(display)).json()).toMatchObject({
+      mode: "holding",
+      photos: [],
+      showNow: [],
+    });
     await backend.settings.update({ pauseWall: false, showHoldingScreen: false }, staffId);
     expect((await getImage(display, approved)).status).toBe(200);
 

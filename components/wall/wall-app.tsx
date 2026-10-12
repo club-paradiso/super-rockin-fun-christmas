@@ -18,9 +18,11 @@ const HOUSES = 7;
 
 /**
  * The media wall. Polls /api/wall/feed, keeps eligible images in memory (object URLs) and lets
- * the pure scheduler decide what enters and leaves. Anything the server stops listing disappears
- * on the same render; after WALL_CONFIG.offlineGraceMs without a successful poll every cached
- * photo is dropped, because the wall can no longer learn about hides or deletions.
+ * the pure scheduler decide what enters and leaves, in the hub's fair rotation order. Anything
+ * the server stops listing disappears on the same render; after WALL_CONFIG.offlineGraceMs
+ * without a successful poll every cached photo is dropped, because the wall can no longer learn
+ * about hides or deletions. Each photo it puts up is reported back (/api/wall/shown), which is
+ * the exposure log the rotation is built on.
  */
 export function WallApp() {
   const [feed, setFeed] = useState<WallFeed | null>(null);
@@ -39,6 +41,22 @@ export function WallApp() {
     [fresh, revoked, feed],
   );
   const allowed = useMemo(() => new Set(eligible), [eligible]);
+  const showNow = useMemo(
+    () => new Set(fresh && !revoked && feed?.mode === "live" ? feed.showNow : []),
+    [fresh, revoked, feed],
+  );
+
+  // What is on screen right now, and what went up since the last report (read by the poller).
+  const onWallRef = useRef<string[]>([]);
+  const unreported = useRef<string[]>([]);
+  useEffect(() => {
+    const ids = schedule.slots.map((s) => s.photoId).filter((id): id is string => !!id);
+    for (const slot of schedule.slots) {
+      if (slot.photoId && slot.phase === "ENTER" && !onWallRef.current.includes(slot.photoId))
+        unreported.current = [...unreported.current, slot.photoId].slice(-50);
+    }
+    onWallRef.current = ids;
+  }, [schedule]);
 
   // Feed polling.
   useEffect(() => {
@@ -55,7 +73,11 @@ export function WallApp() {
         Math.min(8_000, WALL_CONFIG.pollMs - 1_000),
       );
       try {
-        const res = await fetch("/api/wall/feed", { cache: "no-store", signal: controller.signal });
+        const on = onWallRef.current.join(",");
+        const res = await fetch(`/api/wall/feed${on ? `?on=${on}` : ""}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (stopped) return;
         if (res.status === 401) {
           setRevoked(true);
@@ -69,11 +91,26 @@ export function WallApp() {
         setRevoked(false);
         setOnline(true);
         setLastOkAt(Date.now());
+        void report();
       } catch {
         if (!stopped) setOnline(false);
       } finally {
         clearTimeout(timeout);
         inFlight = false;
+      }
+    }
+    /** Exposure report. Unsent entries are kept (max 50) and retried with the next poll. */
+    async function report() {
+      const shown = unreported.current;
+      try {
+        const res = await fetch("/api/wall/shown", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ shown, onWall: onWallRef.current }),
+        });
+        if (res.ok) unreported.current = unreported.current.slice(shown.length);
+      } catch {
+        // Retried after the next successful poll.
       }
     }
     void poll();
@@ -152,9 +189,9 @@ export function WallApp() {
   }, [eligible, allowed]);
 
   // Scheduler tick.
-  const latest = useRef({ eligible, images });
+  const latest = useRef({ eligible, images, showNow, ordering: feed?.ordering ?? "fair" });
   useEffect(() => {
-    latest.current = { eligible, images };
+    latest.current = { eligible, images, showNow, ordering: feed?.ordering ?? "fair" };
   });
   useEffect(() => {
     const id = setInterval(() => {
@@ -166,6 +203,8 @@ export function WallApp() {
           eligible: latest.current.eligible,
           ready: new Set(latest.current.images.keys()),
           timings: WALL_CONFIG,
+          ordering: latest.current.ordering,
+          showNow: latest.current.showNow,
         }),
       );
     }, WALL_CONFIG.tickMs);
