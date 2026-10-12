@@ -43,6 +43,56 @@ export class MemoryQueueStore implements QueueStore {
 
 const DB_NAME = "follow-the-lights";
 const STORE = "uploads";
+const CONSENT_STORE = "consents";
+/** v2 added the consent store. Upgrading keeps every queued photo. */
+const DB_VERSION = 2;
+
+/**
+ * The guest's media-wall answer for a session, kept until the hub has it (AUDIT R1/R2: it used to
+ * be sent once, and only if the QR was already showing).
+ */
+export interface QueuedConsent {
+  sessionId: string;
+  consent: boolean;
+  createdAt: number;
+  attempts: number;
+  nextAttemptAt: number;
+}
+
+export interface ConsentStore {
+  all(): Promise<QueuedConsent[]>;
+  put(entry: QueuedConsent): Promise<void>;
+  delete(sessionId: string): Promise<void>;
+}
+
+export class MemoryConsentStore implements ConsentStore {
+  private readonly entries = new Map<string, QueuedConsent>();
+  async all() {
+    return [...this.entries.values()].sort((a, b) => a.createdAt - b.createdAt);
+  }
+  async put(e: QueuedConsent) {
+    this.entries.set(e.sessionId, { ...e });
+  }
+  async delete(id: string) {
+    this.entries.delete(id);
+  }
+}
+
+function openDb(factory: IDBFactory, name: string): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = factory.open(name, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE))
+        db.createObjectStore(STORE, { keyPath: "sessionId" });
+      if (!db.objectStoreNames.contains(CONSENT_STORE))
+        db.createObjectStore(CONSENT_STORE, { keyPath: "sessionId" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("IndexedDB blocked"));
+  });
+}
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -60,17 +110,7 @@ export class IndexedDbQueueStore implements QueueStore {
   ) {}
 
   private open(): Promise<IDBDatabase> {
-    this.db ??= new Promise((resolve, reject) => {
-      const req = this.factory.open(this.dbName, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(STORE))
-          db.createObjectStore(STORE, { keyPath: "sessionId" });
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => reject(new Error("IndexedDB blocked"));
-    });
+    this.db ??= openDb(this.factory, this.dbName);
     return this.db;
   }
 
@@ -100,16 +140,52 @@ export class IndexedDbQueueStore implements QueueStore {
   }
 }
 
+export class IndexedDbConsentStore implements ConsentStore {
+  private db: Promise<IDBDatabase> | null = null;
+
+  constructor(
+    private readonly factory: IDBFactory = indexedDB,
+    private readonly dbName = DB_NAME,
+  ) {}
+
+  private async tx(mode: IDBTransactionMode) {
+    this.db ??= openDb(this.factory, this.dbName);
+    return (await this.db).transaction(CONSENT_STORE, mode).objectStore(CONSENT_STORE);
+  }
+
+  async all() {
+    const rows = await request((await this.tx("readonly")).getAll() as IDBRequest<QueuedConsent[]>);
+    return rows.sort((a, b) => a.createdAt - b.createdAt);
+  }
+  async put(e: QueuedConsent) {
+    await request((await this.tx("readwrite")).put(e));
+  }
+  async delete(id: string) {
+    await request((await this.tx("readwrite")).delete(id));
+  }
+
+  close() {
+    void this.db?.then((d) => d.close());
+    this.db = null;
+  }
+}
+
 /** IndexedDB when available and working, otherwise memory (e.g. some private-browsing modes). */
-export async function openQueueStore(): Promise<{ store: QueueStore; durable: boolean }> {
+export async function openQueueStore(): Promise<{
+  store: QueueStore;
+  consents: ConsentStore;
+  durable: boolean;
+}> {
   if (typeof indexedDB !== "undefined") {
     const store = new IndexedDbQueueStore();
+    const consents = new IndexedDbConsentStore();
     try {
       await store.all();
-      return { store, durable: true };
+      await consents.all();
+      return { store, consents, durable: true };
     } catch {
       // fall through
     }
   }
-  return { store: new MemoryQueueStore(), durable: false };
+  return { store: new MemoryQueueStore(), consents: new MemoryConsentStore(), durable: false };
 }

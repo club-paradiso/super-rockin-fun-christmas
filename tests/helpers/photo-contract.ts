@@ -140,6 +140,33 @@ export function photoServiceContract(
       });
     });
 
+    it("consent by session id (the kiosk's durable queue): same rules, works after link expiry", async () => {
+      await put();
+      // The guest link has expired, but an answer that waited out a long network outage counts.
+      now = new Date("2026-12-28T10:00:00Z");
+      expect(await svc.setWallConsentForSession(SESSION, true, KIOSK)).toEqual({
+        ok: true,
+        wallConsent: true,
+        moderationStatus: "PENDING",
+      });
+      expect(
+        await svc.setWallConsentForSession(SESSION, true, KIOSK, { submissionsPaused: true }),
+      ).toEqual({ ok: false, reason: "paused" });
+      expect(await svc.setWallConsentForSession(SESSION, false, KIOSK)).toEqual({
+        ok: true,
+        wallConsent: false,
+        moderationStatus: "NONE",
+      });
+      expect(await svc.setWallConsentForSession(SESSION, true, OTHER ?? uuid())).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
+      expect(await svc.setWallConsentForSession(uuid(), true, KIOSK)).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
+    });
+
     it("retention cleanup deletes the object, marks the row, and is idempotent", async () => {
       const { token } = await put();
       now = new Date("2027-01-23T10:00:01Z");

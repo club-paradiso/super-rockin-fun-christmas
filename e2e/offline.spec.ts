@@ -9,7 +9,7 @@ async function idbQueue(page: import("@playwright/test").Page) {
   return page.evaluate(
     () =>
       new Promise<{ sessionId: string; bytes: number; attempts: number }[]>((resolve, reject) => {
-        const req = indexedDB.open("follow-the-lights", 1);
+        const req = indexedDB.open("follow-the-lights"); // current version
         req.onerror = () => reject(req.error);
         req.onsuccess = () => {
           const all = req.result.transaction("uploads").objectStore("uploads").getAll();
@@ -87,4 +87,53 @@ test("reload while queued: the photo survives in IndexedDB and uploads after res
   const after = await storedPhotos();
   expect(after.length).toBe(before + 1);
   expect(after.filter((p) => p.sessionId === queued!.sessionId)).toHaveLength(1);
+});
+
+async function idbConsents(page: import("@playwright/test").Page) {
+  return page.evaluate(
+    () =>
+      new Promise<{ sessionId: string; consent: boolean }[]>((resolve, reject) => {
+        const req = indexedDB.open("follow-the-lights");
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const all = req.result.transaction("consents").objectStore("consents").getAll();
+          all.onsuccess = () => resolve(all.result as { sessionId: string; consent: boolean }[]);
+          all.onerror = () => reject(all.error);
+        };
+      }),
+  );
+}
+
+test("offline: the guest still answers the wall question, and the answer lands with the photo", async ({
+  page,
+  context,
+}) => {
+  await shootFourWithMock(page);
+  await toFinal(page);
+
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await expect(page.getByTestId("delivery-queued")).toBeVisible();
+  const [queued] = await idbQueue(page);
+
+  // Before AUDIT R1/R2 this path ended without asking, and a "yes" given later was dropped.
+  await page.getByTestId("queued-continue").click();
+  await expect(page.getByTestId("screen-consent")).toBeVisible();
+  await page.getByTestId("consent-yes").click();
+  await expect(page.getByTestId("screen-complete")).toBeVisible();
+  expect(await idbConsents(page)).toEqual([
+    expect.objectContaining({ sessionId: queued!.sessionId, consent: true }),
+  ]);
+
+  await context.setOffline(false);
+  await expect
+    .poll(
+      async () => {
+        const row = (await storedPhotos()).find((p) => p.sessionId === queued!.sessionId);
+        return row ? `${row.wallConsent}/${row.moderationStatus}` : "missing";
+      },
+      { timeout: 30_000 },
+    )
+    .toBe("true/PENDING");
+  await expect.poll(() => idbConsents(page)).toEqual([]);
 });
