@@ -219,3 +219,64 @@ The wall keeps eligible images as in-memory object URLs and keeps showing them t
 network loss. After `offlineGraceMs` (2 min) without a successful poll it drops them all, because
 it can no longer learn about hides or deletions. Images are the ~640px review JPEG, small enough
 for venue Wi-Fi.
+
+---
+
+# Phase 1 (local-first) design decisions (2026-10-12)
+
+_Proposed in `docs/ARCHITECTURE.md` part 1. Not implemented yet. Rationale and rejected
+alternatives are in that document, section 1.3._
+
+## D39 · Still no printing
+
+Confirmed by the owner on 2026-10-12. D4 stands.
+
+## D40 · The on-site hub is the source of truth; the cloud is a QR-only copy
+
+The same Next.js app runs as `FTL_ROLE=hub` on a venue laptop (local file backend) and as
+`FTL_ROLE=cloud` on Vercel + Supabase. Capture, consent, moderation, the wall and the emergency
+switches work without internet. The cloud holds only the photo and the token hash for phone
+downloads, never consent or moderation data.
+
+## D41 · Hub runs on the booth laptop
+
+Camera access and `crypto.randomUUID` need a secure context; `localhost` is one, a LAN `http://`
+address is not. A tablet booth would need a locally trusted HTTPS certificate instead.
+
+## D42 · Dedicated router for the event LAN
+
+Wall and staff devices reach the hub over plain HTTP, so cookies cannot be `Secure`. The LAN is a
+dedicated, password-protected router, never the congregation's Wi-Fi.
+
+## D43 · Hub → cloud through a narrow, secret-authenticated API
+
+`/api/hub/*` on the cloud can upload, delete and reissue a token, nothing else. The Supabase
+service-role key never leaves the cloud deployment, so a lost laptop leaks less.
+
+## D44 · Staff sign in with name + PIN on the hub
+
+Email codes need internet. PINs are scrypt-hashed, rate-limited and revocable, and every action
+stays audited per person.
+
+## D45 · Keep the JSON file database until measured otherwise
+
+It already passes the photo and operations contracts. Switch to SQLite only if a save at 5,000
+photos and 20,000 audit events takes more than 200 ms.
+
+## D46 · Fair rotation is ordered on the hub, with a persisted exposure log
+
+Order: show-now requests, then never-shown photos in approval order, then fewest exposures and
+oldest last exposure. Replaces "newest 60" (which starved older photos). Numeric criteria F1–F6
+are in `docs/ARCHITECTURE.md` 1.7. Feed poll goes from 10 s to 5 s to meet the plan's
+"hidden within 5 s".
+
+## D47 · Retention defaults follow the 2026-10-07 plan, pending the church
+
+QR link 24 h; photos not on the wall 24 h; wall photos until `eventEndAt` + 24 h. All are
+settings. The under-14 rule is not implemented until the church decides; until then staff do not
+approve photos showing children without guardian confirmation.
+
+## D48 · Frame choice stays after capture
+
+All frames share 4:3 slots (D6), so the choice can come later and the guest has one less
+decision before shooting. A setting can move it before capture.

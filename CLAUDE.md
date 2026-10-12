@@ -3,6 +3,13 @@
 Web four-cut photo booth + participatory media wall for Christmas Village 2026.
 Next.js 16 (App Router) · TypeScript strict · Tailwind 4 · Vitest · Playwright.
 
+## Transition in progress (read first)
+
+Read `docs/STATUS.md` first. A local-first redesign is proposed in `docs/ARCHITECTURE.md` part 1
+(decisions D39–D48): an on-site hub becomes the source of truth, the cloud keeps only a QR copy,
+and staff sign in with a PIN on the hub. Until that work lands, the rules below describe the code
+as it is. Change each rule in the same PR that changes the behaviour it describes.
+
 ## Non-negotiables
 
 - **No printing.** No printer, print queue, print layout. Delivery is QR → guest's phone.
