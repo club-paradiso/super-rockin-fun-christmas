@@ -95,3 +95,16 @@ export async function photoForToken(token: string): Promise<StoredPhoto | undefi
   const hash = createHash("sha256").update(token).digest("hex");
   return (await storedPhotos()).find((p) => p.tokenHash === hash);
 }
+
+/** Photo row id for a guest token (Supabase runs only; test-side read, no app hooks). */
+export async function photoIdForToken(token: string): Promise<string> {
+  const hash = createHash("sha256").update(token).digest("hex");
+  const db = createClient(
+    process.env.SUPABASE_TEST_URL!,
+    process.env.SUPABASE_TEST_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const { data, error } = await db.from("photos").select("id").eq("token_hash", hash).single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+}

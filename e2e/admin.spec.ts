@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { USE_SUPABASE } from "./env";
-import { photoForToken, tokenFromUrl } from "./helpers";
+import { photoForToken, photoIdForToken, tokenFromUrl } from "./helpers";
 import {
   createEnrollmentCode,
   enrollWithCode,
@@ -158,6 +158,52 @@ test("PAUSE SUBMISSIONS: photography and QR keep working, wall consent is skippe
     "aria-checked",
     "false",
   );
+});
+
+test("media wall: approved photo appears; hide and PAUSE WALL take it off at once", async ({
+  browser,
+}) => {
+  const wallLabel = `E2E 미디어월 ${Date.now() % 100000}`;
+  const code = await createEnrollmentCode(staff, wallLabel);
+  const wall = await newPage(browser);
+  await wall.goto("/kiosk/enroll?next=wall");
+  await wall.getByLabel("등록 코드").fill(code);
+  await wall.getByRole("button", { name: "이 기기 등록" }).click();
+  await expect(wall).toHaveURL(/\/wall$/);
+  await expect(wall.getByTestId("wall")).toHaveAttribute("data-wall-mode", "live");
+
+  const { url, session } = await kioskPhotoToQr(kiosk);
+  const card = await consentYesAndFind(session);
+  await card.getByTestId("action-approve").click();
+  const id = await photoIdForToken(tokenFromUrl(url));
+  const photo = wall.locator(`[data-testid="wall-photo"][data-photo-id="${id}"]`);
+  await expect(photo).toBeVisible({ timeout: 30_000 });
+
+  await staff.goto(`/admin/photos?session=${session}&window=1h`);
+  const libraryCard = staff.getByTestId("photo-card").filter({ hasText: session });
+  await libraryCard.getByTestId("action-hide").click();
+  await expect(libraryCard.getByTestId("photo-status")).toHaveText("숨김");
+  await expect(photo).toHaveCount(0, { timeout: 15_000 });
+  await libraryCard.getByTestId("action-unhide").click();
+  await expect(photo).toBeVisible({ timeout: 30_000 });
+
+  await staff.goto("/admin");
+  await staff.getByTestId("switch-pauseWall").click();
+  await expect(staff.getByTestId("switch-pauseWall")).toHaveAttribute("aria-checked", "true");
+  await expect(wall.getByTestId("wall")).toHaveAttribute("data-wall-mode", "paused", {
+    timeout: 15_000,
+  });
+  await expect(wall.getByTestId("wall-photo")).toHaveCount(0);
+  await staff.getByTestId("switch-pauseWall").click();
+  await expect(staff.getByTestId("switch-pauseWall")).toHaveAttribute("aria-checked", "false");
+
+  // The display reports in like a kiosk, so staff can see it is alive.
+  await staff.goto("/admin/kiosks");
+  await expect(staff.getByTestId("kiosk-item").filter({ hasText: wallLabel })).toHaveAttribute(
+    "data-health",
+    "online",
+  );
+  await wall.context().close();
 });
 
 test("revoking the kiosk from /admin blocks it immediately", async () => {
