@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { ConfigError, isPrivateHost, parseServerConfig } from "@/lib/server/env";
+import { ConfigError, isPrivateHost, parseServerConfig, secureCookies } from "@/lib/server/env";
 
 const SECRETS = {
   KIOSK_SESSION_SECRET: "s".repeat(48),
@@ -99,6 +99,64 @@ describe("server config", () => {
   it("development works with no public URL (falls back to request origin)", () => {
     const c = parseServerConfig({ NODE_ENV: "development", ...SECRETS });
     expect([c.strict, c.publicBaseUrl, c.store]).toEqual([false, null, "local"]);
+  });
+});
+
+describe("hub role (FTL_ROLE=hub)", () => {
+  const HUB = {
+    NODE_ENV: "production",
+    FTL_ROLE: "hub",
+    PHOTO_STORE: "local",
+    KIOSK_SESSION_SECRET: SECRETS.KIOSK_SESSION_SECRET,
+  };
+
+  it("runs a production build on the LAN without a public URL or cron secret", () => {
+    const c = parseServerConfig(HUB);
+    expect([c.role, c.strict, c.store, c.publicBaseUrl]).toEqual(["hub", true, "local", null]);
+    expect(c.staffAuth).toEqual({ mode: "pin", sessionHours: 14 });
+    expect(c.cronSecret).toBeNull();
+  });
+
+  it("allows a LAN http PUBLIC_BASE_URL on the hub only", () => {
+    expect(problems({ ...HUB, PUBLIC_BASE_URL: "http://192.168.0.10:3000" })).toEqual([]);
+    expect(problems({ ...PROD, PUBLIC_BASE_URL: "http://192.168.0.10:3000" }).length).toBe(2);
+  });
+
+  it("still requires strong kiosk secrets and kiosk auth", () => {
+    expect(problems({ ...HUB, KIOSK_SESSION_SECRET: "short" }).join()).toMatch(
+      /KIOSK_SESSION_SECRET/,
+    );
+    expect(problems({ ...HUB, KIOSK_AUTH_DISABLED: "1" }).join()).toMatch(/development/);
+  });
+
+  it("keeps everything local and never runs on Vercel", () => {
+    expect(problems({ ...HUB, PHOTO_STORE: "supabase", ...PROD, FTL_ROLE: "hub" }).join()).toMatch(
+      /PHOTO_STORE=local/,
+    );
+    expect(problems({ ...HUB, VERCEL_ENV: "production" }).join()).toMatch(/not Vercel/);
+  });
+
+  it("rejects an unknown role; the default stays cloud with Supabase staff login", () => {
+    expect(problems({ ...HUB, FTL_ROLE: "edge" }).join()).toMatch(/FTL_ROLE/);
+    const c = parseServerConfig(PROD);
+    expect(c.role).toBe("cloud");
+    expect(c.staffAuth?.mode).toBe("supabase");
+  });
+
+  it("STAFF_SESSION_HOURS is configurable", () => {
+    expect(parseServerConfig({ ...HUB, STAFF_SESSION_HOURS: "8" }).staffAuth).toEqual({
+      mode: "pin",
+      sessionHours: 8,
+    });
+  });
+
+  it("Secure cookies: the hub follows the request; the strict cloud always", () => {
+    const http = new Request("http://192.168.0.10:3000/admin");
+    const https = new Request("https://lights.example.org/admin");
+    const hub = parseServerConfig(HUB);
+    const cloud = parseServerConfig(PROD);
+    expect([secureCookies(hub, http), secureCookies(hub, https)]).toEqual([false, true]);
+    expect([secureCookies(cloud, http), secureCookies(cloud, https)]).toEqual([true, true]);
   });
 });
 

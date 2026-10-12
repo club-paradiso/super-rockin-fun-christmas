@@ -5,6 +5,21 @@ action is checked on the server and recorded in **기록** (audit).
 
 ## Logging in
 
+### On the venue hub (`FTL_ROLE=hub`, the event setup)
+
+1. On a phone connected to the event router, open `http://<hub address>:3000/admin`.
+2. Tap your name, type your 6-digit PIN on the keypad → **로그인**.
+
+Five wrong PINs lock that name for 15 minutes. **First time on a new hub:** the black hub window
+on the booth laptop shows a one-time **설정 코드**. Open `/admin/login`, type that code, your name
+and a new PIN → **첫 스태프 만들기**. After that the code no longer works.
+
+**Adding staff:** **설정 → 스태프** → name + PIN → **스태프 추가**. Tell the person their PIN in
+person. **PIN 바꾸기** sets a new PIN and logs that person out everywhere. **비활성화** cuts
+someone off on their very next click. No email or phone number is stored.
+
+### On the cloud deployment (email codes)
+
 1. Open `https://<site>/admin` → **스태프 로그인**.
 2. Enter your email → **로그인 코드 받기**.
 3. Check your email for a 6-digit code (valid 10 minutes) → enter it → **로그인**.

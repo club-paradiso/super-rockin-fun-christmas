@@ -13,12 +13,22 @@ export async function register() {
       JSON.stringify({
         level: "info",
         event: "config_ok",
+        role: c.role,
         strict: c.strict,
         store: c.store,
         kioskAuth: c.kioskAuth.mode,
         publicBaseUrl: c.publicBaseUrl?.origin ?? null,
       }),
     );
+    if (c.role === "hub") {
+      // A fresh hub prints its one-time first-staff code in this console window.
+      const { ensureSetupCode } = await import("./lib/staff-auth/setup");
+      await ensureSetupCode().catch((e) =>
+        console.error(
+          JSON.stringify({ level: "error", event: "hub_setup_check_failed", message: String(e) }),
+        ),
+      );
+    }
   } catch (err) {
     if (err instanceof ConfigError) {
       console.error(

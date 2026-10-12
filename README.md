@@ -48,7 +48,15 @@ npm run dev
 # http://localhost:3000/kiosk?camera=mock   (no webcam)  or  /kiosk  (real webcam)
 ```
 
-With staff admin (local Supabase in Docker: Postgres, Auth, Storage, Mailpit):
+As the venue hub (the event setup: local files, staff log in with name + PIN, no Supabase):
+
+```bash
+# .env.local: FTL_ROLE=hub, PHOTO_STORE=local, KIOSK_SESSION_SECRET (≥ 32 chars)
+npm run build && npx next start -H 0.0.0.0
+# The console prints a one-time 설정 코드 → open /admin/login and create the first staff member.
+```
+
+With the cloud staff admin (local Supabase in Docker: Postgres, Auth, Storage, Mailpit):
 
 ```bash
 npx supabase start

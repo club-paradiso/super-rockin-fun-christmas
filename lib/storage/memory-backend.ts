@@ -21,6 +21,7 @@ import type {
   SettingsPatch,
   SettingsRepository,
   StaffMember,
+  StaffPin,
   StaffRepository,
   StorageBackend,
   WallEligibleRow,
@@ -402,6 +403,7 @@ export class MemorySettingsRepository implements SettingsRepository {
 
 export class MemoryStaffRepository implements StaffRepository {
   readonly rows = new Map<string, StaffMember>();
+  readonly pins = new Map<string, StaffPin>();
   constructor(private readonly audit: MemoryAuditLog) {}
 
   async get(userId: string) {
@@ -409,8 +411,24 @@ export class MemoryStaffRepository implements StaffRepository {
   }
   async list() {
     return [...this.rows.values()]
-      .sort((a, b) => a.email.localeCompare(b.email))
+      .sort((a, b) => a.email.localeCompare(b.email) || a.displayName.localeCompare(b.displayName))
       .map((r) => ({ ...r }));
+  }
+  async setPin(userId: string, hash: string, actorId: string | null) {
+    if (!this.rows.has(userId)) throw new Error("unknown staff member");
+    const pin: StaffPin = { hash, setAt: now() };
+    this.pins.set(userId, pin);
+    this.audit.append({
+      actorType: actorId ? "staff" : "system",
+      actorId,
+      action: "set_staff_pin",
+      subjectType: "staff",
+      subjectId: userId,
+    });
+    return { ...pin };
+  }
+  async getPin(userId: string) {
+    return copy(this.pins.get(userId));
   }
   async upsert(
     m: { userId: string; email: string; displayName?: string | null; active?: boolean | null },

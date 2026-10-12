@@ -2,10 +2,9 @@ import "server-only";
 import { NextResponse } from "next/server";
 import {
   applyCookies,
-  authorizeStaff,
+  authorizeStaffRequest,
   denialStatus,
   logStaffDenied,
-  staffAuthClientForRequest,
 } from "@/lib/staff-auth/server";
 import type { StaffMember } from "@/lib/storage/types";
 import { getServerConfig } from "./env";
@@ -20,7 +19,8 @@ export interface StaffContext {
 }
 
 /**
- * Wrap a staff API handler. Every call: Supabase Auth session → active staff_members row.
+ * Wrap a staff API handler. Every call: staff session (Supabase Auth on the cloud, PIN cookie on
+ * the hub) → active staff row.
  * Mutations additionally require same-origin + JSON (CSRF). Kiosk cookies are irrelevant here,
  * and staff sessions are irrelevant to kiosk routes: the two never stand in for each other.
  */
@@ -44,9 +44,7 @@ export function staffRoute<P>(
         );
       }
     }
-    const auth = staffAuthClientForRequest(request);
-    const result = await authorizeStaff(auth?.client ?? null);
-    const pending = auth?.pending ?? [];
+    const { auth: result, pending } = await authorizeStaffRequest(request);
     if (!result.ok) {
       logStaffDenied(result.reason, new URL(request.url).pathname);
       return applyCookies(

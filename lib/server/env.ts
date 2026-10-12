@@ -7,14 +7,28 @@ import "server-only";
 
 export type StoreBackend = "supabase" | "local";
 
+/**
+ * `cloud` = the Vercel + Supabase deployment (Phase 1–4 behaviour). `hub` = the on-site hub on
+ * the venue LAN (docs/ARCHITECTURE.md part 1): local files are the source of truth, staff sign in
+ * with a PIN, and the wall and staff phones reach it over plain HTTP on a dedicated router.
+ */
+export type ServerRole = "cloud" | "hub";
+
+export type StaffAuthConfig =
+  /** Supabase Auth email codes + allowlist (cloud). */
+  | { mode: "supabase"; url: string; anonKey: string }
+  /** Name + PIN against the hub's own staff list (hub). Works without internet. */
+  | { mode: "pin"; sessionHours: number };
+
 export interface ServerConfig {
+  role: ServerRole;
   /** Strict = real deployment. Enforces https public origin and strong secrets. */
   strict: boolean;
   publicBaseUrl: URL | null;
   store: StoreBackend;
   supabase: { url: string; serviceRoleKey: string; bucket: string } | null;
-  /** Supabase Auth for staff. Null = /admin unavailable (needs the Supabase backend). */
-  staffAuth: { url: string; anonKey: string } | null;
+  /** How staff sign in. Null = /admin unavailable. */
+  staffAuth: StaffAuthConfig | null;
   /** Build identifier reported by kiosk heartbeats. */
   appBuild: string;
   localDataDir: string;
@@ -81,6 +95,17 @@ export function parseServerConfig(env: Env): ServerConfig {
   // ignored on Vercel so a stray flag can never weaken a real deployment.
   const strict = env.NODE_ENV === "production" && (onVercel || env.FTL_ALLOW_LOCAL_ORIGIN !== "1");
 
+  const rawRole = env.FTL_ROLE?.trim() || "cloud";
+  if (rawRole !== "cloud" && rawRole !== "hub") {
+    problems.push(`FTL_ROLE must be "cloud" or "hub" (got "${rawRole}")`);
+  }
+  const role: ServerRole = rawRole === "hub" ? "hub" : "cloud";
+  if (role === "hub" && onVercel)
+    problems.push("FTL_ROLE=hub runs on the venue laptop, not Vercel");
+  // The hub serves the venue LAN over plain HTTP; its QR links come from the cloud copy
+  // (docs/ARCHITECTURE.md 1.5), so the public-origin rules below apply to the cloud only.
+  const publicRules = strict && role === "cloud";
+
   let publicBaseUrl: URL | null = null;
   const rawBase = env.PUBLIC_BASE_URL?.trim();
   if (rawBase) {
@@ -89,10 +114,10 @@ export function parseServerConfig(env: Env): ServerConfig {
       if (publicBaseUrl.pathname !== "/" || publicBaseUrl.search || publicBaseUrl.hash) {
         problems.push("PUBLIC_BASE_URL must be an origin only, e.g. https://lights.example.org");
       }
-      if (strict && publicBaseUrl.protocol !== "https:") {
+      if (publicRules && publicBaseUrl.protocol !== "https:") {
         problems.push("PUBLIC_BASE_URL must use https in production");
       }
-      if (strict && isPrivateHost(publicBaseUrl.hostname)) {
+      if (publicRules && isPrivateHost(publicBaseUrl.hostname)) {
         problems.push(
           `PUBLIC_BASE_URL points at a private/local host (${publicBaseUrl.hostname}); phones on cellular data cannot reach it`,
         );
@@ -100,7 +125,7 @@ export function parseServerConfig(env: Env): ServerConfig {
     } catch {
       problems.push(`PUBLIC_BASE_URL is not a valid URL ("${rawBase}")`);
     }
-  } else if (strict) {
+  } else if (publicRules) {
     problems.push("PUBLIC_BASE_URL is required in production (QR codes are built from it)");
   }
 
@@ -115,6 +140,9 @@ export function parseServerConfig(env: Env): ServerConfig {
         : "local";
   if (requested && requested !== "local" && requested !== "supabase") {
     problems.push(`PHOTO_STORE must be "supabase" or "local" (got "${requested}")`);
+  }
+  if (role === "hub" && store !== "local") {
+    problems.push("FTL_ROLE=hub keeps everything on the laptop: set PHOTO_STORE=local");
   }
   let supabase: ServerConfig["supabase"] = null;
   if (store === "supabase") {
@@ -172,8 +200,13 @@ export function parseServerConfig(env: Env): ServerConfig {
   // authorization is the staff_members allowlist.
   const anonKey = env.SUPABASE_ANON_KEY?.trim();
   let staffAuth: ServerConfig["staffAuth"] = null;
-  if (store === "supabase" && supabase && anonKey) {
-    staffAuth = { url: supabase.url, anonKey };
+  if (role === "hub") {
+    staffAuth = {
+      mode: "pin",
+      sessionHours: positiveNumber(env, "STAFF_SESSION_HOURS", 14, problems),
+    };
+  } else if (store === "supabase" && supabase && anonKey) {
+    staffAuth = { mode: "supabase", url: supabase.url, anonKey };
   } else if (strict && store === "supabase") {
     problems.push("SUPABASE_ANON_KEY is required for staff login (/admin) in production");
   }
@@ -181,12 +214,14 @@ export function parseServerConfig(env: Env): ServerConfig {
   const cronSecret = env.CRON_SECRET?.trim() || null;
   if (cronSecret && cronSecret.length < 32)
     problems.push("CRON_SECRET must be at least 32 characters");
-  if (strict && !cronSecret)
+  // The hub runs its own retention in-process; only the cloud is called by Vercel Cron.
+  if (publicRules && !cronSecret)
     problems.push("CRON_SECRET is required in production (retention cleanup)");
 
   if (problems.length) throw new ConfigError(problems);
 
   return {
+    role,
     strict,
     publicBaseUrl,
     store,
@@ -201,6 +236,16 @@ export function parseServerConfig(env: Env): ServerConfig {
     // Vercel functions accept at most 4.5 MB request bodies; a final four-cut JPEG is ~0.3–1.5 MB.
     maxUploadBytes: 4 * 1024 * 1024,
   };
+}
+
+/**
+ * Whether session cookies get the `Secure` flag. The hub serves the venue LAN over plain HTTP,
+ * where browsers drop Secure cookies, so it relies on https only when the request actually used
+ * it (the LAN is a dedicated, password-protected router: docs/DECISIONS.md D42).
+ */
+export function secureCookies(config: ServerConfig, request: Request): boolean {
+  const https = new URL(request.url).protocol === "https:";
+  return config.role === "hub" ? https : config.strict || https;
 }
 
 let cached: { config: ServerConfig } | { error: ConfigError } | null = null;

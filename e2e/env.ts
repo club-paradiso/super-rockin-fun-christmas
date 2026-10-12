@@ -1,12 +1,14 @@
 /**
  * Server environment for the E2E run: a production build with kiosk auth ON, using test-only
- * secrets. Storage is the local backend by default; set E2E_STORE=supabase (plus
- * SUPABASE_TEST_URL / SUPABASE_TEST_SERVICE_ROLE_KEY, e.g. from `npx supabase status`) to run the
- * same suite against a real Supabase stack.
+ * secrets. By default it runs as the on-site hub (FTL_ROLE=hub, local files, PIN staff login).
+ * Set E2E_STORE=supabase (plus SUPABASE_TEST_URL / SUPABASE_TEST_SERVICE_ROLE_KEY, e.g. from
+ * `npx supabase status`) to run the same suite as the cloud against a real Supabase stack.
  */
 export const PORT = Number(process.env.E2E_PORT ?? 3100);
 export const ENROLL_SECRET = "e2e-enroll-secret-not-for-production";
 export const USE_SUPABASE = process.env.E2E_STORE === "supabase";
+/** First-staff setup code for the hub run (normally printed in the hub console). */
+export const HUB_SETUP_CODE = "E2E2-HUB3";
 export const MAILPIT_URL = process.env.SUPABASE_TEST_MAILPIT_URL ?? "http://127.0.0.1:54324";
 
 export const E2E_ENV: Record<string, string> = {
@@ -25,5 +27,10 @@ export const E2E_ENV: Record<string, string> = {
         // Server-only: used by the Next.js server for staff login (Supabase Auth).
         SUPABASE_ANON_KEY: process.env.SUPABASE_TEST_ANON_KEY ?? "",
       }
-    : { PHOTO_STORE: "local", FTL_DATA_DIR: ".data-e2e" }),
+    : {
+        FTL_ROLE: "hub",
+        PHOTO_STORE: "local",
+        FTL_DATA_DIR: ".data-e2e",
+        FTL_HUB_SETUP_CODE: HUB_SETUP_CODE,
+      }),
 };
