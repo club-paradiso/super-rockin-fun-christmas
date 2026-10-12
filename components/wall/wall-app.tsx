@@ -43,9 +43,16 @@ export function WallApp() {
   // Feed polling.
   useEffect(() => {
     let stopped = false;
+    let inFlight = false;
     async function poll() {
+      // Only one request may be active. A slow earlier poll must never overwrite
+      // a newer PAUSE WALL or SHOW HOLDING SCREEN response.
+      if (stopped || inFlight) return;
+      inFlight = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), Math.min(8_000, WALL_CONFIG.pollMs - 1_000));
       try {
-        const res = await fetch("/api/wall/feed", { cache: "no-store" });
+        const res = await fetch("/api/wall/feed", { cache: "no-store", signal: controller.signal });
         if (stopped) return;
         if (res.status === 401) {
           setRevoked(true);
@@ -61,6 +68,9 @@ export function WallApp() {
         setLastOkAt(Date.now());
       } catch {
         if (!stopped) setOnline(false);
+      } finally {
+        clearTimeout(timeout);
+        inFlight = false;
       }
     }
     void poll();
@@ -86,6 +96,10 @@ export function WallApp() {
 
   // Image cache: load what is newly eligible (one at a time), release what is not.
   const loading = useRef(new Set<string>());
+  const allowedNow = useRef(allowed);
+  useEffect(() => {
+    allowedNow.current = allowed;
+  }, [allowed]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -108,8 +122,18 @@ export function WallApp() {
         try {
           const res = await fetch(`/api/wall/photos/${id}/image`, { cache: "no-store" });
           if (!res.ok) continue;
-          const url = URL.createObjectURL(await res.blob());
-          setImages((prev) => new Map(prev).set(id, url));
+          const blob = await res.blob();
+          // Eligibility can change while the request is in flight. Never cache a
+          // withdrawn photo, even if React schedules this state update later.
+          if (cancelled || !allowedNow.current.has(id)) continue;
+          const url = URL.createObjectURL(blob);
+          setImages((prev) => {
+            if (cancelled || !allowedNow.current.has(id) || prev.has(id)) {
+              URL.revokeObjectURL(url);
+              return prev;
+            }
+            return new Map(prev).set(id, url);
+          });
         } catch {
           // Network hiccup: the next feed poll retries.
         } finally {
