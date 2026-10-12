@@ -280,3 +280,27 @@ approve photos showing children without guardian confirmation.
 
 All frames share 4:3 slots (D6), so the choice can come later and the guest has one less
 decision before shooting. A setting can move it before capture.
+
+---
+
+# Phase 2 decisions (2026-10-12)
+
+## D49 · First hub staff member via a console setup code
+
+A fresh hub has no staff, so someone must create the first one without a terminal. While the hub
+has no staff it prints a one-time code in its own console window; whoever can read the booth
+laptop's screen can claim it at `/admin/login`. It is single use, rate-limited and same-origin.
+The E2E suite may fix the code with `FTL_HUB_SETUP_CODE`, honoured only with the E2E-only
+`FTL_ALLOW_LOCAL_ORIGIN` flag and never on Vercel.
+
+## D50 · Only wrong PINs count toward the per-person limit
+
+Staff log in on several devices; counting successes would lock them out. Five wrong PINs per
+person per 15 minutes, keyed by staff id so it does not depend on spoofable `x-forwarded-for`.
+
+## D51 · The default local E2E run is the hub
+
+The hub is the event configuration, so `npm run test:e2e` now runs with `FTL_ROLE=hub`. The
+existing kiosk, offline, security and wall specs pass unchanged; `e2e/hub.spec.ts` adds PIN login
+and the capture → consent → approve → wall → hide flow without Supabase. `E2E_STORE=supabase`
+still runs the cloud admin specs.

@@ -213,9 +213,19 @@ export interface StaffMember {
   createdAt: string;
 }
 
+/** A staff PIN on the hub. Kept apart from StaffMember so it can never reach a browser. */
+export interface StaffPin {
+  /** scrypt hash (lib/staff-auth/pin.ts), never the PIN itself. */
+  hash: string;
+  setAt: string;
+}
+
 export interface StaffRepository {
   get(userId: string): Promise<StaffMember | null>;
   list(): Promise<StaffMember[]>;
+  /** Hub only (PIN login). Audited as `set_staff_pin`; the hash is not part of the audit row. */
+  setPin(userId: string, hash: string, actorId: string | null): Promise<StaffPin>;
+  getPin(userId: string): Promise<StaffPin | null>;
   /** Audited add / rename / (de)activate. actorId null = bootstrap script. */
   upsert(
     member: { userId: string; email: string; displayName?: string | null; active?: boolean | null },

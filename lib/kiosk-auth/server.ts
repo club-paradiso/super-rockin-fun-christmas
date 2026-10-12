@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { getServerConfig } from "@/lib/server/env";
+import { getServerConfig, secureCookies } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { hashEnrollmentCode, normalizeEnrollmentCode } from "@/lib/ops/enrollment-code";
 import { newKioskRow } from "@/lib/storage/rows";
@@ -102,7 +102,7 @@ export async function enrollKioskWithCode(
 /** Set-Cookie header value for a kiosk session (or a clearing cookie when value is null). */
 export function kioskCookieHeader(request: Request, value: string | null): string {
   const config = getServerConfig();
-  const secure = config.strict || new URL(request.url).protocol === "https:";
+  const secure = secureCookies(config, request);
   const maxAge =
     value && config.kioskAuth.mode === "required"
       ? Math.round(config.kioskAuth.sessionDays * 86_400)

@@ -27,6 +27,12 @@ export class RateLimiter {
     return entry.count <= this.limit;
   }
 
+  /** True while `key` is over its limit. Does not count as a hit. */
+  isLimited(key: string): boolean {
+    const entry = this.hits.get(key);
+    return !!entry && this.now() - entry.windowStart < this.windowMs && entry.count >= this.limit;
+  }
+
   private sweep(t: number) {
     if (this.hits.size < 5000) return;
     for (const [k, v] of this.hits) if (t - v.windowStart >= this.windowMs) this.hits.delete(k);

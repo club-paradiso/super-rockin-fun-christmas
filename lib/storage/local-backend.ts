@@ -10,6 +10,7 @@ import type {
   PhotoRow,
   RetentionRun,
   StaffMember,
+  StaffPin,
   StorageBackend,
 } from "./types";
 
@@ -29,6 +30,8 @@ interface DbFile {
   enrollmentCodes: EnrollmentCodeRow[];
   settings: EventSettings | null;
   staff: StaffMember[];
+  /** Hub PIN hashes by staff userId (absent in files written before the hub existed). */
+  staffPins?: Record<string, StaffPin>;
   audit: AuditEvent[];
   retentionRuns: RetentionRun[];
 }
@@ -69,6 +72,7 @@ class FileDb {
     for (const c of db.enrollmentCodes ?? []) this.mem.enrollmentCodes.rows.set(c.id, c);
     if (db.settings) this.mem.settings.value = db.settings;
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
+    for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);
     this.mem.audit.load(db.audit ?? []);
     this.mem.retentionRuns.runs.push(...(db.retentionRuns ?? []));
   }
@@ -82,6 +86,7 @@ class FileDb {
       enrollmentCodes: [...m.enrollmentCodes.rows.values()],
       settings: m.settings.value,
       staff: [...m.staff.rows.values()],
+      staffPins: Object.fromEntries(m.staff.pins),
       audit: m.audit.events,
       retentionRuns: m.retentionRuns.runs,
     };
@@ -176,7 +181,7 @@ export function createLocalBackend(rootDir: string): StorageBackend {
     kiosks: wrap(db, m.kiosks, ["insert", "revoke", "touch", "heartbeat", "update"]),
     enrollmentCodes: wrap(db, m.enrollmentCodes, ["create", "consume"]),
     settings: wrap(db, m.settings, ["update"]),
-    staff: wrap(db, m.staff, ["upsert"]),
+    staff: wrap(db, m.staff, ["upsert", "setPin"]),
     audit: wrap(db, m.audit, []),
     retentionRuns: wrap(db, m.retentionRuns, ["record"]),
   };

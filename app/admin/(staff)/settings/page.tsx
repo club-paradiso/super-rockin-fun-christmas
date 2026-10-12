@@ -1,6 +1,7 @@
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { formatTime } from "@/components/admin/labels";
 import { StaffManager } from "@/components/admin/staff-manager";
+import { getServerConfig } from "@/lib/server/env";
 import { requireStaff } from "@/lib/staff-auth/page";
 import { getBackend } from "@/lib/storage/server";
 
@@ -19,7 +20,11 @@ export default async function SettingsPage() {
         마지막 변경: {formatTime(settings.updatedAt)}
         {updater ? ` · ${updater.displayName}` : ""}
       </p>
-      <StaffManager staff={staff} selfId={me.userId} />
+      <StaffManager
+        staff={staff}
+        selfId={me.userId}
+        mode={getServerConfig().staffAuth?.mode === "pin" ? "pin" : "email"}
+      />
     </div>
   );
 }

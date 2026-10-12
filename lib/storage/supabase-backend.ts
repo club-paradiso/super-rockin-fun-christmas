@@ -480,6 +480,13 @@ class SupabaseStaffRepository implements StaffRepository {
     });
     return toStaff(rows[0]!);
   }
+  // PIN login exists only on the hub, which always uses the local backend (FTL_ROLE=hub).
+  async setPin(): Promise<never> {
+    throw new Error("staff PINs live on the hub (local backend), not in Supabase");
+  }
+  async getPin() {
+    return null;
+  }
 }
 
 class SupabaseAuditRepository implements AuditRepository {

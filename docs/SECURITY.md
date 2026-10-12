@@ -68,6 +68,17 @@ uploads already queued wait in IndexedDB ("기기 등록 필요") until the devi
 | Enrollment code reuse / guessing            | One-time, 15 min, SHA-256 stored, atomic consume, rate-limited per IP, ~40-bit space.                                                                                                                                                                |
 | Supabase user JWT used against PostgREST    | RLS on every table with no policies, and privileges revoked from `authenticated` (tested with a real user JWT).                                                                                                                                      |
 
+## Hub staff login (FTL_ROLE=hub)
+
+| Threat                                | Mitigation                                                                                                                                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PIN guessing                          | 6 digits, trivial PINs refused (`000000`, `123456`…). scrypt hash. **5 wrong PINs per person per 15 min**, keyed by staff id (not IP), plus 20 tries per IP. Wrong PIN, unknown person and inactive person look identical. |
+| PIN or hash leaks                     | Only the scrypt hash is stored, apart from the staff row; it never appears in staff lists, API responses or audit rows (tested).                                                                                           |
+| Someone claims a fresh hub            | The first staff member needs the one-time setup code printed in the hub's own console. It works only while the hub has no staff, once, rate-limited, same-origin.                                                          |
+| Forged or replayed staff cookie       | `s1.<id>.<iat>.<exp>.<pinSetAt>.<hmac>`, HMAC key derived from `KIOSK_SESSION_SECRET` with a staff-only label, so kiosk cookies never verify as staff cookies (tested). Every request re-checks an active staff row.       |
+| Ex-staff or a leaked PIN keeps access | Deactivation and PIN resets end existing sessions on the next request (`pinSetAt` must match). Default session 14 h (`STAFF_SESSION_HOURS`).                                                                               |
+| Sniffing on the venue LAN             | The hub serves plain HTTP, so cookies are not `Secure` there. The LAN must be the dedicated, password-protected router (D42), never the congregation Wi-Fi.                                                                |
+
 ## Accepted limitations
 
 - **Rate limits are per server instance** (in memory). On Vercel each instance counts separately
@@ -85,4 +96,7 @@ uploads already queued wait in IndexedDB ("기기 등록 필요") until the devi
 - **The kiosk device itself is trusted.** Someone with the unlocked kiosk can upload. Physical
   supervision is assumed.
 - `x-forwarded-for` is trusted for rate-limit keys. That is correct behind Vercel; on a bare
-  server it can be spoofed, which only weakens the rate limit.
+  server (the hub) it can be spoofed, which only weakens the per-IP limits. The per-person PIN
+  limit does not depend on it.
+- **Hub PINs are shared verbally.** Whoever learns a staff member's PIN and reaches the venue LAN
+  can act as them until the PIN is reset. Reset PINs after the event and when staff change.

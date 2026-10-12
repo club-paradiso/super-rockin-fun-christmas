@@ -1,4 +1,6 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
+import { hashPin } from "@/lib/staff-auth/pin";
 import { getServerConfig } from "@/lib/server/env";
 import { createServiceClient } from "@/lib/storage/supabase-backend";
 import { getBackend } from "@/lib/storage/server";
@@ -37,4 +39,22 @@ export async function addStaffMember(
     { userId, email: normalized, displayName, active: true },
     actorId,
   );
+}
+
+/**
+ * Hub (FTL_ROLE=hub): add a staff member who signs in with name + PIN. No email or other contact
+ * details are stored. Both writes are audited (`add_staff`, `set_staff_pin`).
+ */
+export async function addPinStaffMember(
+  displayName: string,
+  pin: string,
+  actorId: string | null,
+): Promise<StaffMember> {
+  const staff = getBackend().staff;
+  const member = await staff.upsert(
+    { userId: randomUUID(), email: "", displayName, active: true },
+    actorId,
+  );
+  await staff.setPin(member.userId, hashPin(pin), actorId);
+  return member;
 }
