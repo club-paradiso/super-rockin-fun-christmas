@@ -271,6 +271,29 @@ describe("wall consent", () => {
     });
     expect((await image(token)).status).toBe(200);
   });
+
+  // The other-kiosk rule is in the PhotoService contract; one enrollment keeps this file under
+  // the enrollment rate limit.
+  it("by session id (durable kiosk queue): ids validated, unknown sessions refused", async () => {
+    const { cookie } = await enroll("세션 동의 부스");
+    const sessionId = uuid();
+    expect((await upload(cookie, JPEG, {}, sessionId)).ok).toBe(true);
+    const { POST } = await api.consent();
+    const send = (body: unknown, c = cookie) =>
+      POST(
+        new Request("https://lights.example.org/api/photos/consent", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: c },
+          body: JSON.stringify(body),
+        }),
+      );
+    expect((await send({ sessionId: "nope", consent: true })).status).toBe(400);
+    expect((await send({ sessionId: uuid(), consent: true })).status).toBe(404);
+    expect(await (await send({ sessionId, consent: true })).json()).toEqual({
+      wallConsent: true,
+      moderationStatus: "PENDING",
+    });
+  });
 });
 
 describe("Phase 3 kiosk APIs on the local backend", () => {

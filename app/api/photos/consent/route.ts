@@ -5,6 +5,7 @@ import { NO_STORE, jsonError, route } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
 import { limiters } from "@/lib/server/rate-limit";
 import { isSameOrigin } from "@/lib/server/request";
+import { isUuid } from "@/lib/server/validate";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 
 export const runtime = "nodejs";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
  * Record the guest's media-wall choice, from the kiosk that took the photo. Independent of
  * delivery: the guest link works the same whatever is sent here. YES → PENDING human review.
  * YES is refused (409) while staff have paused wall submissions.
+ *
+ * Body: {"sessionId","consent"} (the kiosk's durable consent queue) or {"token","consent"}.
  */
 export const POST = route("consent", async (request: Request) => {
   const config = getServerConfig();
@@ -32,15 +35,21 @@ export const POST = route("consent", async (request: Request) => {
   } catch {
     return jsonError(400, "invalid json");
   }
-  const { token, consent } = (body ?? {}) as { token?: unknown; consent?: unknown };
-  if (typeof token !== "string" || typeof consent !== "boolean") {
-    return jsonError(400, "token and consent are required");
+  const { token, sessionId, consent } = (body ?? {}) as {
+    token?: unknown;
+    sessionId?: unknown;
+    consent?: unknown;
+  };
+  if (typeof consent !== "boolean" || (typeof token !== "string" && !isUuid(sessionId))) {
+    return jsonError(400, "consent and a sessionId or token are required");
   }
   // PAUSE SUBMISSIONS stops new wall submissions only; "NO" and the photo link keep working.
   const settings = await getBackend().settings.get();
-  const result = await getPhotoService().setWallConsent(token, consent, auth.kioskId, {
-    submissionsPaused: settings.pauseSubmissions,
-  });
+  const opts = { submissionsPaused: settings.pauseSubmissions };
+  const service = getPhotoService();
+  const result = isUuid(sessionId)
+    ? await service.setWallConsentForSession(sessionId, consent, auth.kioskId, opts)
+    : await service.setWallConsent(token as string, consent, auth.kioskId, opts);
   if (!result.ok) {
     if (result.reason === "paused") return jsonError(409, "wall submissions paused");
     return jsonError(404, "not found");

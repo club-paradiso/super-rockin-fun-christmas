@@ -48,19 +48,28 @@ describe("uploadOnce", () => {
 });
 
 describe("sendWallConsent", () => {
-  const noSleep = () => Promise.resolve();
-  it("retries transient failures", async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError("offline"))
-      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
-    expect(await sendWallConsent("t", true, fetchImpl, noSleep)).toBe(true);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  it("sends the session id, never a token", async () => {
+    const fetchImpl = respond(200);
+    expect(await sendWallConsent("s-1", true, fetchImpl)).toBe("done");
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(JSON.parse(init.body)).toEqual({ sessionId: "s-1", consent: true });
   });
-  it("does not retry a 4xx", async () => {
-    const fetchImpl = respond(404);
-    expect(await sendWallConsent("t", true, fetchImpl, noSleep)).toBe(false);
-    expect(fetchImpl).toHaveBeenCalledOnce();
+
+  it.each([
+    [401, "retry"],
+    [429, "retry"],
+    [500, "retry"],
+    [503, "retry"],
+    [400, "done"],
+    [404, "done"],
+    [409, "done"],
+  ])("HTTP %i → %s", async (status, expected) => {
+    expect(await sendWallConsent("s", true, respond(status))).toBe(expected);
+  });
+
+  it("a thrown fetch (offline) → retry", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("offline"));
+    expect(await sendWallConsent("s", false, fetchImpl)).toBe("retry");
   });
 });
 

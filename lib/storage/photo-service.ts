@@ -223,8 +223,33 @@ export class PhotoService {
   ): Promise<ConsentResult> {
     const found = await this.resolve(token);
     if (!found.ok || found.row.kioskId !== kioskId) return { ok: false, reason: "not_found" };
+    return this.applyConsent(found.row, consent, kioskId, opts);
+  }
+
+  /**
+   * The same choice addressed by session id, which is what the kiosk's durable consent queue
+   * holds (it never stores tokens). Only the kiosk that uploaded the session may answer, and a
+   * deleted photo cannot be answered for. Unlike the token path it still works after the guest
+   * link has expired: an answer queued while offline must not be lost to a slow network.
+   */
+  async setWallConsentForSession(
+    sessionId: string,
+    consent: boolean,
+    kioskId: string | null,
+    opts: { submissionsPaused: boolean } = { submissionsPaused: false },
+  ): Promise<ConsentResult> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    if (!row || isGone(row) || row.kioskId !== kioskId) return { ok: false, reason: "not_found" };
+    return this.applyConsent(row, consent, kioskId, opts);
+  }
+
+  private async applyConsent(
+    row: PhotoRow,
+    consent: boolean,
+    kioskId: string | null,
+    opts: { submissionsPaused: boolean },
+  ): Promise<ConsentResult> {
     if (consent && opts.submissionsPaused) return { ok: false, reason: "paused" };
-    const row = found.row;
     const from = row.moderationStatus;
     const reviewable = from === "NONE" || from === "PENDING";
     const to: ModerationStatus = consent ? "PENDING" : "NONE";

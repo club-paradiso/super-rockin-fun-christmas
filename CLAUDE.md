@@ -74,7 +74,7 @@ components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff
 lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/kiosk              pure state machine, session helpers, upload/consent client
-lib/offline            IndexedDB queue store + UploadQueue (retry, dedupe, reload-safe)
+lib/offline            IndexedDB stores + UploadQueue and ConsentQueue (retry, dedupe, reload-safe)
 lib/kiosk-auth         signed kiosk session cookie, enrollment, verification
 lib/server             env validation, logging, rate limits, request helpers
 lib/storage            PhotoService (all rules) + backends: memory, local files, Supabase

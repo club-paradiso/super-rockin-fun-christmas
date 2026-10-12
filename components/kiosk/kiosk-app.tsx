@@ -33,6 +33,7 @@ import {
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
 import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { ConsentQueue } from "@/lib/offline/consent-queue";
 import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
@@ -254,6 +255,8 @@ export function KioskApp({
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
   // a finished photo. The QR appears only once the server has issued a real token.
   const queueRef = useRef<Promise<UploadQueue> | null>(null);
+  // The guest's media-wall answer, kept until the server has it (survives offline and reloads).
+  const consentRef = useRef<Promise<ConsentQueue> | null>(null);
   const sessionRef = useRef(state.sessionId);
   const [queueStatus, setQueueStatus] = useState({ depth: 0, authBlocked: false, durable: true });
 
@@ -280,22 +283,35 @@ export function KioskApp({
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
     let unsubscribe = () => {};
-    const ready = openQueueStore().then(({ store, durable }) => {
+    const opened = openQueueStore();
+    const consents = opened.then(
+      ({ store, consents }) => new ConsentQueue(consents, store, sendWallConsent),
+    );
+    const ready = opened.then(({ store, durable }) => {
       const queue = new UploadQueue(store, uploadOnce);
       unsubscribe = queue.subscribe((event) => {
         if (event.type === "status") {
           setQueueStatus({ depth: event.depth, authBlocked: event.authBlocked, durable });
         } else if (event.type === "uploaded") {
           void showQr(event.sessionId, event.result);
+          // A wall answer given while this photo was still queued can go now.
+          void consents.then((c) => c.processDue(true));
         }
       });
       void queue.emitStatus();
-      void queue.processDue(); // entries left over from before a reload / restart
-      timer = setInterval(() => void queue.processDue(), 5_000);
+      // Entries left over from before a reload / restart.
+      void queue.processDue().then(() => consents.then((c) => c.processDue()));
+      timer = setInterval(() => {
+        void queue.processDue().then(() => consents.then((c) => c.processDue()));
+      }, 5_000);
       return queue;
     });
     queueRef.current = ready;
-    const onOnline = () => void ready.then((q) => q.processDue(true));
+    consentRef.current = consents;
+    const onOnline = () =>
+      void ready
+        .then((q) => q.processDue(true))
+        .then(() => consents.then((c) => c.processDue(true)));
     window.addEventListener("online", onOnline);
     return () => {
       clearInterval(timer);
@@ -340,10 +356,13 @@ export function KioskApp({
   };
 
   const chooseConsent = (consent: "yes" | "no") => {
-    if (state.delivery.status === "ready") {
-      // Best effort. Failure here never affects the guest's own download link.
-      void sendWallConsent(state.delivery.token, consent === "yes");
-    }
+    // Stored first, sent when the photo is on the server, retried until it lands. Whatever
+    // happens here never affects the guest's own download link.
+    const sessionId = state.sessionId;
+    void consentRef.current?.then(async (c) => {
+      await c.enqueue(sessionId, consent === "yes");
+      await c.processDue(true);
+    });
     dispatch({ type: "SET_CONSENT", consent });
   };
 
@@ -770,12 +789,17 @@ function Screen(p: ScreenProps) {
                 <button type="button" className="btn-primary" onClick={p.onRetryDelivery}>
                   다시 시도
                 </button>
+                {/* The photo is safe on this device and uploads later, so the wall question
+                    still makes sense: the answer waits with it (ConsentQueue). */}
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => dispatch({ type: "FINISH" })}
+                  data-testid="queued-continue"
+                  onClick={() =>
+                    dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
+                  }
                 >
-                  그만하기
+                  QR 없이 다음으로
                 </button>
               </div>
             </div>

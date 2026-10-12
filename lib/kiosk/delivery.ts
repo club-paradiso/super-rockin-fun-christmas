@@ -1,4 +1,5 @@
 import type { QueuedUpload } from "@/lib/offline/queue-store";
+import type { ConsentOutcome } from "@/lib/offline/consent-queue";
 import type { UploadOutcome, UploadSuccess } from "@/lib/offline/upload-queue";
 
 /**
@@ -46,27 +47,28 @@ export async function uploadOnce(
   }
 }
 
-/** Best-effort, retried a few times. A failure never affects the guest's download link. */
+/**
+ * One attempt to record the guest's media-wall answer for a session (the ConsentQueue retries).
+ * "done" also covers answers the server will never take (submissions paused → 409, photo gone →
+ * 404, bad request → 400): retrying those would not change anything.
+ */
 export async function sendWallConsent(
-  token: string,
+  sessionId: string,
   consent: boolean,
   fetchImpl: typeof fetch = fetch,
-  sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
-): Promise<boolean> {
-  for (const delay of [0, 2_000, 8_000]) {
-    if (delay) await sleep(delay);
-    try {
-      const response = await fetchImpl("/api/photos/consent", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, consent }),
-      });
-      if (response.ok) return true;
-      if (response.status < 500 && response.status !== 429) return false;
-    } catch {
-      // network: retry
-    }
+): Promise<ConsentOutcome> {
+  try {
+    const response = await fetchImpl("/api/photos/consent", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId, consent }),
+    });
+    if (response.ok) return "done";
+    if (response.status === 401 || response.status === 429 || response.status >= 500)
+      return "retry";
+    return "done";
+  } catch {
+    return "retry";
   }
-  return false;
 }

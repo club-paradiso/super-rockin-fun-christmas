@@ -324,6 +324,16 @@ The design said approval order, but rows do not record when they were approved. 
 keeps the same guarantee (a new photo never jumps one that was already waiting) without a schema
 change.
 
+## D56 · The wall answer is queued by session id, like the photo
+
+The kiosk stores the guest's answer in IndexedDB (`consents`, database v2) and sends it by
+session id once that session's photo has left the upload queue, retrying across network loss and
+reloads (AUDIT R1/R2). Session ids, not tokens, so no guest link is ever stored on the kiosk. The
+server accepts it only from the kiosk that uploaded the session, under the same rules as before
+(YES → PENDING, refused while submissions are paused), and still after the guest link has
+expired. When the photo is still queued, the kiosk now continues to the wall question
+("QR 없이 다음으로") instead of ending the session without asking.
+
 ## D55 · Feed = top of the order + what is on screen
 
 Sending only the top `max(4S, 30)` keeps the response small with thousands of photos. A photo goes
