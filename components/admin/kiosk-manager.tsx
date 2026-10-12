@@ -114,7 +114,8 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
         onConfirm={() => send({ action: "revoke" })}
         onCancel={() => setConfirmRevoke(false)}
       >
-        이 기기는 즉시 사진을 올릴 수 없게 돼요. 다시 쓰려면 새 등록 코드로 등록해야 해요.
+        이 기기는 즉시 사진을 올리거나 미디어월을 보여줄 수 없게 돼요. 다시 쓰려면 새 등록 코드로
+        등록해야 해요.
       </ConfirmDialog>
     </li>
   );
@@ -176,6 +177,7 @@ export function EnrollmentCodeCreator() {
           <p className="text-base text-mist">
             &ldquo;{result.label}&rdquo; 키오스크에서 /kiosk/enroll 을 열고 입력하세요
           </p>
+          <p className="text-sm text-mist">미디어월 화면은 /kiosk/enroll?next=wall 에서 입력해요</p>
           <p
             className="my-3 font-mono text-5xl font-bold tracking-[0.2em] text-amber"
             data-testid="enrollment-code"

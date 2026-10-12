@@ -91,8 +91,8 @@ lasts the normal link lifetime, but never past the photo's retention date.
 | Switch                                     | Effect now                                                                                                                                      | Who reads it    |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
 | **미디어월 참여 중지** (PAUSE SUBMISSIONS) | Kiosks stop asking "미디어월에도 보여줄까요?" and the server refuses new "yes" answers. **Taking photos, QR codes and downloads keep working.** | kiosks + server |
-| **미디어월 일시정지** (PAUSE WALL)         | Stored and audited; the Phase 4 wall will stop showing new photos                                                                               | Phase 4 wall    |
-| **대기 화면 표시** (SHOW HOLDING SCREEN)   | Stored and audited; the Phase 4 wall will show a holding screen                                                                                 | Phase 4 wall    |
+| **미디어월 일시정지** (PAUSE WALL)         | The wall takes every photo down within 10 s and shows only the village. Turning it off brings approved photos back                              | `/wall` feed    |
+| **대기 화면 표시** (SHOW HOLDING SCREEN)   | The wall shows a holding message and receives no photos. Wins over PAUSE WALL                                                                   | `/wall` feed    |
 
 While any switch is on, a red banner appears on every admin page.
 

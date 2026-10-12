@@ -78,6 +78,12 @@ export interface PhotoListFilter {
   limit: number;
 }
 
+/** A row of the `wall_eligible_photos` view: APPROVED, wall consent, not deleted. Server-only. */
+export type WallEligibleRow = Pick<
+  PhotoRow,
+  "id" | "createdAt" | "frameId" | "mime" | "thumbPath" | "objectPath"
+>;
+
 export interface PhotoStats {
   byStatus: Record<ModerationStatus, number>;
   /** Photos whose image is still stored. */
@@ -110,6 +116,8 @@ export interface PhotoRepository {
   listObjectCleanupDue(limit: number): Promise<PhotoRow[]>;
   /** Newest first. */
   list(filter: PhotoListFilter): Promise<PhotoRow[]>;
+  /** Wall candidates (APPROVED AND wall_consent AND not deleted), newest first. */
+  listWallEligible(limit: number): Promise<WallEligibleRow[]>;
   stats(): Promise<PhotoStats>;
 }
 
@@ -261,6 +269,13 @@ export interface StorageBackend {
   staff: StaffRepository;
   audit: AuditRepository;
   retentionRuns: RetentionRunRepository;
+}
+
+/** What the media wall may know about a photo. No object path, no token, no kiosk. */
+export interface WallPhoto {
+  id: string;
+  frameId: string;
+  createdAt: string;
 }
 
 /** What a guest-facing route may know about a photo. No object path, no token hash. */

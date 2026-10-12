@@ -36,6 +36,42 @@ body {
     radial-gradient(1.5px 1.5px at 7% 88%, rgba(247, 239, 224, 0.4), transparent 60%);
 }
 
+/* Media wall: a photo rises into a lit window and fades out. Uses the individual `translate`
+   and `scale` properties so the inline rotate() transform of each slot is left alone. */
+.wall-photo-enter {
+  animation: wall-enter 1.5s ease-out both;
+}
+.wall-photo-exit {
+  animation: wall-exit 1.5s ease-in both;
+}
+@keyframes wall-enter {
+  from {
+    opacity: 0;
+    translate: 0 4vh;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+@keyframes wall-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    translate: 0 -2vh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wall-photo-enter,
+  .wall-photo-exit {
+    animation-duration: 0.01s;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply inline-flex min-h-20 items-center justify-center rounded-2xl bg-amber px-10 text-2xl font-bold text-ink shadow-[0_0_40px_rgba(255,207,138,0.25)] transition active:scale-[0.98] disabled:opacity-50;

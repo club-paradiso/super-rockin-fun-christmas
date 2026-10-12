@@ -14,12 +14,12 @@ const SWITCHES = [
   {
     key: "pauseWall",
     title: "미디어월 일시정지",
-    help: "미디어월이 새 사진을 보여주지 않아요 (Phase 4 미디어월이 사용).",
+    help: "미디어월에서 사진을 모두 내리고 배경만 보여줘요. 다시 켜면 승인된 사진이 돌아와요.",
   },
   {
     key: "showHoldingScreen",
     title: "대기 화면 표시",
-    help: "미디어월을 안내용 대기 화면으로 바꿔요 (Phase 4 미디어월이 사용).",
+    help: "미디어월을 안내용 대기 화면으로 바꿔요. 사진은 보내지 않아요.",
   },
 ] as const;
 

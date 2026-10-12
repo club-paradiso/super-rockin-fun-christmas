@@ -345,3 +345,168 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("media wall API on the local backend", () => {
+  const wall = {
+    feed: () => import("@/app/api/wall/feed/route"),
+    image: () => import("@/app/api/wall/photos/[id]/image/route"),
+  };
+  const getFeed = async (cookie: string | null) => {
+    const { GET } = await wall.feed();
+    return GET(
+      new Request("https://lights.example.org/api/wall/feed", {
+        headers: cookie ? { cookie } : {},
+      }),
+    );
+  };
+  const getImage = async (cookie: string | null, id: string) => {
+    const { GET } = await wall.image();
+    return GET(
+      new Request(`https://lights.example.org/api/wall/photos/${id}/image`, {
+        headers: cookie ? { cookie } : {},
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+  };
+
+  it("a display enrolled with next=wall lands on /wall and sees only approved, consented photos", async () => {
+    const { getBackend, getPhotoService } = await import("@/lib/storage/server");
+    const { generateEnrollmentCode, hashEnrollmentCode, normalizeEnrollmentCode } =
+      await import("@/lib/ops/enrollment-code");
+    const backend = getBackend();
+    const svc = getPhotoService();
+    const staffId = uuid();
+
+    const code = generateEnrollmentCode();
+    await backend.enrollmentCodes.create({
+      id: uuid(),
+      codeHash: hashEnrollmentCode(normalizeEnrollmentCode(code)!),
+      label: "미디어월",
+      createdBy: staffId,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const { POST: enrollPost } = await api.enroll();
+    const enrolled = await enrollPost(
+      new Request("https://lights.example.org/api/kiosk/enroll", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          origin: "https://lights.example.org",
+          // Own client IP: earlier tests in this file used up the default one's enroll budget.
+          "x-forwarded-for": "10.9.0.1",
+        },
+        body: new URLSearchParams({ code, next: "wall" }),
+      }),
+    );
+    expect(enrolled.status).toBe(303);
+    expect(enrolled.headers.get("location")).toBe("/wall");
+    const display = enrolled.headers.get("set-cookie")!.split(";")[0]!;
+
+    expect((await getFeed(null)).status).toBe(401);
+    expect((await getFeed("ftl_kiosk=v1.forged")).status).toBe(401);
+
+    // Two guests say YES, one says NO; staff approves one YES.
+    const kioskRes = await enrollPost(
+      new Request("https://lights.example.org/api/kiosk/enroll", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://lights.example.org",
+          "x-forwarded-for": "10.9.0.2",
+        },
+        body: JSON.stringify({ secret: ENROLL, label: "wall test kiosk" }),
+      }),
+    );
+    expect(kioskRes.status).toBe(201);
+    const kiosk = kioskRes.headers.get("set-cookie")!.split(";")[0]!;
+    const { POST: consent } = await api.consent();
+    const shoot = async (yes: boolean) => {
+      const sessionId = uuid();
+      const { token } = (await (await upload(kiosk, JPEG, {}, sessionId)).json()) as {
+        token: string;
+      };
+      await consent(
+        new Request("https://lights.example.org/api/photos/consent", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: kiosk },
+          body: JSON.stringify({ token, consent: yes }),
+        }),
+      );
+      return (await backend.photos.findBySessionId(sessionId))!.id;
+    };
+    const approved = await shoot(true);
+    const pending = await shoot(true);
+    const declined = await shoot(false);
+    expect((await svc.moderate(approved, "approve", staffId)).ok).toBe(true);
+
+    const res = await getFeed(display);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const text = await res.text();
+    const body = JSON.parse(text) as { mode: string; photos: { id: string }[] };
+    expect(body.mode).toBe("live");
+    const ids = body.photos.map((p) => p.id);
+    expect(ids).toContain(approved);
+    expect(ids).not.toContain(pending);
+    expect(ids).not.toContain(declined);
+    expect(text).not.toMatch(/objectPath|object_path|tokenHash|kioskId|photos\//);
+
+    const img = await getImage(display, approved);
+    expect(img.status).toBe(200);
+    expect(img.headers.get("content-type")).toBe("image/jpeg");
+    expect(img.headers.get("cache-control")).toBe("private, no-store");
+    expect((await getImage(display, pending)).status).toBe(404);
+    expect((await getImage(display, declined)).status).toBe(404);
+    expect((await getImage(display, "not-a-uuid")).status).toBe(404);
+    expect((await getImage(null, approved)).status).toBe(401);
+
+    // Hidden after the last poll: refused at once, gone from the next poll.
+    await svc.moderate(approved, "hide", staffId);
+    expect((await getImage(display, approved)).status).toBe(404);
+    expect(
+      ((await (await getFeed(display)).json()) as { photos: { id: string }[] }).photos.map(
+        (p) => p.id,
+      ),
+    ).not.toContain(approved);
+    await svc.moderate(approved, "unhide", staffId);
+
+    // Emergency switches send no photos at all, and images are refused.
+    await backend.settings.update({ pauseWall: true }, staffId);
+    expect(await (await getFeed(display)).json()).toEqual({ mode: "paused", photos: [] });
+    expect((await getImage(display, approved)).status).toBe(404);
+    await backend.settings.update({ showHoldingScreen: true }, staffId);
+    expect(await (await getFeed(display)).json()).toEqual({ mode: "holding", photos: [] });
+    await backend.settings.update({ pauseWall: false, showHoldingScreen: false }, staffId);
+    expect((await getImage(display, approved)).status).toBe(200);
+
+    // Revoking the display cuts it off on its next request.
+    const displayRow = (await backend.kiosks.list()).find((k) => k.label === "미디어월")!;
+    await backend.kiosks.update(displayRow.id, { revoke: true }, staffId);
+    expect((await getFeed(display)).status).toBe(401);
+    expect((await getImage(display, approved)).status).toBe(401);
+  });
+
+  it("enrollment errors keep the wall destination; anything else never redirects off-site", async () => {
+    const { POST: enrollPost } = await api.enroll();
+    const send = (fields: Record<string, string>, ip: string) =>
+      enrollPost(
+        new Request("https://lights.example.org/api/kiosk/enroll", {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin: "https://lights.example.org",
+            "x-forwarded-for": ip,
+          },
+          body: new URLSearchParams(fields),
+        }),
+      );
+    const bad = await send({ code: "ZZZZ-ZZZZ", next: "wall" }, "10.9.0.3");
+    expect(bad.headers.get("location")).toBe("/kiosk/enroll?error=401&next=wall");
+    const evil = await send(
+      { secret: ENROLL, label: "x", next: "https://evil.example" },
+      "10.9.0.4",
+    );
+    expect(evil.headers.get("location")).toBe("/kiosk");
+  });
+});

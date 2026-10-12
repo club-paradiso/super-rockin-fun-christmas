@@ -1,4 +1,4 @@
-# Security model (Phase 2 + 3)
+# Security model (Phase 2–4)
 
 Scope: a church Christmas event with one to a few kiosks, guest phones on any network, and a few
 volunteer staff. The goal is proportionate protection for guests' photos, not enterprise
@@ -31,6 +31,9 @@ security.
 | Broken production config (e.g. localhost QR)                     | `parseServerConfig` refuses non-https or private-network `PUBLIC_BASE_URL`, missing or weak secrets, and disabled kiosk auth in production. The kiosk shows a staff error and logs `config_invalid` at boot.                                                               |
 | Photos kept forever                                              | Retention cron deletes the objects and marks rows `DELETED`.                                                                                                                                                                                                               |
 | Wall abuse                                                       | Consent can only be set by the kiosk that took the photo. YES → `PENDING`. Nothing auto-approves. A DB constraint makes `APPROVED` impossible without consent.                                                                                                             |
+| An unmoderated or withdrawn photo reaches the wall               | `/api/wall/feed` returns only `wall_eligible_photos` (APPROVED ∧ consent ∧ not deleted). The image route re-checks the row on every request. A hidden or deleted photo leaves the screen within one poll (10 s). After 2 min offline the wall drops every cached photo.    |
+| PAUSE WALL / SHOW HOLDING SCREEN ignored by a stale display      | Applied on the server: the feed sends no photo ids and the image route returns 404 while either switch is on.                                                                                                                                                              |
+| Anyone opens /wall or its APIs                                   | The display must be enrolled (one-time code, HttpOnly session, revocable in /admin). Feed and image return 401 otherwise. Responses carry ids only — no tokens, storage paths or kiosk ids.                                                                                |
 
 ## Kiosk enrollment flow
 

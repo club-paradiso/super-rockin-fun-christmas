@@ -13,15 +13,31 @@ export const dynamic = "force-dynamic";
  * Enroll this browser as a kiosk. Two ways:
  *  - `code`: a one-time code a staff member generated in /admin (preferred; expires, single use).
  *  - `secret` + `label`: the Phase 2 shared secret, only when KIOSK_ENROLL_SECRET is set (legacy).
- * Success sets an HttpOnly kiosk session cookie and returns to /kiosk.
+ * Success sets an HttpOnly kiosk session cookie and returns to /kiosk, or to /wall when the form
+ * says `next=wall` (a media wall display is enrolled the same way, see DECISIONS D36).
  */
 export const POST = route("enroll", async (request: Request) => {
   const config = getServerConfig();
   const isForm = request.headers
     .get("content-type")
     ?.startsWith("application/x-www-form-urlencoded");
+  let fields: Record<string, string> = {};
+  const FIELDS = ["code", "secret", "label", "next"];
+  if (isForm) {
+    const form = await request.formData();
+    for (const k of FIELDS) fields[k] = String(form.get(k) ?? "");
+  } else {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    fields = Object.fromEntries(
+      FIELDS.map((k) => [k, typeof body[k] === "string" ? (body[k] as string) : ""]),
+    );
+  }
+  // Only two fixed destinations: never an open redirect.
+  const toWall = fields.next === "wall";
   const fail = (status: number, error: string) =>
-    isForm ? seeOther(`/kiosk/enroll?error=${status}`) : jsonError(status, error);
+    isForm
+      ? seeOther(`/kiosk/enroll?error=${status}${toWall ? "&next=wall" : ""}`)
+      : jsonError(status, error);
 
   if (!isSameOrigin(request, [config.publicBaseUrl]))
     return jsonError(403, "cross-origin request refused");
@@ -31,20 +47,6 @@ export const POST = route("enroll", async (request: Request) => {
   if (!limiters.enroll.take(ip)) {
     logEvent("kiosk_enroll_rate_limited", { ip }, "warn");
     return fail(429, "too many attempts");
-  }
-
-  let fields: Record<string, string> = {};
-  if (isForm) {
-    const form = await request.formData();
-    for (const k of ["code", "secret", "label"]) fields[k] = String(form.get(k) ?? "");
-  } else {
-    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    fields = Object.fromEntries(
-      ["code", "secret", "label"].map((k) => [
-        k,
-        typeof body[k] === "string" ? (body[k] as string) : "",
-      ]),
-    );
   }
 
   let enrolled: { kioskId: string; label: string; cookieValue: string } | null = null;
@@ -69,7 +71,7 @@ export const POST = route("enroll", async (request: Request) => {
   }
 
   const cookie = kioskCookieHeader(request, enrolled.cookieValue);
-  if (isForm) return seeOther("/kiosk", { "set-cookie": cookie });
+  if (isForm) return seeOther(toWall ? "/wall" : "/kiosk", { "set-cookie": cookie });
   return NextResponse.json(
     { kioskId: enrolled.kioskId, label: enrolled.label },
     { status: 201, headers: { ...NO_STORE, "set-cookie": cookie } },

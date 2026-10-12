@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { planModeration, type ModerationAction } from "@/lib/ops/moderation";
+import { isWallEligible, planModeration, type ModerationAction } from "@/lib/ops/moderation";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
   GuestPhoto,
@@ -8,6 +8,7 @@ import type {
   PhotoMime,
   PhotoRow,
   StorageBackend,
+  WallPhoto,
 } from "./types";
 
 export interface PhotoServiceOptions {
@@ -359,6 +360,24 @@ export class PhotoService {
     }
     const data = await this.backend.objects.get(row.objectPath);
     return data ? { data, mime: row.mime } : null;
+  }
+
+  // ── media wall ───────────────────────────────────────────────────────────────────────────
+
+  /** Photos the wall may show right now, newest first. Ids and frames only — no paths. */
+  async wallPhotos(limit: number): Promise<WallPhoto[]> {
+    const rows = await this.backend.photos.listWallEligible(limit);
+    return rows.map(({ id, frameId, createdAt }) => ({ id, frameId, createdAt }));
+  }
+
+  /**
+   * Wall image bytes (the ~640px review JPEG — small enough for venue Wi-Fi). Re-checks the row
+   * on every request, so a photo hidden or deleted after the last feed poll is refused.
+   */
+  async wallImage(photoId: string): Promise<{ data: Uint8Array; mime: PhotoMime } | null> {
+    const row = await this.backend.photos.getById(photoId);
+    if (!row || isGone(row) || !isWallEligible(row)) return null;
+    return this.staffImage(photoId, "thumb");
   }
 
   // ── storage cleanup ──────────────────────────────────────────────────────────────────────

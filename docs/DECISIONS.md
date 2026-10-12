@@ -196,3 +196,26 @@ response. The server enforces it regardless (consent YES → 409).
 
 The default view is 6 h (max 24 h on that page), found by time, kiosk or the 8-character session
 code shown on the kiosk. This is recovery, not browsing; there is no face or person search.
+
+## D36 · The wall display is an enrolled device, like a kiosk
+
+The wall browser enrolls with the same one-time code (`/kiosk/enroll?next=wall`) and gets the same
+HttpOnly signed session, so it can be revoked from /admin and its heartbeat shows it online. No
+second auth system, no staff login on a public screen. Cost: an enrolled wall could also call the
+kiosk upload API; acceptable because both devices are staff-placed and revocable, and the wall
+never receives tokens or storage paths. A device `role` can be added later if that matters.
+
+## D37 · The wall polls a server feed; the server applies every rule
+
+`/api/wall/feed` reads `wall_eligible_photos` (APPROVED + consent + not deleted) with the service
+role and returns ids only. PAUSE WALL and SHOW HOLDING SCREEN are applied there: the wall is sent
+no photo ids at all. `/api/wall/photos/[id]/image` re-checks the row on every request. Polling
+(10 s) instead of Realtime: no anon database access, and one poll is the upper bound for a hidden
+or deleted photo to leave the screen.
+
+## D38 · Offline cache with a time limit
+
+The wall keeps eligible images as in-memory object URLs and keeps showing them through short
+network loss. After `offlineGraceMs` (2 min) without a successful poll it drops them all, because
+it can no longer learn about hides or deletions. Images are the ~640px review JPEG, small enough
+for venue Wi-Fi.

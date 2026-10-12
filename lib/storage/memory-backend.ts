@@ -23,7 +23,9 @@ import type {
   StaffMember,
   StaffRepository,
   StorageBackend,
+  WallEligibleRow,
 } from "./types";
+import { isWallEligible } from "@/lib/ops/moderation";
 import { MODERATION_STATES } from "./types";
 
 /**
@@ -177,6 +179,21 @@ export class MemoryPhotoRepository implements PhotoRepository {
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, f.limit)
       .map((r) => ({ ...r }));
+  }
+  /** Same rule as the `wall_eligible_photos` view in supabase/migrations. */
+  async listWallEligible(limit: number): Promise<WallEligibleRow[]> {
+    return [...this.rows.values()]
+      .filter(isWallEligible)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .slice(0, limit)
+      .map(({ id, createdAt, frameId, mime, thumbPath, objectPath }) => ({
+        id,
+        createdAt,
+        frameId,
+        mime,
+        thumbPath,
+        objectPath,
+      }));
   }
   async stats(): Promise<PhotoStats> {
     const byStatus = Object.fromEntries(MODERATION_STATES.map((s) => [s, 0])) as Record<
