@@ -33,6 +33,9 @@ Next.js 16 (App Router) · TypeScript strict · Tailwind 4 · Vitest · Playwrig
 - **Moderation rules live in `lib/ops/moderation.ts`.** APPROVED requires wall consent; DELETED is
   terminal and removes the image. No AI moderation, no face anything.
 - **PAUSE SUBMISSIONS never blocks photography or QR delivery** — only new wall consent.
+- **The wall only ever receives `wall_eligible_photos` ids**, through `/api/wall/feed`. PAUSE WALL
+  and SHOW HOLDING SCREEN are applied on the server. Never give the wall anon database access,
+  tokens or storage URLs.
 
 ## Layout
 
@@ -47,7 +50,9 @@ app/admin              staff control panel: login, (staff)/ pages (overview, mod
                        sessions, photos, kiosks, settings, audit)
 app/api/admin          staff APIs (staffRoute: Supabase session + allowlist + CSRF)
 app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
-app/wall               placeholder until Phase 4
+app/wall               media wall (server gate: config + enrolled display) → components/wall
+app/api/wall           wall feed (eligible ids only) + image proxy (kiosk cookie)
+lib/wall               wall states, pure scheduler, server feed (applies emergency switches)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models
 lib/staff-auth         Supabase Auth (@supabase/ssr) server clients + allowlist check
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)

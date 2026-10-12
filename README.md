@@ -10,21 +10,21 @@ Christmas Village media wall after staff review. There is **no printing**.
 
 ## Status
 
-**Phase 3 is done: staff operations (authentication, moderation, kiosk management, emergency
-controls). It is tested in software against a local Supabase stack. It has not been deployed or
-tried on real devices, and it is not production-ready.**
+**Phase 4 is done in software: the media wall shows approved, consented photos in a night-village
+scene and obeys the emergency switches. Phases 1–4 are tested against a local Supabase stack. The
+app has not been deployed or tried on real devices, and it is not production-ready.**
 
-| Area                                                                        | State                                              |
-| --------------------------------------------------------------------------- | -------------------------------------------------- |
-| Kiosk: camera → countdown → 4 shots → review/retake → frame                 | ✅ Phase 1                                         |
-| Secure upload, private storage, QR → `/p/[token]`, offline queue, retention | ✅ Phase 2                                         |
-| Staff login (Supabase Auth email code + allowlist)                          | ✅ Phase 3                                         |
-| Moderation queue, photo library, audited state machine                      | ✅ Phase 3                                         |
-| Recent sessions + "QR 다시 보여주기" (token rotation)                       | ✅ Phase 3                                         |
-| Kiosk management: one-time enrollment codes, heartbeat, revoke              | ✅ Phase 3                                         |
-| Emergency switches (pause submissions / wall / holding screen)              | ✅ Phase 3 (wall switches are consumed in Phase 4) |
-| `/wall` media wall                                                          | ⏳ Phase 4 (placeholder)                           |
-| Real phones, real staff devices, real camera, iPad, MY4CUT                  | ❌ **not verified**                                |
+| Area                                                                           | State               |
+| ------------------------------------------------------------------------------ | ------------------- |
+| Kiosk: camera → countdown → 4 shots → review/retake → frame                    | ✅ Phase 1          |
+| Secure upload, private storage, QR → `/p/[token]`, offline queue, retention    | ✅ Phase 2          |
+| Staff login (Supabase Auth email code + allowlist)                             | ✅ Phase 3          |
+| Moderation queue, photo library, audited state machine                         | ✅ Phase 3          |
+| Recent sessions + "QR 다시 보여주기" (token rotation)                          | ✅ Phase 3          |
+| Kiosk management: one-time enrollment codes, heartbeat, revoke                 | ✅ Phase 3          |
+| Emergency switches (pause submissions / wall / holding screen)                 | ✅ Phase 3 + 4      |
+| `/wall` media wall: approved + consented only, enrolled display, offline cache | ✅ Phase 4          |
+| Real phones, staff devices, wall screen, camera, iPad, MY4CUT                  | ❌ **not verified** |
 
 ## Surfaces
 
@@ -34,7 +34,7 @@ tried on real devices, and it is not production-ready.**
 | `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                  |
 | `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                |
 | `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, emergency, audit — see [`docs/ADMIN.md`](docs/ADMIN.md) |
-| `/wall`         | Display      | Media wall (placeholder until Phase 4)                                                               |
+| `/wall`         | Display      | Media wall. Requires an enrolled display (`/kiosk/enroll?next=wall`)                                 |
 
 ## Quick start (development)
 

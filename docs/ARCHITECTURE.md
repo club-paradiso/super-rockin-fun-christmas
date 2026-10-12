@@ -148,9 +148,33 @@ staff browser ──HttpOnly sb-* cookies──► Next.js (/admin pages, /api/a
   (audited).
   - `pause_submissions` is enforced by the consent API (409 for YES) and the kiosk (skips the
     consent screen).
-  - `pause_wall` and `show_holding_screen` are stored for Phase 4.
-- **Phase 4 source of truth:** the `wall_eligible_photos` view (APPROVED ∧ wall_consent ∧ not
-  deleted, service_role only) and `isWallEligible()`.
+  - `pause_wall` and `show_holding_screen` are applied by the wall feed (below).
+- **Wall source of truth:** the `wall_eligible_photos` view (APPROVED ∧ wall_consent ∧ not
+  deleted, service_role only) and `isWallEligible()` for the memory and local backends.
+
+## Media wall (Phase 4)
+
+```
+wall browser (/wall, enrolled like a kiosk) ──cookie: ftl_kiosk──► Next.js
+   poll GET /api/wall/feed every 10 s  ───►  lib/wall/server.ts wallFeed()
+                                               holding? → { mode: "holding", photos: [] }
+                                               paused?  → { mode: "paused",  photos: [] }
+                                               else     → wall_eligible_photos (ids only)
+   GET /api/wall/photos/:id/image      ───►  re-checks the row, ~640px JPEG via the server
+   POST /api/kiosk/heartbeat (45 s)    ───►  shows the display online in /admin → 키오스크
+```
+
+- **Auth:** the display enrolls with a one-time code at `/kiosk/enroll?next=wall` (D36). Revoking
+  it in /admin cuts the feed and images off on the next request.
+- **Scheduler** (`lib/wall/scheduler.ts`, pure): up to 5 slots, at most one entrance per second.
+  Each photo goes `ENTER → VISIBLE → EXIT`, then `COOLDOWN` (60 s) before it may return.
+  Never-shown photos go first, newest first. A photo the feed no longer lists leaves its slot on
+  the next step, in any phase.
+- **Renderer** (`components/wall/wall-app.tsx`): night-village scene; screen states `BOOT`,
+  `EMPTY`, `ACTIVE`, `OFFLINE`, `MAINTENANCE` (`lib/wall/states.ts`). A photo the feed stops
+  listing is no longer rendered from that same render on, before the next scheduler step.
+- **Offline cache:** images are held as in-memory object URLs. After 2 min without a successful
+  poll every cached photo is dropped (D38). Knobs live in `config/wall.ts`.
 
 ## Known limitations
 

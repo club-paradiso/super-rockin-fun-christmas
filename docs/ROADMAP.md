@@ -38,15 +38,20 @@ download → QR → phone page → consent → reset.
 - CI: staff auth, admin APIs and admin E2E run against a local Supabase (Auth + Mailpit) in
   Docker.
 
-## Phase 4 — media wall (`/wall`) — next
+## Phase 4 — media wall (`/wall`) ✅ software · ❌ real wall display not verified
 
-Consume `wall_eligible_photos` through a server endpoint (no anon table access). Respect
-`pause_wall` and `show_holding_screen`. Wall display auth: probably a kiosk-like enrolled display
-device rather than staff login.
-
-Night-village scene, `APPROVED AND wall_consent` only, `ENTER → VISIBLE → EXIT → COOLDOWN`,
-polling or Realtime through a server endpoint (not anon table access), offline cache, and
-BOOT/EMPTY/OFFLINE/MAINTENANCE states.
+- Display auth: the wall is an enrolled device (one-time code at `/kiosk/enroll?next=wall`,
+  HttpOnly session, revocable, heartbeat in /admin).
+- `/api/wall/feed` reads `wall_eligible_photos` through the server (no anon table access); PAUSE
+  WALL and SHOW HOLDING SCREEN send no photos at all. `/api/wall/photos/[id]/image` re-checks
+  the row every time.
+- Night-village scene, screen states `BOOT/EMPTY/ACTIVE/OFFLINE/MAINTENANCE`, photo lifecycle
+  `ENTER → VISIBLE → EXIT → COOLDOWN` from a pure scheduler; hidden or deleted photos leave
+  within one poll (10 s).
+- Offline cache: in-memory images, dropped after 2 min without a successful poll.
+- Tests: wall rule in the operations contract (memory, local, Supabase), scheduler unit tests,
+  wall API tests, E2E on the local store and an approve → wall → hide → pause flow on Supabase.
+- **Open gate:** `docs/DEPLOYMENT.md` §7 on the real screen.
 
 ## Before the event (real hardware)
 

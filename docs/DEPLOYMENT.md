@@ -102,3 +102,25 @@ Before the event, a person must do this on the actual staff phone or tablet:
 - revoke and re-enroll a kiosk with a one-time code.
 
 Until then: `REAL_STAFF_DEVICE_TEST: NOT VERIFIED`.
+
+## 6. Enroll the wall display
+
+1. In `/admin → 키오스크`, create a one-time code labelled e.g. `미디어월`.
+2. On the wall PC or TV browser, open `https://<PUBLIC_BASE_URL>/kiosk/enroll?next=wall` and type
+   the code. The browser goes to `/wall`.
+3. Make the browser full screen and turn off sleep and screen savers. The wall shows up in the
+   kiosk list and reports in every 45 s.
+
+## 7. REAL WALL DISPLAY TEST (the Phase 4 gate)
+
+Before the event, a person must do this on the actual wall screen at the venue:
+
+- with nothing approved, the wall shows the empty village;
+- take a photo, answer **네**, approve it in /admin: it appears within about 20 s;
+- hide it: it leaves within 10 s; unhide: it comes back; delete another: it never appears again;
+- toggle PAUSE WALL (photos leave, village stays) and SHOW HOLDING SCREEN (holding message);
+- pull the network cable or turn Wi-Fi off: the wall keeps going for about 2 minutes, then shows
+  only the village; it recovers on its own when the network returns;
+- check readability and brightness from where guests stand, and leave it running for an hour.
+
+Until then: `REAL_WALL_DISPLAY_TEST: NOT VERIFIED`.
