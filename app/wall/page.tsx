@@ -1,4 +1,13 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { StaffNotice } from "@/components/staff-notice";
+import { WallApp } from "@/components/wall/wall-app";
+import { authenticateKiosk } from "@/lib/kiosk-auth/server";
+import { KIOSK_COOKIE } from "@/lib/kiosk-auth/session";
+import { ConfigError, getServerConfig } from "@/lib/server/env";
+import { logEvent } from "@/lib/server/log";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "FOLLOW THE LIGHTS · Media Wall",
@@ -6,29 +15,36 @@ export const metadata: Metadata = {
 };
 
 /**
- * Placeholder for the media wall (Phase 4). Shows the EMPTY state so the display can be
- * positioned and tested at the venue. See docs/ROADMAP.md.
+ * The media wall. The display is an enrolled device (same one-time code and revocable HttpOnly
+ * session as a kiosk, see DECISIONS D36); everything it shows comes from /api/wall/feed.
  */
-export default function WallPage() {
-  return (
-    <main
-      data-testid="wall"
-      data-wall-state="EMPTY"
-      className="night-sky flex h-dvh w-full flex-col items-center justify-end overflow-hidden pb-[12vh]"
-    >
-      <div className="flex gap-[3vw]" aria-hidden>
-        {Array.from({ length: 7 }, (_, i) => (
-          <div
-            key={i}
-            className="rounded-t-md bg-dusk"
-            style={{ width: "6vw", height: `${10 + ((i * 37) % 9)}vh` }}
-          >
-            <div className="mx-auto mt-[2vh] h-[3vh] w-[2.5vw] rounded-sm bg-amber/70 shadow-[0_0_30px_rgba(255,207,138,0.6)]" />
-          </div>
-        ))}
-      </div>
-      <p className="mt-[6vh] text-[2.2vw] tracking-[0.3em] text-amber">FOLLOW THE LIGHTS</p>
-      <p className="mt-2 text-[1.3vw] text-mist">곧 이 마을에 여러분의 빛이 켜집니다</p>
-    </main>
-  );
+export default async function WallPage() {
+  try {
+    getServerConfig();
+  } catch (err) {
+    if (!(err instanceof ConfigError)) throw err;
+    logEvent("config_invalid", { route: "wall", problems: err.problems.join(" | ") }, "error");
+    return (
+      <StaffNotice title="서버 설정 오류" testId="wall-config-error">
+        <ul className="list-disc text-left text-lg">
+          {err.problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      </StaffNotice>
+    );
+  }
+
+  const auth = await authenticateKiosk((await cookies()).get(KIOSK_COOKIE)?.value ?? null);
+  if (!auth.ok) {
+    return (
+      <StaffNotice title="이 화면은 아직 미디어월로 등록되지 않았어요" testId="wall-not-enrolled">
+        <p>운영 화면에서 만든 일회용 코드로 이 기기를 등록해 주세요.</p>
+        <a href="/kiosk/enroll?next=wall" className="btn-primary mt-8">
+          기기 등록하기
+        </a>
+      </StaffNotice>
+    );
+  }
+  return <WallApp />;
 }
