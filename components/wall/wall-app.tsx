@@ -50,7 +50,10 @@ export function WallApp() {
       if (stopped || inFlight) return;
       inFlight = true;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), Math.min(8_000, WALL_CONFIG.pollMs - 1_000));
+      const timeout = setTimeout(
+        () => controller.abort(),
+        Math.min(8_000, WALL_CONFIG.pollMs - 1_000),
+      );
       try {
         const res = await fetch("/api/wall/feed", { cache: "no-store", signal: controller.signal });
         if (stopped) return;
