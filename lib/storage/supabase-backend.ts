@@ -26,6 +26,7 @@ import type {
   StaffMember,
   StaffRepository,
   StorageBackend,
+  WallEligibleRow,
 } from "./types";
 import { MODERATION_STATES } from "./types";
 
@@ -56,6 +57,15 @@ const toPhoto = (r: Row): PhotoRow => ({
   objectDeletedAt: iso(r.object_deleted_at),
   createdAt: iso(r.created_at)!,
   updatedAt: iso(r.updated_at)!,
+});
+
+const toWallEligible = (r: Row): WallEligibleRow => ({
+  id: r.id as string,
+  createdAt: iso(r.created_at)!,
+  frameId: r.frame_id as string,
+  mime: r.mime as PhotoMime,
+  thumbPath: (r.thumb_path as string | null) ?? null,
+  objectPath: r.object_path as string,
 });
 
 const toKiosk = (r: Row): KioskRow => ({
@@ -262,6 +272,17 @@ class SupabasePhotoRepository implements PhotoRepository {
     const { data, error } = await q.order("created_at", { ascending: false }).limit(f.limit);
     if (error) throw new SupabaseError("list photos", error);
     return (data as Row[]).map(toPhoto);
+  }
+
+  /** Reads the `wall_eligible_photos` view, so the wall rule also lives in the database. */
+  async listWallEligible(limit: number) {
+    const { data, error } = await this.db
+      .from("wall_eligible_photos")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw new SupabaseError("list wall photos", error);
+    return (data as Row[]).map(toWallEligible);
   }
 
   async stats(): Promise<PhotoStats> {

@@ -189,6 +189,44 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect((await svc.staffImage(p.id, "full"))!.data).toEqual(JPEG);
     });
 
+    it("media wall sees only APPROVED + consented photos, and follows every later change", async () => {
+      const { svc, shoot, staffId } = await setup();
+      const noConsent = await shoot(false);
+      const pending = await shoot(true);
+      const rejected = await shoot(true);
+      const hidden = await shoot(true);
+      const deleted = await shoot(true);
+      const approved = await shoot(true);
+      await svc.moderate(rejected.id, "reject", staffId);
+      for (const p of [hidden, deleted, approved]) await svc.moderate(p.id, "approve", staffId);
+      await svc.moderate(hidden.id, "hide", staffId);
+      await svc.moderate(deleted.id, "delete", staffId);
+
+      const ours = new Set(
+        [noConsent, pending, rejected, hidden, deleted, approved].map((p) => p.id),
+      );
+      const onWall = async () =>
+        (await svc.wallPhotos(1000)).map((p) => p.id).filter((id) => ours.has(id));
+      expect(await onWall()).toEqual([approved.id]);
+      const feed = await svc.wallPhotos(1000);
+      expect(Object.keys(feed.find((p) => p.id === approved.id)!).sort()).toEqual([
+        "createdAt",
+        "frameId",
+        "id",
+      ]);
+
+      expect(await svc.wallImage(approved.id)).not.toBeNull();
+      for (const p of [noConsent, pending, rejected, hidden, deleted])
+        expect(await svc.wallImage(p.id)).toBeNull();
+
+      // Changes after the wall last looked are honoured on the next look.
+      await svc.moderate(approved.id, "hide", staffId);
+      expect(await onWall()).toEqual([]);
+      expect(await svc.wallImage(approved.id)).toBeNull();
+      await svc.moderate(hidden.id, "unhide", staffId);
+      expect(await onWall()).toEqual([hidden.id]);
+    });
+
     it("guest consent: refused while submissions are paused; NO is always allowed", async () => {
       const { svc, kioskId, shoot } = await setup();
       const p = await shoot(false);
