@@ -35,6 +35,11 @@ security.
 | PAUSE WALL / SHOW HOLDING SCREEN ignored by a stale display      | Applied on the server: the feed sends no photo ids and the image route returns 404 while either switch is on.                                                                                                                                                              |
 | Anyone opens /wall or its APIs                                   | The display must be enrolled (one-time code, HttpOnly session, revocable in /admin). Feed and image return 401 otherwise. Responses carry ids only — no tokens, storage paths or kiosk ids.                                                                                |
 
+Wall rotation (Phase 2-3): `/api/wall/shown` accepts only photo ids from an enrolled display,
+same-origin, at most 50 per report and 60 reports a minute. A forged report can only change the
+order of photos that are already approved; it can never add a photo to the wall. "지금 띄우기"
+is a staff API, refused for anything not approved with consent, and audited.
+
 ## Kiosk enrollment flow
 
 ```

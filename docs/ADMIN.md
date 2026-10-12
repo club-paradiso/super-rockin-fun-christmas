@@ -61,6 +61,14 @@ this, and so does the database.
 If two staff act on the same photo at once, the second one gets "다른 스태프가 먼저 처리했어요" and
 nothing is overwritten.
 
+## 지금 띄우기 (show now)
+
+When a guest asks "when will my photo be on the wall?", find it in **사진** (or **최근 세션**) and
+press **지금 띄우기**. It appears on the wall within about 10 seconds, making room by ending the
+turn of the photo that has been up longest. Only approved photos with wall consent can be shown.
+Every request is recorded in **기록**. The wall otherwise rotates fairly on its own: new photos
+first, then the ones shown least often.
+
 ## Deleting a photo
 
 **삭제** opens a confirmation dialog, then:

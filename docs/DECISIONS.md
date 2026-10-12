@@ -304,3 +304,29 @@ The hub is the event configuration, so `npm run test:e2e` now runs with `FTL_ROL
 existing kiosk, offline, security and wall specs pass unchanged; `e2e/hub.spec.ts` adds PIN login
 and the capture → consent → approve → wall → hide flow without Supabase. `E2E_STORE=supabase`
 still runs the cloud admin specs.
+
+## D52 · Rotation state lives on the hub only
+
+Exposures and show-now requests are kept by the hub's local backend. The Supabase backend does not
+persist them (`exposures()` returns null), and a cloud wall falls back to the old newest-first
+rotation (`ordering: "newest"`). The wall runs on the hub (D40), so a migration for a legacy path
+is not worth its code.
+
+## D53 · Exposure reports are saved within 30 s, everything else at once
+
+The wall reports every few seconds; rewriting the whole local database file each time would be
+wasteful. A crash loses at most 30 s of exposure counts, which only nudges the order. Staff
+actions (show-now included) and all audited changes are still saved before they return.
+
+## D54 · Never-shown photos wait in capture order
+
+The design said approval order, but rows do not record when they were approved. Capture order
+keeps the same guarantee (a new photo never jumps one that was already waiting) without a schema
+change.
+
+## D55 · Feed = top of the order + what is on screen
+
+Sending only the top `max(4S, 30)` keeps the response small with thousands of photos. A photo goes
+to the back of the order as soon as it is reported shown, so the wall sends `?on=` and the hub
+keeps those ids in the answer while they are still eligible; otherwise the safety rule would pull
+a photo off the wall halfway through its turn.

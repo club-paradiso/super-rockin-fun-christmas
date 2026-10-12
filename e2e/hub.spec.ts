@@ -114,6 +114,14 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await expect(staff.getByTestId("audit-item").filter({ hasText: "승인" }).first()).toContainText(
     "현장 책임자",
   );
+
+  // 지금 띄우기: unhide, ask for it now, and it is back on the wall at once.
+  await staff.goto(`/admin/photos?session=${session}&window=1h`);
+  await libraryCard.getByTestId("action-unhide").click();
+  await expect(libraryCard.getByTestId("photo-status")).toHaveText("승인됨");
+  await libraryCard.getByTestId("action-show-now").click();
+  await expect(libraryCard.getByTestId("action-show-now")).toHaveText("곧 미디어월에 나와요");
+  await expect(photo).toBeVisible({ timeout: 15_000 });
   await wall.context().close();
 });
 

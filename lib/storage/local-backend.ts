@@ -12,6 +12,8 @@ import type {
   StaffMember,
   StaffPin,
   StorageBackend,
+  WallExposure,
+  WallShowNow,
 } from "./types";
 
 /**
@@ -34,11 +36,22 @@ interface DbFile {
   staffPins?: Record<string, StaffPin>;
   audit: AuditEvent[];
   retentionRuns: RetentionRun[];
+  /** Wall rotation (absent in files written before Phase 2-3). */
+  wallExposures?: WallExposure[];
+  wallShowNow?: WallShowNow[];
 }
+
+/**
+ * Wall exposure reports arrive every few seconds. Rewriting the whole file each time is wasteful,
+ * so they are saved at most this often; a crash loses at most this much exposure history, which
+ * only nudges the rotation order. Every other write is saved immediately.
+ */
+const LAZY_SAVE_MS = 30_000;
 
 class FileDb {
   private loaded: Promise<void> | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private lazyTimer: ReturnType<typeof setTimeout> | null = null;
   readonly mem: MemoryBackend = createMemoryBackend();
 
   constructor(private readonly file: string) {}
@@ -75,6 +88,8 @@ class FileDb {
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);
     this.mem.audit.load(db.audit ?? []);
     this.mem.retentionRuns.runs.push(...(db.retentionRuns ?? []));
+    for (const e of db.wallExposures ?? []) this.mem.wall.exposureRows.set(e.photoId, e);
+    for (const r of db.wallShowNow ?? []) this.mem.wall.showNow.set(r.photoId, r);
   }
 
   private async save() {
@@ -89,6 +104,8 @@ class FileDb {
       staffPins: Object.fromEntries(m.staff.pins),
       audit: m.audit.events,
       retentionRuns: m.retentionRuns.runs,
+      wallExposures: [...m.wall.exposureRows.values()],
+      wallShowNow: [...m.wall.showNow.values()],
     };
     await mkdir(path.dirname(this.file), { recursive: true });
     const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`;
@@ -96,17 +113,34 @@ class FileDb {
     await rename(tmp, this.file);
   }
 
-  /** Serialize every operation; persist after writes. */
-  run<T>(fn: () => Promise<T>, write: boolean): Promise<T> {
+  /** Serialize every operation; persist after writes (lazy writes: within LAZY_SAVE_MS). */
+  run<T>(fn: () => Promise<T>, write: boolean | "lazy"): Promise<T> {
     this.loaded ??= this.load();
     const next = this.queue.then(async () => {
       await this.loaded;
       const result = await fn();
-      if (write) await this.save();
+      if (write === true) {
+        this.cancelLazy();
+        await this.save();
+      } else if (write === "lazy" && !this.lazyTimer) {
+        this.lazyTimer = setTimeout(() => void this.flush(), LAZY_SAVE_MS);
+        this.lazyTimer.unref?.();
+      }
       return result;
     });
     this.queue = next.catch(() => undefined);
     return next;
+  }
+
+  /** Save now if a lazy write is pending. */
+  flush(): Promise<void> {
+    if (!this.lazyTimer) return this.queue.then(() => undefined);
+    return this.run(async () => undefined, true);
+  }
+
+  private cancelLazy() {
+    if (this.lazyTimer) clearTimeout(this.lazyTimer);
+    this.lazyTimer = null;
   }
 }
 
@@ -143,8 +177,16 @@ class FileObjectStorage implements ObjectStorage {
 const registry = ((globalThis as { __ftlFileDbs?: Map<string, FileDb> }).__ftlFileDbs ??=
   new Map());
 
-/** Wrap every method of a repository so it runs serialized; listed methods also persist. */
-function wrap<T extends object>(db: FileDb, repo: T, writes: (keyof T)[]): T {
+/**
+ * Wrap every method of a repository so it runs serialized; listed methods also persist
+ * (`lazy` ones within LAZY_SAVE_MS).
+ */
+function wrap<T extends object>(
+  db: FileDb,
+  repo: T,
+  writes: (keyof T)[],
+  lazy: (keyof T)[] = [],
+): T {
   const out = {} as Record<string, unknown>;
   for (const key of Object.getOwnPropertyNames(Object.getPrototypeOf(repo)) as (keyof T &
     string)[]) {
@@ -153,7 +195,7 @@ function wrap<T extends object>(db: FileDb, repo: T, writes: (keyof T)[]): T {
     out[key] = (...args: unknown[]) =>
       db.run(
         () => (fn as (...a: unknown[]) => Promise<unknown>).apply(repo, args),
-        writes.includes(key),
+        writes.includes(key) ? true : lazy.includes(key) ? "lazy" : false,
       );
   }
   return out as T;
@@ -184,7 +226,13 @@ export function createLocalBackend(rootDir: string): StorageBackend {
     staff: wrap(db, m.staff, ["upsert", "setPin"]),
     audit: wrap(db, m.audit, []),
     retentionRuns: wrap(db, m.retentionRuns, ["record"]),
+    wall: wrap(db, m.wall, ["requestShowNow"], ["report"]),
   };
+}
+
+/** Save every pending lazy write (tests, and the hub's shutdown hook). */
+export async function flushLocalBackends() {
+  await Promise.all([...registry.values()].map((db) => db.flush()));
 }
 
 /** Tests only: simulate a process restart (drop in-memory copies; disk stays). */

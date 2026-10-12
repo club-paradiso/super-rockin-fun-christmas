@@ -27,6 +27,7 @@ import type {
   StaffRepository,
   StorageBackend,
   WallEligibleRow,
+  WallRepository,
 } from "./types";
 import { MODERATION_STATES } from "./types";
 
@@ -502,6 +503,23 @@ class SupabaseAuditRepository implements AuditRepository {
   }
 }
 
+/**
+ * The wall runs on the hub (D40), which keeps rotation state in its local files. The cloud does
+ * not persist it: `exposures()` returns null and the wall feed falls back to newest-first (D52).
+ */
+class SupabaseWallRepository implements WallRepository {
+  async exposures() {
+    return null;
+  }
+  async report() {}
+  async requestShowNow(): Promise<never> {
+    throw new Error("show-now lives on the hub (FTL_ROLE=hub)");
+  }
+  async showNowQueue() {
+    return [];
+  }
+}
+
 class SupabaseRetentionRunRepository implements RetentionRunRepository {
   constructor(private readonly db: SupabaseClient) {}
 
@@ -556,5 +574,6 @@ export function createSupabaseBackend(opts: {
     staff: new SupabaseStaffRepository(db),
     audit: new SupabaseAuditRepository(db),
     retentionRuns: new SupabaseRetentionRunRepository(db),
+    wall: new SupabaseWallRepository(),
   };
 }

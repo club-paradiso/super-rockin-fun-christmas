@@ -24,6 +24,9 @@ import type {
   StaffPin,
   StaffRepository,
   StorageBackend,
+  WallExposure,
+  WallRepository,
+  WallShowNow,
   WallEligibleRow,
 } from "./types";
 import { isWallEligible } from "@/lib/ops/moderation";
@@ -475,6 +478,49 @@ export class MemoryRetentionRunRepository implements RetentionRunRepository {
   }
 }
 
+export class MemoryWallRepository implements WallRepository {
+  readonly exposureRows = new Map<string, WallExposure>();
+  readonly showNow = new Map<string, WallShowNow>();
+  constructor(private readonly audit: MemoryAuditLog) {}
+
+  async exposures() {
+    return [...this.exposureRows.values()].map((e) => ({ ...e }));
+  }
+  async report(input: { shown: string[]; onWall: string[]; at: string }) {
+    for (const id of input.shown) {
+      const old = this.exposureRows.get(id);
+      this.exposureRows.set(id, {
+        photoId: id,
+        shownCount: (old?.shownCount ?? 0) + 1,
+        firstShownAt: old?.firstShownAt ?? input.at,
+        lastShownAt: input.at,
+      });
+    }
+    for (const id of [...input.shown, ...input.onWall]) this.showNow.delete(id);
+  }
+  async requestShowNow(photoId: string, staffUserId: string) {
+    const request = this.showNow.get(photoId) ?? {
+      photoId,
+      requestedAt: now(),
+      requestedBy: staffUserId,
+    };
+    this.showNow.set(photoId, request);
+    this.audit.append({
+      actorType: "staff",
+      actorId: staffUserId,
+      action: "wall_show_now",
+      subjectType: "photo",
+      subjectId: photoId,
+    });
+    return { ...request };
+  }
+  async showNowQueue() {
+    return [...this.showNow.values()]
+      .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
+      .map((r) => ({ ...r }));
+  }
+}
+
 export type MemoryBackend = StorageBackend & {
   photos: MemoryPhotoRepository;
   objects: MemoryObjectStorage;
@@ -484,6 +530,7 @@ export type MemoryBackend = StorageBackend & {
   staff: MemoryStaffRepository;
   audit: MemoryAuditLog;
   retentionRuns: MemoryRetentionRunRepository;
+  wall: MemoryWallRepository;
 };
 
 export function createMemoryBackend(): MemoryBackend {
@@ -499,5 +546,6 @@ export function createMemoryBackend(): MemoryBackend {
     staff: new MemoryStaffRepository(audit),
     audit,
     retentionRuns: new MemoryRetentionRunRepository(),
+    wall: new MemoryWallRepository(audit),
   };
 }

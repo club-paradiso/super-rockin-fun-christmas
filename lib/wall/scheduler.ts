@@ -7,6 +7,10 @@ import type { WallPhotoPhase } from "./states";
  *
  * Safety rule: a photo that is no longer in `eligible` (hidden, deleted, wall paused) leaves its
  * slot on the very next step — no exit animation, no waiting.
+ *
+ * Which photo goes up next is the hub's decision (`ordering: "fair"`, lib/wall/rotation.ts): the
+ * wall takes the first usable photo in the order it was given. Show-now photos skip the cooldown
+ * and, when no slot is about to free up, push the longest-visible photo into its exit.
  */
 export interface WallSlot {
   photoId: string | null;
@@ -30,15 +34,19 @@ export function emptySchedule(slotCount: number, now = 0): WallSchedule {
 
 export interface StepInput {
   now: number;
-  /** Ids the server allows right now, newest first. */
+  /** Ids the server allows right now, in the order the server gave them. */
   eligible: readonly string[];
   /** Ids whose image is loaded and can be shown without a blank frame. */
   ready: ReadonlySet<string>;
   timings: WallTimings;
+  /** `fair` (hub): follow `eligible` order. `newest` (cloud fallback): never-shown, then rested. */
+  ordering?: "fair" | "newest";
+  /** Staff asked for these now. */
+  showNow?: ReadonlySet<string>;
 }
 
 export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedule {
-  const { now, eligible, ready, timings } = input;
+  const { now, eligible, timings } = input;
   const allowed = new Set(eligible);
   const lastShown: Record<string, number> = {};
   for (const [id, at] of Object.entries(state.lastShown)) if (allowed.has(id)) lastShown[id] = at;
@@ -59,19 +67,50 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
     return slot;
   });
 
+  makeRoomForShowNow(slots, input);
+
   const free = slots.findIndex((s) => !s.photoId);
   if (free >= 0) {
-    const next = pickNext({ now, eligible, ready, timings, slots, lastShown });
+    const next = pickNext({ ...input, slots, lastShown });
     if (next) slots[free] = { photoId: next, phase: "ENTER", since: now };
   }
   return { slots, lastShown };
 }
 
-/** Never-shown photos first (newest first), then the one that has rested longest. */
+/**
+ * When show-now photos are waiting and no slot is empty or already leaving, send the photo that
+ * has been fully visible the longest into its exit (one per step). Show-now photos are never
+ * pushed out, and nothing is cut short before it has finished entering.
+ */
+function makeRoomForShowNow(slots: WallSlot[], input: StepInput) {
+  const { now, ready, showNow = new Set() } = input;
+  if (!showNow.size) return;
+  const onWall = new Set(slots.map((s) => s.photoId));
+  const waiting = input.eligible.filter(
+    (id) => showNow.has(id) && ready.has(id) && !onWall.has(id),
+  ).length;
+  const freeing = slots.filter((s) => !s.photoId || s.phase === "EXIT").length;
+  if (waiting <= freeing) return;
+  let victim = -1;
+  slots.forEach((s, i) => {
+    if (s.phase !== "VISIBLE" || showNow.has(s.photoId!)) return;
+    if (victim < 0 || s.since < slots[victim]!.since) victim = i;
+  });
+  if (victim >= 0) slots[victim] = { ...slots[victim]!, phase: "EXIT", since: now };
+}
+
 function pickNext(input: StepInput & { slots: WallSlot[]; lastShown: Record<string, number> }) {
-  const { now, eligible, ready, timings, slots, lastShown } = input;
+  const { now, eligible, ready, timings, slots, lastShown, showNow = new Set() } = input;
   const onWall = new Set(slots.map((s) => s.photoId));
   const candidates = eligible.filter((id) => ready.has(id) && !onWall.has(id));
+  const resting = (id: string) =>
+    lastShown[id] !== undefined && now - lastShown[id]! < timings.cooldownMs;
+
+  const urgent = candidates.find((id) => showNow.has(id));
+  if (urgent) return urgent;
+  if (input.ordering === "fair") return candidates.find((id) => !resting(id)) ?? null;
+
+  // Cloud fallback: never-shown photos first (newest first), then the one that has rested longest.
   const fresh = candidates.find((id) => lastShown[id] === undefined);
   if (fresh) return fresh;
   let best: string | null = null;

@@ -36,6 +36,7 @@ export function PhotoCard({
   const [busy, setBusy] = useState<ModerationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shownNow, setShownNow] = useState(false);
 
   const actions = primaryOnly
     ? photo.actions.filter((a) => a === "approve" || a === "reject")
@@ -52,6 +53,13 @@ export function PhotoCard({
     setConfirmDelete(false);
     if (!res.ok) setError(errorText(res.error));
     router.refresh();
+  }
+
+  async function showNow() {
+    setError(null);
+    const res = await postJson(`/api/admin/photos/${photo.id}/show-now`, {});
+    if (res.ok) setShownNow(true);
+    else setError(errorText(res.error));
   }
 
   return (
@@ -121,6 +129,17 @@ export function PhotoCard({
               {busy === a ? "…" : ACTION_LABEL[a]}
             </button>
           ))}
+          {photo.wallEligible && !primaryOnly && (
+            <button
+              type="button"
+              disabled={busy !== null || shownNow}
+              onClick={showNow}
+              className="admin-btn admin-btn-primary"
+              data-testid="action-show-now"
+            >
+              {shownNow ? "곧 미디어월에 나와요" : "지금 띄우기"}
+            </button>
+          )}
         </div>
         {showRecovery && photo.canShowQrAgain && <QrRecovery photoId={photo.id} />}
       </div>
