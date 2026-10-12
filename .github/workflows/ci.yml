@@ -62,7 +62,9 @@ jobs:
           CI: "true"
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" asks the GitHub API which release is newest, and that
+          # unauthenticated call is rate-limited on shared runners.
+          version: 2.120.0
       - name: Start Supabase (migrations, Auth, Storage, Mailpit)
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
       - name: E2E — local Supabase (kiosk + staff admin flows)
@@ -94,7 +96,9 @@ jobs:
       - run: npm ci
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" asks the GitHub API which release is newest, and that
+          # unauthenticated call is rate-limited on shared runners.
+          version: 2.120.0
       - name: Start Supabase (applies supabase/migrations; Mailpit for staff OTP)
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
       - name: Integration tests (contracts, RLS, audit, staff auth, admin + kiosk APIs)
