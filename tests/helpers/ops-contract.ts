@@ -230,6 +230,49 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect(await onWall()).toEqual([hidden.id]);
     });
 
+    // Phase 4 (DoD 2): not just the states we thought of. Random guest and staff moves, legal or
+    // not, on a handful of photos; after every move the wall sees exactly the photos whose guest
+    // said yes and that staff approved, and nothing else gets an image. Seeded, so a failure
+    // replays the same way.
+    it("random guest and staff moves never put an unconsented or unapproved photo on the wall", async () => {
+      const { svc, shoot, staffId, kioskId, backend } = await setup();
+      let seed = 20261128;
+      const rand = (n: number) => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed % n;
+      };
+      const photos = [];
+      for (let i = 0; i < 6; i++) photos.push(await shoot(false));
+      const ids = new Set(photos.map((p) => p.id));
+      const actions = ["approve", "reject", "hide", "unhide", "reopen", "delete"] as const;
+      for (let move = 0; move < 60; move++) {
+        const p = photos[rand(photos.length)]!;
+        const r = rand(10);
+        if (r < 3) await svc.setWallConsent(p.token, r !== 0, kioskId);
+        else await svc.moderate(p.id, actions[rand(actions.length)]!, staffId);
+
+        const rows = await Promise.all(photos.map((x) => backend.photos.getById(x.id)));
+        const expected = rows
+          .filter(
+            (row) => row!.moderationStatus === "APPROVED" && row!.wallConsent && !row!.deletedAt,
+          )
+          .map((row) => row!.id)
+          .sort();
+        const onWall = (await svc.wallPhotos(1000))
+          .map((x) => x.id)
+          .filter((id) => ids.has(id))
+          .sort();
+        expect(onWall, `move ${move}`).toEqual(expected);
+        for (const row of rows) {
+          // Consent is the guest's: staff can never produce an approved photo without it.
+          if (row!.moderationStatus === "APPROVED") expect(row!.wallConsent).toBe(true);
+          expect((await svc.wallImage(row!.id)) !== null, `move ${move} image`).toBe(
+            expected.includes(row!.id),
+          );
+        }
+      }
+    });
+
     it("wall image: made once from the original, kept next to it, deleted with the photo", async () => {
       const { svc, shoot, backend, objectExists, staffId } = await setup();
       const p = await shoot(true);

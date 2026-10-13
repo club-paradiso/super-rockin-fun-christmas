@@ -1,0 +1,23 @@
+{
+  "minutesPlanned": 180,
+  "canvas": "3840x1080",
+  "photosAddedDuringRun": 0,
+  "photosHiddenDuringRun": 0,
+  "crashed": 0,
+  "consoleErrors": 0,
+  "errors": [],
+  "samples": [
+    {
+      "minute": 0,
+      "heapUsedMb": 3.5,
+      "heapTotalMb": 4.54,
+      "domNodes": 305,
+      "listeners": 318,
+      "documents": 1,
+      "fps": 51.3,
+      "visible": 2,
+      "reloads": 0,
+      "hubRssMb": 290
+    }
+  ]
+}
