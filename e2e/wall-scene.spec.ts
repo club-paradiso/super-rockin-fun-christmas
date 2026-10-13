@@ -206,3 +206,26 @@ test("low-spec mode: at most 4 photos, no twinkling", async () => {
   expect(anim).toBe("none");
   await page.close();
 });
+
+test("staff turn the wall off and back on from /admin; the wall follows within a poll", async () => {
+  const page = await wallCtx.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/wall?canvas=1920x1080");
+  await expect(page.getByTestId("wall-photo").first()).toBeVisible({ timeout: 30_000 });
+
+  await staff.goto("/admin");
+  await expect(staff.getByTestId("wall-open-status")).toContainText("켜짐");
+  await staff.getByTestId("wall-force-off").click();
+  await expect(staff.getByTestId("wall-open-status")).toContainText("꺼짐 · 스태프가 꺼 둠");
+  await expect(page.getByTestId("wall-closed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("wall-photo")).toHaveCount(0);
+
+  await staff.getByTestId("wall-force-auto").click();
+  await expect(staff.getByTestId("wall-open-status")).toContainText("켜짐");
+  await expect(page.getByTestId("wall-closed")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("wall-photo").first()).toBeVisible({ timeout: 30_000 });
+
+  await staff.goto("/admin/audit");
+  await expect(staff.getByTestId("audit-item").first()).toContainText("현장 책임자");
+  await page.close();
+});

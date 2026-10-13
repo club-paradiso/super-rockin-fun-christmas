@@ -1,5 +1,7 @@
 /** Media wall behaviour knobs. Change here, not inside components. */
 export const WALL_CONFIG = {
+  /** Opening hours (set in /admin → 설정) are wall-clock times in this zone. */
+  timeZone: "Asia/Seoul",
   /**
    * How often the wall asks the server which photos it may show. Also the upper bound for a
    * hidden or deleted photo to leave the screen (plan target: 5 s).

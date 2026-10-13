@@ -64,6 +64,18 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
               ? "오류"
               : "알 수 없음"}
         </dd>
+        {(kiosk.frameRate !== null || kiosk.memoryMb !== null) && (
+          <>
+            <dt>화면</dt>
+            <dd className="text-cream" data-testid="kiosk-display-metrics">
+              {kiosk.frameRate !== null ? `${kiosk.frameRate}fps` : "—"}
+              {kiosk.memoryMb !== null && ` · 메모리 ${kiosk.memoryMb}MB`}
+              {kiosk.frameRate !== null && kiosk.frameRate < 20 && (
+                <span className="text-alert"> · 느려요 (저사양 모드 권장)</span>
+              )}
+            </dd>
+          </>
+        )}
         <dt>등록</dt>
         <dd className="text-cream">
           {formatTime(kiosk.createdAt)} ·{" "}

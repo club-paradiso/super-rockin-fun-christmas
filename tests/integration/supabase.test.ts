@@ -209,13 +209,25 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
         try {
           await client.query(`set local role ${role}`);
           await expect(
-            client.query("select public.ftl_settings_update(true, null, null, gen_random_uuid())"),
+            client.query(
+              "select public.ftl_settings_update(true, null, null, null, false, null, null, gen_random_uuid())",
+            ),
           ).rejects.toThrow(/permission denied/);
         } finally {
           await client.query("rollback");
         }
       },
     );
+
+    it("there is exactly one settings function (the pre-2-4b signature is gone)", async () => {
+      const { rows } = await client.query(
+        "select pg_get_function_identity_arguments(p.oid) as args from pg_proc p " +
+          "join pg_namespace n on n.oid = p.pronamespace " +
+          "where n.nspname = 'public' and p.proname = 'ftl_settings_update'",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].args).toMatch(/p_wall_force text/);
+    });
 
     it("audit_events is append-only, even for the database owner", async () => {
       const { rows } = await client.query("select id from public.audit_events limit 1");
