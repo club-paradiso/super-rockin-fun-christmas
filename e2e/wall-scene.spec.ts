@@ -81,11 +81,24 @@ async function photoIdForSession(sessionId: string) {
 
 async function approve(request: APIRequestContext, sessionId: string) {
   const id = await photoIdForSession(sessionId);
+  // The kiosk's completion screen can appear before its queued consent write
+  // finishes. Moderation is only valid after the server persists PENDING.
+  await expect
+    .poll(
+      async () => {
+        const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
+          photos: { id: string; moderationStatus: string }[];
+        };
+        return db.photos.find((photo) => photo.id === id)?.moderationStatus;
+      },
+      { timeout: 20_000 },
+    )
+    .toBe("PENDING");
   const res = await request.post(`/api/admin/photos/${id}/moderate`, {
     data: { action: "approve" },
     headers: { origin: ORIGIN },
   });
-  expect(res.status()).toBe(200);
+  expect(res.status(), await res.text()).toBe(200);
   approved++;
 }
 
