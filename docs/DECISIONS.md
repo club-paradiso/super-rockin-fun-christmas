@@ -476,3 +476,21 @@ the three frames as components at real pixel size, wall scenes built from `cloth
 numbers, booth and admin screens, signage with English plus Hangul pronunciation). It is not
 synced automatically; `design/README.md` maps each Figma layer to the code that must change, and
 `design/previews/` keeps a snapshot for anyone without Figma access.
+
+## D64 · Closing the event is one staff action; checking the deletion is a read-only script
+
+The automatic deletion (D58: wall photos at EVENT_END_AT + 24 h) needs the hub switched on at
+that time, and nobody can see from the outside that it happened. Phase 5 adds two things.
+
+- **"행사 종료 처리"** (admin → 설정, hub only, `lib/ops/event-close.ts`). Refused before
+  EVENT_END_AT when that is set; the phrase "행사 종료" must be typed, then confirmed. One audited
+  settings change stops new wall submissions and the wall, then every photo still on the hub is
+  deleted the usual way (tombstone, then bytes), audited per photo as `event_close_delete` by the
+  staff member who pressed it, and each cloud copy is queued for deletion. Running it again is
+  harmless. There are no staff roles, so any signed-in staff member can press it; the typed
+  phrase, the event-end gate and the per-photo audit are the guard.
+- **`scripts/event-check.mjs`** (desktop icon "삭제 확인"). Read-only: photos not yet deleted,
+  cloud deletes not yet sent, photo files, old `.before-restore-*` folders (the restore script
+  never deletes, so these hold photos too), the USB mirror and the booth browser profile. Exit 0
+  only when all are empty. Deleting folders stays a human step in RUNBOOK 8: the script never
+  deletes, so a wrong path can never wipe the wrong disk.

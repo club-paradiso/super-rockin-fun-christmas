@@ -58,7 +58,7 @@ export interface ServerConfig {
    * wallUntil = no event end configured: the PHOTO_RETENTION_DAYS ceiling decides. That ceiling
    * applies to every photo in any case.
    */
-  hubRetention: { unpostedHours: number; wallUntil: Date | null } | null;
+  hubRetention: { unpostedHours: number; wallUntil: Date | null; eventEnd: Date | null } | null;
   /**
    * Hub only: USB backup and disk warning (lib/ops/backup.ts). backupDir null = no backup
    * configured (the overview says so).
@@ -279,6 +279,7 @@ export function parseServerConfig(env: Env): ServerConfig {
     const graceHours = positiveNumber(env, "HUB_WALL_GRACE_HOURS", 24, problems);
     const rawEnd = env.EVENT_END_AT?.trim();
     let wallUntil: Date | null = null;
+    let eventEnd: Date | null = null;
     if (rawEnd) {
       const end = new Date(rawEnd);
       // An explicit offset: "2026-12-25T22:00:00+09:00". A bare time would depend on the laptop.
@@ -286,11 +287,14 @@ export function parseServerConfig(env: Env): ServerConfig {
         problems.push(
           `EVENT_END_AT must be a date and time with an offset, e.g. 2026-12-25T22:00:00+09:00 (got "${rawEnd}")`,
         );
-      else wallUntil = new Date(end.getTime() + graceHours * 3_600_000);
+      else {
+        eventEnd = end;
+        wallUntil = new Date(end.getTime() + graceHours * 3_600_000);
+      }
     }
     if (unpostedHours > retentionDays * 24)
       problems.push("HUB_UNPOSTED_HOURS cannot be longer than PHOTO_RETENTION_DAYS");
-    hubRetention = { unpostedHours, wallUntil };
+    hubRetention = { unpostedHours, wallUntil, eventEnd };
   } else if (env.EVENT_END_AT?.trim()) {
     problems.push("EVENT_END_AT is for the hub (FTL_ROLE=hub) only");
   }

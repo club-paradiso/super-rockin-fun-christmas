@@ -216,7 +216,11 @@ describe("hub retention config (D47)", () => {
   };
 
   it("defaults: unposted 24 h, no event end (the PHOTO_RETENTION_DAYS ceiling decides)", () => {
-    expect(parseServerConfig(HUB).hubRetention).toEqual({ unpostedHours: 24, wallUntil: null });
+    expect(parseServerConfig(HUB).hubRetention).toEqual({
+      unpostedHours: 24,
+      wallUntil: null,
+      eventEnd: null,
+    });
     expect(parseServerConfig(PROD).hubRetention).toBeNull();
   });
 
@@ -232,6 +236,7 @@ describe("hub retention config (D47)", () => {
     expect(short.hubRetention).toEqual({
       unpostedHours: 6,
       wallUntil: new Date("2026-12-25T15:00:00Z"),
+      eventEnd: new Date("2026-12-25T13:00:00Z"),
     });
   });
 
