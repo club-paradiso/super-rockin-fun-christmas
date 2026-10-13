@@ -2,6 +2,7 @@ import "server-only";
 import { getFrame } from "@/config/frames";
 import { getCloudSync } from "@/lib/cloud/server";
 import { getServerConfig } from "@/lib/server/env";
+import { opsStatus, type OpsStatus } from "./backup-server";
 import type { CloudSyncStatus } from "@/lib/cloud/sync";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 import type {
@@ -151,6 +152,8 @@ export interface Overview {
   settings: EventSettings;
   /** Hub with a cloud only: QR copies and deletes still waiting for the internet. */
   cloud: CloudSyncStatus | null;
+  /** Hub only: USB backup and free disk space. */
+  ops: OpsStatus | null;
   /** What gets deleted when, as configured (shown so staff can tell guests). */
   retention:
     | { where: "cloud"; days: number }
@@ -172,12 +175,13 @@ function retentionView(): Overview["retention"] {
 /** Only measured values. Anything we cannot measure is absent, not shown as green. */
 export async function getOverview(): Promise<Overview> {
   const backend = getBackend();
-  const [stats, kiosks, lastRetention, settings, cloud] = await Promise.all([
+  const [stats, kiosks, lastRetention, settings, cloud, ops] = await Promise.all([
     getPhotoService().stats(),
     backend.kiosks.list(),
     backend.retentionRuns.latest(),
     backend.settings.get(),
     getCloudSync()?.status() ?? null,
+    opsStatus(),
   ]);
   const views = kiosks.map((k) => toStaffKioskView(k));
   const count = (h: KioskHealth) => views.filter((v) => v.health === h).length;
@@ -199,6 +203,7 @@ export async function getOverview(): Promise<Overview> {
     lastRetention,
     settings,
     cloud,
+    ops,
     retention: retentionView(),
   };
 }

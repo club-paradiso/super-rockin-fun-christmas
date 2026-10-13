@@ -59,6 +59,11 @@ export interface ServerConfig {
    * applies to every photo in any case.
    */
   hubRetention: { unpostedHours: number; wallUntil: Date | null } | null;
+  /**
+   * Hub only: USB backup and disk warning (lib/ops/backup.ts). backupDir null = no backup
+   * configured (the overview says so).
+   */
+  hubOps: { backupDir: string | null; backupMinutes: number; diskWarnBytes: number } | null;
 }
 
 export class ConfigError extends Error {
@@ -290,6 +295,17 @@ export function parseServerConfig(env: Env): ServerConfig {
     problems.push("EVENT_END_AT is for the hub (FTL_ROLE=hub) only");
   }
 
+  let hubOps: ServerConfig["hubOps"] = null;
+  if (role === "hub") {
+    hubOps = {
+      backupDir: env.HUB_BACKUP_DIR?.trim() || null,
+      backupMinutes: positiveNumber(env, "HUB_BACKUP_MINUTES", 10, problems),
+      diskWarnBytes: positiveNumber(env, "HUB_DISK_WARN_MB", 2048, problems) * 1024 * 1024,
+    };
+  } else if (env.HUB_BACKUP_DIR?.trim()) {
+    problems.push("HUB_BACKUP_DIR is for the hub (FTL_ROLE=hub) only");
+  }
+
   if (problems.length) throw new ConfigError(problems);
 
   return {
@@ -310,6 +326,7 @@ export function parseServerConfig(env: Env): ServerConfig {
     cloudSync,
     hubSyncSecret: role === "cloud" ? syncSecret : null,
     hubRetention,
+    hubOps,
   };
 }
 

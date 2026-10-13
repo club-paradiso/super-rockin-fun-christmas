@@ -46,6 +46,11 @@ test("fresh hub: first staff member with the console setup code, then /admin", a
   await expect(staff.getByTestId("retention-rules")).toContainText(
     "행사 종료 시각이 설정되지 않아 촬영 30일 뒤 삭제",
   );
+  // E2E sets no HUB_BACKUP_DIR: the overview must say so instead of looking fine.
+  await expect(staff.getByTestId("backup-status")).toContainText(
+    "백업 위치(HUB_BACKUP_DIR)가 설정되지 않았어요",
+  );
+  await expect(staff.getByTestId("ops-status")).toContainText("확인 필요");
 });
 
 test("the setup code is single-use; a stranger only sees the PIN login", async ({ browser }) => {

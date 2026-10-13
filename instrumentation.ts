@@ -30,6 +30,9 @@ export async function register() {
       // No Vercel Cron on the hub: it deletes expired photos itself (D47).
       const { startHubRetention } = await import("./lib/ops/hub-retention-server");
       startHubRetention();
+      // USB backup, if HUB_BACKUP_DIR is set (lib/ops/backup.ts).
+      const { startHubBackup } = await import("./lib/ops/backup-server");
+      startHubBackup();
     }
     if (c.role === "hub") {
       // A fresh hub prints its one-time first-staff code in this console window.

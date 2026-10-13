@@ -396,3 +396,24 @@ never act as staff. The menu acts on the booth itself: camera choice, its upload
 queues ("지금 다시 보내기"), start over, reload. It closes after 60 s without a touch. On the hub
 the camera choice moves from the guests' ready screen into this menu; cloud kiosks keep it where
 it was. Hub only: cloud staff have no PINs.
+
+## D60 · Operations tools: a Node launcher, a mirrored USB backup, warnings on the overview
+
+- **Launcher:** `scripts/hub-start.mjs` (plain Node, so it runs without a build step and is unit
+  tested) builds once, runs `next start` on all interfaces, restarts it when it stops (1 s up to
+  30 s), prints the addresses for staff phones and the wall, and opens the booth in Chrome or Edge
+  kiosk mode with its own profile. A second start finds the hub already up and only reopens the
+  booth. `ops/*.bat` and `ops/*.command` are thin wrappers for the desktop icons; no pm2 or
+  Windows service (D41: borrowed laptops).
+- **Wall PC:** Chrome or Edge only, no Node. `ops/start-wall.*` reopens the browser when it closes;
+  a close within 10 s means another wall window already holds the profile, so it stops instead of
+  stacking windows. The hub address lives in `ops/wall-hub.txt`.
+- **Backup:** every `HUB_BACKUP_MINUTES` (10) and on "지금 백업", a mirror to
+  `HUB_BACKUP_DIR/ftl-backup`: a consistent `db.json` snapshot plus the image files. Deleted photos
+  leave the backup on the next run, so the stick never keeps a photo longer than the hub. If the
+  folder is missing (stick not plugged in) it fails loudly rather than writing to the laptop.
+  `.env.local` is not backed up: the spare laptop gets its own copy.
+- **Restore:** `scripts/hub-restore.mjs` never deletes; the current data folder is renamed aside.
+- **Overview:** last backup, failure reason, free space on the laptop and the stick, with a warning
+  below `HUB_DISK_WARN_MB` (2048) or when no backup finished within three intervals. Warnings only:
+  a full disk makes uploads fail, and the booth's queue keeps those photos until there is room.
