@@ -280,6 +280,8 @@ export class MemoryKioskRepository implements KioskRepository {
       queueDepth: hb.queueDepth,
       cameraState: hb.cameraState,
       appBuild: hb.appBuild,
+      frameRate: hb.frameRate ?? null,
+      memoryMb: hb.memoryMb ?? null,
     });
   }
   async update(
@@ -360,6 +362,8 @@ export class MemoryEnrollmentCodeRepository implements EnrollmentCodeRepository 
       cameraState: null,
       appBuild: null,
       enrolledVia: "code",
+      frameRate: null,
+      memoryMb: null,
     };
     await this.kiosks.insert(kiosk);
     this.audit.append({
@@ -385,6 +389,8 @@ export class MemorySettingsRepository implements SettingsRepository {
     pauseSubmissions: false,
     pauseWall: false,
     showHoldingScreen: false,
+    wallHours: null,
+    wallForce: "auto",
     updatedAt: now(),
     updatedBy: null,
   };
@@ -400,11 +406,18 @@ export class MemorySettingsRepository implements SettingsRepository {
         pause_submissions: s.pauseSubmissions,
         pause_wall: s.pauseWall,
         show_holding_screen: s.showHoldingScreen,
+        wall_hours: s.wallHours ? `${s.wallHours.start}-${s.wallHours.end}` : null,
+        wall_force: s.wallForce,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
       pauseWall: patch.pauseWall ?? before.pauseWall,
       showHoldingScreen: patch.showHoldingScreen ?? before.showHoldingScreen,
+      wallHours:
+        patch.wallHours === undefined
+          ? before.wallHours
+          : patch.wallHours && { ...patch.wallHours },
+      wallForce: patch.wallForce ?? before.wallForce,
       updatedAt: now(),
       updatedBy: staffUserId,
     };

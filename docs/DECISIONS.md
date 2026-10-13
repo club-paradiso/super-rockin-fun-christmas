@@ -439,3 +439,17 @@ What only the real LED can answer is readability at viewing distance; `photoHeig
   mismatch would count as an error and trigger a reload.
 - Not yet: opening hours (`wallHours`, needs a settings migration) and frame-rate / memory in the
   wall heartbeat. Both are 2-4b.
+
+## D62 · Opening hours are a setting with a staff override, applied by the hub
+
+`wallHours` (one daily window, "HH:MM" in `WALL_CONFIG.timeZone` = Asia/Seoul, may run past
+midnight) and `wallForce` (`auto` follows the hours, `on` / `off` override them) live in the event
+settings, changed through the same single audited call as the emergency switches
+(`ftl_settings_update`, now with the hours; migration `20261013090000_phase2_wall_hours.sql`).
+The hub applies them on every feed poll: outside the hours the feed is `closed` with no photo
+ids and the image route refuses, exactly like PAUSE WALL. Order: holding screen, then pause, then
+closed. No hours = always open, so nothing changes until staff set them.
+
+The wall's heartbeat now carries its frame rate (animation frames between heartbeats) and, in
+Chromium, its JS heap in MB. Stored on the kiosk row (`frame_rate`, `memory_mb`), shown in
+/admin → 키오스크, with a hint below 20 fps to use low-spec mode. Out-of-range values are dropped.

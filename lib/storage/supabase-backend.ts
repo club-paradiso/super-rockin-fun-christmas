@@ -80,6 +80,8 @@ const toKiosk = (r: Row): KioskRow => ({
   cameraState: (r.camera_state as KioskRow["cameraState"]) ?? null,
   appBuild: (r.app_build as string | null) ?? null,
   enrolledVia: (r.enrolled_via as KioskRow["enrolledVia"]) ?? "secret",
+  frameRate: r.frame_rate == null ? null : Number(r.frame_rate),
+  memoryMb: (r.memory_mb as number | null) ?? null,
 });
 
 const toCode = (r: Row): EnrollmentCodeRow => ({
@@ -97,6 +99,11 @@ const toSettings = (r: Row): EventSettings => ({
   pauseSubmissions: r.pause_submissions as boolean,
   pauseWall: r.pause_wall as boolean,
   showHoldingScreen: r.show_holding_screen as boolean,
+  wallHours:
+    r.wall_hours_start && r.wall_hours_end
+      ? { start: r.wall_hours_start as string, end: r.wall_hours_end as string }
+      : null,
+  wallForce: (r.wall_force as EventSettings["wallForce"]) ?? "auto",
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -385,6 +392,8 @@ class SupabaseKioskRepository implements KioskRepository {
         queue_depth: hb.queueDepth,
         camera_state: hb.cameraState,
         app_build: hb.appBuild,
+        frame_rate: hb.frameRate ?? null,
+        memory_mb: hb.memoryMb ?? null,
       })
       .eq("id", id);
     if (error) throw new SupabaseError("kiosk heartbeat", error);
@@ -454,6 +463,11 @@ class SupabaseSettingsRepository implements SettingsRepository {
       p_pause_submissions: patch.pauseSubmissions ?? null,
       p_pause_wall: patch.pauseWall ?? null,
       p_show_holding_screen: patch.showHoldingScreen ?? null,
+      p_wall_force: patch.wallForce ?? null,
+      // Hours are nullable themselves, so "leave unchanged" needs its own flag.
+      p_set_wall_hours: patch.wallHours !== undefined,
+      p_wall_hours_start: patch.wallHours?.start ?? null,
+      p_wall_hours_end: patch.wallHours?.end ?? null,
       p_actor_id: staffUserId,
     });
     return toSettings(rows[0]!);

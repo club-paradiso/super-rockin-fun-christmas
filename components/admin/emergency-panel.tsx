@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { EventSettings } from "@/lib/storage/types";
+import type { EventSettings, WallForce } from "@/lib/storage/types";
+import type { WallOpenReason } from "@/lib/wall/hours";
 import { errorText, postJson } from "./api";
 
 const SWITCHES = [
@@ -23,11 +24,43 @@ const SWITCHES = [
   },
 ] as const;
 
-/** Big, explicit on/off switches. Every change is audited server-side. */
-export function EmergencyPanel({ settings }: { settings: EventSettings }) {
+const FORCE_OPTIONS: { value: WallForce; label: string }[] = [
+  { value: "auto", label: "자동 (운영 시간)" },
+  { value: "on", label: "계속 켜기" },
+  { value: "off", label: "끄기" },
+];
+
+const OPEN_TEXT: Record<WallOpenReason, string> = {
+  "forced-on": "켜짐 · 스태프가 켜 둠",
+  "forced-off": "꺼짐 · 스태프가 꺼 둠",
+  always: "켜짐 · 운영 시간 없음",
+  "in-hours": "켜짐 · 운영 시간 안",
+  "out-of-hours": "꺼짐 · 운영 시간 밖",
+};
+
+/**
+ * Big, explicit on/off switches. Every change is audited server-side. `wallStatus` is computed
+ * on the server (opening hours are in the event's time zone, not the phone's).
+ */
+export function EmergencyPanel({
+  settings,
+  wallStatus,
+}: {
+  settings: EventSettings;
+  wallStatus: { open: boolean; reason: WallOpenReason };
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function setForce(wallForce: WallForce) {
+    setBusy("wallForce");
+    setError(null);
+    const res = await postJson("/api/admin/settings", { wallForce });
+    setBusy(null);
+    if (!res.ok) setError(errorText(res.error));
+    router.refresh();
+  }
 
   async function toggle(key: (typeof SWITCHES)[number]["key"]) {
     setBusy(key);
@@ -75,6 +108,41 @@ export function EmergencyPanel({ settings }: { settings: EventSettings }) {
             </button>
           );
         })}
+      </div>
+      <div className="mt-4 flex flex-col gap-2" data-testid="wall-force">
+        <p className="text-xl font-bold">
+          미디어월 켜기/끄기{" "}
+          <span
+            className={`ml-2 rounded-full px-3 py-1 text-sm ${wallStatus.open ? "bg-pine text-cream" : "bg-alert text-ink"}`}
+            data-testid="wall-open-status"
+          >
+            지금 {OPEN_TEXT[wallStatus.reason]}
+          </span>
+        </p>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="미디어월 켜기/끄기">
+          {FORCE_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={settings.wallForce === o.value}
+              disabled={busy !== null}
+              onClick={() => setForce(o.value)}
+              data-testid={`wall-force-${o.value}`}
+              className={`min-h-14 rounded-2xl border-2 px-4 text-lg font-bold ${
+                settings.wallForce === o.value
+                  ? "border-amber bg-amber/20"
+                  : "border-cream/15 bg-ink"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-base text-mist">
+          자동이면 설정의 운영 시간에만 사진이 나와요. 시간 밖에는 &ldquo;오늘의 미디어월은
+          여기까지예요&rdquo; 화면이 떠요.
+        </p>
       </div>
       {error && <p className="mt-3 text-alert">{error}</p>}
     </section>

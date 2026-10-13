@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BackupButton } from "@/components/admin/backup-button";
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
+import { WALL_CONFIG } from "@/config/wall";
+import { wallOpen } from "@/lib/wall/hours";
 import { STATUS_LABEL, ago, formatBytes, formatTime } from "@/components/admin/labels";
 import { getOverview } from "@/lib/ops/admin";
 import { requireStaff } from "@/lib/staff-auth/page";
@@ -45,7 +47,10 @@ export default async function OverviewPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold">개요</h1>
-      <EmergencyPanel settings={o.settings} />
+      <EmergencyPanel
+        settings={o.settings}
+        wallStatus={wallOpen(o.settings, new Date(), WALL_CONFIG.timeZone)}
+      />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tile
           label="검수 대기"

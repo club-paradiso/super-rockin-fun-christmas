@@ -1,6 +1,7 @@
 import "server-only";
 import { WALL_CONFIG } from "@/config/wall";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
+import { wallOpen } from "./hours";
 import { feedSize, rotationOrder } from "./rotation";
 import type { WallFeed } from "./states";
 
@@ -25,6 +26,9 @@ export async function wallFeed(
   if (settings.showHoldingScreen)
     return { mode: "holding", ordering: "fair", photos: [], showNow: [] };
   if (settings.pauseWall) return { mode: "paused", ordering: "fair", photos: [], showNow: [] };
+  const hours = wallOpen(settings, new Date(), WALL_CONFIG.timeZone);
+  if (!hours.open)
+    return { mode: "closed", ordering: "fair", photos: [], showNow: [], opensAt: hours.opensAt };
 
   const [eligible, exposures, queue] = await Promise.all([
     getPhotoService().wallPhotos(MAX_ELIGIBLE),
@@ -68,6 +72,7 @@ export async function wallFeed(
 export async function wallImage(photoId: string) {
   const settings = await getBackend().settings.get();
   if (settings.showHoldingScreen || settings.pauseWall) return null;
+  if (!wallOpen(settings, new Date(), WALL_CONFIG.timeZone).open) return null;
   return getPhotoService().wallImage(photoId);
 }
 

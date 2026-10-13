@@ -72,6 +72,9 @@ export function WallApp({
     slotsRef.current = slotCount;
   }, [slotCount]);
 
+  // Frames drawn since the last heartbeat (frame rate for /admin → 키오스크).
+  const frames = useRef({ count: 0, since: 0 });
+
   // Watchdog (docs/ARCHITECTURE.md 1.8): reload if drawing stalls or an error escapes, at most
   // once a minute; plus one planned reload a day.
   useEffect(() => {
@@ -80,6 +83,7 @@ export function WallApp({
     let raf = 0;
     const frame = () => {
       lastFrameAt = Date.now();
+      frames.current.count++;
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -208,14 +212,27 @@ export function WallApp({
     };
   }, []);
 
-  // Heartbeat, so staff can see the display in /admin → 키오스크.
+  // Heartbeat, so staff can see the display in /admin → 키오스크, with its frame rate and (in
+  // Chromium) JS memory: the numbers a long run is judged by (docs/ARCHITECTURE.md 1.8).
   useEffect(() => {
-    const beat = () =>
-      fetch("/api/kiosk/heartbeat", {
+    frames.current = { count: 0, since: Date.now() };
+    const beat = () => {
+      const t = Date.now();
+      const { count, since } = frames.current;
+      frames.current = { count: 0, since: t };
+      const seconds = (t - since) / 1000;
+      const heap = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+      return fetch("/api/kiosk/heartbeat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ queueDepth: 0, camera: "unknown" }),
+        body: JSON.stringify({
+          queueDepth: 0,
+          camera: "unknown",
+          frameRate: seconds >= 1 ? Math.round((count / seconds) * 10) / 10 : null,
+          memoryMb: heap ? Math.round(heap.usedJSHeapSize / 1_048_576) : null,
+        }),
       }).catch(() => undefined);
+    };
     void beat();
     const id = setInterval(beat, WALL_CONFIG.heartbeatMs);
     return () => clearInterval(id);
@@ -347,6 +364,21 @@ export function WallApp({
                   <p className="font-bold text-cream" style={{ fontSize: unit * 64 }}>
                     잠시 후 다시 불을 밝힐게요
                   </p>
+                </div>
+              ) : feed?.mode === "closed" && !revoked ? (
+                <div
+                  data-testid="wall-closed"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-ink/70 text-center"
+                  style={{ gap: unit * 30 }}
+                >
+                  <p className="font-bold text-cream" style={{ fontSize: unit * 60 }}>
+                    오늘의 미디어월은 여기까지예요
+                  </p>
+                  {feed.opensAt && (
+                    <p className="text-amber" style={{ fontSize: unit * 40 }}>
+                      {feed.opensAt}에 다시 불을 밝힐게요
+                    </p>
+                  )}
                 </div>
               ) : screen === "EMPTY" ? (
                 <p

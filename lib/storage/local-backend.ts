@@ -80,10 +80,18 @@ class FileDb {
         cameraState: k.cameraState ?? null,
         appBuild: k.appBuild ?? null,
         enrolledVia: k.enrolledVia ?? "secret",
+        frameRate: k.frameRate ?? null,
+        memoryMb: k.memoryMb ?? null,
       });
     }
     for (const c of db.enrollmentCodes ?? []) this.mem.enrollmentCodes.rows.set(c.id, c);
-    if (db.settings) this.mem.settings.value = db.settings;
+    // Files written before Phase 2-4b have no opening hours.
+    if (db.settings)
+      this.mem.settings.value = {
+        ...db.settings,
+        wallHours: db.settings.wallHours ?? null,
+        wallForce: db.settings.wallForce ?? "auto",
+      };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);
     this.mem.audit.load(db.audit ?? []);

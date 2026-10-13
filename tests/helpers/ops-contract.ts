@@ -303,7 +303,19 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
         queueDepth: 3,
         cameraState: "ok",
         appBuild: "test",
+        frameRate: null,
+        memoryMb: null,
       });
+      // A wall display also reports how smoothly it draws (docs/ARCHITECTURE.md 1.8).
+      await backend.kiosks.heartbeat(kioskId, {
+        atIso: at,
+        queueDepth: 0,
+        cameraState: "unknown",
+        appBuild: "test",
+        frameRate: 59.5,
+        memoryMb: 182,
+      });
+      expect(await backend.kiosks.get(kioskId)).toMatchObject({ frameRate: 59.5, memoryMb: 182 });
       expect(new Date((await backend.kiosks.get(kioskId))!.heartbeatAt!).getTime()).toBe(
         new Date(at).getTime(),
       );
@@ -377,6 +389,31 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
       expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
       expect(JSON.parse(last!.fromState!)).toMatchObject({ pause_submissions: true });
+    });
+
+    it("wall opening hours and the staff override: stored, audited, clearable", async () => {
+      const { backend, staffId } = await setup();
+      const s = await backend.settings.update(
+        { wallHours: { start: "17:00", end: "22:00" }, wallForce: "off" },
+        staffId,
+      );
+      expect(s).toMatchObject({ wallHours: { start: "17:00", end: "22:00" }, wallForce: "off" });
+      // Changing something else leaves the hours alone.
+      expect(await backend.settings.update({ pauseWall: false }, staffId)).toMatchObject({
+        wallHours: { start: "17:00", end: "22:00" },
+      });
+      const cleared = await backend.settings.update(
+        { wallHours: null, wallForce: "auto" },
+        staffId,
+      );
+      expect(cleared).toMatchObject({ wallHours: null, wallForce: "auto" });
+      expect(await backend.settings.get()).toMatchObject({ wallHours: null, wallForce: "auto" });
+      const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
+      expect(JSON.parse(last!.fromState!)).toMatchObject({
+        wall_hours: "17:00-22:00",
+        wall_force: "off",
+      });
+      expect(JSON.parse(last!.toState!)).toMatchObject({ wall_hours: null, wall_force: "auto" });
     });
 
     it("staff allowlist add / deactivate / reactivate are audited", async () => {

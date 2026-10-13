@@ -77,6 +77,9 @@ export interface StaffKioskView {
   createdAt: string;
   revokedAt: string | null;
   enrolledVia: KioskRow["enrolledVia"];
+  /** Wall displays: frames per second and JS memory from the last heartbeat. */
+  frameRate: number | null;
+  memoryMb: number | null;
 }
 
 export function toStaffKioskView(k: KioskRow, now = Date.now()): StaffKioskView {
@@ -92,6 +95,8 @@ export function toStaffKioskView(k: KioskRow, now = Date.now()): StaffKioskView 
     createdAt: k.createdAt,
     revokedAt: k.revokedAt,
     enrolledVia: k.enrolledVia,
+    frameRate: k.frameRate,
+    memoryMb: k.memoryMb,
   };
 }
 

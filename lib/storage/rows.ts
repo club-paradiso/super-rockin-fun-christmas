@@ -18,5 +18,7 @@ export function newKioskRow(
     cameraState: null,
     appBuild: null,
     enrolledVia,
+    frameRate: null,
+    memoryMb: null,
   };
 }

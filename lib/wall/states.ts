@@ -29,9 +29,10 @@ export function wallScreenState(input: {
 
 /**
  * What the server lets the wall do right now. `holding` (SHOW HOLDING SCREEN) wins over `paused`
- * (PAUSE MEDIA WALL); both send no photos at all.
+ * (PAUSE MEDIA WALL), which wins over `closed` (outside opening hours, lib/wall/hours.ts). None of
+ * them sends any photos.
  */
-export type WallFeedMode = "live" | "paused" | "holding";
+export type WallFeedMode = "live" | "paused" | "holding" | "closed";
 
 export interface WallFeed {
   mode: WallFeedMode;
@@ -43,4 +44,6 @@ export interface WallFeed {
   photos: { id: string; frameId: string; createdAt: string }[];
   /** Staff asked for these now: the wall makes room for them at once. */
   showNow: string[];
+  /** `closed` only: when the wall opens again ("HH:MM"), if there are opening hours. */
+  opensAt?: string | null;
 }

@@ -163,12 +163,17 @@ export interface KioskRow {
   cameraState: CameraState | null;
   appBuild: string | null;
   enrolledVia: "secret" | "code";
+  /** Wall displays only: frames per second and JS heap (MB) from the last heartbeat. */
+  frameRate: number | null;
+  memoryMb: number | null;
 }
 
 export interface KioskHeartbeat {
   atIso: string;
   queueDepth: number;
   cameraState: CameraState;
+  frameRate?: number | null;
+  memoryMb?: number | null;
   appBuild: string | null;
 }
 
@@ -207,16 +212,32 @@ export interface EnrollmentCodeRepository {
   listRecent(limit: number): Promise<EnrollmentCodeRow[]>;
 }
 
+/** Daily media-wall opening hours, "HH:MM" in the event's time zone (config/wall.ts). */
+export interface WallHours {
+  start: string;
+  /** May be earlier than start: the window then runs past midnight. */
+  end: string;
+}
+
+/** Staff override of the opening hours: follow them, or keep the wall on / off for now. */
+export type WallForce = "auto" | "on" | "off";
+
 export interface EventSettings {
   pauseSubmissions: boolean;
   pauseWall: boolean;
   showHoldingScreen: boolean;
+  /** Null = no opening hours: the wall is on whenever it is switched on. */
+  wallHours: WallHours | null;
+  wallForce: WallForce;
   updatedAt: string;
   updatedBy: string | null;
 }
 
 export type SettingsPatch = Partial<
-  Pick<EventSettings, "pauseSubmissions" | "pauseWall" | "showHoldingScreen">
+  Pick<
+    EventSettings,
+    "pauseSubmissions" | "pauseWall" | "showHoldingScreen" | "wallHours" | "wallForce"
+  >
 >;
 
 export interface SettingsRepository {

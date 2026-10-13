@@ -162,6 +162,68 @@ describe("show-now", () => {
   });
 });
 
+describe("opening hours on the hub", () => {
+  async function settings(body: unknown, cookie = staff) {
+    const { POST } = await import("@/app/api/admin/settings/route");
+    return POST(post("/api/admin/settings", body, cookie), { params: Promise.resolve({}) });
+  }
+  async function image(id: string) {
+    const { GET } = await import("@/app/api/wall/photos/[id]/image/route");
+    return GET(
+      new Request(`${ORIGIN}/api/wall/photos/${id}/image`, { headers: { cookie: kiosk } }),
+      {
+        params: Promise.resolve({ id }),
+      },
+    );
+  }
+
+  it("staff only; refuses nonsense hours and forces", async () => {
+    expect((await settings({ wallForce: "off" }, "")).status).toBe(401);
+    expect((await settings({ wallForce: "sometimes" })).status).toBe(400);
+    expect((await settings({ wallHours: { start: "17:00", end: "17:00" } })).status).toBe(400);
+    expect((await settings({ wallHours: { start: "5pm", end: "10pm" } })).status).toBe(400);
+  });
+
+  it("closed (staff off): no photo ids and no images reach the wall; on again: back", async () => {
+    expect((await image(approved[0]!)).status).toBe(200);
+    expect((await settings({ wallForce: "off" })).status).toBe(200);
+    const closed = await feed();
+    expect([closed.mode, closed.photos, closed.showNow]).toEqual(["closed", [], []]);
+    expect((await image(approved[0]!)).status).toBe(404);
+    expect((await settings({ wallForce: "auto" })).status).toBe(200);
+    expect((await feed()).mode).toBe("live");
+  });
+
+  it("outside the hours the wall is told when it opens again", async () => {
+    const { localHHMM } = await import("@/lib/wall/hours");
+    // A one-minute window an hour from now is certainly not now.
+    const later = new Date(Date.now() + 3_600_000);
+    const start = localHHMM(later, WALL_CONFIG.timeZone);
+    const end = localHHMM(new Date(later.getTime() + 60_000), WALL_CONFIG.timeZone);
+    expect((await settings({ wallHours: { start, end } })).status).toBe(200);
+    expect(await feed()).toMatchObject({ mode: "closed", photos: [], opensAt: start });
+    expect((await settings({ wallForce: "on" })).status).toBe(200);
+    expect((await feed()).mode).toBe("live");
+    expect((await settings({ wallForce: "auto", wallHours: null })).status).toBe(200);
+    expect((await feed()).mode).toBe("live");
+  });
+});
+
+describe("wall heartbeat metrics", () => {
+  it("stores frame rate and memory; drops values that make no sense", async () => {
+    const { POST } = await import("@/app/api/kiosk/heartbeat/route");
+    const { getBackend } = await import("@/lib/storage/server");
+    const { authenticateKiosk } = await import("@/lib/kiosk-auth/server");
+    const auth = await authenticateKiosk(kiosk.slice(kiosk.indexOf("=") + 1));
+    const id = auth.ok ? auth.kioskId! : "";
+    const beat = (body: unknown) => POST(post("/api/kiosk/heartbeat", body, kiosk));
+    expect((await beat({ queueDepth: 0, frameRate: 58.73, memoryMb: 210 })).status).toBe(200);
+    expect(await getBackend().kiosks.get(id)).toMatchObject({ frameRate: 58.7, memoryMb: 210 });
+    await beat({ queueDepth: 0, frameRate: 9999, memoryMb: -1 });
+    expect(await getBackend().kiosks.get(id)).toMatchObject({ frameRate: null, memoryMb: null });
+  });
+});
+
 describe("exposure report endpoint", () => {
   it("needs an enrolled display, same origin, and photo ids", async () => {
     expect((await report([], [], "")).status).toBe(401);
