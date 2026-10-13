@@ -189,5 +189,51 @@ export function photoServiceContract(
       await svc.purgeRetention(1000);
       expect((await backend.photos.findBySessionId(SESSION))!.deletedAt).toBeNull();
     });
+
+    // Cloud side of the hub's QR copy (/api/hub/*): copies have no kiosk.
+    it("hub copy: reissue rotates the link, capped at retention; kiosk photos are out of reach", async () => {
+      const first = await put({ kioskId: null });
+      const again = await svc.reissueForHub(SESSION);
+      expect(again.ok).toBe(true);
+      if (!again.ok) return;
+      expect((await svc.resolve(first.token)).ok).toBe(false);
+      expect((await svc.resolve(again.token)).ok).toBe(true);
+      now = new Date("2027-01-22T12:00:00Z");
+      const late = await svc.reissueForHub(SESSION);
+      expect(late.ok && late.tokenExpiresAt).toBe("2027-01-23T10:00:00.000Z");
+      now = new Date("2027-01-23T10:00:00Z"); // retention reached, before the purge ran
+      expect(await svc.reissueForHub(SESSION)).toEqual({ ok: false, reason: "gone" });
+      expect(await svc.reissueForHub(uuid())).toEqual({ ok: false, reason: "absent" });
+
+      if (KIOSK === null) return;
+      const kioskSession = uuid();
+      await put({ sessionId: kioskSession });
+      expect(await svc.reissueForHub(kioskSession)).toEqual({ ok: false, reason: "absent" });
+    });
+
+    it("hub copy: delete removes the bytes and the link, idempotently, with a system audit", async () => {
+      const { token } = await put({ kioskId: null });
+      expect(await svc.deleteForHub(SESSION)).toBe("deleted");
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(row.moderationStatus).toBe("DELETED");
+      expect(row.objectDeletedAt).not.toBeNull();
+      expect(await backend.objects.get(row.objectPath)).toBeNull();
+      expect((await svc.resolve(token)).ok).toBe(false);
+      expect(await svc.deleteForHub(SESSION)).toBe("deleted");
+      expect(await svc.deleteForHub(uuid())).toBe("absent");
+      expect(await svc.reissueForHub(SESSION)).toEqual({ ok: false, reason: "gone" });
+      const [event] = await backend.audit.list({
+        subjectType: "photo",
+        subjectId: row.id,
+        limit: 1,
+      });
+      expect(event).toMatchObject({ action: "hub_delete", actorType: "system" });
+
+      if (KIOSK === null) return;
+      const kioskSession = uuid();
+      const kioskPhoto = await put({ sessionId: kioskSession });
+      expect(await svc.deleteForHub(kioskSession)).toBe("absent");
+      expect((await svc.resolve(kioskPhoto.token)).ok).toBe(true);
+    });
   });
 }

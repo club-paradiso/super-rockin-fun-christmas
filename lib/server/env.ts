@@ -45,6 +45,13 @@ export interface ServerConfig {
     | { mode: "disabled" };
   cronSecret: string | null;
   maxUploadBytes: number;
+  /**
+   * Hub only: where the QR copy goes (docs/ARCHITECTURE.md 1.5). Null = no cloud configured; the
+   * hub then works fully offline and its QR codes point at the hub itself (LAN only).
+   */
+  cloudSync: { baseUrl: URL; secret: string; timeoutMs: number } | null;
+  /** Cloud only: the shared secret that lets the hub use /api/hub/*. Null = those routes 404. */
+  hubSyncSecret: string | null;
 }
 
 export class ConfigError extends Error {
@@ -76,6 +83,12 @@ export function isPrivateHost(hostname: string): boolean {
 }
 
 type Env = Record<string, string | undefined>;
+
+function secretsCollide(secret: string, env: Env): boolean {
+  return [env.KIOSK_SESSION_SECRET, env.KIOSK_ENROLL_SECRET, env.CRON_SECRET].some(
+    (other) => !!other && other.trim() === secret,
+  );
+}
 
 function positiveNumber(env: Env, key: string, fallback: number, problems: string[]): number {
   const raw = env[key];
@@ -218,6 +231,36 @@ export function parseServerConfig(env: Env): ServerConfig {
   if (publicRules && !cronSecret)
     problems.push("CRON_SECRET is required in production (retention cleanup)");
 
+  // Hub ⇄ cloud copy for QR downloads (D43). One shared secret, set on both sides.
+  const syncSecret = env.HUB_SYNC_SECRET?.trim() || null;
+  if (syncSecret && syncSecret.length < 32)
+    problems.push("HUB_SYNC_SECRET must be at least 32 characters (openssl rand -base64 48)");
+  if (syncSecret && secretsCollide(syncSecret, env))
+    problems.push("HUB_SYNC_SECRET must differ from the kiosk and cron secrets");
+  let cloudSync: ServerConfig["cloudSync"] = null;
+  const rawCloud = env.CLOUD_BASE_URL?.trim();
+  if (rawCloud) {
+    if (role !== "hub") problems.push("CLOUD_BASE_URL is for the hub (FTL_ROLE=hub) only");
+    let baseUrl: URL | null = null;
+    try {
+      baseUrl = new URL(rawCloud);
+      if (baseUrl.pathname !== "/" || baseUrl.search || baseUrl.hash)
+        problems.push("CLOUD_BASE_URL must be an origin only, e.g. https://lights.example.org");
+      if (strict && baseUrl.protocol !== "https:")
+        problems.push("CLOUD_BASE_URL must use https (photos travel over the internet)");
+    } catch {
+      problems.push(`CLOUD_BASE_URL is not a valid URL ("${rawCloud}")`);
+    }
+    if (!syncSecret)
+      problems.push("CLOUD_BASE_URL needs HUB_SYNC_SECRET (the same value as the cloud)");
+    if (baseUrl && syncSecret)
+      cloudSync = {
+        baseUrl,
+        secret: syncSecret,
+        timeoutMs: positiveNumber(env, "CLOUD_SYNC_TIMEOUT_MS", 8000, problems),
+      };
+  }
+
   if (problems.length) throw new ConfigError(problems);
 
   return {
@@ -235,6 +278,8 @@ export function parseServerConfig(env: Env): ServerConfig {
     cronSecret,
     // Vercel functions accept at most 4.5 MB request bodies; a final four-cut JPEG is ~0.3–1.5 MB.
     maxUploadBytes: 4 * 1024 * 1024,
+    cloudSync,
+    hubSyncSecret: role === "cloud" ? syncSecret : null,
   };
 }
 

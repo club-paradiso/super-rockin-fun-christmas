@@ -51,6 +51,21 @@ export interface PhotoRow {
   objectDeletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Hub only: state of the QR copy in the cloud (docs/ARCHITECTURE.md 1.5). Absent elsewhere. */
+  cloud?: CloudCopy;
+}
+
+/**
+ * The hub's view of a photo's cloud copy. PENDING → SYNCED by upload; DELETE_PENDING → DELETED
+ * once the cloud copy (and its guest link) is gone. Attempts back off; nothing here is a guest
+ * token (the hub never stores one).
+ */
+export interface CloudCopy {
+  state: "PENDING" | "SYNCED" | "DELETE_PENDING" | "DELETED";
+  attempts: number;
+  nextAttemptAt: string;
+  lastError: string | null;
+  syncedAt: string | null;
 }
 
 export type PhotoPatch = Partial<Pick<PhotoRow, "tokenHash" | "tokenExpiresAt">>;
@@ -118,6 +133,10 @@ export interface PhotoRepository {
   list(filter: PhotoListFilter): Promise<PhotoRow[]>;
   /** Wall candidates (APPROVED AND wall_consent AND not deleted), newest first. */
   listWallEligible(limit: number): Promise<WallEligibleRow[]>;
+  /** Hub only. Unaudited bookkeeping of the cloud copy (not a decision by anyone). */
+  setCloud(id: string, cloud: CloudCopy): Promise<void>;
+  /** Hub only. Rows whose cloud upload or delete is due, oldest first. */
+  listCloudDue(nowIso: string, limit: number): Promise<PhotoRow[]>;
   stats(): Promise<PhotoStats>;
 }
 

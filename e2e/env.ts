@@ -34,3 +34,32 @@ export const E2E_ENV: Record<string, string> = {
         FTL_HUB_SETUP_CODE: HUB_SETUP_CODE,
       }),
 };
+
+/**
+ * Hub + cloud pair for e2e/cloud.spec.ts (hub runs only): a second hub with CLOUD_BASE_URL, and a
+ * cloud-role server with its own store. The hub reaches the cloud through a proxy the spec starts
+ * and stops, so "the internet goes down" is a real refused connection.
+ */
+export const CLOUD_PORT = PORT + 1;
+export const HUB_CLOUD_PORT = PORT + 2;
+export const CLOUD_PROXY_PORT = PORT + 3;
+const HUB_SYNC_SECRET = "e2e-hub-sync-secret-0123456789-abcdefghijklmnop";
+
+export const CLOUD_ENV: Record<string, string> = {
+  ...E2E_ENV,
+  FTL_ROLE: "cloud",
+  PHOTO_STORE: "local",
+  FTL_DATA_DIR: ".data-e2e-cloud",
+  PUBLIC_BASE_URL: `http://127.0.0.1:${CLOUD_PORT}`,
+  HUB_SYNC_SECRET,
+};
+delete CLOUD_ENV.FTL_HUB_SETUP_CODE;
+
+export const HUB_CLOUD_ENV: Record<string, string> = {
+  ...E2E_ENV,
+  FTL_DATA_DIR: ".data-e2e-hub-cloud",
+  PUBLIC_BASE_URL: `http://127.0.0.1:${HUB_CLOUD_PORT}`,
+  CLOUD_BASE_URL: `http://127.0.0.1:${CLOUD_PROXY_PORT}`,
+  HUB_SYNC_SECRET,
+  CLOUD_SYNC_TIMEOUT_MS: "3000",
+};

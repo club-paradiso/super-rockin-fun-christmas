@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import { makeQrSvg } from "@/lib/qr";
 import { JPEG, SESSION } from "../helpers/images";
 
@@ -27,6 +27,14 @@ describe("uploadOnce", () => {
     expect(init.headers["x-queue-depth"]).toBe("2");
     expect(init.credentials).toBe("same-origin");
     expect(Object.keys(init.headers).join()).not.toMatch(/auth|secret|key/i);
+  });
+
+  it("202 from a hub = stored, QR pending (not a retry)", async () => {
+    const fetchImpl = respond(202, { qr: "pending", duplicate: false, wallSubmissions: "open" });
+    expect(await uploadOnce(entry, 0, fetchImpl)).toEqual({
+      ok: true,
+      result: { qr: "pending", duplicate: false, wallSubmissions: "open", qrPending: true },
+    });
   });
 
   it.each([
@@ -76,5 +84,18 @@ describe("sendWallConsent", () => {
 describe("QR", () => {
   it("renders an SVG", async () => {
     expect((await makeQrSvg("https://lights.example.org/p/abc")).startsWith("<svg")).toBe(true);
+  });
+});
+
+describe("requestQr", () => {
+  it("returns the link on 200 and null while pending or on errors", async () => {
+    const link = { token: "t", url: "https://x/p/t", expiresAt: "e" };
+    expect(await requestQr("s", respond(200, link))).toEqual(link);
+    expect(await requestQr("s", respond(202, { qr: "pending" }))).toBeNull();
+    expect(await requestQr("s", respond(500))).toBeNull();
+    expect(await requestQr("s", vi.fn().mockRejectedValue(new TypeError("offline")))).toBeNull();
+    const fetchImpl = respond(202, { qr: "pending" });
+    await requestQr("s-1", fetchImpl);
+    expect(JSON.parse(fetchImpl.mock.calls[0]![1].body)).toEqual({ sessionId: "s-1" });
   });
 });

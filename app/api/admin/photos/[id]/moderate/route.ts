@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCloudSync } from "@/lib/cloud/server";
 import { kioskLabelMap, toStaffPhotoView } from "@/lib/ops/admin";
 import { MODERATION_ACTIONS, type ModerationAction } from "@/lib/ops/moderation";
 import { NO_STORE, jsonError } from "@/lib/server/http";
@@ -35,6 +36,11 @@ export const POST = staffRoute<{ id: string }>(
 
     const result = await getPhotoService().moderate(id, action, staff.userId, note);
     if (!result.ok) return jsonError(STATUS[result.reason] ?? 400, result.reason);
+    // The cloud copy and its guest link go too (retried in the background while offline).
+    if (action === "delete")
+      await getCloudSync()
+        ?.markDeleted(id)
+        .catch(() => undefined);
     logEvent("moderation", {
       photoId: id,
       action,

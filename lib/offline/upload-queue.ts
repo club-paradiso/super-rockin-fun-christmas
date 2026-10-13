@@ -1,13 +1,17 @@
 import type { QueueStore, QueuedUpload } from "./queue-store";
 
-export interface UploadSuccess {
-  token: string;
-  url: string;
-  expiresAt: string;
-  duplicate: boolean;
-  /** Whether staff currently accept new media-wall submissions. */
-  wallSubmissions?: "open" | "paused";
-}
+export type UploadSuccess =
+  | {
+      token: string;
+      url: string;
+      expiresAt: string;
+      duplicate: boolean;
+      /** Whether staff currently accept new media-wall submissions. */
+      wallSubmissions?: "open" | "paused";
+      qrPending?: undefined;
+    }
+  /** Hub with a cloud: the photo is stored, its QR copy is not in the cloud yet (HTTP 202). */
+  | { qrPending: true; duplicate: boolean; wallSubmissions?: "open" | "paused" };
 
 export type UploadOutcome =
   | { ok: true; result: UploadSuccess }

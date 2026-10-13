@@ -71,6 +71,25 @@ export default async function OverviewPage() {
           sub={`${formatBytes(o.storedBytes)} (DB 기록 기준)`}
         />
       </div>
+      {o.cloud && (
+        <section className="admin-card p-4" data-testid="cloud-status">
+          <h2 className="mb-2 text-xl font-bold">QR 서버 (인터넷)</h2>
+          {o.cloud.pendingUploads === 0 && o.cloud.pendingDeletes === 0 ? (
+            <p className="text-lg">밀린 일이 없어요.</p>
+          ) : (
+            <p className="text-lg">
+              <span className="text-alert">
+                QR 대기 {o.cloud.pendingUploads}건 · 삭제 대기 {o.cloud.pendingDeletes}건
+              </span>
+              <br />
+              <span className="text-base text-mist">
+                인터넷이 돌아오면 자동으로 보내요. 사진은 이 노트북에 안전하게 있어요.
+                {o.cloud.lastError && ` 마지막 오류: ${o.cloud.lastError}`}
+              </span>
+            </p>
+          )}
+        </section>
+      )}
       <section className="admin-card p-4">
         <h2 className="mb-2 text-xl font-bold">마지막 자동 정리</h2>
         {o.lastRetention ? (

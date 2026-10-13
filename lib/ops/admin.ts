@@ -1,5 +1,7 @@
 import "server-only";
 import { getFrame } from "@/config/frames";
+import { getCloudSync } from "@/lib/cloud/server";
+import type { CloudSyncStatus } from "@/lib/cloud/sync";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 import type {
   AuditEvent,
@@ -146,16 +148,19 @@ export interface Overview {
   };
   lastRetention: RetentionRun | null;
   settings: EventSettings;
+  /** Hub with a cloud only: QR copies and deletes still waiting for the internet. */
+  cloud: CloudSyncStatus | null;
 }
 
 /** Only measured values. Anything we cannot measure is absent, not shown as green. */
 export async function getOverview(): Promise<Overview> {
   const backend = getBackend();
-  const [stats, kiosks, lastRetention, settings] = await Promise.all([
+  const [stats, kiosks, lastRetention, settings, cloud] = await Promise.all([
     getPhotoService().stats(),
     backend.kiosks.list(),
     backend.retentionRuns.latest(),
     backend.settings.get(),
+    getCloudSync()?.status() ?? null,
   ]);
   const views = kiosks.map((k) => toStaffKioskView(k));
   const count = (h: KioskHealth) => views.filter((v) => v.health === h).length;
@@ -176,6 +181,7 @@ export async function getOverview(): Promise<Overview> {
     },
     lastRetention,
     settings,
+    cloud,
   };
 }
 

@@ -32,7 +32,7 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
-import { sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import { ConsentQueue } from "@/lib/offline/consent-queue";
 import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
@@ -269,6 +269,10 @@ export function KioskApp({
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
     if (result.wallSubmissions) setWallSubmissions(result.wallSubmissions);
     if (sessionId !== sessionRef.current) return; // a previous guest's queued photo finished
+    if (result.qrPending) {
+      dispatch({ type: "DELIVERY_QR_PENDING" });
+      return;
+    }
     const svg = await makeQrSvg(result.url);
     if (sessionId !== sessionRef.current) return;
     setQrSvg(svg);
@@ -319,6 +323,26 @@ export function KioskApp({
       window.removeEventListener("online", onOnline);
     };
   }, [showQr]);
+
+  // Hub + cloud: the photo is on the hub, its QR copy is on the way. Ask every few seconds while
+  // this guest is still on the delivery screen; a later guest never sees an earlier QR.
+  const qrPending = state.phase === "delivery" && state.delivery.status === "qr-pending";
+  useEffect(() => {
+    if (!qrPending) return;
+    const sessionId = state.sessionId;
+    let stopped = false;
+    const ask = async () => {
+      const link = await requestQr(sessionId);
+      if (link && !stopped)
+        await showQr(sessionId, { ...link, duplicate: true, wallSubmissions: undefined });
+    };
+    void ask();
+    const id = setInterval(() => void ask(), KIOSK_CONFIG.qrPollSeconds * 1000);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [qrPending, state.sessionId, showQr]);
 
   const deliver = useCallback(async () => {
     if (!finalImage || !queueRef.current) return;
@@ -775,6 +799,28 @@ function Screen(p: ScreenProps) {
                 세션 {state.sessionId.slice(0, 8)}
               </p>
             </>
+          ) : d.status === "qr-pending" ? (
+            <div data-testid="delivery-qr-pending" className="flex flex-col items-center gap-8">
+              <Title>QR을 준비하고 있어요</Title>
+              <Lead>
+                사진은 안전하게 저장했어요. 인터넷이 조금 느려서 QR이 늦어지고 있어요. 잠시만
+                기다리면 이 화면에 QR이 나와요.
+              </Lead>
+              <button
+                type="button"
+                className="btn-secondary"
+                data-testid="qr-pending-continue"
+                onClick={() =>
+                  dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
+                }
+              >
+                QR 없이 다음으로
+              </button>
+              {/* Without a QR this is how staff find the photo later (최근 세션 → QR 다시 보여주기). */}
+              <p className="font-mono text-base text-mist/70" data-testid="session-code">
+                세션 {state.sessionId.slice(0, 8)}
+              </p>
+            </div>
           ) : d.status === "queued" ? (
             <div data-testid="delivery-queued" className="flex flex-col items-center gap-8">
               <Title>
