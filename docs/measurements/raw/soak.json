@@ -1,7 +1,7 @@
 {
   "minutesPlanned": 180,
   "canvas": "3840x1080",
-  "photosAddedDuringRun": 5,
+  "photosAddedDuringRun": 6,
   "photosHiddenDuringRun": 1,
   "crashed": 0,
   "consoleErrors": 0,
@@ -186,6 +186,42 @@
       "visible": 5,
       "reloads": 0,
       "hubRssMb": 295
+    },
+    {
+      "minute": 15,
+      "heapUsedMb": 3.73,
+      "heapTotalMb": 4.54,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 31.3,
+      "visible": 8,
+      "reloads": 0,
+      "hubRssMb": 295
+    },
+    {
+      "minute": 16,
+      "heapUsedMb": 3.74,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 30.6,
+      "visible": 6,
+      "reloads": 0,
+      "hubRssMb": 296
+    },
+    {
+      "minute": 17,
+      "heapUsedMb": 3.74,
+      "heapTotalMb": 4.29,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 30.3,
+      "visible": 5,
+      "reloads": 0,
+      "hubRssMb": 296
     }
   ]
 }
