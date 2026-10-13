@@ -1,7 +1,7 @@
 {
   "minutesPlanned": 180,
   "canvas": "3840x1080",
-  "photosAddedDuringRun": 6,
+  "photosAddedDuringRun": 9,
   "photosHiddenDuringRun": 1,
   "crashed": 0,
   "consoleErrors": 0,
@@ -222,6 +222,126 @@
       "visible": 5,
       "reloads": 0,
       "hubRssMb": 296
+    },
+    {
+      "minute": 18,
+      "heapUsedMb": 3.75,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 28,
+      "visible": 7,
+      "reloads": 0,
+      "hubRssMb": 302
+    },
+    {
+      "minute": 19,
+      "heapUsedMb": 3.75,
+      "heapTotalMb": 4.54,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 27.6,
+      "visible": 5,
+      "reloads": 0,
+      "hubRssMb": 296
+    },
+    {
+      "minute": 20,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 28.6,
+      "visible": 5,
+      "reloads": 0,
+      "hubRssMb": 302
+    },
+    {
+      "minute": 21,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 29.4,
+      "visible": 6,
+      "reloads": 0,
+      "hubRssMb": 302
+    },
+    {
+      "minute": 22,
+      "heapUsedMb": 3.75,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 30.5,
+      "visible": 7,
+      "reloads": 0,
+      "hubRssMb": 302
+    },
+    {
+      "minute": 23,
+      "heapUsedMb": 3.75,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 29.6,
+      "visible": 5,
+      "reloads": 0,
+      "hubRssMb": 297
+    },
+    {
+      "minute": 24,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.54,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 28.1,
+      "visible": 6,
+      "reloads": 0,
+      "hubRssMb": 297
+    },
+    {
+      "minute": 25,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 30.7,
+      "visible": 7,
+      "reloads": 0,
+      "hubRssMb": 297
+    },
+    {
+      "minute": 26,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.79,
+      "domNodes": 337,
+      "listeners": 334,
+      "documents": 1,
+      "fps": 27.3,
+      "visible": 5,
+      "reloads": 0,
+      "hubRssMb": 302
+    },
+    {
+      "minute": 27,
+      "heapUsedMb": 3.76,
+      "heapTotalMb": 4.79,
+      "domNodes": 333,
+      "listeners": 332,
+      "documents": 1,
+      "fps": 31.5,
+      "visible": 4,
+      "reloads": 0,
+      "hubRssMb": 297
     }
   ]
 }
