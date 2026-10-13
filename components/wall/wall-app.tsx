@@ -2,19 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
+import { clotheslineLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
+import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
+import { Peg, WallScene } from "./wall-scene";
 
-/** Where each lit window sits above the village (percent of the screen). */
-const SLOT_POSITIONS = [
-  { left: 8, top: 14, tilt: -3 },
-  { left: 27, top: 6, tilt: 2 },
-  { left: 46, top: 16, tilt: -1 },
-  { left: 65, top: 7, tilt: 3 },
-  { left: 83, top: 15, tilt: -2 },
-] as const;
+const RELOAD_KEY = "ftl-wall-reloaded-at";
 
-const HOUSES = 7;
+/** Reload the page, remembering when, so the watchdog never loops faster than once a minute. */
+function reloadPage() {
+  try {
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {
+    // Storage unavailable: the reload still helps.
+  }
+  window.location.reload();
+}
 
 /**
  * The media wall. Polls /api/wall/feed, keeps eligible images in memory (object URLs) and lets
@@ -24,16 +28,97 @@ const HOUSES = 7;
  * about hides or deletions. Each photo it puts up is reported back (/api/wall/shown), which is
  * the exposure log the rotation is built on.
  */
-export function WallApp() {
+export function WallApp({
+  canvas = null,
+  lite = false,
+}: {
+  /** Fixed scene size (WALL_CANVAS / ?canvas=); null = the screen's own size. */
+  canvas?: { width: number; height: number } | null;
+  /** Low-spec mode: fades only, no twinkling, fewer photos. */
+  lite?: boolean;
+}) {
+  // Measured after mount, so the server render and the first client render agree.
+  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const measure = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const size = canvas ?? viewport;
+  const layout = useMemo(
+    () =>
+      size &&
+      clotheslineLayout(
+        size,
+        WALL_CONFIG.scene,
+        lite ? Math.min(WALL_CONFIG.liteMaxSlots, WALL_CONFIG.scene.maxSlots) : undefined,
+      ),
+    [size, lite],
+  );
+  const slotCount = layout?.slots.length ?? 0;
+  const slotsRef = useRef(slotCount);
+
   const [feed, setFeed] = useState<WallFeed | null>(null);
   const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const [online, setOnline] = useState(true);
   const [revoked, setRevoked] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [images, setImages] = useState<ReadonlyMap<string, string>>(new Map());
-  const [schedule, setSchedule] = useState<WallSchedule>(() =>
-    emptySchedule(Math.min(WALL_CONFIG.slots, SLOT_POSITIONS.length)),
-  );
+  const [schedule, setSchedule] = useState<WallSchedule>(() => emptySchedule(0));
+  // The scene decides how many photos hang at once; the next tick starts a fresh line if the
+  // shape changed (lib/wall/scheduler.ts works on a fixed number of slots).
+  useEffect(() => {
+    slotsRef.current = slotCount;
+  }, [slotCount]);
+
+  // Watchdog (docs/ARCHITECTURE.md 1.8): reload if drawing stalls or an error escapes, at most
+  // once a minute; plus one planned reload a day.
+  useEffect(() => {
+    let lastFrameAt = Date.now();
+    let errored = false;
+    let raf = 0;
+    const frame = () => {
+      lastFrameAt = Date.now();
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    const onError = () => {
+      errored = true;
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onError);
+    const check = setInterval(() => {
+      let lastReloadAt: number | null = null;
+      try {
+        lastReloadAt = Number(sessionStorage.getItem(RELOAD_KEY)) || null;
+      } catch {}
+      if (
+        shouldReload({
+          now: Date.now(),
+          lastFrameAt,
+          visible: document.visibilityState === "visible",
+          errored,
+          lastReloadAt,
+          stallMs: WALL_CONFIG.watchdog.stallMs,
+          minReloadGapMs: WALL_CONFIG.watchdog.minReloadGapMs,
+        })
+      )
+        reloadPage();
+      errored = false;
+    }, 2_000);
+    const daily = setTimeout(
+      reloadPage,
+      msUntilDaily(new Date(), WALL_CONFIG.watchdog.dailyReloadAt),
+    );
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(check);
+      clearTimeout(daily);
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onError);
+    };
+  }, []);
 
   const fresh = lastOkAt !== null && now - lastOkAt <= WALL_CONFIG.offlineGraceMs;
   const eligible = useMemo(
@@ -73,8 +158,10 @@ export function WallApp() {
         Math.min(8_000, WALL_CONFIG.pollMs - 1_000),
       );
       try {
-        const on = onWallRef.current.join(",");
-        const res = await fetch(`/api/wall/feed${on ? `?on=${on}` : ""}`, {
+        const q = new URLSearchParams();
+        if (onWallRef.current.length) q.set("on", onWallRef.current.join(","));
+        if (slotsRef.current) q.set("slots", String(slotsRef.current));
+        const res = await fetch(`/api/wall/feed?${q}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -197,16 +284,17 @@ export function WallApp() {
     const id = setInterval(() => {
       const t = Date.now();
       setNow(t);
-      setSchedule((s) =>
-        stepSchedule(s, {
+      setSchedule((prev) => {
+        const s = prev.slots.length === slotsRef.current ? prev : emptySchedule(slotsRef.current);
+        return stepSchedule(s, {
           now: t,
           eligible: latest.current.eligible,
           ready: new Set(latest.current.images.keys()),
           timings: WALL_CONFIG,
           ordering: latest.current.ordering,
           showNow: latest.current.showNow,
-        }),
-      );
+        });
+      });
     }, WALL_CONFIG.tickMs);
     return () => clearInterval(id);
   }, []);
@@ -218,69 +306,104 @@ export function WallApp() {
     approvedCount: eligible.length,
   });
 
+  const unit = (layout?.height ?? 1000) / 1000;
+  const scale =
+    layout && viewport
+      ? Math.min(viewport.width / layout.width, viewport.height / layout.height)
+      : 1;
+
   return (
     <main
       data-testid="wall"
       data-wall-state={screen}
       data-wall-mode={revoked ? "revoked" : (feed?.mode ?? "boot")}
-      className="night-sky relative flex h-dvh w-full cursor-none flex-col items-center justify-end overflow-hidden pb-[12vh]"
+      className="relative h-dvh w-full cursor-none overflow-hidden bg-[#0b0806]"
     >
-      {schedule.slots.map((slot, i) => {
-        const url = slot.photoId && allowed.has(slot.photoId) ? images.get(slot.photoId) : null;
-        if (!slot.photoId || !slot.phase || !url) return null;
-        const pos = SLOT_POSITIONS[i]!;
-        return (
-          <figure
-            key={`${i}-${slot.photoId}`}
-            data-testid="wall-photo"
-            data-photo-id={slot.photoId}
-            data-phase={slot.phase}
-            className={`wall-photo absolute ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
-            style={{
-              left: `${pos.left}%`,
-              top: `${pos.top}%`,
-              transform: `translateX(-50%) rotate(${pos.tilt}deg)`,
-            }}
-          >
-            {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt=""
-              className="max-h-[34vh] max-w-[15vw] rounded-md object-contain shadow-[0_0_40px_rgba(255,207,138,0.45)]"
-            />
-          </figure>
-        );
-      })}
-
-      <div className="flex gap-[3vw]" aria-hidden>
-        {Array.from({ length: HOUSES }, (_, i) => (
-          <div
-            key={i}
-            className="rounded-t-md bg-dusk"
-            style={{ width: "6vw", height: `${10 + ((i * 37) % 9)}vh` }}
-          >
-            <div className="mx-auto mt-[2vh] h-[3vh] w-[2.5vw] rounded-sm bg-amber/70 shadow-[0_0_30px_rgba(255,207,138,0.6)]" />
-          </div>
-        ))}
-      </div>
-
-      {feed?.mode === "holding" && !revoked ? (
+      {layout && viewport && (
         <div
-          data-testid="wall-holding"
-          className="absolute inset-0 flex flex-col items-center justify-center gap-[3vh] bg-ink/80 text-center"
+          className="absolute"
+          style={{
+            left: (viewport.width - layout.width * scale) / 2,
+            top: (viewport.height - layout.height * scale) / 2,
+            width: layout.width,
+            height: layout.height,
+            transform: `scale(${scale})`,
+            transformOrigin: "0 0",
+          }}
         >
-          <p className="text-[2.2vw] tracking-[0.3em] text-amber">FOLLOW THE LIGHTS</p>
-          <p className="text-[3.2vw] font-bold text-cream">잠시 후 다시 불을 밝힐게요</p>
+          <WallScene
+            layout={layout}
+            lite={lite}
+            overlay={
+              feed?.mode === "holding" && !revoked ? (
+                <div
+                  data-testid="wall-holding"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-ink/85 text-center"
+                  style={{ gap: unit * 30 }}
+                >
+                  <p className="text-amber" style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}>
+                    FOLLOW THE LIGHTS
+                  </p>
+                  <p className="font-bold text-cream" style={{ fontSize: unit * 64 }}>
+                    잠시 후 다시 불을 밝힐게요
+                  </p>
+                </div>
+              ) : screen === "EMPTY" ? (
+                <p
+                  data-testid="wall-empty"
+                  className="absolute w-full text-center text-cream/80"
+                  style={{
+                    top: layout.line.y0 + layout.line.sag + unit * 120,
+                    fontSize: unit * 40,
+                  }}
+                >
+                  사진을 찍고 미디어월에 함께해 주세요
+                </p>
+              ) : null
+            }
+          >
+            {schedule.slots.map((slot, i) => {
+              const place = layout.slots[i];
+              const url =
+                slot.photoId && allowed.has(slot.photoId) ? images.get(slot.photoId) : null;
+              if (!place || !slot.photoId || !slot.phase || !url) return null;
+              return (
+                <figure
+                  key={`${i}-${slot.photoId}`}
+                  data-testid="wall-photo"
+                  data-photo-id={slot.photoId}
+                  data-phase={slot.phase}
+                  className="absolute"
+                  style={{
+                    left: place.box.x,
+                    top: place.y,
+                    width: place.box.width,
+                    height: place.box.height + (place.box.y - place.y),
+                    transform: `rotate(${place.tilt}deg)`,
+                    transformOrigin: "50% 0",
+                  }}
+                >
+                  <div
+                    className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
+                  >
+                    <Peg unit={unit} />
+                    {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt=""
+                      className="h-full w-full object-contain object-top"
+                      style={{
+                        paddingTop: place.box.y - place.y,
+                        filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.55))",
+                      }}
+                    />
+                  </div>
+                </figure>
+              );
+            })}
+          </WallScene>
         </div>
-      ) : (
-        <p className="mt-[6vh] text-[2.2vw] tracking-[0.3em] text-amber">FOLLOW THE LIGHTS</p>
-      )}
-
-      {screen === "EMPTY" && (
-        <p data-testid="wall-empty" className="mt-[2vh] text-[1.4vw] text-mist">
-          사진을 찍고 미디어월에 함께해 주세요
-        </p>
       )}
 
       {revoked && (

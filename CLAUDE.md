@@ -73,7 +73,8 @@ app/api/admin          staff APIs (staffRoute: Supabase session + allowlist + CS
 app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
 app/wall               media wall (server gate: config + enrolled display) → components/wall
 app/api/wall           wall feed (ordered eligible ids) + exposure report + image proxy (kiosk cookie)
-lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches)
+lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches),
+                       clothesline layout (any LED shape, D61), watchdog
 app/api/hub            cloud side of the hub's QR copy: put / reissue / delete (Bearer HUB_SYNC_SECRET)
 app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a cloud)
 lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)

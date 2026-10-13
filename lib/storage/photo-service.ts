@@ -17,7 +17,16 @@ export interface PhotoServiceOptions {
   now?: () => Date;
   /** Makes the staff review thumbnail. Optional: missing/failed thumbnails are made lazily. */
   thumbnailer?: (data: Uint8Array) => Promise<Uint8Array>;
+  /**
+   * Makes the media-wall image (large enough to read on the LED, smaller than the original).
+   * Optional: without it the wall gets the original.
+   */
+  wallImager?: (data: Uint8Array) => Promise<Uint8Array>;
 }
+
+/** Derived objects that live next to a photo and must go when it goes. */
+const derivedPath = (objectPath: string, kind: "thumb" | "wall") =>
+  `${objectPath.replace(/\.[a-z]+$/, "")}.${kind}.jpg`;
 
 export interface PutPhotoInput {
   sessionId: string;
@@ -472,10 +481,35 @@ export class PhotoService {
    * Wall image bytes (the ~640px review JPEG — small enough for venue Wi-Fi). Re-checks the row
    * on every request, so a photo hidden or deleted after the last feed poll is refused.
    */
+  /**
+   * The wall's copy of an eligible photo: made once from the original at the wall size and kept
+   * next to it (deleted with it). Never the 640 px staff thumbnail, which is too small to read on
+   * the LED (docs/ARCHITECTURE.md 1.8).
+   */
   async wallImage(photoId: string): Promise<{ data: Uint8Array; mime: PhotoMime } | null> {
     const row = await this.backend.photos.getById(photoId);
     if (!row || isGone(row) || !isWallEligible(row)) return null;
-    return this.staffImage(photoId, "thumb");
+    const path = derivedPath(row.objectPath, "wall");
+    const cached = await this.backend.objects.get(path);
+    if (cached) return { data: cached, mime: "image/jpeg" };
+    const original = await this.backend.objects.get(row.objectPath);
+    if (!original) return null;
+    if (!this.opts.wallImager) return { data: original, mime: row.mime };
+    let made: Uint8Array;
+    try {
+      made = await this.opts.wallImager(original);
+    } catch {
+      return { data: original, mime: row.mime };
+    }
+    // Two walls asking at once: the second write finds the file there; either copy is fine.
+    await this.backend.objects.put(path, made, "image/jpeg").catch(() => undefined);
+    // Deleted or withdrawn while we were resizing: do not leave the copy behind.
+    const after = await this.backend.photos.getById(photoId);
+    if (!after || isGone(after) || !isWallEligible(after)) {
+      await this.backend.objects.remove(path).catch(() => undefined);
+      return null;
+    }
+    return { data: made, mime: "image/jpeg" };
   }
 
   // ── storage cleanup ──────────────────────────────────────────────────────────────────────
@@ -483,8 +517,9 @@ export class PhotoService {
   private async removeObjects(row: Pick<PhotoRow, "objectPath" | "thumbPath">) {
     await this.backend.objects.remove(row.objectPath);
     if (row.thumbPath) await this.backend.objects.remove(row.thumbPath);
-    // Lazily generated thumbnails use this derived path even if the row never recorded it.
-    await this.backend.objects.remove(`${row.objectPath.replace(/\.[a-z]+$/, "")}.thumb.jpg`);
+    // Lazily generated copies use these derived paths even if the row never recorded them.
+    await this.backend.objects.remove(derivedPath(row.objectPath, "thumb"));
+    await this.backend.objects.remove(derivedPath(row.objectPath, "wall"));
   }
 
   private async removeObjectsAndMark(row: PhotoRow): Promise<boolean> {

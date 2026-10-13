@@ -6,6 +6,7 @@ import { authenticateKiosk } from "@/lib/kiosk-auth/server";
 import { KIOSK_COOKIE } from "@/lib/kiosk-auth/session";
 import { ConfigError, getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
+import { parseCanvas } from "@/lib/wall/layout";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,16 @@ export const metadata: Metadata = {
 /**
  * The media wall. The display is an enrolled device (same one-time code and revocable HttpOnly
  * session as a kiosk, see DECISIONS D36); everything it shows comes from /api/wall/feed.
+ *
+ * Scene size: WALL_CANVAS=3840x1080 on the hub (the LED's input resolution), or ?canvas=WxH to try
+ * a size at the LED; without either the scene fills the screen. Low-spec mode: WALL_LITE=1 or
+ * ?lite=1.
  */
-export default async function WallPage() {
+export default async function WallPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   try {
     getServerConfig();
   } catch (err) {
@@ -46,5 +55,9 @@ export default async function WallPage() {
       </StaffNotice>
     );
   }
-  return <WallApp />;
+  const q = await searchParams;
+  const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
+  const canvas = parseCanvas(one(q.canvas)) ?? parseCanvas(process.env.WALL_CANVAS);
+  const lite = one(q.lite) === "1" || process.env.WALL_LITE === "1";
+  return <WallApp canvas={canvas} lite={lite} />;
 }

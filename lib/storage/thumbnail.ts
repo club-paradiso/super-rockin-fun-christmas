@@ -15,3 +15,16 @@ export async function makeThumbnail(data: Uint8Array): Promise<Uint8Array> {
 }
 
 export type Thumbnailer = typeof makeThumbnail;
+
+/**
+ * The media-wall copy: long edge `longEdge` px (WALL_CONFIG.imageLongEdge), never enlarged. A
+ * 1200×3600 strip becomes ~467×1400, readable at the strip height an LED shows.
+ */
+export async function makeWallImage(data: Uint8Array, longEdge: number): Promise<Uint8Array> {
+  const out = await sharp(data)
+    .rotate()
+    .resize({ width: longEdge, height: longEdge, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 84 })
+    .toBuffer();
+  return new Uint8Array(out);
+}
