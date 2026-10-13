@@ -453,3 +453,26 @@ closed. No hours = always open, so nothing changes until staff set them.
 The wall's heartbeat now carries its frame rate (animation frames between heartbeats) and, in
 Chromium, its JS heap in MB. Stored on the kiosk row (`frame_rate`, `memory_mb`), shown in
 /admin → 키오스크, with a hint below 20 fps to use low-spec mode. Out-of-range values are dropped.
+
+## D63 · One brand font, shipped with the app; the Figma file is the editable source
+
+The frames' text is drawn on a canvas, and a canvas does not wait for web fonts: before this, the
+"FOLLOW THE LIGHTS" mark came out in whatever font the borrowed laptop had (Malgun Gothic,
+Apple SD Gothic Neo, or a plain sans), so the same frame looked different on every booth. Now
+Noto Sans KR (variable, OFL-1.1) is bundled with the app (`@fontsource-variable/noto-sans-kr`),
+served by the hub itself, so it also works with no internet. The kiosk loads exactly the
+weights, sizes and characters its frames draw (`lib/compositor/fonts.ts`) and composes the final
+photo only after that settles. If loading fails, it still composes with the fallback font rather
+than block a guest. The same family is the UI font and the Figma font.
+
+The wordmark has a legibility rule that `tests/unit/frames.test.ts` checks for every frame:
+weight at least 700, size at least 4.5% of the output width, letter spacing 10–25% of the size, fits in 90% of
+the width, below every photo, contrast at least 4.5:1 against the background. The snow-paper strip's
+mark went from 800 to 700 for this (heavier strokes clog first at small sizes; Figma's Noto Sans
+KR has no 800 either).
+
+Design source: Figma file `S5hz7sZaXXB2kNc9YrB3cB` (tokens as variables, text styles, logo,
+the three frames as components at real pixel size, wall scenes built from `clotheslineLayout`
+numbers, booth and admin screens, signage with English plus Hangul pronunciation). It is not
+synced automatically; `design/README.md` maps each Figma layer to the code that must change, and
+`design/previews/` keeps a snapshot for anyone without Figma access.

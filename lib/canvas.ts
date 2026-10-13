@@ -39,6 +39,10 @@ export function canvasToBlob(
   });
 }
 
-/** Font stack shared by the UI and the compositor so frame text renders the same everywhere. */
-export const FONT_STACK =
-  '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif';
+/**
+ * Font stack shared by the UI and the compositor. The first family is bundled with the app
+ * (@fontsource-variable/noto-sans-kr, served by the hub, so it works offline) and is the same
+ * typeface as the Figma design source; the rest are fallbacks only.
+ */
+export const BRAND_FONT = "Noto Sans KR Variable";
+export const FONT_STACK = `"${BRAND_FONT}", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif`;

@@ -21,7 +21,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.
-- **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor.
+- **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
+  keeps the legible wordmark rule in `tests/unit/frames.test.ts`; mirror frame changes in Figma
+  (`design/README.md`).
 - **No secrets in the browser.** Never add `NEXT_PUBLIC_` to a secret. Kiosk auth is the
   HttpOnly cookie from `/kiosk/enroll`; the browser never talks to Supabase.
 - **Private photos.** Bucket stays private; guests only ever see `/p/[token]` and
@@ -96,6 +98,7 @@ supabase/migrations    schema, RLS, private bucket
 scripts                hub-start.mjs (launcher), hub-restore.mjs, staff-add.mjs (plain Node, unit tested)
 ops                    desktop-icon wrappers: start-hub / restore-backup (.bat/.command), start-wall
 config/                kiosk knobs and frame definitions
+design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
 tests/integration      real Supabase (npm run test:supabase)
 e2e/                   Playwright (kiosk auth on; E2E_STORE=supabase optional)

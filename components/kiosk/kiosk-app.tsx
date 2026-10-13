@@ -22,6 +22,7 @@ import {
   type CapturedFrame,
 } from "@/lib/camera";
 import { composeFrame, formatDateLabel } from "@/lib/compositor";
+import { loadFrameFonts } from "@/lib/compositor/fonts";
 import {
   capturedCount,
   createInitialState,
@@ -213,11 +214,19 @@ export function KioskApp({
     [state.shots],
   );
 
+  // ── Brand font: loaded once, before any frame text is drawn (canvas does not wait for it) ─
+  const fontsRef = useRef<Promise<boolean> | null>(null);
+  const [fontsSettled, setFontsSettled] = useState(false);
+  useEffect(() => {
+    fontsRef.current ??= loadFrameFonts(FRAMES);
+    void fontsRef.current.then(() => setFontsSettled(true));
+  }, []);
+
   // ── Frame picker thumbnails: the guest's real photos in every frame ──────────────────────
   const showThumbs = state.phase === "frame";
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
-    if (!showThumbs || !images) return out;
+    if (!showThumbs || !images || !fontsSettled) return out;
     const dateLabel = formatDateLabel(new Date());
     for (const frame of FRAMES) {
       const canvas = composeFrame(frame, images, {
@@ -228,7 +237,7 @@ export function KioskApp({
       out[frame.id] = canvas.toDataURL("image/jpeg", 0.8);
     }
     return out;
-  }, [showThumbs, images]);
+  }, [showThumbs, images, fontsSettled]);
 
   // ── Final composite ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -236,11 +245,14 @@ export function KioskApp({
     if (finalImage?.frameId === state.frameId) return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
-    const canvas = composeFrame(frame, images, {
-      createCanvas: createDomCanvas,
-      context: { dateLabel: formatDateLabel(new Date()) },
-    }) as HTMLCanvasElement;
-    canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality).then((blob) => {
+    // A font that failed to load must not block the guest: compose with the fallback face.
+    void (fontsRef.current ?? Promise.resolve(false)).then(async () => {
+      if (cancelled) return;
+      const canvas = composeFrame(frame, images, {
+        createCanvas: createDomCanvas,
+        context: { dateLabel: formatDateLabel(new Date()) },
+      }) as HTMLCanvasElement;
+      const blob = await canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality);
       if (cancelled) return;
       setFinalImage({
         frameId: frame.id,
