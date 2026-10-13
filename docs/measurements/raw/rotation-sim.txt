@@ -1,0 +1,10 @@
+# FTL_SIM_REPORT=1 npx vitest run tests/unit/rotation.test.ts --disableConsoleIntercept
+# 2026-10-13T03:14Z, commit 9a817da + slot cases 3/8/9
+[sim] steady N=500 S=6 12h {"maxGapS":1508,"boundS":1535,"minCount":28,"maxCount":29,"minRepeatS":1496}
+[sim] steady N=50 S=5 12h {"maxGapS":180,"boundS":203,"minCount":240,"maxCount":241,"minRepeatS":180}
+[sim] steady N=7 S=6 2h {"maxGapS":78,"boundS":101,"minCount":93,"maxCount":93,"minRepeatS":78}
+[sim] steady N=300 S=3 5h {"maxGapS":1800,"boundS":1823,"minCount":10,"maxCount":11,"minRepeatS":1800}
+[sim] steady N=1260 S=8 5h {"maxGapS":2840,"boundS":2867,"minCount":6,"maxCount":7,"minRepeatS":2830}
+[sim] steady N=1260 S=9 5h {"maxGapS":2520,"boundS":2543,"minCount":7,"maxCount":8,"minRepeatS":2520}
+[sim] steady N=5000 S=6 9h {"maxGapS":15008,"boundS":15035,"minCount":2,"maxCount":3}
+[sim] busy evening 6h {"approvals":362,"showNow":40,"showNowMaxS":6,"firstShowP50S":4,"firstShowP95S":11,"firstShowMaxS":82,"hiddenGoneMaxS":4,"hidesOnWall":55}

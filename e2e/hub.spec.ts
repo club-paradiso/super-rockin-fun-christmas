@@ -105,9 +105,13 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
 
-  await staff.goto("/admin/moderation");
+  // The booth's completion screen can appear before its queued consent reaches the hub, and the
+  // moderation page is rendered once: reload until the photo is there.
   const card = staff.getByTestId("photo-card").filter({ hasText: session });
-  await expect(card.getByTestId("photo-status")).toHaveText("검수 대기");
+  await expect(async () => {
+    await staff.goto("/admin/moderation");
+    await expect(card.getByTestId("photo-status")).toHaveText("검수 대기", { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
   await card.getByTestId("action-approve").click();
 
   const id = await photoIdForToken(tokenFromUrl(url));

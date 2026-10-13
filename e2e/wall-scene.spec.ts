@@ -207,6 +207,37 @@ test("low-spec mode: at most 4 photos, no twinkling", async () => {
   await page.close();
 });
 
+// Phase 4 network cut: the wall PC loses the hub (cable out, Wi-Fi gone). A short blip changes
+// nothing a guest would notice: the photos already on the line stay. The wall keeps rotating what
+// it already has, shows a small staff hint, and once WALL_CONFIG.offlineGraceMs has passed it
+// shows nothing at all (it can no longer learn about a hide or a delete). It comes back on its
+// own when the hub answers again.
+test("network cut between wall and hub: hint, nothing after the grace, recover", async () => {
+  test.setTimeout(240_000);
+  const page = await wallCtx.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/wall?canvas=1920x1080");
+  await expect(page.getByTestId("wall-photo").first()).toBeVisible({ timeout: 30_000 });
+
+  const cutAt = Date.now();
+  await page.route("**/api/wall/**", (route) => route.abort("internetdisconnected"));
+  await expect(page.getByTestId("wall-offline")).toBeVisible({ timeout: 20_000 });
+  expect(await page.getByTestId("wall-photo").count()).toBeGreaterThan(0);
+
+  // Past the grace (+ one poll + the exit animation), and for a while after: no photo at all.
+  await page.waitForTimeout(Math.max(0, cutAt + 120_000 + 5_000 + 2_000 - Date.now()));
+  for (let i = 0; i < 5; i++) {
+    expect(await page.getByTestId("wall-photo").count()).toBe(0);
+    await page.waitForTimeout(2_000);
+  }
+  await expect(page.getByTestId("wall-offline")).toBeVisible();
+
+  await page.unroute("**/api/wall/**");
+  await expect(page.getByTestId("wall-offline")).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByTestId("wall-photo").first()).toBeVisible({ timeout: 40_000 });
+  await page.close();
+});
+
 test("staff turn the wall off and back on from /admin; the wall follows within a poll", async () => {
   const page = await wallCtx.newPage();
   await page.setViewportSize({ width: 1920, height: 1080 });

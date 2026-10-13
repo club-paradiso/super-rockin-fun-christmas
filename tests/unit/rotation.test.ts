@@ -298,6 +298,10 @@ describe("fairness simulation (real WALL_CONFIG timings)", { timeout: 180_000 },
     { n: 500, slots: 6, hours: 12 },
     { n: 50, slots: 5, hours: 12 },
     { n: 7, slots: 6, hours: 2 },
+    // The clothesline's real photo counts (D61): 16:9 → 3, 32:9 → 8, 4:1 → 9.
+    { n: 300, slots: 3, hours: 5 },
+    { n: 1260, slots: 8, hours: 5 },
+    { n: 1260, slots: 9, hours: 5 },
   ])(
     "steady wall, N=$n S=$slots, $hours h: F3 no starvation, F4 even, F5 cooldown",
     ({ n, slots, hours }) => {
