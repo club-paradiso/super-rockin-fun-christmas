@@ -16,6 +16,7 @@ const limiter = new RateLimiter(30, 60_000);
  * Ids and frame ids only: no storage paths, tokens or kiosk ids.
  *
  * `?on=<id>,<id>` = what the display shows right now; those stay listed while still eligible.
+ * `?slots=<n>` = how many photos its scene shows at once (1–12), which sizes the answer.
  */
 export const GET = route("wall_feed", async (request: Request) => {
   const auth = await authenticateKioskRequest(request);
@@ -23,9 +24,9 @@ export const GET = route("wall_feed", async (request: Request) => {
   if (!limiter.take(auth.kioskId ?? "dev")) return jsonError(429, "too many requests");
   const headers: Record<string, string> = { ...NO_STORE };
   if (auth.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, auth.renewCookie);
-  const on = (new URL(request.url).searchParams.get("on") ?? "")
-    .split(",")
-    .filter(isUuid)
-    .slice(0, 50);
-  return NextResponse.json(await wallFeed(on), { headers });
+  const params = new URL(request.url).searchParams;
+  const on = (params.get("on") ?? "").split(",").filter(isUuid).slice(0, 50);
+  const asked = Number(params.get("slots"));
+  const slots = Number.isInteger(asked) && asked >= 1 && asked <= 12 ? asked : undefined;
+  return NextResponse.json(await wallFeed(on, slots), { headers });
 });

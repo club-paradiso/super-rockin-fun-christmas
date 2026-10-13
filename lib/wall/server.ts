@@ -15,7 +15,11 @@ const MAX_ELIGIBLE = 20_000;
  * still eligible, even when the rotation has moved on, so the wall never has to drop a photo in
  * the middle of its turn just because it fell out of the top of the order.
  */
-export async function wallFeed(onWall: readonly string[] = []): Promise<WallFeed> {
+export async function wallFeed(
+  onWall: readonly string[] = [],
+  /** Photos the display shows at once (its scene decides); sizes the answer. */
+  slots: number = WALL_CONFIG.slots,
+): Promise<WallFeed> {
   const backend = getBackend();
   const settings = await backend.settings.get();
   if (settings.showHoldingScreen)
@@ -55,7 +59,7 @@ export async function wallFeed(onWall: readonly string[] = []): Promise<WallFeed
   return {
     mode: "live",
     ordering: "fair",
-    photos: withOnWall(order.slice(0, feedSize(WALL_CONFIG.slots))),
+    photos: withOnWall(order.slice(0, feedSize(slots))),
     showNow,
   };
 }

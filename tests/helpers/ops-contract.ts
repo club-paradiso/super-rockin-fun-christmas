@@ -20,6 +20,8 @@ export interface OpsFixture {
 }
 
 const fakeThumb = async (d: Uint8Array) => d.slice(0, 4);
+const WALL_BYTES = JPEG.slice(0, 8);
+const fakeWall = async () => WALL_BYTES.slice();
 
 /**
  * Phase 3 operations every backend must satisfy, including atomic audit. Runs on memory and
@@ -36,6 +38,7 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
         linkTtlHours: 72,
         retentionDays: 30,
         thumbnailer: fakeThumb,
+        wallImager: fakeWall,
       });
       const shoot = async (consent: boolean) => {
         const put = await svc.put({
@@ -225,6 +228,23 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect(await svc.wallImage(approved.id)).toBeNull();
       await svc.moderate(hidden.id, "unhide", staffId);
       expect(await onWall()).toEqual([hidden.id]);
+    });
+
+    it("wall image: made once from the original, kept next to it, deleted with the photo", async () => {
+      const { svc, shoot, backend, objectExists, staffId } = await setup();
+      const p = await shoot(true);
+      await svc.moderate(p.id, "approve", staffId);
+      const row = (await backend.photos.getById(p.id))!;
+      const wallPath = row.objectPath.replace(/\.[a-z]+$/, "") + ".wall.jpg";
+      const first = await svc.wallImage(p.id);
+      expect(first?.mime).toBe("image/jpeg");
+      expect(Array.from(first!.data)).toEqual(Array.from(WALL_BYTES));
+      expect(await objectExists(wallPath)).toBe(true);
+      expect(Array.from((await svc.wallImage(p.id))!.data)).toEqual(Array.from(WALL_BYTES));
+
+      await svc.moderate(p.id, "delete", staffId);
+      expect(await svc.wallImage(p.id)).toBeNull();
+      expect(await objectExists(wallPath)).toBe(false);
     });
 
     it("guest consent: refused while submissions are paused; NO is always allowed", async () => {

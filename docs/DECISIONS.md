@@ -417,3 +417,25 @@ it was. Hub only: cloud staff have no PINs.
 - **Overview:** last backup, failure reason, free space on the laptop and the stick, with a warning
   below `HUB_DISK_WARN_MB` (2048) or when no backup finished within three intervals. Warnings only:
   a full disk makes uploads fail, and the booth's queue keeps those photos until there is room.
+
+## D61 · The wall scene adapts to the LED shape instead of waiting for its resolution
+
+The LED's input resolution is still unknown, and the plan said not to fix a layout without it.
+Rather than guess one, the clothesline scene is built from shares of the canvas
+(`WALL_CONFIG.scene`): every photo is half the canvas height, and the number of photos follows
+the width (16:9 → 3, 32:9 → 8, 4:1 → 9, at most 10). The canvas is `WALL_CANVAS` on the hub, or
+`?canvas=WxH` to try a size at the LED, or the screen itself. Tests check every candidate shape
+(inside the window, on the line, no overlap), and E2E opens each one with real approved photos.
+What only the real LED can answer is readability at viewing distance; `photoHeight` is the knob.
+
+- The wall tells the hub its photo count (`/api/wall/feed?slots=`), so the feed is sized for it.
+- The wall image is its own copy, long edge 1400 px (`WALL_CONFIG.imageLongEdge`), made on first
+  request and kept next to the original as `<photo>.wall.jpg`; it is deleted with the photo like
+  the thumbnail. The 640 px staff thumbnail is no longer sent to the wall.
+- Low-spec mode (`WALL_LITE=1`, `?lite=1`): fades only, no twinkling, at most 4 photos.
+- Watchdog: reload when no animation frame for 10 s while visible or after an unhandled error,
+  at most once a minute (`sessionStorage`), plus a planned reload at 05:00. The viewport is
+  measured after mount so the server render and the first client render agree; a hydration
+  mismatch would count as an error and trigger a reload.
+- Not yet: opening hours (`wallHours`, needs a settings migration) and frame-rate / memory in the
+  wall heartbeat. Both are 2-4b.
