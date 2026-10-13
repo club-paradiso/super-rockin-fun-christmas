@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackupButton } from "@/components/admin/backup-button";
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { STATUS_LABEL, ago, formatBytes, formatTime } from "@/components/admin/labels";
 import { getOverview } from "@/lib/ops/admin";
@@ -90,6 +91,7 @@ export default async function OverviewPage() {
           )}
         </section>
       )}
+      {o.ops && <OpsSection ops={o.ops} />}
       <section className="admin-card p-4">
         <h2 className="mb-2 text-xl font-bold">마지막 자동 정리</h2>
         {o.lastRetention ? (
@@ -135,5 +137,58 @@ export default async function OverviewPage() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function OpsSection({ ops }: { ops: NonNullable<Awaited<ReturnType<typeof getOverview>>["ops"]> }) {
+  const { backup, disk } = ops;
+  const stale = backup.stale;
+  const low = (free: number | null) => free !== null && free < disk.warnBelow;
+  const warn =
+    !backup.configured || !!backup.error || stale || low(disk.dataFree) || low(disk.backupFree);
+  return (
+    <section className="admin-card p-4" data-testid="ops-status">
+      <h2 className="mb-2 text-xl font-bold">
+        백업 · 저장 공간 {warn && <span className="text-alert">· 확인 필요</span>}
+      </h2>
+      <ul className="flex flex-col gap-1 text-lg">
+        <li data-testid="backup-status">
+          {!backup.configured ? (
+            <span className="text-alert">
+              백업 위치(HUB_BACKUP_DIR)가 설정되지 않았어요. 노트북이 고장 나면 사진을 잃어요.
+            </span>
+          ) : backup.lastAt ? (
+            <span className={stale || backup.error ? "text-alert" : undefined}>
+              마지막 백업 {formatTime(backup.lastAt)} ({ago(backup.lastAt)}) · 사진 파일{" "}
+              {backup.files}개 · {backup.everyMinutes}분마다
+            </span>
+          ) : (
+            <span className="text-alert">아직 백업한 적이 없어요.</span>
+          )}
+        </li>
+        {backup.error && (
+          <li className="text-alert" data-testid="backup-error">
+            백업 실패 {formatTime(backup.error.at)}: USB가 꽂혀 있는지 확인해 주세요. (
+            {backup.error.message})
+          </li>
+        )}
+        <li className={low(disk.dataFree) ? "text-alert" : undefined} data-testid="disk-status">
+          노트북 남은 공간: {disk.dataFree === null ? "알 수 없음" : formatBytes(disk.dataFree)}
+          {low(disk.dataFree) && " · 부족해요. 기술 담당에게 연락하세요"}
+        </li>
+        {backup.configured && (
+          <li className={low(disk.backupFree) ? "text-alert" : undefined}>
+            USB 남은 공간:{" "}
+            {disk.backupFree === null ? "USB를 찾을 수 없어요" : formatBytes(disk.backupFree)}
+            {low(disk.backupFree) && " · 부족해요"}
+          </li>
+        )}
+      </ul>
+      {backup.configured && (
+        <div className="mt-3">
+          <BackupButton />
+        </div>
+      )}
+    </section>
   );
 }

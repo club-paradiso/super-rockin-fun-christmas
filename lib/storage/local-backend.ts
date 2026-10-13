@@ -92,7 +92,7 @@ class FileDb {
     for (const r of db.wallShowNow ?? []) this.mem.wall.showNow.set(r.photoId, r);
   }
 
-  private async save() {
+  private serialize(): string {
     const m = this.mem;
     const db: DbFile = {
       version: 3,
@@ -107,10 +107,20 @@ class FileDb {
       wallExposures: [...m.wall.exposureRows.values()],
       wallShowNow: [...m.wall.showNow.values()],
     };
+    return JSON.stringify(db);
+  }
+
+  private async save() {
+    const json = this.serialize();
     await mkdir(path.dirname(this.file), { recursive: true });
     const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`;
-    await writeFile(tmp, JSON.stringify(db));
+    await writeFile(tmp, json);
     await rename(tmp, this.file);
+  }
+
+  /** The whole database as it is between two operations (for backups); saves nothing. */
+  snapshot(): Promise<string> {
+    return this.run(async () => this.serialize(), false);
   }
 
   /** Serialize every operation; persist after writes (lazy writes: within LAZY_SAVE_MS). */
@@ -229,6 +239,17 @@ export function createLocalBackend(rootDir: string): StorageBackend {
     retentionRuns: wrap(db, m.retentionRuns, ["record"]),
     wall: wrap(db, m.wall, ["requestShowNow"], ["report"]),
   };
+}
+
+/** A consistent copy of `<rootDir>/db.json` as it is right now (lib/ops/backup.ts). */
+export function snapshotLocalBackend(rootDir: string): Promise<string> {
+  const file = path.resolve(rootDir, "db.json");
+  let db = registry.get(file);
+  if (!db) {
+    db = new FileDb(file);
+    registry.set(file, db);
+  }
+  return db.snapshot();
 }
 
 /** Save every pending lazy write (tests, and the hub's shutdown hook). */

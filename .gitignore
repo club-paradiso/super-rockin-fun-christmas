@@ -31,3 +31,4 @@ blob-report/
 # supabase cli local state
 supabase/.branches
 supabase/.temp
+.browser/
