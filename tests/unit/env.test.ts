@@ -207,6 +207,49 @@ describe("hub → cloud copy config", () => {
   });
 });
 
+describe("hub retention config (D47)", () => {
+  const HUB = {
+    NODE_ENV: "production",
+    FTL_ROLE: "hub",
+    PHOTO_STORE: "local",
+    KIOSK_SESSION_SECRET: SECRETS.KIOSK_SESSION_SECRET,
+  };
+
+  it("defaults: unposted 24 h, no event end (the PHOTO_RETENTION_DAYS ceiling decides)", () => {
+    expect(parseServerConfig(HUB).hubRetention).toEqual({ unpostedHours: 24, wallUntil: null });
+    expect(parseServerConfig(PROD).hubRetention).toBeNull();
+  });
+
+  it("wall photos go at EVENT_END_AT + HUB_WALL_GRACE_HOURS", () => {
+    const c = parseServerConfig({ ...HUB, EVENT_END_AT: "2026-12-25T22:00:00+09:00" });
+    expect(c.hubRetention?.wallUntil?.toISOString()).toBe("2026-12-26T13:00:00.000Z");
+    const short = parseServerConfig({
+      ...HUB,
+      EVENT_END_AT: "2026-12-25T13:00:00Z",
+      HUB_WALL_GRACE_HOURS: "2",
+      HUB_UNPOSTED_HOURS: "6",
+    });
+    expect(short.hubRetention).toEqual({
+      unpostedHours: 6,
+      wallUntil: new Date("2026-12-25T15:00:00Z"),
+    });
+  });
+
+  it("refuses an event end without an offset, nonsense, and settings that contradict", () => {
+    expect(problems({ ...HUB, EVENT_END_AT: "2026-12-25T22:00:00" }).join()).toMatch(
+      /EVENT_END_AT must be a date and time with an offset/,
+    );
+    expect(problems({ ...HUB, EVENT_END_AT: "christmas" }).join()).toMatch(/EVENT_END_AT/);
+    expect(problems({ ...HUB, HUB_UNPOSTED_HOURS: "0" }).join()).toMatch(/HUB_UNPOSTED_HOURS/);
+    expect(
+      problems({ ...HUB, HUB_UNPOSTED_HOURS: "100", PHOTO_RETENTION_DAYS: "2" }).join(),
+    ).toMatch(/cannot be longer than PHOTO_RETENTION_DAYS/);
+    expect(problems({ ...PROD, EVENT_END_AT: "2026-12-25T22:00:00+09:00" }).join()).toMatch(
+      /EVENT_END_AT is for the hub/,
+    );
+  });
+});
+
 describe("isPrivateHost", () => {
   it.each([
     "localhost",

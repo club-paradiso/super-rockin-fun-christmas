@@ -142,17 +142,26 @@ export class CloudSync {
     return { ok: true, link: result.value };
   }
 
-  /** Staff deleted the photo on the hub: the cloud copy and its guest link must go too. */
+  /** Staff deleted the photo on the hub: the cloud copy and its guest link must go too, now. */
   async markDeleted(photoId: string) {
+    await this.queueDelete(photoId);
+    await this.processOne(photoId);
+  }
+
+  /**
+   * Queue the cloud delete for the worker without calling the cloud here (retention deletes
+   * many photos at once; offline, one call each would mean one timeout each).
+   */
+  async queueDelete(photoId: string) {
     await this.exclusive(photoId, async () => {
       const row = await this.backend.photos.getById(photoId);
-      if (row && row.cloud?.state !== "DELETED")
-        await this.backend.photos.setCloud(
-          photoId,
-          this.state({ state: "DELETE_PENDING" }, row.cloud),
-        );
+      // Never sent and nothing in flight: there is no copy to delete.
+      if (!row || !row.cloud || row.cloud.state === "DELETED") return;
+      await this.backend.photos.setCloud(
+        photoId,
+        this.state({ state: "DELETE_PENDING" }, row.cloud),
+      );
     });
-    await this.processOne(photoId);
   }
 
   private processOne(photoId: string) {

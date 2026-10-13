@@ -75,7 +75,8 @@ lib/wall               wall states, pure rotation order + scheduler, server feed
 app/api/hub            cloud side of the hub's QR copy: put / reissue / delete (Bearer HUB_SYNC_SECRET)
 app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a cloud)
 lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)
-lib/ops                moderation rules, enrollment codes, kiosk health, staff read models
+lib/ops                moderation rules, enrollment codes, kiosk health, staff read models,
+                       hub retention (D47/D58: rules in hub-retention.ts, timer in -server.ts)
 lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)

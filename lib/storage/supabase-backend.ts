@@ -268,6 +268,7 @@ class SupabasePhotoRepository implements PhotoRepository {
     if (f.statuses) q = q.in("moderation_status", f.statuses);
     if (f.wallConsent !== undefined) q = q.eq("wall_consent", f.wallConsent);
     if (f.since) q = q.gte("created_at", f.since);
+    if (f.before) q = q.lt("created_at", f.before);
     if (f.kioskId) q = q.eq("kiosk_id", f.kioskId);
     if (f.sessionShort) q = q.like("session_short", `${f.sessionShort.toLowerCase()}%`);
     const { data, error } = await q.order("created_at", { ascending: false }).limit(f.limit);

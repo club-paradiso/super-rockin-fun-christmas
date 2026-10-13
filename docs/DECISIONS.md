@@ -366,3 +366,22 @@ reached, the kiosk gets 202 "QR 준비 중" and asks `/api/photos/qr` every 3 s;
 - **No consent, moderation or exposure data goes to the cloud** (D40). Staff "QR 다시 보여주기" on
   the hub reissues the cloud link and is audited on the hub; while the cloud is unreachable it
   answers 503 rather than showing a hub link a phone cannot open.
+
+## D58 · Hub retention runs in the hub process, by moderation state
+
+D47 implemented. Every 10 minutes while the hub runs (and 30 s after it starts):
+
+- **Never on the wall** (NONE, PENDING, REJECTED): deleted `HUB_UNPOSTED_HOURS` (24) after
+  capture. A photo still waiting for review at 24 h is deleted too, as planned.
+- **On the wall** (APPROVED, and HIDDEN, because staff may show a hidden photo again): deleted at
+  `EVENT_END_AT` + `HUB_WALL_GRACE_HOURS` (24).
+- **Ceiling:** nothing outlives `PHOTO_RETENTION_DAYS` after capture, whichever comes first. With
+  no `EVENT_END_AT` the ceiling is the only rule for wall photos, so a missing setting never keeps
+  photos longer.
+
+These are environment settings for whoever sets up the hub, not staff switches: retention is a
+privacy commitment and should not change mid-event. The overview shows the rules as configured.
+Deletes are the usual tombstone-then-bytes, audited as `system` / `retention_delete` with the
+rule as the note. Cloud copies are queued (`CloudSync.queueDelete`) instead of sent one by one,
+so a run while offline does not wait on one timeout per photo; the sync worker sends them.
+The final values still wait for the church (STATUS, 10/16).

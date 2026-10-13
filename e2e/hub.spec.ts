@@ -41,6 +41,11 @@ test("fresh hub: first staff member with the console setup code, then /admin", a
   await expect(staff).toHaveURL(/\/admin$/);
   await expect(staff.getByTestId("staff-name")).toHaveText("현장 책임자");
   await expect(staff.getByTestId("emergency-panel")).toBeVisible();
+  // D47 as configured (defaults; E2E sets no EVENT_END_AT).
+  await expect(staff.getByTestId("retention-rules")).toContainText("촬영 24시간 뒤 삭제");
+  await expect(staff.getByTestId("retention-rules")).toContainText(
+    "행사 종료 시각이 설정되지 않아 촬영 30일 뒤 삭제",
+  );
 });
 
 test("the setup code is single-use; a stranger only sees the PIN login", async ({ browser }) => {

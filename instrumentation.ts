@@ -27,6 +27,11 @@ export async function register() {
       startCloudSyncWorker();
     }
     if (c.role === "hub") {
+      // No Vercel Cron on the hub: it deletes expired photos itself (D47).
+      const { startHubRetention } = await import("./lib/ops/hub-retention-server");
+      startHubRetention();
+    }
+    if (c.role === "hub") {
       // A fresh hub prints its one-time first-staff code in this console window.
       const { ensureSetupCode } = await import("./lib/staff-auth/setup");
       await ensureSetupCode().catch((e) =>
