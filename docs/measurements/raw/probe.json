@@ -1,0 +1,92 @@
+{
+  "minutes": 20,
+  "pid": "25187",
+  "samples": [
+    {
+      "minute": 0,
+      "rssMb": 206
+    },
+    {
+      "minute": 1,
+      "rssMb": 356
+    },
+    {
+      "minute": 2,
+      "rssMb": 444
+    },
+    {
+      "minute": 3,
+      "rssMb": 509
+    },
+    {
+      "minute": 4,
+      "rssMb": 604
+    },
+    {
+      "minute": 5,
+      "rssMb": 674
+    },
+    {
+      "minute": 6,
+      "rssMb": 683
+    },
+    {
+      "minute": 7,
+      "rssMb": 679
+    },
+    {
+      "minute": 8,
+      "rssMb": 687
+    },
+    {
+      "minute": 9,
+      "rssMb": 698
+    },
+    {
+      "minute": 10,
+      "rssMb": 699
+    },
+    {
+      "minute": 11,
+      "rssMb": 703
+    },
+    {
+      "minute": 12,
+      "rssMb": 708
+    },
+    {
+      "minute": 13,
+      "rssMb": 719
+    },
+    {
+      "minute": 14,
+      "rssMb": 724
+    },
+    {
+      "minute": 15,
+      "rssMb": 728
+    },
+    {
+      "minute": 16,
+      "rssMb": 733
+    },
+    {
+      "minute": 17,
+      "rssMb": 733
+    },
+    {
+      "minute": 18,
+      "rssMb": 740
+    },
+    {
+      "minute": 19,
+      "rssMb": 746
+    },
+    {
+      "minute": 20,
+      "rssMb": 747
+    }
+  ],
+  "afterPurge": 349,
+  "twoMinLater": 527
+}
