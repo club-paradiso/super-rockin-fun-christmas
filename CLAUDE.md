@@ -83,7 +83,7 @@ app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a 
 lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models,
                        hub retention (D47/D58: rules in hub-retention.ts, timer in -server.ts),
-                       USB backup + disk status (D60: backup.ts, backup-server.ts)
+                       USB backup + disk status (D60: backup.ts, backup-server.ts), event close (D64)
 lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
@@ -95,13 +95,16 @@ lib/kiosk-auth         signed kiosk session cookie, enrollment, verification
 lib/server             env validation, logging, rate limits, request helpers
 lib/storage            PhotoService (all rules) + backends: memory, local files, Supabase
 supabase/migrations    schema, RLS, private bucket
-scripts                hub-start.mjs (launcher), hub-restore.mjs, staff-add.mjs (plain Node, unit tested)
-ops                    desktop-icon wrappers: start-hub / restore-backup (.bat/.command), start-wall
+scripts                hub-start.mjs (launcher), hub-restore.mjs, event-check.mjs (read-only deletion
+                       check), staff-add.mjs (plain Node, unit tested)
+ops                    desktop-icon wrappers: start-hub / restore-backup / event-check (.bat/.command),
+                       start-wall
 config/                kiosk knobs and frame definitions
 design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
 tests/integration      real Supabase (npm run test:supabase)
-e2e/                   Playwright (kiosk auth on; E2E_STORE=supabase optional)
+e2e/                   Playwright (kiosk auth on; E2E_STORE=supabase optional; SCREENSHOTS=1)
+measure/               Phase 4 measurements: seeded hub load + long wall run (playwright.measure.config.ts)
 ```
 
 ## Working rules

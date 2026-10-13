@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { isWallEligible, planModeration, type ModerationAction } from "@/lib/ops/moderation";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
+  Actor,
   GuestPhoto,
   ModerationStatus,
   PhotoListFilter,
@@ -569,7 +570,31 @@ export class PhotoService {
     );
   }
 
-  private async tombstoneAll(rows: PhotoRow[], note: string | null): Promise<PurgeResult> {
+  /**
+   * "행사 종료 처리" (Phase 5, RUNBOOK 8): delete every photo still on the hub, whatever its state,
+   * captured before `beforeIso`. Audited per photo as the staff member who closed the event. One
+   * batch per call; the caller repeats until a batch comes back empty.
+   */
+  async closeEvent(staffUserId: string, beforeIso: string, limit = 200): Promise<PurgeResult> {
+    const due = await this.backend.photos.list({
+      statuses: ["NONE", "PENDING", "APPROVED", "REJECTED", "HIDDEN"],
+      before: beforeIso,
+      limit,
+    });
+    return this.tombstoneAll(
+      due.filter((r) => !r.deletedAt),
+      "event_close",
+      { type: "staff", id: staffUserId },
+      "event_close_delete",
+    );
+  }
+
+  private async tombstoneAll(
+    rows: PhotoRow[],
+    note: string | null,
+    actor: Actor = { type: "system", id: null },
+    action = "retention_delete",
+  ): Promise<PurgeResult> {
     const nowIso = this.now().toISOString();
     const result: PurgeResult = { examined: rows.length, deleted: 0, failed: 0, deletedIds: [] };
     for (const row of rows) {
@@ -579,8 +604,8 @@ export class PhotoService {
           from: row.moderationStatus,
           to: "DELETED",
           deletedAt: nowIso,
-          actor: { type: "system", id: null },
-          action: "retention_delete",
+          actor,
+          action,
           note,
         })
         .catch(() => null);

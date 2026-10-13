@@ -62,4 +62,7 @@ export const HUB_CLOUD_ENV: Record<string, string> = {
   CLOUD_BASE_URL: `http://127.0.0.1:${CLOUD_PROXY_PORT}`,
   HUB_SYNC_SECRET,
   CLOUD_SYNC_TIMEOUT_MS: "3000",
+  // The event ended an hour ago: "행사 종료 처리" is allowed. Wall photos would only go by
+  // themselves 24 h after this, so nothing else in the run is affected.
+  EVENT_END_AT: new Date(Date.now() - 3_600_000).toISOString(),
 };

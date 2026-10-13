@@ -202,3 +202,33 @@ test("staff delete on the hub kills the cloud link too", async () => {
   expect((await kiosk.request.get(url)).status()).toBe(404);
   expect((await hubRow(session))?.cloud?.state).toBe("DELETED");
 });
+
+// Phase 5, RUNBOOK 8: the hub's EVENT_END_AT is an hour ago (e2e/env.ts), so staff may close the
+// event. Every photo on the hub goes, and every cloud link with it.
+test("행사 종료 처리: typed phrase + confirm deletes every photo and every cloud link", async () => {
+  const first = await kioskPhotoToQr(kiosk);
+  const second = await kioskPhotoToQr(kiosk);
+  for (const p of [first, second])
+    expect((await kiosk.request.get(`${p.url}/image`)).status()).toBe(200);
+
+  await staff.goto("/admin/settings");
+  const section = staff.getByTestId("event-close");
+  await expect(section).toContainText("행사 종료 처리");
+  const button = section.getByTestId("event-close-open");
+  await expect(button).toBeDisabled();
+  await section.getByTestId("event-close-phrase").fill("행사 종료");
+  await button.click();
+  await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
+  await expect(section.getByTestId("event-close-message")).toContainText("장을 지웠어요");
+
+  for (const p of [first, second]) {
+    await expect
+      .poll(async () => (await kiosk.request.get(`${p.url}/image`)).status(), { timeout: 30_000 })
+      .toBe(404);
+    expect((await hubRow(p.session))?.moderationStatus).toBe("DELETED");
+  }
+  const live = (await rows(".data-e2e-hub-cloud")).filter((r) => r.moderationStatus !== "DELETED");
+  expect(live).toEqual([]);
+  await staff.goto("/admin/audit");
+  await expect(staff.getByTestId("audit-item").first()).toContainText("현장 책임자");
+});
