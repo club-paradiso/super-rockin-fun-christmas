@@ -1,0 +1,100 @@
+{
+  "photos": 3000,
+  "counts": {
+    "approved": 1260,
+    "rejected": 90,
+    "hidden": 90,
+    "pending": 360,
+    "no": 750,
+    "none": 450
+  },
+  "seconds": 73,
+  "imageBytes": [
+    1141233,
+    1145555,
+    1141841,
+    1139846,
+    1140173,
+    1138769,
+    1140340,
+    1141698,
+    1138754,
+    1145542,
+    1141685,
+    1140035
+  ],
+  "buckets": [
+    {
+      "photos": 250,
+      "writeMsP50": 2.5,
+      "writeMsP95": 12,
+      "dbBytes": 221179
+    },
+    {
+      "photos": 500,
+      "writeMsP50": 3.7,
+      "writeMsP95": 15.8,
+      "dbBytes": 444049
+    },
+    {
+      "photos": 750,
+      "writeMsP50": 5.1,
+      "writeMsP95": 16.2,
+      "dbBytes": 665014
+    },
+    {
+      "photos": 1000,
+      "writeMsP50": 6.3,
+      "writeMsP95": 18.3,
+      "dbBytes": 887995
+    },
+    {
+      "photos": 1250,
+      "writeMsP50": 6.7,
+      "writeMsP95": 17.6,
+      "dbBytes": 1109234
+    },
+    {
+      "photos": 1500,
+      "writeMsP50": 7.3,
+      "writeMsP95": 17.1,
+      "dbBytes": 1332385
+    },
+    {
+      "photos": 1750,
+      "writeMsP50": 10.7,
+      "writeMsP95": 24.9,
+      "dbBytes": 1553624
+    },
+    {
+      "photos": 2000,
+      "writeMsP50": 10.4,
+      "writeMsP95": 21.9,
+      "dbBytes": 1776775
+    },
+    {
+      "photos": 2250,
+      "writeMsP50": 10.4,
+      "writeMsP95": 22.1,
+      "dbBytes": 1998014
+    },
+    {
+      "photos": 2500,
+      "writeMsP50": 11.1,
+      "writeMsP95": 22.7,
+      "dbBytes": 2221165
+    },
+    {
+      "photos": 2750,
+      "writeMsP50": 12.5,
+      "writeMsP95": 22.2,
+      "dbBytes": 2442404
+    },
+    {
+      "photos": 3000,
+      "writeMsP50": 15.5,
+      "writeMsP95": 29.5,
+      "dbBytes": 2665555
+    }
+  ]
+}
