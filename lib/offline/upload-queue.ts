@@ -87,6 +87,21 @@ export class UploadQueue {
     return (await this.store.all()).length;
   }
 
+  /** What staff see in help mode: oldest first, without the image bytes. */
+  async entries(): Promise<
+    Pick<QueuedUpload, "sessionId" | "createdAt" | "attempts" | "lastError" | "state">[]
+  > {
+    return (await this.store.all())
+      .map(({ sessionId, createdAt, attempts, lastError, state }) => ({
+        sessionId,
+        createdAt,
+        attempts,
+        lastError,
+        state,
+      }))
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+
   /** Persist a finished photo. Re-enqueueing the same session keeps one entry. */
   async enqueue(
     input: Pick<QueuedUpload, "sessionId" | "frameId" | "mime" | "data">,

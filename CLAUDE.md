@@ -37,7 +37,8 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   by `list()`/`get()`; first staff only via the console setup code (`lib/staff-auth/setup.ts`).
 - **Kiosk and staff auth never substitute for each other.** Kiosk APIs read only the kiosk
   cookie; staff APIs read only the staff session (Supabase cookies or `ftl_staff`). The staff
-  cookie MAC key is derived with a staff-only label.
+  cookie MAC key is derived with a staff-only label. Booth help mode (`/api/kiosk/help`, D59)
+  checks a staff PIN but issues no session; every PIN check goes through `attemptStaffPin`.
 - **Every state change is audited atomically**: moderation, deletion, token rotation, kiosk
   rename/revoke, enrollment codes, settings, staff changes go through ONE backend call (a SQL
   `ftl_*` function on Supabase). Never update those columns directly.
@@ -63,7 +64,8 @@ app/kiosk              booth (server gate: config + enrollment) → components/k
 app/kiosk/enroll       staff device enrollment
 app/p/[token]          phone download page + image route (server reads private bucket)
 app/api/photos         upload (kiosk auth, idempotent per session) and consent
-app/api/kiosk          enroll / signout · app/api/operator/kiosks: list / revoke
+app/api/kiosk          enroll / signout / help (booth help mode: kiosk cookie + staff PIN, D59)
+                       · app/api/operator/kiosks: list / revoke
 app/api/cron/retention retention cleanup (Bearer CRON_SECRET, Vercel Cron)
 app/admin              staff control panel: login, (staff)/ pages (overview, moderation,
                        sessions, photos, kiosks, settings, audit)
@@ -82,7 +84,7 @@ proxy.ts               refreshes staff sessions for /admin pages (no authorizati
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
 lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
-lib/kiosk              pure state machine, session helpers, upload/consent client
+lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client
 lib/offline            IndexedDB stores + UploadQueue and ConsentQueue (retry, dedupe, reload-safe)
 lib/kiosk-auth         signed kiosk session cookie, enrollment, verification
 lib/server             env validation, logging, rate limits, request helpers

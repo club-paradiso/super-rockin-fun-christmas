@@ -39,6 +39,22 @@ export class RateLimiter {
   }
 }
 
+/**
+ * Staff PIN guessing limits, shared by every route that checks a PIN (admin login, kiosk help).
+ * Kept on globalThis: Next.js bundles routes separately, and a per-module limiter would give each
+ * route its own five tries. 6 digits = 10^6 PINs; 5 wrong tries per person per 15 min makes
+ * guessing take years. Only failures count, so staff can sign in on several devices.
+ */
+export function staffPinLimits() {
+  const g = globalThis as {
+    __ftlPinLimits?: { perIp: RateLimiter; failuresPerUser: RateLimiter };
+  };
+  return (g.__ftlPinLimits ??= {
+    perIp: new RateLimiter(20, 15 * 60_000),
+    failuresPerUser: new RateLimiter(5, 15 * 60_000),
+  });
+}
+
 export const limiters = {
   /** Enrollment attempts per client IP. */
   enroll: new RateLimiter(10, 15 * 60_000),

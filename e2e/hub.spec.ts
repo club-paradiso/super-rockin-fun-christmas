@@ -130,6 +130,45 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await wall.context().close();
 });
 
+async function holdCorner(page: Page, ms: number) {
+  const box = (await page.getByTestId("help-corner").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+}
+
+test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, start over", async () => {
+  await kiosk.goto("/kiosk?camera=mock");
+  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+
+  // A guest's quick touch never opens it.
+  await holdCorner(kiosk, 800);
+  await expect(kiosk.getByTestId("help-panel")).toHaveCount(0);
+
+  await holdCorner(kiosk, 3_300);
+  const panel = kiosk.getByTestId("help-panel");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "현장 책임자" }).click();
+  await typePin(kiosk, "000001");
+  await expect(panel.getByTestId("help-denied")).toHaveText("PIN이 맞지 않아요.");
+  await typePin(kiosk, ADMIN_PIN);
+  await expect(panel.getByTestId("help-menu")).toBeVisible();
+  await expect(panel).toContainText("스태프 도움 · 현장 책임자");
+  await expect(panel.getByTestId("help-camera").locator("option")).toContainText([
+    "기본 카메라",
+    "Mock camera",
+  ]);
+  await expect(panel.getByTestId("help-queue")).toContainText("없어요");
+  // Unlocking the booth menu never hands the booth a staff session.
+  expect((await kiosk.context().cookies()).some((c) => c.name === "ftl_staff")).toBe(false);
+
+  await panel.getByTestId("help-reset").click();
+  await expect(kiosk.getByTestId("help-panel")).toHaveCount(0);
+  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+});
+
 test("signing out ends the staff session", async () => {
   await staff.getByRole("button", { name: "로그아웃" }).click();
   await expect(staff).toHaveURL(/\/admin\/login/);

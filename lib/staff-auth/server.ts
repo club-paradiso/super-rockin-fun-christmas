@@ -9,6 +9,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 import { getServerConfig, secureCookies, type ServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
+import { staffPinLimits } from "@/lib/server/rate-limit";
+import { clientIp } from "@/lib/server/request";
 import { readCookie } from "@/lib/kiosk-auth/server";
 import { getBackend } from "@/lib/storage/server";
 import type { StaffMember, StaffPin } from "@/lib/storage/types";
@@ -162,6 +164,26 @@ async function authorizePinSession(config: ServerConfig, value: string | null): 
   if (!pin || pinSetAtMs(pin.setAt) !== claims.pinSetAt)
     return { ok: false, reason: "unauthenticated" };
   return { ok: true, staff, email: staff.email };
+}
+
+/**
+ * One PIN attempt from a request, under the shared guessing limits: 429 while the person or the
+ * address is locked out, 401 for unknown, inactive and wrong alike.
+ */
+export async function attemptStaffPin(
+  request: Request,
+  userId: string,
+  pin: string,
+): Promise<{ ok: true; staff: StaffMember; pin: StaffPin } | { ok: false; status: 401 | 429 }> {
+  const limits = staffPinLimits();
+  if (!limits.perIp.take(clientIp(request)) || limits.failuresPerUser.isLimited(userId))
+    return { ok: false, status: 429 };
+  const found = await checkStaffPin(userId, pin);
+  if (!found) {
+    limits.failuresPerUser.take(userId);
+    return { ok: false, status: 401 };
+  }
+  return { ok: true, ...found };
 }
 
 /** Check a PIN for an active staff member. Same answer for unknown, inactive and wrong. */
