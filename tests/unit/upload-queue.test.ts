@@ -35,6 +35,27 @@ function fakeServer() {
 }
 
 describe("UploadQueue", () => {
+  it("entries() lists what is waiting for staff (help mode), oldest first, without the image", async () => {
+    let t = 1000;
+    const queue = new UploadQueue(new MemoryQueueStore(), async () => offline, { now: () => t });
+    const a = entry();
+    const b = entry();
+    await queue.enqueue(a);
+    t = 2000;
+    await queue.enqueue(b);
+    await queue.deliverNow(b.sessionId);
+    const listed = await queue.entries();
+    expect(listed.map((e) => e.sessionId)).toEqual([a.sessionId, b.sessionId]);
+    expect(listed[1]).toEqual({
+      sessionId: b.sessionId,
+      createdAt: 2000,
+      attempts: 1,
+      lastError: "Failed to fetch",
+      state: "pending",
+    });
+    expect(JSON.stringify(listed)).not.toContain("data");
+  });
+
   it("a failed upload is persisted to IndexedDB, then retried and removed once online", async () => {
     const idb = new IDBFactory();
     const server = fakeServer();

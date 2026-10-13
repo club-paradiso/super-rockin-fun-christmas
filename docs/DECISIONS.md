@@ -385,3 +385,14 @@ Deletes are the usual tombstone-then-bytes, audited as `system` / `retention_del
 rule as the note. Cloud copies are queued (`CloudSync.queueDelete`) instead of sent one by one,
 so a run while offline does not wait on one timeout per photo; the sync worker sends them.
 The final values still wait for the church (STATUS, 10/16).
+
+## D59 · Staff help mode unlocks the booth's own menu, never a staff session
+
+A 3-second hold on the booth's top-left corner (a guest's tap never opens it), then the staff
+member's name and PIN. `/api/kiosk/help` needs the kiosk cookie and checks the PIN on the hub,
+counting wrong PINs against the same per-person limit as the staff login (5 per 15 min, shared
+process-wide). It answers with the name only: no cookie and no staff session, so the booth can
+never act as staff. The menu acts on the booth itself: camera choice, its upload and consent
+queues ("지금 다시 보내기"), start over, reload. It closes after 60 s without a touch. On the hub
+the camera choice moves from the guests' ready screen into this menu; cloud kiosks keep it where
+it was. Hub only: cloud staff have no PINs.

@@ -38,6 +38,7 @@ import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
+import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { CameraPreview, Lead, ShotProgress, Stage, Title } from "./ui";
 
 export interface Shot {
@@ -69,10 +70,13 @@ function readStoredDevice(): string | undefined {
 export function KioskApp({
   cameraMode,
   initialWallSubmissions = "open",
+  staffHelp = false,
 }: {
   cameraMode: CameraMode;
   /** From event settings at page load; refreshed by heartbeats and upload responses. */
   initialWallSubmissions?: "open" | "paused";
+  /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
+  staffHelp?: boolean;
 }) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
@@ -399,13 +403,29 @@ export function KioskApp({
 
   const selectDevice = (id: string) => {
     try {
-      localStorage.setItem(DEVICE_KEY, id);
+      if (id) localStorage.setItem(DEVICE_KEY, id);
+      else localStorage.removeItem(DEVICE_KEY);
     } catch {}
-    setDeviceId(id);
+    setDeviceId(id || undefined);
     cameraRef.current?.stop();
     setStream(null);
-    dispatch({ type: "CAMERA_RESTART" });
+    // Ready: restart the preview with the new camera. Camera error: try the new one at once.
+    dispatch({ type: state.phase === "camera-error" ? "CAMERA_RETRY" : "CAMERA_RESTART" });
   };
+
+  // ── Staff help mode: what the menu reads and does (this booth only) ─────────────────────
+  const listDevices = useCallback(async () => (await cameraRef.current?.listDevices()) ?? [], []);
+  const loadQueue = useCallback(async (): Promise<HelpQueueView> => {
+    const [queue, consents] = await Promise.all([queueRef.current, consentRef.current]);
+    return {
+      uploads: (await queue?.entries()) ?? [],
+      consents: (await consents?.pending()) ?? 0,
+    };
+  }, []);
+  const sendNow = useCallback(async () => {
+    await (await queueRef.current)?.processDue(true);
+    await (await consentRef.current)?.processDue(true);
+  }, []);
 
   // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
@@ -455,6 +475,7 @@ export function KioskApp({
         devices={devices}
         deviceId={deviceId}
         onSelectDevice={selectDevice}
+        guestCameraChoice={!staffHelp}
         thumbs={thumbs}
         finalImage={finalImage}
         qrSvg={qrSvg}
@@ -473,6 +494,16 @@ export function KioskApp({
         />
       )}
       <StatusBadges cameraMode={cameraMode} online={online} queue={queueStatus} />
+      {staffHelp && (
+        <HelpPanel
+          listDevices={listDevices}
+          deviceId={deviceId}
+          onSelectDevice={selectDevice}
+          loadQueue={loadQueue}
+          onSendNow={sendNow}
+          onReset={reset}
+        />
+      )}
     </main>
   );
 }
@@ -486,6 +517,8 @@ interface ScreenProps {
   devices: CameraDevice[];
   deviceId: string | undefined;
   onSelectDevice: (id: string) => void;
+  /** Without staff help mode (cloud kiosks) the camera choice stays on the ready screen. */
+  guestCameraChoice: boolean;
   thumbs: Record<string, string>;
   finalImage: FinalImage | null;
   qrSvg: string | null;
@@ -582,7 +615,7 @@ function Screen(p: ScreenProps) {
           >
             촬영 시작
           </button>
-          {p.devices.length > 1 && (
+          {p.guestCameraChoice && p.devices.length > 1 && (
             <label className="flex items-center gap-3 text-base text-mist">
               카메라
               <select

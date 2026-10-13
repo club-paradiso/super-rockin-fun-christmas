@@ -82,6 +82,7 @@ uploads already queued wait in IndexedDB ("기기 등록 필요") until the devi
 | Someone claims a fresh hub            | The first staff member needs the one-time setup code printed in the hub's own console. It works only while the hub has no staff, once, rate-limited, same-origin.                                                          |
 | Forged or replayed staff cookie       | `s1.<id>.<iat>.<exp>.<pinSetAt>.<hmac>`, HMAC key derived from `KIOSK_SESSION_SECRET` with a staff-only label, so kiosk cookies never verify as staff cookies (tested). Every request re-checks an active staff row.       |
 | Ex-staff or a leaked PIN keeps access | Deactivation and PIN resets end existing sessions on the next request (`pinSetAt` must match). Default session 14 h (`STAFF_SESSION_HOURS`).                                                                               |
+| Booth help mode used as a back door   | `/api/kiosk/help` needs the kiosk cookie and a staff PIN, shares the per-person wrong-PIN limit with the login, and issues no cookie: the booth menu only touches the booth (camera, its queues, reload).                  |
 | Sniffing on the venue LAN             | The hub serves plain HTTP, so cookies are not `Secure` there. The LAN must be the dedicated, password-protected router (D42), never the congregation Wi-Fi.                                                                |
 
 ## Hub → cloud QR copy (`/api/hub/*`, D43, D57)
