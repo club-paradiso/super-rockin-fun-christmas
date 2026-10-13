@@ -49,6 +49,8 @@ export interface PurgeResult {
   examined: number;
   deleted: number;
   failed: number;
+  /** Rows marked DELETED by this run (their guest link is dead), e.g. to delete a cloud copy. */
+  deletedIds: string[];
 }
 
 export type ConsentResult =
@@ -503,11 +505,39 @@ export class PhotoService {
   async purgeRetention(limit = 200): Promise<PurgeResult> {
     const nowIso = this.now().toISOString();
     const due = await this.backend.photos.listRetentionDue(nowIso, limit);
-    let deleted = 0;
-    let failed = 0;
-    const seen = new Set<string>();
-    for (const row of due) {
-      seen.add(row.id);
+    const result = await this.tombstoneAll(due, null);
+    const seen = new Set(due.map((r) => r.id));
+    const cleanup = await this.backend.photos.listObjectCleanupDue(limit);
+    for (const row of cleanup) {
+      if (seen.has(row.id)) continue;
+      result.examined++;
+      if (await this.removeObjectsAndMark(row)) result.deleted++;
+      else result.failed++;
+    }
+    return result;
+  }
+
+  /**
+   * Hub retention by moderation state (D47, lib/ops/hub-retention.ts): delete live photos in
+   * `statuses` captured before `beforeIso`. Same order as every delete: tombstone, then bytes.
+   */
+  async purgeCapturedBefore(
+    statuses: ModerationStatus[],
+    beforeIso: string,
+    note: string,
+    limit = 200,
+  ): Promise<PurgeResult> {
+    const due = await this.backend.photos.list({ statuses, before: beforeIso, limit });
+    return this.tombstoneAll(
+      due.filter((r) => !r.deletedAt && r.moderationStatus !== "DELETED"),
+      note,
+    );
+  }
+
+  private async tombstoneAll(rows: PhotoRow[], note: string | null): Promise<PurgeResult> {
+    const nowIso = this.now().toISOString();
+    const result: PurgeResult = { examined: rows.length, deleted: 0, failed: 0, deletedIds: [] };
+    for (const row of rows) {
       const marked = await this.backend.photos
         .transition({
           photoId: row.id,
@@ -516,21 +546,17 @@ export class PhotoService {
           deletedAt: nowIso,
           actor: { type: "system", id: null },
           action: "retention_delete",
+          note,
         })
         .catch(() => null);
       if (!marked) {
-        failed++;
+        result.failed++;
         continue;
       }
-      if (await this.removeObjectsAndMark(marked)) deleted++;
-      else failed++;
+      result.deletedIds.push(marked.id);
+      if (await this.removeObjectsAndMark(marked)) result.deleted++;
+      else result.failed++;
     }
-    const cleanup = await this.backend.photos.listObjectCleanupDue(limit);
-    for (const row of cleanup) {
-      if (seen.has(row.id)) continue;
-      if (await this.removeObjectsAndMark(row)) deleted++;
-      else failed++;
-    }
-    return { examined: seen.size + cleanup.filter((r) => !seen.has(r.id)).length, deleted, failed };
+    return result;
   }
 }

@@ -52,6 +52,13 @@ export interface ServerConfig {
   cloudSync: { baseUrl: URL; secret: string; timeoutMs: number } | null;
   /** Cloud only: the shared secret that lets the hub use /api/hub/*. Null = those routes 404. */
   hubSyncSecret: string | null;
+  /**
+   * Hub only (D47): photos that never reach the wall go `unpostedHours` after capture; wall
+   * photos (approved or hidden) at `wallUntil` (EVENT_END_AT + HUB_WALL_GRACE_HOURS). Null
+   * wallUntil = no event end configured: the PHOTO_RETENTION_DAYS ceiling decides. That ceiling
+   * applies to every photo in any case.
+   */
+  hubRetention: { unpostedHours: number; wallUntil: Date | null } | null;
 }
 
 export class ConfigError extends Error {
@@ -261,6 +268,28 @@ export function parseServerConfig(env: Env): ServerConfig {
       };
   }
 
+  let hubRetention: ServerConfig["hubRetention"] = null;
+  if (role === "hub") {
+    const unpostedHours = positiveNumber(env, "HUB_UNPOSTED_HOURS", 24, problems);
+    const graceHours = positiveNumber(env, "HUB_WALL_GRACE_HOURS", 24, problems);
+    const rawEnd = env.EVENT_END_AT?.trim();
+    let wallUntil: Date | null = null;
+    if (rawEnd) {
+      const end = new Date(rawEnd);
+      // An explicit offset: "2026-12-25T22:00:00+09:00". A bare time would depend on the laptop.
+      if (!/(Z|[+-]\d\d:\d\d)$/.test(rawEnd) || Number.isNaN(end.getTime()))
+        problems.push(
+          `EVENT_END_AT must be a date and time with an offset, e.g. 2026-12-25T22:00:00+09:00 (got "${rawEnd}")`,
+        );
+      else wallUntil = new Date(end.getTime() + graceHours * 3_600_000);
+    }
+    if (unpostedHours > retentionDays * 24)
+      problems.push("HUB_UNPOSTED_HOURS cannot be longer than PHOTO_RETENTION_DAYS");
+    hubRetention = { unpostedHours, wallUntil };
+  } else if (env.EVENT_END_AT?.trim()) {
+    problems.push("EVENT_END_AT is for the hub (FTL_ROLE=hub) only");
+  }
+
   if (problems.length) throw new ConfigError(problems);
 
   return {
@@ -280,6 +309,7 @@ export function parseServerConfig(env: Env): ServerConfig {
     maxUploadBytes: 4 * 1024 * 1024,
     cloudSync,
     hubSyncSecret: role === "cloud" ? syncSecret : null,
+    hubRetention,
   };
 }
 

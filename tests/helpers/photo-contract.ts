@@ -190,6 +190,38 @@ export function photoServiceContract(
       expect((await backend.photos.findBySessionId(SESSION))!.deletedAt).toBeNull();
     });
 
+    it("hub retention: deletes live photos in the given states captured before a time", async () => {
+      const early = await put();
+      now = new Date("2026-12-24T12:00:00Z");
+      const laterSession = uuid();
+      const later = await put({ sessionId: laterSession });
+      now = new Date("2026-12-25T11:00:00Z");
+      const r = await svc.purgeCapturedBefore(["NONE"], "2026-12-24T11:00:00.000Z", "unposted");
+      expect(r.deletedIds).toContain(early.photo.id);
+      expect(r.deletedIds).not.toContain(later.photo.id);
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(row.moderationStatus).toBe("DELETED");
+      expect(row.objectDeletedAt).not.toBeNull();
+      expect((await svc.resolve(early.token)).ok).toBe(false);
+      expect((await svc.resolve(later.token)).ok).toBe(true);
+      const [event] = await backend.audit.list({
+        subjectType: "photo",
+        subjectId: row.id,
+        limit: 1,
+      });
+      expect(event).toMatchObject({
+        action: "retention_delete",
+        actorType: "system",
+        note: "unposted",
+      });
+      // Other states are untouched; a second run finds nothing of this photo.
+      const again = await svc.purgeCapturedBefore(["PENDING"], "2026-12-25T11:00:00.000Z", "x");
+      expect(again.deletedIds).not.toContain(later.photo.id);
+      expect(
+        (await svc.purgeCapturedBefore(["NONE"], "2026-12-24T11:00:00.000Z", "x")).deletedIds,
+      ).not.toContain(early.photo.id);
+    });
+
     // Cloud side of the hub's QR copy (/api/hub/*): copies have no kiosk.
     it("hub copy: reissue rotates the link, capped at retention; kiosk photos are out of reach", async () => {
       const first = await put({ kioskId: null });

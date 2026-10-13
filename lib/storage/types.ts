@@ -88,6 +88,8 @@ export interface PhotoListFilter {
   statuses?: ModerationStatus[];
   wallConsent?: boolean;
   since?: string;
+  /** Captured strictly before this instant. */
+  before?: string;
   kioskId?: string;
   sessionShort?: string;
   limit: number;

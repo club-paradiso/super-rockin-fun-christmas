@@ -1,6 +1,7 @@
 import "server-only";
 import { getFrame } from "@/config/frames";
 import { getCloudSync } from "@/lib/cloud/server";
+import { getServerConfig } from "@/lib/server/env";
 import type { CloudSyncStatus } from "@/lib/cloud/sync";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 import type {
@@ -150,6 +151,22 @@ export interface Overview {
   settings: EventSettings;
   /** Hub with a cloud only: QR copies and deletes still waiting for the internet. */
   cloud: CloudSyncStatus | null;
+  /** What gets deleted when, as configured (shown so staff can tell guests). */
+  retention:
+    | { where: "cloud"; days: number }
+    | { where: "hub"; days: number; unpostedHours: number; wallUntil: string | null };
+}
+
+function retentionView(): Overview["retention"] {
+  const c = getServerConfig();
+  return c.hubRetention
+    ? {
+        where: "hub",
+        days: c.retentionDays,
+        unpostedHours: c.hubRetention.unpostedHours,
+        wallUntil: c.hubRetention.wallUntil?.toISOString() ?? null,
+      }
+    : { where: "cloud", days: c.retentionDays };
 }
 
 /** Only measured values. Anything we cannot measure is absent, not shown as green. */
@@ -182,6 +199,7 @@ export async function getOverview(): Promise<Overview> {
     lastRetention,
     settings,
     cloud,
+    retention: retentionView(),
   };
 }
 

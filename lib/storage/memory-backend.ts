@@ -178,6 +178,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
           (!f.statuses || f.statuses.includes(r.moderationStatus)) &&
           (f.wallConsent === undefined || r.wallConsent === f.wallConsent) &&
           (!f.since || r.createdAt >= f.since) &&
+          (!f.before || r.createdAt < f.before) &&
           (!f.kioskId || r.kioskId === f.kioskId) &&
           (!f.sessionShort || r.sessionId.startsWith(f.sessionShort.toLowerCase())),
       )

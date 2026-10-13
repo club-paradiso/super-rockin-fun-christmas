@@ -101,7 +101,27 @@ export default async function OverviewPage() {
             )}
           </p>
         ) : (
-          <p className="text-lg text-mist">아직 실행 기록이 없어요 (매일 03:17 KST 실행).</p>
+          <p className="text-lg text-mist">
+            아직 실행 기록이 없어요 (
+            {o.retention.where === "hub" ? "켜진 동안 10분마다" : "매일 03:17 KST"} 실행).
+          </p>
+        )}
+        {o.retention.where === "hub" ? (
+          <ul className="mt-2 text-base text-mist" data-testid="retention-rules">
+            <li>
+              미디어월에 안 나간 사진(동의 안 함·거절·검수 대기): 촬영 {o.retention.unpostedHours}
+              시간 뒤 삭제
+            </li>
+            <li>
+              미디어월 사진:{" "}
+              {o.retention.wallUntil
+                ? `${formatTime(o.retention.wallUntil)}에 삭제`
+                : `행사 종료 시각이 설정되지 않아 촬영 ${o.retention.days}일 뒤 삭제`}
+            </li>
+            <li>어떤 사진이든 촬영 {o.retention.days}일을 넘기지 않음</li>
+          </ul>
+        ) : (
+          <p className="mt-2 text-base text-mist">사진은 촬영 {o.retention.days}일 뒤 삭제돼요.</p>
         )}
       </section>
       <section className="admin-card p-4">

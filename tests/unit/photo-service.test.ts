@@ -58,17 +58,17 @@ describe("retention failure is retried safely", () => {
     });
     now = new Date("2026-12-26T00:00:00Z");
     backend.objects.failRemove = true;
-    expect(await svc.purgeRetention()).toEqual({ examined: 1, deleted: 0, failed: 1 });
+    expect(await svc.purgeRetention()).toMatchObject({ examined: 1, deleted: 0, failed: 1 });
     const row = [...backend.photos.rows.values()][0]!;
     // Privacy first: the row is DELETED (guest link dead) before storage is touched…
     expect([row.moderationStatus, row.objectDeletedAt]).toEqual(["DELETED", null]);
     expect(backend.objects.objects.size).toBeGreaterThan(0);
     backend.objects.failRemove = false;
     // …and the next run finishes removing the image.
-    expect(await svc.purgeRetention()).toEqual({ examined: 1, deleted: 1, failed: 0 });
+    expect(await svc.purgeRetention()).toMatchObject({ examined: 1, deleted: 1, failed: 0 });
     expect(backend.objects.objects.size).toBe(0);
     expect([...backend.photos.rows.values()][0]!.objectDeletedAt).not.toBeNull();
-    expect(await svc.purgeRetention()).toEqual({ examined: 0, deleted: 0, failed: 0 });
+    expect(await svc.purgeRetention()).toMatchObject({ examined: 0, deleted: 0, failed: 0 });
   });
 });
 
