@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+// Bundled brand font (OFL): the booth renders frame text identically on any laptop, offline.
+import "@fontsource-variable/noto-sans-kr";
 import "./globals.css";
 
 export const metadata: Metadata = {

@@ -28,6 +28,19 @@ test("happy path: 4 shots → composite → authenticated upload → QR → phon
     return [el.naturalWidth, el.naturalHeight];
   });
   expect(dims).toEqual([1600, 1600]);
+  // The frame text was drawn in the bundled brand font, served by us (works offline).
+  const font = await page.evaluate(() => ({
+    loaded: [...document.fonts].some(
+      (f) => f.family.replaceAll('"', "") === "Noto Sans KR Variable" && f.status === "loaded",
+    ),
+    files: performance
+      .getEntriesByType("resource")
+      .map((e) => e.name)
+      .filter((n) => /\.woff2?(\?|$)/.test(n)),
+  }));
+  expect(font.loaded).toBe(true);
+  expect(font.files.length).toBeGreaterThan(0);
+  for (const file of font.files) expect(file.startsWith("http://127.0.0.1:")).toBe(true);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("local-download").click();

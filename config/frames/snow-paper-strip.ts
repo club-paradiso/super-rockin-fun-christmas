@@ -34,7 +34,7 @@ export const snowPaperStrip: FrameDefinition = {
       x: 600,
       y: 3516,
       size: 56,
-      weight: 800,
+      weight: 700,
       color: "#2a2620",
       align: "center",
       letterSpacing: 8,
