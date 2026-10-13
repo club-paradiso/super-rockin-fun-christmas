@@ -18,8 +18,14 @@ export async function register() {
         store: c.store,
         kioskAuth: c.kioskAuth.mode,
         publicBaseUrl: c.publicBaseUrl?.origin ?? null,
+        cloud: c.cloudSync?.baseUrl.origin ?? null,
       }),
     );
+    if (c.role === "hub" && c.cloudSync) {
+      // Copies queued while offline go out in the background (lib/cloud).
+      const { startCloudSyncWorker } = await import("./lib/cloud/server");
+      startCloudSyncWorker();
+    }
     if (c.role === "hub") {
       // A fresh hub prints its one-time first-staff code in this console window.
       const { ensureSetupCode } = await import("./lib/staff-auth/setup");

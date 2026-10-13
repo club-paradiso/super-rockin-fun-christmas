@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_ENV, PORT } from "./e2e/env";
+import {
+  CLOUD_ENV,
+  CLOUD_PORT,
+  E2E_ENV,
+  HUB_CLOUD_ENV,
+  HUB_CLOUD_PORT,
+  PORT,
+  USE_SUPABASE,
+} from "./e2e/env";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -18,11 +26,33 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
   ],
-  webServer: {
-    command: `rm -rf .data-e2e && npm run build && npx next start -p ${PORT} -H 127.0.0.1`,
-    url: `http://127.0.0.1:${PORT}/kiosk/enroll`,
-    reuseExistingServer: false,
-    timeout: 240_000,
-    env: E2E_ENV,
-  },
+  // Started one after another: the first builds, the others reuse the build with their own env.
+  webServer: [
+    {
+      command: `rm -rf .data-e2e && npm run build && npx next start -p ${PORT} -H 127.0.0.1`,
+      url: `http://127.0.0.1:${PORT}/kiosk/enroll`,
+      reuseExistingServer: false,
+      timeout: 240_000,
+      env: E2E_ENV,
+    },
+    // Hub + cloud pair for e2e/cloud.spec.ts (QR copy, cloud outage). Hub runs only.
+    ...(USE_SUPABASE
+      ? []
+      : [
+          {
+            command: `rm -rf .data-e2e-cloud && npx next start -p ${CLOUD_PORT} -H 127.0.0.1`,
+            url: `http://127.0.0.1:${CLOUD_PORT}/kiosk/enroll`,
+            reuseExistingServer: false,
+            timeout: 60_000,
+            env: CLOUD_ENV,
+          },
+          {
+            command: `rm -rf .data-e2e-hub-cloud && npx next start -p ${HUB_CLOUD_PORT} -H 127.0.0.1`,
+            url: `http://127.0.0.1:${HUB_CLOUD_PORT}/kiosk/enroll`,
+            reuseExistingServer: false,
+            timeout: 60_000,
+            env: HUB_CLOUD_ENV,
+          },
+        ]),
+  ],
 });

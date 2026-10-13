@@ -19,6 +19,8 @@ export const KIOSK_CONFIG = {
   completeResetSeconds: 20,
   /** Seconds of no touch before an abandoned session is reset. */
   idleResetSeconds: Number(process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS ?? 90),
+  /** Hub + cloud: how often the kiosk asks whether a pending QR copy has reached the cloud. */
+  qrPollSeconds: 3,
   /** Final image encoding for delivery. JPEG keeps phone downloads small. */
   outputMime: "image/jpeg" as const,
   outputQuality: 0.92,

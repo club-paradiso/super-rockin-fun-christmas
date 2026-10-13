@@ -33,6 +33,8 @@ export const ERROR_TEXT: Record<string, string> = {
   not_found: "찾을 수 없어요.",
   retention_passed: "보관 기간이 끝나 새 QR을 만들 수 없어요.",
   network: "네트워크 오류예요. 다시 시도해 주세요.",
+  cloud_unavailable: "인터넷 연결이 안 돼서 새 QR을 만들 수 없어요. 잠시 후 다시 해 주세요.",
+  cloud_gone: "QR 서버의 보관 기간이 끝나 새 QR을 만들 수 없어요. 사진은 이 노트북에 있어요.",
   not_on_wall: "승인되고 미디어월 동의가 있는 사진만 띄울 수 있어요.",
   not_staff: "스태프 권한이 없어요.",
   inactive: "비활성화된 스태프 계정이에요.",

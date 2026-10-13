@@ -154,6 +154,36 @@ describe("delivery and consent are independent", () => {
     expect(s.consent).toBe("no"); // answer is final once complete
   });
 
+  it("hub + cloud: QR pending → link arrives → ready; pending never replaces a ready QR", () => {
+    let s = run(
+      toFinal(),
+      { type: "REQUEST_DELIVERY" },
+      { type: "DELIVERY_STARTED" },
+      { type: "DELIVERY_QR_PENDING" },
+    );
+    expect(s.delivery).toEqual({ status: "qr-pending" });
+    s = run(s, {
+      type: "DELIVERY_SUCCEEDED",
+      token: "t",
+      url: "https://x/p/t",
+      expiresAt: "2026-12-27T00:00:00Z",
+    });
+    expect(s.delivery).toMatchObject({ status: "ready", url: "https://x/p/t" });
+    s = run(s, { type: "DELIVERY_QR_PENDING" });
+    expect(s.delivery.status).toBe("ready");
+  });
+
+  it("QR pending: the guest can still answer the wall question", () => {
+    const s = run(
+      toFinal(),
+      { type: "REQUEST_DELIVERY" },
+      { type: "DELIVERY_QR_PENDING" },
+      { type: "TO_CONSENT" },
+      { type: "SET_CONSENT", consent: "yes" },
+    );
+    expect([s.phase, s.consent]).toEqual(["complete", "yes"]);
+  });
+
   it("a failed delivery can still finish the session", () => {
     const s = run(
       toFinal(),

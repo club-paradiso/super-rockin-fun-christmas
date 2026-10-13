@@ -28,6 +28,8 @@ export type DeliveryState =
   | { status: "uploading" }
   /** Saved on the kiosk and waiting to reach the server. No QR until a real token exists. */
   | { status: "queued"; reason: "network" | "auth" }
+  /** Saved on the hub (wall consent can follow); the cloud QR copy is still on its way. */
+  | { status: "qr-pending" }
   | { status: "ready"; token: string; url: string; expiresAt: string }
   | { status: "failed"; message: string };
 
@@ -70,6 +72,7 @@ export type KioskAction<Shot> =
   | { type: "CONFIRM_FRAME" }
   | { type: "BACK_TO_FRAME" }
   | { type: "REQUEST_DELIVERY" }
+  | { type: "DELIVERY_QR_PENDING" }
   | { type: "DELIVERY_STARTED" }
   | { type: "DELIVERY_SUCCEEDED"; token: string; url: string; expiresAt: string }
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
@@ -248,6 +251,11 @@ export function kioskReducer<Shot>(
           expiresAt: action.expiresAt,
         },
       };
+
+    case "DELIVERY_QR_PENDING":
+      return state.phase === "delivery" && state.delivery.status !== "ready"
+        ? { ...state, delivery: { status: "qr-pending" } }
+        : state;
 
     case "DELIVERY_QUEUED":
       return state.phase === "delivery" && state.delivery.status !== "ready"

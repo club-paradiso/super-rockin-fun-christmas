@@ -84,6 +84,17 @@ uploads already queued wait in IndexedDB ("기기 등록 필요") until the devi
 | Ex-staff or a leaked PIN keeps access | Deactivation and PIN resets end existing sessions on the next request (`pinSetAt` must match). Default session 14 h (`STAFF_SESSION_HOURS`).                                                                               |
 | Sniffing on the venue LAN             | The hub serves plain HTTP, so cookies are not `Secure` there. The LAN must be the dedicated, password-protected router (D42), never the congregation Wi-Fi.                                                                |
 
+## Hub → cloud QR copy (`/api/hub/*`, D43, D57)
+
+| Threat                                            | Mitigation                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Someone else uploads to or deletes from the cloud | `/api/hub/*` needs `Authorization: Bearer HUB_SYNC_SECRET` (constant-time compare, at least 32 chars, must differ from the kiosk and cron secrets). Without the secret configured the routes answer 404. Failures are logged and rate-limited. |
+| A leaked hub secret                               | It can only upload, reissue or delete **hub copies** (no kiosk). It cannot read photos, list anything, touch kiosk uploads, consent, moderation or staff. Rotate it on both sides; the hub keeps its queue meanwhile.                          |
+| A lost hub laptop                                 | It holds the hub secret, not the Supabase service-role key. Guest tokens are never stored on the hub, so old QR links cannot be recovered from it.                                                                                             |
+| Photos in transit                                 | `CLOUD_BASE_URL` must be https in production.                                                                                                                                                                                                  |
+| A rescan kills a guest's QR                       | Per-photo lock on the hub: the kiosk's QR request and the background worker never upload the same photo twice at once.                                                                                                                         |
+| Staff delete does not reach the cloud             | Queued as `DELETE_PENDING` and retried until the cloud confirms; shown on the hub overview ("삭제 대기 N건").                                                                                                                                  |
+
 ## Accepted limitations
 
 - **Rate limits are per server instance** (in memory). On Vercel each instance counts separately

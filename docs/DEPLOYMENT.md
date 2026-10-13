@@ -32,18 +32,19 @@ Next.js server is the only thing that talks to Supabase.
 2. Environment variables (Production, and Preview if you test previews). Use
    `openssl rand -base64 48` for the secrets:
 
-| name                        | value                                                                             |
-| --------------------------- | --------------------------------------------------------------------------------- |
-| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open |
-| `PHOTO_STORE`               | `supabase`                                                                        |
-| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                       |
-| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                  |
-| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                 |
-| `KIOSK_ENROLL_SECRET`       | ≥ 20 random chars, different from the above (**Sensitive**)                       |
-| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically             |
-| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                   |
-| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                   |
-| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                         |
+| name                        | value                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open   |
+| `PHOTO_STORE`               | `supabase`                                                                          |
+| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                    |
+| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                   |
+| `KIOSK_ENROLL_SECRET`       | ≥ 20 random chars, different from the above (**Sensitive**)                         |
+| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically               |
+| `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub |
+| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                     |
+| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                     |
+| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                           |
 
 Preview deployments get a different URL per deploy. Set `PUBLIC_BASE_URL` (Preview scope) to
 the preview URL you are testing, or use a stable preview alias. Production refuses to start
@@ -84,6 +85,25 @@ Playwright cannot prove this. A person with a phone must do it:
 
 Record the device models, OS versions and results in the PR. Until this is done, the status is
 `REAL_PHONE_CELLULAR_TEST: NOT VERIFIED`.
+
+## Connecting the on-site hub (QR copy, D57)
+
+The hub (`FTL_ROLE=hub` on the booth laptop) sends each photo's copy to this deployment and shows
+the link it gets back. Set the same `HUB_SYNC_SECRET` on both sides, and on the hub:
+
+```bash
+CLOUD_BASE_URL=https://<your-domain-or-project>.vercel.app   # origin only
+HUB_SYNC_SECRET=<same value as on Vercel>
+CLOUD_SYNC_TIMEOUT_MS=8000                                    # optional
+```
+
+The hub console prints `config_ok` with `cloud: <origin>` at start. A wrong secret shows on the
+hub overview as "QR 대기 N건 · 마지막 오류: cloud 401"; the photos wait on the hub and go out once
+the secret is fixed. With a hub, the cloud keeps only copies, so its `PHOTO_RETENTION_DAYS` can be
+as short as the link lifetime (the plan proposes a 24 h link; the final values wait for the
+church's privacy decision, see `docs/STATUS.md`).
+
+`HUB_TO_CLOUD_OVER_REAL_INTERNET: NOT VERIFIED` (tested with two local servers only).
 
 ## Self-hosted alternative (Path A on one PC)
 

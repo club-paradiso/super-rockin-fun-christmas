@@ -47,6 +47,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **The wall only ever receives `wall_eligible_photos` ids**, through `/api/wall/feed`. PAUSE WALL
   and SHOW HOLDING SCREEN are applied on the server. Never give the wall anon database access,
   tokens or storage URLs.
+- **The cloud is only a QR copy** (D40, D43, D57). A hub with `CLOUD_BASE_URL` shows the cloud's
+  guest link and never stores it; consent, moderation and exposures never go to the cloud. All
+  cloud calls go through `CloudSync` (one call per photo at a time: a second upload would reissue
+  the token and kill a scanned QR). A hub delete must reach the cloud (`markDeleted`). The cloud's
+  `/api/hub/*` only touches copies with `kioskId` null; a copy deleted there is final (410).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
@@ -67,6 +72,9 @@ app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
 app/wall               media wall (server gate: config + enrolled display) → components/wall
 app/api/wall           wall feed (ordered eligible ids) + exposure report + image proxy (kiosk cookie)
 lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches)
+app/api/hub            cloud side of the hub's QR copy: put / reissue / delete (Bearer HUB_SYNC_SECRET)
+app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a cloud)
+lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models
 lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)

@@ -340,3 +340,29 @@ Sending only the top `max(4S, 30)` keeps the response small with thousands of ph
 to the back of the order as soon as it is reported shown, so the wall sends `?on=` and the hub
 keeps those ids in the answer while they are still eligible; otherwise the safety rule would pull
 a photo off the wall halfway through its turn.
+
+## D57 · The QR copy: upload on demand, retry in the background, never store the guest token
+
+On a hub with `CLOUD_BASE_URL`, an upload stores the photo on the hub and then sends the copy to
+the cloud within the same request (`CLOUD_SYNC_TIMEOUT_MS`, default 8 s). The cloud answers with
+its own guest link, which goes straight to the kiosk; the hub keeps only the copy's state
+(`PENDING`, `SYNCED`, `DELETE_PENDING`, `DELETED`) and never the token. If the cloud cannot be
+reached, the kiosk gets 202 "QR 준비 중" and asks `/api/photos/qr` every 3 s; a background worker
+(every 15 s, backoff 5 s to 5 min) uploads copies nobody is waiting for.
+
+- **One cloud call per photo at a time.** A second upload of the same session makes the cloud
+  issue a new token and kill the QR the guest may have just scanned, so the kiosk's QR request and
+  the worker take a per-photo lock.
+- **Asking again reissues.** A copy already in the cloud gets a fresh token instead of a second
+  upload, also when its link had expired, up to the cloud's retention. A copy the cloud deleted
+  (its retention, or a hub delete) answers 410 and stays deleted: DELETED is terminal there too,
+  and staff see "QR 서버의 보관 기간이 끝났어요" instead of "try again". Only a copy the cloud has
+  no record of at all (a replaced database) is uploaded again.
+- **Deletes follow.** A staff delete on the hub queues the cloud delete; it is sent at once and
+  retried until the cloud confirms. A photo deleted before its copy ever arrived still sends the
+  delete, because a lost response may have stored it.
+- **The cloud copy has no kiosk** (`kiosk_id` null), and `/api/hub/*` refuses to touch photos a
+  kiosk uploaded to the cloud directly. Cloud deletes are audited as `system` / `hub_delete`.
+- **No consent, moderation or exposure data goes to the cloud** (D40). Staff "QR 다시 보여주기" on
+  the hub reissues the cloud link and is audited on the hub; while the cloud is unreachable it
+  answers 503 rather than showing a hub link a phone cannot open.

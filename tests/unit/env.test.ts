@@ -160,6 +160,53 @@ describe("hub role (FTL_ROLE=hub)", () => {
   });
 });
 
+describe("hub → cloud copy config", () => {
+  const HUB = {
+    NODE_ENV: "production",
+    FTL_ROLE: "hub",
+    PHOTO_STORE: "local",
+    KIOSK_SESSION_SECRET: SECRETS.KIOSK_SESSION_SECRET,
+  };
+  const SYNC = "y".repeat(40);
+
+  it("hub: CLOUD_BASE_URL + HUB_SYNC_SECRET enable the copy; https required for real", () => {
+    const c = parseServerConfig({
+      ...HUB,
+      CLOUD_BASE_URL: "https://lights.example.org",
+      HUB_SYNC_SECRET: SYNC,
+    });
+    expect(c.cloudSync).toMatchObject({ secret: SYNC, timeoutMs: 8000 });
+    expect(c.cloudSync!.baseUrl.origin).toBe("https://lights.example.org");
+    expect(c.hubSyncSecret).toBeNull(); // the hub never serves /api/hub
+    expect(
+      problems({
+        ...HUB,
+        CLOUD_BASE_URL: "http://lights.example.org",
+        HUB_SYNC_SECRET: SYNC,
+      }).join(),
+    ).toMatch(/https/);
+    expect(problems({ ...HUB, CLOUD_BASE_URL: "https://lights.example.org" }).join()).toMatch(
+      /HUB_SYNC_SECRET/,
+    );
+  });
+
+  it("no cloud configured: the hub runs offline-only", () => {
+    expect(parseServerConfig(HUB).cloudSync).toBeNull();
+  });
+
+  it("cloud: HUB_SYNC_SECRET opens /api/hub; strong and distinct; CLOUD_BASE_URL is hub-only", () => {
+    expect(parseServerConfig({ ...PROD, HUB_SYNC_SECRET: SYNC }).hubSyncSecret).toBe(SYNC);
+    expect(parseServerConfig(PROD).hubSyncSecret).toBeNull();
+    expect(problems({ ...PROD, HUB_SYNC_SECRET: "short" }).join()).toMatch(/32 characters/);
+    expect(problems({ ...PROD, HUB_SYNC_SECRET: SECRETS.KIOSK_SESSION_SECRET }).join()).toMatch(
+      /differ/,
+    );
+    expect(
+      problems({ ...PROD, CLOUD_BASE_URL: "https://x.example.org", HUB_SYNC_SECRET: SYNC }).join(),
+    ).toMatch(/hub \(FTL_ROLE=hub\) only/);
+  });
+});
+
 describe("isPrivateHost", () => {
   it.each([
     "localhost",

@@ -28,6 +28,13 @@ export async function uploadOnce(
       signal: controller.signal,
     });
     const status = response.status;
+    if (response.status === 202) {
+      const body = (await response.json()) as Omit<
+        Extract<UploadSuccess, { qrPending: true }>,
+        "qrPending"
+      >;
+      return { ok: true, result: { ...body, qrPending: true } };
+    }
     if (response.ok) return { ok: true, result: (await response.json()) as UploadSuccess };
     const message = `upload failed (${status})`;
     if (status === 401) return { ok: false, kind: "auth", status, message };
@@ -70,5 +77,30 @@ export async function sendWallConsent(
     return "done";
   } catch {
     return "retry";
+  }
+}
+
+/**
+ * Hub + cloud: ask whether this session's QR copy has reached the cloud. The link, or null while
+ * it is still pending (or on any error: the caller simply asks again).
+ */
+export async function requestQr(
+  sessionId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ token: string; url: string; expiresAt: string } | null> {
+  try {
+    const response = await fetchImpl("/api/photos/qr", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+    if (response.status !== 200) return null;
+    const body = (await response.json()) as { token?: string; url?: string; expiresAt?: string };
+    return body.token && body.url && body.expiresAt
+      ? { token: body.token, url: body.url, expiresAt: body.expiresAt }
+      : null;
+  } catch {
+    return null;
   }
 }

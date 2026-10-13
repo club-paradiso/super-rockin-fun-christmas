@@ -218,6 +218,7 @@ export function createLocalBackend(rootDir: string): StorageBackend {
       "rotateToken",
       "setThumbPath",
       "markObjectsDeleted",
+      "setCloud",
     ]),
     objects: new FileObjectStorage(path.join(rootDir, "objects")),
     kiosks: wrap(db, m.kiosks, ["insert", "revoke", "touch", "heartbeat", "update"]),

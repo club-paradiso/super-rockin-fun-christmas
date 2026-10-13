@@ -275,6 +275,14 @@ class SupabasePhotoRepository implements PhotoRepository {
     return (data as Row[]).map(toPhoto);
   }
 
+  // The cloud never keeps a cloud copy of itself: these exist on the hub only (FTL_ROLE=hub).
+  async setCloud(): Promise<never> {
+    throw new Error("cloud-copy bookkeeping lives on the hub (local backend)");
+  }
+  async listCloudDue() {
+    return [];
+  }
+
   /** Reads the `wall_eligible_photos` view, so the wall rule also lives in the database. */
   async listWallEligible(limit: number) {
     const { data, error } = await this.db

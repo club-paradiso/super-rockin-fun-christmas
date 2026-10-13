@@ -1,5 +1,6 @@
 import type {
   AuditEvent,
+  CloudCopy,
   AuditRepository,
   AuditSubject,
   EnrollmentCodeRepository,
@@ -182,6 +183,21 @@ export class MemoryPhotoRepository implements PhotoRepository {
       )
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, f.limit)
+      .map((r) => ({ ...r }));
+  }
+  async setCloud(id: string, cloud: CloudCopy) {
+    const row = this.rows.get(id);
+    if (row) this.rows.set(id, { ...row, cloud: { ...cloud } });
+  }
+  async listCloudDue(nowIso: string, limit: number) {
+    return [...this.rows.values()]
+      .filter(
+        (r) =>
+          (r.cloud?.state === "PENDING" || r.cloud?.state === "DELETE_PENDING") &&
+          r.cloud.nextAttemptAt <= nowIso,
+      )
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .slice(0, limit)
       .map((r) => ({ ...r }));
   }
   /** Same rule as the `wall_eligible_photos` view in supabase/migrations. */

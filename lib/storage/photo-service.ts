@@ -358,6 +358,62 @@ export class PhotoService {
     return { ok: true, token, tokenExpiresAt, row: updated };
   }
 
+  // ── hub → cloud copy (cloud side) ─────────────────────────────────────────────────────
+
+  /**
+   * A fresh guest link for a session the hub uploaded: the kiosk is asking again for its QR, or
+   * staff pressed "QR 다시 보여주기" on the hub (audited there; the hub is the record). Uses the
+   * unaudited token-reissue path. Expiry is a fresh link TTL capped at retention.
+   */
+  async reissueForHub(
+    sessionId: string,
+  ): Promise<
+    { ok: true; token: string; tokenExpiresAt: string } | { ok: false; reason: "absent" | "gone" }
+  > {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    // A kiosk's own photo is invisible here: "absent", like a session that never existed.
+    if (!row || row.kioskId !== null) return { ok: false, reason: "absent" };
+    if (isGone(row)) return { ok: false, reason: "gone" };
+    const nowMs = this.now().getTime();
+    const expires = Math.min(
+      nowMs + this.opts.linkTtlHours * 3_600_000,
+      new Date(row.retentionExpiresAt).getTime(),
+    );
+    if (expires <= nowMs) return { ok: false, reason: "gone" };
+    const token = newToken();
+    const tokenExpiresAt = new Date(expires).toISOString();
+    const updated = await this.backend.photos.update(row.id, {
+      tokenHash: hashToken(token),
+      tokenExpiresAt,
+    });
+    return updated ? { ok: true, token, tokenExpiresAt } : { ok: false, reason: "gone" };
+  }
+
+  /**
+   * Staff deleted the photo on the hub: remove the cloud copy and kill its guest link. Same order
+   * as a staff delete (tombstone first, then bytes). Idempotent; unknown sessions are a no-op.
+   */
+  async deleteForHub(sessionId: string): Promise<"deleted" | "absent" | "retry"> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    if (!row || row.kioskId !== null) return "absent";
+    if (!isGone(row)) {
+      const marked = await this.backend.photos.transition({
+        photoId: row.id,
+        from: row.moderationStatus,
+        to: "DELETED",
+        deletedAt: this.now().toISOString(),
+        actor: { type: "system", id: null },
+        action: "hub_delete",
+      });
+      // Lost a race with another change: the hub's sync worker will simply try again.
+      if (!marked) return "retry";
+      await this.removeObjectsAndMark(marked);
+      return "deleted";
+    }
+    if (!row.objectDeletedAt) await this.removeObjectsAndMark(row);
+    return "deleted";
+  }
+
   /** Bytes for staff review. Thumbnails are generated on first use for older photos. */
   async staffImage(
     photoId: string,
