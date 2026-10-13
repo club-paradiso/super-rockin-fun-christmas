@@ -302,6 +302,10 @@ export function parseServerConfig(env: Env): ServerConfig {
       backupMinutes: positiveNumber(env, "HUB_BACKUP_MINUTES", 10, problems),
       diskWarnBytes: positiveNumber(env, "HUB_DISK_WARN_MB", 2048, problems) * 1024 * 1024,
     };
+    // A timer longer than 2^31-1 ms (about 24.8 days) fires after 1 ms in Node: a typo here
+    // would copy the whole photo folder in a tight loop. One day is plenty for "rarely".
+    if (hubOps.backupMinutes > 1440)
+      problems.push("HUB_BACKUP_MINUTES must be 1440 (one day) or less");
   } else if (env.HUB_BACKUP_DIR?.trim()) {
     problems.push("HUB_BACKUP_DIR is for the hub (FTL_ROLE=hub) only");
   }

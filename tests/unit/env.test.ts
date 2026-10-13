@@ -248,6 +248,16 @@ describe("hub retention config (D47)", () => {
       /EVENT_END_AT is for the hub/,
     );
   });
+
+  // Found by the Phase 4 load run: 100000 minutes overflowed Node's timer and backed up every ms.
+  it("backup interval: at most one day", () => {
+    expect(parseServerConfig({ ...HUB, HUB_BACKUP_MINUTES: "1440" }).hubOps?.backupMinutes).toBe(
+      1440,
+    );
+    expect(problems({ ...HUB, HUB_BACKUP_MINUTES: "100000" }).join()).toMatch(
+      /HUB_BACKUP_MINUTES must be 1440/,
+    );
+  });
 });
 
 describe("isPrivateHost", () => {
