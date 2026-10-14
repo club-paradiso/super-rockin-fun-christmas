@@ -100,12 +100,9 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await wall.getByRole("button", { name: "이 기기 등록" }).click();
   await expect(wall).toHaveURL(/\/wall$/);
 
-  const { url, session } = await kioskPhotoToQr(kiosk);
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await kiosk.getByTestId("consent-yes").click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
+  const { url, session } = await kioskPhotoToQr(kiosk, "yes");
 
-  // The booth's completion screen can appear before its queued consent reaches the hub, and the
+  // The booth's QR screen can appear before its queued consent reaches the hub, and the
   // moderation page is rendered once: reload until the photo is there.
   const card = staff.getByTestId("photo-card").filter({ hasText: session });
   await expect(async () => {
@@ -121,6 +118,7 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await staff.goto(`/admin/photos?session=${session}&window=1h`);
   const libraryCard = staff.getByTestId("photo-card").filter({ hasText: session });
   await libraryCard.getByTestId("action-hide").click();
+  await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
   await expect(libraryCard.getByTestId("photo-status")).toHaveText("숨김");
   await expect(photo).toHaveCount(0, { timeout: 15_000 });
 
@@ -149,7 +147,8 @@ async function holdCorner(page: Page, ms: number) {
 
 test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, start over", async () => {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
 
   // A guest's quick touch never opens it.

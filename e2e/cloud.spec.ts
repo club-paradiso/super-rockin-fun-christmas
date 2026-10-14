@@ -94,10 +94,22 @@ test("setup: staff and an enrolled booth on the hub", async ({ browser }) => {
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 });
 
+/** Booth session up to the wall question's answer (the QR screen follows). */
+async function shootAndAnswer(answer: "yes" | "no") {
+  await kiosk.goto("/kiosk?camera=mock");
+  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await kiosk.getByRole("button", { name: "촬영 시작" }).click();
+  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await kiosk.getByTestId(`consent-${answer}`).click();
+}
+
 test("online: the QR is the cloud's link, the phone downloads from the cloud, consent stays on the hub", async ({
   browser,
 }) => {
-  const { url, session } = await kioskPhotoToQr(kiosk);
+  const { url, session } = await kioskPhotoToQr(kiosk, "yes");
   expect(url.startsWith(`${CLOUD}/p/`)).toBe(true);
 
   const phone = await newPage(browser);
@@ -107,8 +119,7 @@ test("online: the QR is the cloud's link, the phone downloads from the cloud, co
   await phone.context().close();
 
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await kiosk.getByTestId("consent-yes").click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
 
   const hub = (await hubRow(session))!;
   expect(hub.cloud?.state).toBe("SYNCED");
@@ -124,13 +135,7 @@ test("cloud down: 'QR 준비 중', never a fake QR; the QR appears by itself whe
   browser,
 }) => {
   await closeProxy();
-  await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
-  await kiosk.getByRole("button", { name: "촬영 시작" }).click();
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
-  await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await shootAndAnswer("no");
 
   await expect(kiosk.getByTestId("delivery-qr-pending")).toBeVisible();
   await expect(kiosk.getByTestId("qr-code")).toHaveCount(0);
@@ -149,23 +154,17 @@ test("cloud down: 'QR 준비 중', never a fake QR; the QR appears by itself whe
   expect((await hubRow(session))?.cloud?.state).toBe("SYNCED");
 });
 
-test("cloud down: the guest can leave without a QR and still answer the wall question", async () => {
+test("cloud down: the wall answer is kept and the guest can leave without a QR", async () => {
   await closeProxy();
   try {
-    await kiosk.goto("/kiosk?camera=mock");
-    await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
-    await kiosk.getByRole("button", { name: "촬영 시작" }).click();
-    await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-    await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
-    await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
+    // The photo is on the hub while the guest answers; only the QR copy waits for the cloud.
+    await shootAndAnswer("yes");
     await expect(kiosk.getByTestId("delivery-qr-pending")).toBeVisible();
     const session = (await kiosk.getByTestId("session-code").textContent())!
       .replace("세션", "")
       .trim();
     await kiosk.getByTestId("qr-pending-continue").click();
-    await kiosk.getByTestId("consent-yes").click();
-    await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
+    await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
     await expect
       .poll(async () => {
         const r = await hubRow(session);

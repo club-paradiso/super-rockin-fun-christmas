@@ -73,10 +73,7 @@ test("one-time code enrolls a fresh kiosk, and cannot be reused", async ({ brows
   );
 });
 
-async function consentYesAndFind(session: string) {
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await kiosk.getByTestId("consent-yes").click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
+async function findInQueue(session: string) {
   await staff.goto("/admin/moderation");
   const card = staff.getByTestId("photo-card").filter({ hasText: session });
   await expect(card).toBeVisible();
@@ -85,8 +82,8 @@ async function consentYesAndFind(session: string) {
 }
 
 test("moderation: consent YES → PENDING → staff approves → APPROVED + audit event", async () => {
-  const { url, session } = await kioskPhotoToQr(kiosk);
-  const card = await consentYesAndFind(session);
+  const { url, session } = await kioskPhotoToQr(kiosk, "yes");
+  const card = await findInQueue(session);
   await card.getByTestId("action-approve").click();
   await expect(staff.getByTestId("photo-card").filter({ hasText: session })).toHaveCount(0);
   await expect
@@ -99,8 +96,8 @@ test("moderation: consent YES → PENDING → staff approves → APPROVED + audi
 });
 
 test("reject: guest can still download, photo is not wall-eligible", async () => {
-  const { url, session } = await kioskPhotoToQr(kiosk);
-  const card = await consentYesAndFind(session);
+  const { url, session } = await kioskPhotoToQr(kiosk, "yes");
+  const card = await findInQueue(session);
   await card.getByTestId("action-reject").click();
   await expect
     .poll(async () => (await photoForToken(tokenFromUrl(url)))?.moderationStatus)
@@ -147,10 +144,11 @@ test("PAUSE SUBMISSIONS: photography and QR keep working, wall consent is skippe
 
   const { url } = await kioskPhotoToQr(kiosk); // fresh page load picks up the setting
   await expect(kiosk.locator("main")).toHaveAttribute("data-wall-submissions", "paused");
+  // The wall question was skipped: five steps, straight from the frame to the QR.
+  await expect(kiosk.getByTestId("step-progress")).toHaveText("5 / 5");
   expect((await kiosk.request.get(`${url}/image`)).status()).toBe(200);
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
-  await expect(kiosk.getByTestId("screen-consent")).toHaveCount(0);
+  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
   expect((await photoForToken(tokenFromUrl(url)))?.moderationStatus).toBe("NONE");
 
   await staff.getByTestId("switch-pauseSubmissions").click();
@@ -172,8 +170,8 @@ test("media wall: approved photo appears; hide and PAUSE WALL take it off at onc
   await expect(wall).toHaveURL(/\/wall$/);
   await expect(wall.getByTestId("wall")).toHaveAttribute("data-wall-mode", "live");
 
-  const { url, session } = await kioskPhotoToQr(kiosk);
-  const card = await consentYesAndFind(session);
+  const { url, session } = await kioskPhotoToQr(kiosk, "yes");
+  const card = await findInQueue(session);
   await card.getByTestId("action-approve").click();
   const id = await photoIdForToken(tokenFromUrl(url));
   const photo = wall.locator(`[data-testid="wall-photo"][data-photo-id="${id}"]`);
@@ -181,8 +179,22 @@ test("media wall: approved photo appears; hide and PAUSE WALL take it off at onc
 
   await staff.goto(`/admin/photos?session=${session}&window=1h`);
   const libraryCard = staff.getByTestId("photo-card").filter({ hasText: session });
-  await libraryCard.getByTestId("action-hide").click();
-  await expect(libraryCard.getByTestId("photo-status")).toHaveText("숨김");
+  // Hiding asks first, then offers a 5-second undo (Figma A2, A3).
+  const hide = async () => {
+    await libraryCard.getByTestId("action-hide").click();
+    await expect(staff.locator("dialog[open]")).toContainText(
+      `${session} 사진을 미디어월에서 숨길까요?`,
+    );
+    await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
+    await expect(libraryCard.getByTestId("photo-status")).toHaveText("숨김");
+  };
+  await hide();
+  const undo = libraryCard.getByTestId("undo-hide");
+  await expect(undo).toContainText(`${session} 사진을 숨겼어요.`);
+  await undo.getByRole("button", { name: "되돌리기" }).click();
+  await expect(libraryCard.getByTestId("photo-status")).toHaveText("승인됨");
+  await hide();
+  await expect(undo).toHaveCount(0, { timeout: 8_000 }); // the undo offer goes away by itself
   await expect(photo).toHaveCount(0, { timeout: 15_000 });
   await libraryCard.getByTestId("action-unhide").click();
   await expect(photo).toBeVisible({ timeout: 30_000 });

@@ -102,20 +102,19 @@ async function approve(request: APIRequestContext, sessionId: string) {
   approved++;
 }
 
-async function boothPhoto(frame: "starlight-strip" | "village-window") {
+async function boothPhoto(frame: "navy-strip" | "wood-window") {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByTestId(`frame-option-${frame}`).click();
+  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByTestId(`frame-option-${frame}`).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
-  await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
   const short = (await kiosk.getByTestId("session-code").textContent())!.replace("세션", "").trim();
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await kiosk.getByTestId("consent-yes").click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
   const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
     photos: { sessionId: string }[];
   };
@@ -132,7 +131,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
   await enrollWithCode(kiosk, await createEnrollmentCode(staff, "장면 부스"));
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 
-  for (const frame of ["starlight-strip", "village-window"] as const)
+  for (const frame of ["navy-strip", "wood-window"] as const)
     await approve(staff.request, await boothPhoto(frame));
 
   for (let n = 0; n < 9; n++) {
@@ -142,7 +141,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
       headers: {
         "content-type": "image/jpeg",
         "x-session-id": sessionId,
-        "x-frame-id": "starlight-strip",
+        "x-frame-id": "navy-strip",
         origin: ORIGIN,
       },
     });

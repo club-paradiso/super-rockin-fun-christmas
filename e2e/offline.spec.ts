@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, shootFourWithMock, storedPhotos, toFinal } from "./helpers";
+import { enrollKiosk, shootFourWithMock, storedPhotos, toFrame } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -34,13 +34,14 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
   context,
 }) => {
   await shootFourWithMock(page);
-  await toFinal(page);
+  await toFrame(page);
   const before = (await storedPhotos()).length;
 
   await context.setOffline(true);
-  await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await page.getByTestId("consent-no").click();
   await expect(page.getByTestId("delivery-queued")).toBeVisible();
-  await expect(page.getByText("네트워크 연결을 확인하고 있어요")).toBeVisible();
+  await expect(page.getByText("사진을 보내고 있어요")).toBeVisible();
   await expect(page.getByTestId("qr-code")).toHaveCount(0);
   await expect(page.getByTestId("queue-badge")).toHaveText("전송 대기 1건");
   await expect(page.getByTestId("offline-badge")).toBeVisible();
@@ -68,12 +69,13 @@ test("reload while queued: the photo survives in IndexedDB and uploads after res
   page,
 }) => {
   await shootFourWithMock(page);
-  await toFinal(page);
+  await toFrame(page);
   const before = (await storedPhotos()).length;
 
   // Server unreachable for uploads only (page itself still loads).
   await page.route("**/api/photos", (route) => route.abort("internetdisconnected"));
-  await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await page.getByTestId("consent-no").click();
   await expect(page.getByTestId("delivery-queued")).toBeVisible();
   const [queued] = await idbQueue(page);
 
@@ -109,18 +111,17 @@ test("offline: the guest still answers the wall question, and the answer lands w
   context,
 }) => {
   await shootFourWithMock(page);
-  await toFinal(page);
+  await toFrame(page);
 
+  // The upload starts with the wall question on screen; offline, it waits on the device.
   await context.setOffline(true);
-  await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
-  await expect(page.getByTestId("delivery-queued")).toBeVisible();
-  const [queued] = await idbQueue(page);
-
-  // Before AUDIT R1/R2 this path ended without asking, and a "yes" given later was dropped.
-  await page.getByTestId("queued-continue").click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
   await expect(page.getByTestId("screen-consent")).toBeVisible();
   await page.getByTestId("consent-yes").click();
-  await expect(page.getByTestId("screen-complete")).toBeVisible();
+  await expect(page.getByTestId("delivery-queued")).toBeVisible();
+  const [queued] = await idbQueue(page);
+  await page.getByTestId("queued-continue").click();
+  await expect(page.getByTestId("screen-welcome")).toBeVisible();
   expect(await idbConsents(page)).toEqual([
     expect.objectContaining({ sessionId: queued!.sessionId, consent: true }),
   ]);

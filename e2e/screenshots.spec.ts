@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, enrollKiosk } from "./helpers";
+import { SHOOT_TIMEOUT, enrollKiosk, startSession } from "./helpers";
 
 /**
  * Phase 4 real-resolution screenshots (SCREENSHOTS=1 only): every booth screen at 1280×800 and
@@ -23,8 +23,7 @@ const hideMockBadge = (page: Page) =>
 async function shootToReview(page: Page) {
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await startSession(page);
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
@@ -42,25 +41,29 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await hideMockBadge(page);
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
   await shot(page, "booth-1280x800-01-welcome");
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await page.waitForTimeout(800); // frame thumbnails
+  await shot(page, "booth-1280x800-02-pick");
+  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   await page.waitForTimeout(800); // mock camera's first frames
-  await shot(page, "booth-1280x800-02-ready");
+  await shot(page, "booth-1280x800-03-ready");
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
-  await shot(page, "booth-1280x800-03-countdown");
+  await shot(page, "booth-1280x800-04-countdown");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await shot(page, "booth-1280x800-04-review");
+  await shot(page, "booth-1280x800-05-review");
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();
   await page.waitForTimeout(800); // frame thumbnails
-  await shot(page, "booth-1280x800-05-frame");
-  await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await shot(page, "booth-1280x800-06-frame");
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
   await expect(page.getByTestId("final-image")).toBeVisible();
-  await shot(page, "booth-1280x800-06-final");
-  await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await shot(page, "booth-1280x800-07-consent");
+  await page.getByTestId("consent-yes").click();
   await expect(page.getByTestId("qr-code").locator("svg")).toBeVisible();
-  await shot(page, "booth-1280x800-07-qr");
+  await shot(page, "booth-1280x800-08-qr");
   const url = (await page.getByTestId("qr-code").getAttribute("data-url"))!;
 
   const phone = await (
@@ -71,13 +74,6 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await phone.waitForTimeout(500);
   await shot(phone, "phone-390x844-guest-page");
   await phone.context().close();
-
-  await page.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(page.getByTestId("screen-consent")).toBeVisible();
-  await shot(page, "booth-1280x800-08-consent");
-  await page.getByTestId("consent-yes").click();
-  await expect(page.getByTestId("screen-complete")).toBeVisible();
-  await shot(page, "booth-1280x800-09-complete");
 });
 
 test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ page }) => {
@@ -87,7 +83,7 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await hideMockBadge(page);
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
   await shot(page, "booth-1920x1080-01-welcome");
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await startSession(page);
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
@@ -96,13 +92,13 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await shot(page, "booth-1920x1080-02-frame");
 });
 
-for (const frame of ["starlight-strip", "snow-paper-strip", "village-window"]) {
+for (const frame of ["navy-strip", "wood-window", "clothesline", "cream-strip"]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);
     await shootToReview(page);
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
     await page.getByTestId(`frame-option-${frame}`).click();
-    await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+    await page.getByRole("button", { name: "이 틀로 할게요" }).click();
     const img = page.getByTestId("final-image");
     await expect(img).toBeVisible();
     const b64 = await img.evaluate(async (el: HTMLImageElement) => {

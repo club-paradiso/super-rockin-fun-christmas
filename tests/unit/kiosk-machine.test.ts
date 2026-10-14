@@ -4,6 +4,7 @@ import {
   capturedCount,
   createInitialState,
   kioskReducer,
+  progressStep,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -15,7 +16,7 @@ function init(): S {
   return createInitialState<string>({
     shotCount: 4,
     countdownSeconds: 3,
-    frameId: "starlight-strip",
+    frameId: "navy-strip",
   });
 }
 
@@ -24,7 +25,7 @@ function run(state: S, ...actions: KioskAction<string>[]): S {
 }
 
 const toReady = (s = init()) =>
-  run(s, { type: "START", sessionId: SESSION }, { type: "CAMERA_READY" });
+  run(s, { type: "START", sessionId: SESSION }, { type: "CONFIRM_PICK" }, { type: "CAMERA_READY" });
 const ticks = (n: number) => Array.from({ length: n }, () => ({ type: "TICK" }) as const);
 
 /** Count down and capture one shot. */
@@ -130,78 +131,97 @@ describe("failures", () => {
   });
 });
 
-describe("delivery and consent are independent", () => {
-  const toFinal = () => run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME" });
+describe("frame first, then again with the photos", () => {
+  it("start → pick a frame → camera; the choice is preselected after shooting", () => {
+    let s = run(init(), { type: "START", sessionId: SESSION });
+    expect(s.phase).toBe("pick");
+    s = run(s, { type: "SELECT_FRAME", frameId: "clothesline" }, { type: "CONFIRM_PICK" });
+    expect([s.phase, s.frameId]).toEqual(["camera", "clothesline"]);
+    s = run(s, { type: "CAMERA_READY" }, { type: "BEGIN_SHOOTING" });
+    for (let i = 0; i < 4; i++) s = shoot(s, `shot-${i}`);
+    s = run(s, { type: "CONFIRM_SHOTS" });
+    expect([s.phase, s.frameId]).toEqual(["frame", "clothesline"]);
+    s = run(s, { type: "SELECT_FRAME", frameId: "cream-strip" });
+    expect(s.frameId).toBe("cream-strip");
+  });
 
-  it("declining the wall keeps the delivered link", () => {
-    let s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_STARTED" },
-      {
-        type: "DELIVERY_SUCCEEDED",
-        token: "t",
-        url: "https://x/p/t",
-        expiresAt: "2026-12-27T00:00:00Z",
-      },
-      { type: "TO_CONSENT" },
-      { type: "SET_CONSENT", consent: "no" },
-    );
-    expect(s.phase).toBe("complete");
+  it("does not start the camera or change the frame from other screens", () => {
+    const welcome = init();
+    expect(run(welcome, { type: "CONFIRM_PICK" })).toBe(welcome);
+    const review = toReview();
+    expect(run(review, { type: "SELECT_FRAME", frameId: "x" })).toBe(review);
+  });
+
+  it("asks the wall question unless submissions are paused", () => {
+    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(frame, { type: "CONFIRM_FRAME", askConsent: true }).phase).toBe("consent");
+    expect(run(frame, { type: "CONFIRM_FRAME", askConsent: false }).phase).toBe("delivery");
+  });
+});
+
+describe("delivery and consent are independent", () => {
+  const toConsent = () =>
+    run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME", askConsent: true });
+  const ready = {
+    type: "DELIVERY_SUCCEEDED",
+    token: "t",
+    url: "https://x/p/t",
+    expiresAt: "2026-12-27T00:00:00Z",
+  } as const;
+
+  it("the upload runs while the guest answers; declining keeps the link", () => {
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, ready);
+    expect([s.phase, s.delivery.status]).toEqual(["consent", "ready"]);
+    s = run(s, { type: "SET_CONSENT", consent: "no" });
+    expect(s.phase).toBe("delivery");
     expect(s.consent).toBe("no");
     expect(s.delivery).toMatchObject({ status: "ready", token: "t" });
     s = run(s, { type: "SET_CONSENT", consent: "yes" });
-    expect(s.consent).toBe("no"); // answer is final once complete
+    expect(s.consent).toBe("no"); // answered once; the QR screen cannot change it
+  });
+
+  it("the QR may arrive after the answer", () => {
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, { type: "SET_CONSENT", consent: "yes" });
+    expect([s.phase, s.delivery.status]).toEqual(["delivery", "uploading"]);
+    s = run(s, ready);
+    expect(s.delivery.status).toBe("ready");
   });
 
   it("hub + cloud: QR pending → link arrives → ready; pending never replaces a ready QR", () => {
-    let s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_STARTED" },
-      { type: "DELIVERY_QR_PENDING" },
-    );
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, { type: "DELIVERY_QR_PENDING" });
     expect(s.delivery).toEqual({ status: "qr-pending" });
-    s = run(s, {
-      type: "DELIVERY_SUCCEEDED",
-      token: "t",
-      url: "https://x/p/t",
-      expiresAt: "2026-12-27T00:00:00Z",
-    });
+    s = run(s, ready);
     expect(s.delivery).toMatchObject({ status: "ready", url: "https://x/p/t" });
     s = run(s, { type: "DELIVERY_QR_PENDING" });
     expect(s.delivery.status).toBe("ready");
   });
 
-  it("QR pending: the guest can still answer the wall question", () => {
+  it("offline: the photo waits on the device and the guest still answers", () => {
     const s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_QR_PENDING" },
-      { type: "TO_CONSENT" },
+      toConsent(),
+      { type: "DELIVERY_QUEUED", reason: "network" },
       { type: "SET_CONSENT", consent: "yes" },
     );
-    expect([s.phase, s.consent]).toEqual(["complete", "yes"]);
+    expect([s.phase, s.consent, s.delivery.status]).toEqual(["delivery", "yes", "queued"]);
   });
 
-  it("a failed delivery can still finish the session", () => {
-    const s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_FAILED", message: "offline" },
-      { type: "FINISH" },
-    );
-    expect(s.phase).toBe("complete");
-    expect(s.consent).toBeNull();
+  it("ignores delivery events before the frame is final", () => {
+    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(frame, ready)).toBe(frame);
+    expect(run(frame, { type: "DELIVERY_STARTED" })).toBe(frame);
   });
+});
 
-  it("frame choice can change from the final preview", () => {
-    const s = run(
-      toFinal(),
-      { type: "BACK_TO_FRAME" },
-      { type: "SELECT_FRAME", frameId: "village-window" },
-    );
-    expect([s.phase, s.frameId]).toEqual(["frame", "village-window"]);
+describe("progress", () => {
+  it("counts six steps, or five while the wall question is skipped", () => {
+    expect(progressStep("welcome", true)).toBeNull();
+    expect(progressStep("pick", true)).toEqual({ step: 1, total: 6 });
+    expect(progressStep("countdown", true)).toEqual({ step: 2, total: 6 });
+    expect(progressStep("review", true)).toEqual({ step: 3, total: 6 });
+    expect(progressStep("frame", true)).toEqual({ step: 4, total: 6 });
+    expect(progressStep("consent", true)).toEqual({ step: 5, total: 6 });
+    expect(progressStep("delivery", true)).toEqual({ step: 6, total: 6 });
+    expect(progressStep("delivery", false)).toEqual({ step: 5, total: 5 });
   });
 });
 
@@ -210,11 +230,9 @@ describe("reset", () => {
     const done = run(
       toReview(),
       { type: "CONFIRM_SHOTS" },
-      { type: "SELECT_FRAME", frameId: "village-window" },
-      { type: "CONFIRM_FRAME" },
-      { type: "REQUEST_DELIVERY" },
+      { type: "SELECT_FRAME", frameId: "wood-window" },
+      { type: "CONFIRM_FRAME", askConsent: true },
       { type: "DELIVERY_SUCCEEDED", token: "t", url: "u", expiresAt: "e" },
-      { type: "TO_CONSENT" },
       { type: "SET_CONSENT", consent: "yes" },
     );
     const s = run(done, { type: "RESET" });
@@ -224,6 +242,7 @@ describe("reset", () => {
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
     expect(s.retakeIndex).toBeNull();
+    expect(s.frameId).toBe("wood-window"); // last choice becomes the next default
   });
 
   it("each START begins a new session id", () => {
