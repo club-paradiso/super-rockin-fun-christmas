@@ -7,6 +7,7 @@ import type {
   FrameDecoration,
   FrameDefinition,
   FrameSlot,
+  Rotation,
 } from "./types";
 
 export interface ComposeOptions {
@@ -45,11 +46,42 @@ export function composeFrame(
   ctx.imageSmoothingQuality = "high";
 
   drawBackground(ctx, frame.background, frame.outputWidth, frame.outputHeight);
-  frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!));
-  for (const deco of frame.decorations) drawDecoration(ctx, deco, context);
+  const placed = photoLayers(frame);
+  if (!placed) frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!));
+  for (const deco of frame.decorations) {
+    if (deco.type === "photo") drawPhoto(ctx, frame.slots[deco.slot]!, images[deco.slot]!);
+    else drawDecoration(ctx, deco, context);
+  }
 
   ctx.restore();
   return canvas;
+}
+
+/**
+ * True when the frame stacks its own photos. Then every slot must appear exactly once, so a
+ * typo in a frame file can never drop or double a guest's photo.
+ */
+export function photoLayers(frame: FrameDefinition): boolean {
+  const layers = frame.decorations.flatMap((d) => (d.type === "photo" ? [d.slot] : []));
+  if (layers.length === 0) return false;
+  const sorted = [...layers].sort((a, b) => a - b);
+  if (sorted.length !== frame.slots.length || sorted.some((slot, i) => slot !== i)) {
+    throw new CompositionError(`Frame "${frame.id}" must place each of its slots exactly once`);
+  }
+  return true;
+}
+
+/** Applies a rotation to the context (inside a save/restore pair). */
+function rotate(
+  ctx: CanvasRenderingContext2D,
+  rotation: Rotation | undefined,
+  box: { x: number; y: number; width: number; height: number },
+) {
+  if (!rotation?.deg) return;
+  const pivot = rotation.pivot ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  ctx.translate(pivot.x, pivot.y);
+  ctx.rotate((rotation.deg * Math.PI) / 180);
+  ctx.translate(-pivot.x, -pivot.y);
 }
 
 function drawBackground(
@@ -89,6 +121,7 @@ function roundedRectPath(
 function drawPhoto(ctx: CanvasRenderingContext2D, slot: FrameSlot, image: ComposeImage) {
   const crop = coverCrop(image.width, image.height, slot.width / slot.height);
   ctx.save();
+  rotate(ctx, slot.rotation, slot);
   roundedRectPath(ctx, slot.x, slot.y, slot.width, slot.height, slot.radius ?? 0);
   ctx.clip();
   ctx.drawImage(
@@ -106,6 +139,7 @@ function drawPhoto(ctx: CanvasRenderingContext2D, slot: FrameSlot, image: Compos
 
   if (slot.border && slot.border.width > 0) {
     ctx.save();
+    rotate(ctx, slot.rotation, slot);
     ctx.strokeStyle = slot.border.color;
     ctx.lineWidth = slot.border.width;
     roundedRectPath(ctx, slot.x, slot.y, slot.width, slot.height, slot.radius ?? 0);
@@ -116,16 +150,36 @@ function drawPhoto(ctx: CanvasRenderingContext2D, slot: FrameSlot, image: Compos
 
 function drawDecoration(
   ctx: CanvasRenderingContext2D,
-  deco: FrameDecoration,
+  deco: Exclude<FrameDecoration, { type: "photo" }>,
   context: ComposeContext,
 ) {
   ctx.save();
   switch (deco.type) {
-    case "rect":
-      ctx.fillStyle = deco.color;
+    case "rect": {
+      rotate(ctx, deco.rotation, deco);
+      if (deco.stops) {
+        const gradient = ctx.createLinearGradient(0, deco.y, 0, deco.y + deco.height);
+        for (const stop of deco.stops) gradient.addColorStop(stop.offset, stop.color);
+        ctx.fillStyle = gradient;
+      } else {
+        ctx.fillStyle = deco.color;
+      }
+      if (deco.shadow) {
+        ctx.shadowColor = deco.shadow.color;
+        ctx.shadowBlur = deco.shadow.blur;
+        ctx.shadowOffsetY = deco.shadow.offsetY;
+      }
       roundedRectPath(ctx, deco.x, deco.y, deco.width, deco.height, deco.radius ?? 0);
       ctx.fill();
       break;
+    }
+    case "image": {
+      const asset = context.assets?.get(deco.src);
+      if (!asset) break;
+      ctx.globalAlpha = deco.opacity ?? 1;
+      ctx.drawImage(asset.source, deco.x, deco.y, deco.width, deco.height);
+      break;
+    }
     case "text": {
       ctx.fillStyle = deco.color;
       ctx.font = `${deco.weight ?? 500} ${deco.size}px ${FONT_STACK}`;
