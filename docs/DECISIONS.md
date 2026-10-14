@@ -514,16 +514,24 @@ as the design source.
   designed at 600 × 1800 and saved at 2× so photos stay sharp on a phone. Retired frame ids are
   still accepted on upload (`isKnownFrameId`), so a photo waiting in a kiosk queue or coming from a
   not-yet-updated hub is never refused.
-- **Figma artwork as SVG, not new fonts.** The Latin wordmarks and script titles (Fraunces,
-  Caveat) are exported from Figma as outlined SVGs under `public/frames/` and drawn by the
+- **Figma artwork as SVG, not new fonts.** Every frame carries the same wordmark (Brand/Lockup):
+  gold on the navy frames, navy with an amber star on the cream ones. It and the Latin lines
+  (Fraunces, Caveat) are exported from Figma as outlined SVGs under `public/frames/` and drawn by the
   compositor as `image` decorations, preloaded like the brand font (`lib/compositor/assets.ts`).
   The only live text left is Korean in Noto Sans KR (D63). The frame format gained photo layers
   (so a clothesline can cross the photo above it), rotation (the polaroids' tilt) and shadows.
-- **Two deliberate differences from Figma.** The 빨랫줄 title is a deeper wood (`#8b5e36`, 5.0:1)
-  than Figma's `#a9774a` (3.4:1), to keep D63's 4.5:1 logo rule; Figma should take the same colour.
-  The wall question says "사진은 정해진 기간이 지나면 지워져요." instead of "행사가 끝나면 지워져요":
-  retention does not do that yet, and the period waits for the church's privacy decision.
+- **One deliberate difference from Figma.** The wall question says "사진은 정해진 기간이 지나면
+  지워져요." instead of "행사가 끝나면 지워져요": retention does not do that yet, and the period
+  waits for the church's privacy decision.
 - **Hiding from the wall asks first and can be undone for 5 seconds** (Figma A2/A3). `NONE` reads
   "미디어월 안 띄움", and the audit log shows Korean state names.
-- **Not done here:** the wall background and five fixed photo positions (Figma "03 Media Wall"
-  was not in the file when this was built), and the admin "지금 미디어월" side panel of A2/A3.
+- **The wall is the Figma picture.** `03 Media Wall` → `Wall/Background — v3` (the window on Jeju at
+  11 p.m., with the line and the wordmark in it) is one bundled 3840 × 1080 JPEG, and five strips
+  hang at the clip points of `Composite preview v3` (`config/wall.ts` `scene`). This replaces D61's
+  drawn scene whose photo count followed the screen shape: the scene now keeps its size and is
+  fitted to any screen without stretching (black bands on other shapes). Timings are unchanged
+  (enter/exit 1.5 s, visible 14 s, cooldown 60 s). Low-spec mode keeps four slots (no middle one).
+- **iPad portrait.** `01b Platform — iPad 세로 키오스크` is the same flow stacked vertically; the booth
+  switches layout with the screen's orientation (`portrait:`), and text and buttons scale with the
+  narrower side.
+- **Not done here:** the admin "지금 미디어월" side panel of A2/A3.

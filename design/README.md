@@ -16,22 +16,24 @@ Figma와 코드는 **자동으로 동기화되지 않는다.** Figma에서 바�
 | --------------------------- | --------------------------------------------------------------------------------------- |
 | 00 Foundations              | 색 변수, 글자 스타일, 로고 락업, 반짝이·집게·버튼 컴포넌트                              |
 | 01 Platform — Booth & Admin | 부스 화면 01~07(시작 → 틀 → 촬영 → 확인 → 틀 다시 → 미디어월 → 사진 받기), 관리자 A0~A8 |
-| 02 네컷 Templates           | 네컷 틀 A~D(남색·창틀·빨랫줄·크림, 600×1800). E~J는 후보안이라 코드에 없다              |
+| 01b Platform — iPad 세로    | 같은 부스 화면의 세로(820×1180) 배치. 코드는 화면 방향에 따라 `portrait:` 로 바꾼다     |
+| 02 네컷 Templates           | 네컷 틀 A~D(남색·창틀·빨랫줄·크림, 600×1800). E~J는 "보관 · 사용 안 함"이라 코드에 없다 |
+| 03 Media Wall               | 미디어월 배경 v3(3840×1080)과 사진 5장을 건 합성 미리보기                               |
 
 ## 무엇을 바꾸면 어디를 고치나
 
-| Figma에서 바꾼 것                    | 코드에서 고칠 곳                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| 색 변수 `ink`~`pine`                 | `app/globals.css` 의 `@theme` (`--color-*`). 변수 설명에 같은 hex가 적혀 있다                             |
-| 색 변수 `frame/*`                    | 해당 프레임 파일 `config/frames/*.ts`                                                                     |
-| 색 변수 `wall/*`                     | `components/wall/wall-scene.tsx` (방 벽·창틀·빨랫줄·전구)                                                 |
-| 글꼴                                 | 앱은 `@fontsource-variable/noto-sans-kr` 를 함께 배포한다(`app/layout.tsx`, `lib/canvas.ts` `BRAND_FONT`) |
-| 네컷 틀 (`Template/A`~`D`)           | `config/frames/<id>.ts` 와 `public/frames/*.svg`. 아래 "프레임 옮기는 법"                                 |
-| 미디어월 사진 크기·개수·줄 처짐      | `config/wall.ts` 의 `scene` (`photoHeight`, `gap`, `sag` 등). 배치 계산은 `lib/wall/layout.ts`            |
-| 미디어월 문구 (닫힘·잠시 멈춤·빈 줄) | `components/wall/wall-app.tsx`                                                                            |
-| 부스 문구·버튼                       | `components/kiosk/kiosk-app.tsx`, 버튼·배경·글자 크기는 `app/globals.css` 의 `.booth-*`                   |
-| 관리자 문구·상태 색                  | `components/admin/*`, 상태 이름과 색은 `components/admin/labels.ts`                                       |
-| 사인물                               | 코드 없음. Figma에서 PDF(벡터)로 내보내 인쇄한다                                                          |
+| Figma에서 바꾼 것                      | 코드에서 고칠 곳                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 색 변수 `ink`~`pine`                   | `app/globals.css` 의 `@theme` (`--color-*`). 변수 설명에 같은 hex가 적혀 있다                             |
+| 색 변수 `frame/*`                      | 해당 프레임 파일 `config/frames/*.ts`                                                                     |
+| 미디어월 배경 (`Wall/Background — v3`) | 3840×1080으로 내보내 `public/wall/background-v3.jpg` 를 바꾼다. 빨랫줄·워드마크가 그림 안에 있다          |
+| 글꼴                                   | 앱은 `@fontsource-variable/noto-sans-kr` 를 함께 배포한다(`app/layout.tsx`, `lib/canvas.ts` `BRAND_FONT`) |
+| 네컷 틀 (`Template/A`~`D`)             | `config/frames/<id>.ts` 와 `public/frames/*.svg`. 아래 "프레임 옮기는 법"                                 |
+| 미디어월 사진 자리·기울기·줄 높이      | `config/wall.ts` 의 `scene` (`slots`, `strip`, `line`). Figma `Composite preview v3` 의 값을 옮긴다       |
+| 미디어월 문구 (닫힘·잠시 멈춤·빈 줄)   | `components/wall/wall-app.tsx`                                                                            |
+| 부스 문구·버튼                         | `components/kiosk/kiosk-app.tsx`, 버튼·배경·글자 크기는 `app/globals.css` 의 `.booth-*`                   |
+| 관리자 문구·상태 색                    | `components/admin/*`, 상태 이름과 색은 `components/admin/labels.ts`                                       |
+| 사인물                                 | 코드 없음. Figma에서 PDF(벡터)로 내보내 인쇄한다                                                          |
 
 ### 프레임 옮기는 법
 

@@ -62,8 +62,7 @@ preselected, "이 틀로 할게요"), media-wall question beside the finished st
 ### Public consent
 
 - Asked before the QR: "이 사진을 미디어월에 띄워도 될까요?" → "네, 띄워주세요" /
-  "아니요, 저만 볼게요", same size and style. The screen says "아니요를 눌러도 사진은 받아볼 수
-  있어요." The QR screen adds "잠시 뒤 큰 화면에서 내 사진을 찾아보세요." only after a yes.
+  "아니요, 저만 볼게요", same size and style. The screen says "아니요를 눌러도 사진은 받을 수 있어요." The QR screen adds "잠시 뒤 큰 화면에서 내 사진을 찾아보세요." only after a yes.
 
 ### Moderation (`/admin`) — Phase 3
 
@@ -77,7 +76,8 @@ undo ("<세션> 사진을 숨겼어요." [되돌리기]). Labels are Korean, in 
 
 Screen states: `BOOT`, `EMPTY`, `ACTIVE`, `OFFLINE`, `MAINTENANCE`. Photo lifecycle:
 `ENTER → VISIBLE → EXIT → COOLDOWN`. Photos appear inside a Christmas Village night scene —
-explicitly not a slideshow.
+explicitly not a slideshow: the Figma `03 Media Wall` picture (3840 × 1080, a window on Jeju at
+night) with five strips clipped to its clothesline, fitted to the screen without stretching.
 
 ## 5. Out of scope
 
