@@ -21,7 +21,11 @@ Next.js server is the only thing that talks to Supabase.
    - Email provider on, OTP length 6, expiry 600 s;
    - "Magic Link" email template: subject `FOLLOW THE LIGHTS 스태프 로그인 코드`, body from
      `supabase/templates/staff-login.html` (it must contain `{{ .Token }}`);
-   - configure **custom SMTP**. Supabase's built-in mailer is rate-limited and meant for testing.
+   - configure **custom SMTP** first. Supabase's built-in mailer is rate-limited, only mails
+     members of the Supabase organization, and the dashboard will not let you edit the email
+     templates until custom SMTP is on. Without the template above the email carries a link instead
+     of the 6-digit code, and staff cannot log in. A Gmail account with an app password works
+     (`smtp.gmail.com`, port 465).
      (`npx supabase config push` can apply the `[auth]` section from `config.toml`.)
 6. First staff member: `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run staff:add -- lead@example.org "책임자"`.
 
@@ -144,3 +148,23 @@ Before the event, a person must do this on the actual wall screen at the venue:
 - check readability and brightness from where guests stand, and leave it running for an hour.
 
 Until then: `REAL_WALL_DISPLAY_TEST: NOT VERIFIED`.
+
+## Preview deployment (2026-10-14)
+
+A preview for real-device testing, without a hub. Checklist: `docs/PREVIEW_DEVICE_TEST.md`.
+
+- Origin: `https://follow-the-lights.vercel.app` (Vercel team `club-paradiso`, project
+  `follow-the-lights`, functions in `icn1` Seoul). Standard Deployment Protection leaves this
+  production domain public, so phones open it without a Vercel login.
+- Code: `main` at `5390ff0`, uploaded with the Vercel CLI (`vercel link`, then
+  `vercel deploy --prod` from a clean checkout of `main`). The project is not connected to GitHub,
+  so merging to `main` does not change the preview. To update it, deploy again the same way.
+- Supabase: project `follow-the-lights-preview` (ref `wzjjblrtrrwwczzmsmvm`, Seoul, free plan; a
+  free project pauses after a week without use). The three migrations were applied through the
+  Supabase MCP connector, so the dashboard's migration history shows the same names with
+  different version numbers. They are re-runnable, so a later `supabase db push` is harmless.
+- Env vars (Production): `PUBLIC_BASE_URL`, `PHOTO_STORE`, `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `KIOSK_SESSION_SECRET`, `CRON_SECRET`,
+  `NEXT_PUBLIC_CAMERA_MODE`, `PHOTO_LINK_TTL_HOURS=72`, `PHOTO_RETENTION_DAYS=30`. Not set on
+  purpose: `KIOSK_ENROLL_SECRET` (kiosks use one-time codes), `HUB_SYNC_SECRET` (no hub yet),
+  `KIOSK_AUTH_DISABLED`.
