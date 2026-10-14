@@ -123,7 +123,7 @@ describe("composeFrame", () => {
     expect(render()).toHaveLength(4);
     const draws = render(new Map([["/frames/navy-lockup.svg", lockup]]));
     const logo = draws.find((d) => (d.args[0] as { id?: string }).id === "lockup");
-    expect(logo?.args.slice(1)).toEqual([45, 1570, 511, 84]);
+    expect(logo?.args.slice(1)).toEqual([91, 1580, 418, 69]);
   });
 
   it("refuses a frame that places a slot twice", () => {

@@ -19,11 +19,11 @@ export const creamStrip: FrameDefinition = {
     { type: "image", src: "/frames/cream-sparkle.svg", x: 272, y: 1518, width: 56, height: 56 },
     {
       type: "image",
-      src: "/frames/cream-title.svg",
-      x: 103.135,
-      y: 1600.12,
-      width: 393,
-      height: 53,
+      src: "/frames/cream-lockup.svg",
+      x: 91,
+      y: 1588,
+      width: 418,
+      height: 69,
       brand: { color: "#0b1026", on: "#fff7e6" },
     },
     {

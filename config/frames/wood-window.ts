@@ -78,5 +78,13 @@ export const woodWindow: FrameDefinition = {
       height: 69,
       brand: { color: "#f2c14e", on: "#33417f" },
     },
+    {
+      type: "image",
+      src: "/frames/wood-christmas-2026.svg",
+      x: 218.731,
+      y: 1715.87,
+      width: 165,
+      height: 17,
+    },
   ],
 };

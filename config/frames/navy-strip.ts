@@ -1,22 +1,29 @@
 import type { FrameDefinition } from "@/lib/compositor/types";
 import { sparkles, stripSlots, STRIP } from "./shared";
 
-// Template A · Navy Strip — 짙은 남색 밤하늘 + 금색 반짝이. 기본 추천안.
+// Template A · Navy Strip — 짙은 남색 밤하늘 + 금색 반짝이. 기본 추천안. A cream 18 px margin
+// around a navy panel.
 export const navyStrip: FrameDefinition = {
   id: "navy-strip",
   name: "Navy Strip",
   label: "남색",
   outputWidth: STRIP.width,
   outputHeight: STRIP.height,
-  background: {
-    type: "vertical",
-    stops: [
-      { offset: 0, color: "#121a3d" },
-      { offset: 1, color: "#070a1c" },
-    ],
-  },
+  background: { type: "solid", color: "#f7f1e3" },
   slots: stripSlots(200 / 3),
   decorations: [
+    {
+      type: "rect",
+      x: 18,
+      y: 18,
+      width: 564,
+      height: 1764,
+      color: "#121a3d",
+      stops: [
+        { offset: 0, color: "#121a3d" },
+        { offset: 1, color: "#070a1c" },
+      ],
+    },
     ...sparkles(
       "/frames/navy-sparkle.svg",
       [
@@ -57,10 +64,10 @@ export const navyStrip: FrameDefinition = {
     {
       type: "image",
       src: "/frames/navy-lockup.svg",
-      x: 45,
-      y: 1570,
-      width: 511,
-      height: 84,
+      x: 91,
+      y: 1580,
+      width: 418,
+      height: 69,
       brand: { color: "#f2c14e", on: "#070a1c" },
     },
     {
