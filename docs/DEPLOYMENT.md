@@ -156,9 +156,11 @@ A preview for real-device testing, without a hub. Checklist: `docs/PREVIEW_DEVIC
 - Origin: `https://follow-the-lights.vercel.app` (Vercel team `club-paradiso`, project
   `follow-the-lights`, functions in `icn1` Seoul). Standard Deployment Protection leaves this
   production domain public, so phones open it without a Vercel login.
-- Code: `main` at `5390ff0`, uploaded with the Vercel CLI (`vercel link`, then
-  `vercel deploy --prod` from a clean checkout of `main`). The project is not connected to GitHub,
-  so merging to `main` does not change the preview. To update it, deploy again the same way.
+- Code: the project is connected to this GitHub repository with production branch `main`, so every
+  merge to `main` redeploys the preview. The first build (`main` at `5390ff0`) was uploaded with
+  the Vercel CLI before the repository was connected. Other branches get Vercel preview
+  deployments, which have no env vars and sit behind Vercel login: use them only to check that
+  the build passes.
 - Supabase: project `follow-the-lights-preview` (ref `wzjjblrtrrwwczzmsmvm`, Seoul, free plan; a
   free project pauses after a week without use). The three migrations were applied through the
   Supabase MCP connector, so the dashboard's migration history shows the same names with
