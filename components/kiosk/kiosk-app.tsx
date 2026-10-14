@@ -580,16 +580,20 @@ function Screen(p: ScreenProps) {
       return (
         <section
           data-testid="screen-welcome"
-          className="booth-sky flex min-h-dvh w-full cursor-pointer items-center px-[max(24px,6.25vw)]"
+          className="booth-sky flex min-h-dvh w-full cursor-pointer items-center px-[max(24px,6.25vw)] portrait:items-end portrait:pb-[6vh]"
           onClick={p.onStart}
         >
-          <div className="flex flex-col items-start gap-[max(16px,3vh)]">
+          <div className="flex flex-col items-start gap-[max(16px,3vh)] portrait:w-full">
             <BrandLockup className="h-[clamp(96px,16vh,170px)] w-auto" />
             <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
             <p className="booth-lead">
               네 장을 찍으면 휴대폰으로 바로 받을 수 있어요. 원하시면 저 큰 화면에도 걸어드려요.
             </p>
-            <button type="button" className="booth-btn-primary mt-[2vh]" onClick={p.onStart}>
+            <button
+              type="button"
+              className="booth-btn-primary mt-[2vh] portrait:mt-[8vh] portrait:w-full"
+              onClick={p.onStart}
+            >
               화면을 눌러 시작
             </button>
           </div>
@@ -607,7 +611,7 @@ function Screen(p: ScreenProps) {
           {!pick && (
             <p className="booth-lead mt-3 text-center">다른 틀이 더 잘 어울리면 바꿔도 돼요.</p>
           )}
-          <div className="mt-[3vh] flex flex-wrap items-end justify-center gap-[max(16px,2.8vh)]">
+          <div className="mt-[3vh] flex flex-wrap items-end justify-center gap-[max(16px,2.8vh)] portrait:flex-nowrap portrait:gap-4">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -617,12 +621,12 @@ function Screen(p: ScreenProps) {
                   data-testid={`frame-option-${frame.id}`}
                   aria-pressed={selected}
                   onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
-                  className={`flex flex-col items-center gap-4 rounded-[20px] p-[14px] transition ${
+                  className={`flex flex-col items-center gap-4 rounded-[20px] p-[14px] transition portrait:p-[10px] ${
                     selected ? "border-[5px] border-warm bg-navy" : "border-2 border-white"
                   }`}
                 >
                   <div
-                    className={`flex items-center ${pick ? "h-[max(300px,52vh)]" : "h-[max(280px,47vh)]"}`}
+                    className={`flex items-center ${pick ? "h-[max(300px,52vh)]" : "h-[max(280px,47vh)]"} portrait:h-[min(37vh,53vw)]`}
                   >
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
@@ -642,10 +646,10 @@ function Screen(p: ScreenProps) {
               );
             })}
           </div>
-          <div className="mt-[3vh] flex w-full justify-end">
+          <div className="mt-[3vh] flex w-full justify-end portrait:mt-auto">
             <button
               type="button"
-              className="booth-btn-primary"
+              className="booth-btn-primary portrait:w-full"
               onClick={() =>
                 dispatch(
                   pick
@@ -699,9 +703,9 @@ function Screen(p: ScreenProps) {
         <BoothScreen
           testId={shooting ? "screen-shooting" : "screen-ready"}
           progress={progress}
-          className="flex-row items-center gap-[max(24px,2.1vw)]"
+          className="flex-row items-center gap-[max(24px,2.1vw)] portrait:flex-col portrait:justify-center"
         >
-          <div className="flex-[1.6]">
+          <div className="flex-[1.6] portrait:w-full portrait:flex-none">
             <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
               <div className="absolute inset-0 flex items-center justify-center">
                 {state.phase === "countdown" ? (
@@ -716,12 +720,12 @@ function Screen(p: ScreenProps) {
               </div>
             </CameraPreview>
           </div>
-          <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)]">
+          <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- static SVG from Figma */}
             <img
               src="/kiosk/lights-camera-action.svg"
               alt="LIGHTS, CAMERA, ACTION!"
-              className="h-[max(56px,8.4vh)] w-auto"
+              className="h-[max(56px,8.4vh)] w-auto portrait:h-[max(44px,5vh)]"
             />
             <p className="booth-title" data-testid="shot-label">
               {state.retakeIndex !== null
@@ -774,7 +778,7 @@ function Screen(p: ScreenProps) {
       return (
         <BoothScreen testId="screen-review" progress={progress}>
           <h1 className="booth-title">잘 나왔나요?</h1>
-          <div className="mt-[3vh] grid w-full grid-cols-4 gap-[max(12px,1.1vw)]">
+          <div className="mt-[3vh] grid w-full grid-cols-4 gap-[max(12px,1.1vw)] portrait:grid-cols-2">
             {state.shots.map((shot, i) => (
               <div key={i} className="flex flex-col gap-[1.6vh]">
                 <div
@@ -804,7 +808,7 @@ function Screen(p: ScreenProps) {
           </div>
           <button
             type="button"
-            className="booth-btn-primary mt-[4vh]"
+            className="booth-btn-primary mt-[4vh] portrait:mt-auto portrait:w-full"
             onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
           >
             이대로 좋아요
@@ -817,10 +821,10 @@ function Screen(p: ScreenProps) {
         <BoothScreen
           testId="screen-consent"
           progress={progress}
-          className="flex-row items-center justify-center gap-[max(32px,4vw)]"
+          className="flex-row items-center justify-center gap-[max(32px,4vw)] portrait:flex-col portrait:gap-[3vh]"
         >
           <FinalPreview finalImage={p.finalImage} frameId={state.frameId} />
-          <div className="flex max-w-[44rem] flex-col items-start gap-[max(14px,2.2vh)]">
+          <div className="flex max-w-[44rem] flex-col items-start gap-[max(14px,2.2vh)] portrait:w-full portrait:max-w-none portrait:items-center portrait:text-center">
             <h1 className="booth-title">
               이 사진을 미디어월에
               <br />
@@ -829,10 +833,10 @@ function Screen(p: ScreenProps) {
             <p className="booth-lead">
               미디어월에 다른 분들 사진과 함께 돌아가며 보여요.
               <br />
-              아니요를 눌러도 사진은 받아볼 수 있어요.
+              아니요를 눌러도 사진은 받을 수 있어요.
             </p>
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}
-            <div className="flex w-full max-w-[30rem] flex-col gap-[max(14px,2.6vh)]">
+            <div className="flex w-full max-w-[30rem] flex-col gap-[max(14px,2.6vh)] portrait:max-w-none">
               <button
                 type="button"
                 className="booth-btn-secondary w-full"
@@ -868,14 +872,15 @@ function Screen(p: ScreenProps) {
           <BoothScreen
             testId="screen-delivery"
             progress={progress}
-            className="flex-row items-center justify-center gap-[max(40px,6.25vw)]"
+            className="flex-row items-center justify-center gap-[max(40px,6.25vw)] portrait:flex-col portrait:gap-[2.4vh] portrait:text-center"
           >
+            {/* Portrait (iPad): title, lead, QR, button — the column dissolves into the screen's. */}
             <div
-              className="flex flex-col items-start gap-[max(16px,2.6vh)]"
+              className="flex flex-col items-start gap-[max(16px,2.6vh)] portrait:contents"
               data-testid="delivery-ready"
             >
-              <h1 className="booth-title">휴대폰으로 사진을 받아 가세요</h1>
-              <p className="booth-lead">
+              <h1 className="booth-title portrait:order-1">휴대폰으로 사진을 받아 가세요</h1>
+              <p className="booth-lead portrait:order-2">
                 휴대폰 카메라로 QR을 비춰 주세요.
                 {state.consent === "yes" && (
                   <>
@@ -884,12 +889,16 @@ function Screen(p: ScreenProps) {
                   </>
                 )}
               </p>
-              <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
+              <button
+                type="button"
+                className="booth-btn-secondary portrait:order-4 portrait:w-full"
+                onClick={p.onReset}
+              >
                 다 받았어요
               </button>
-              <p className="booth-caption">잠시 뒤 처음 화면으로 돌아가요</p>
+              <p className="booth-caption portrait:order-5">잠시 뒤 처음 화면으로 돌아가요</p>
             </div>
-            <div className="flex flex-col items-center gap-5 rounded-[28px] bg-glow p-[max(24px,3.7vh)]">
+            <div className="flex flex-col items-center gap-5 rounded-[28px] bg-glow p-[max(24px,3.7vh)] portrait:order-3">
               <div
                 data-testid="qr-code"
                 data-url={d.url}
@@ -990,7 +999,7 @@ function Screen(p: ScreenProps) {
 /** The finished strip, shown beside the wall question. */
 function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; frameId: string }) {
   return (
-    <div className="flex h-[min(66vh,720px)] items-center">
+    <div className="flex h-[min(66vh,720px)] items-center portrait:h-[36vh]">
       {finalImage?.frameId === frameId ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL
         <img
