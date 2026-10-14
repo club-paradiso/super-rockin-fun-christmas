@@ -369,6 +369,22 @@ export function KioskApp({
     };
   }, [qrPending, state.sessionId, showQr]);
 
+  // The guest may answer the wall question while the strip is still being composed, before the
+  // photo is in the upload queue. The consent queue sends an answer as soon as its session has no
+  // queued upload, so storing it that early would send it for a session the server does not know
+  // yet, and the 404 would drop it. The answer is therefore stored once the photo is queued.
+  const photoQueuedRef = useRef(new Map<string, { done: Promise<void>; resolve: () => void }>());
+  const photoQueued = useCallback((sessionId: string) => {
+    let entry = photoQueuedRef.current.get(sessionId);
+    if (!entry) {
+      let resolve = () => {};
+      const done = new Promise<void>((r) => (resolve = r));
+      entry = { done, resolve };
+      photoQueuedRef.current.set(sessionId, entry);
+    }
+    return entry;
+  }, []);
+
   const deliver = useCallback(async () => {
     if (!finalImage || !queueRef.current) return;
     const sessionId = state.sessionId;
@@ -381,6 +397,7 @@ export function KioskApp({
         mime: finalImage.blob.type === "image/png" ? "image/png" : "image/jpeg",
         data: await finalImage.blob.arrayBuffer(),
       });
+      photoQueued(sessionId).resolve();
       const outcome = await queue.deliverNow(sessionId);
       if (outcome.ok) return; // the "uploaded" event shows the QR
       if (outcome.kind === "network" || outcome.kind === "server") {
@@ -396,7 +413,7 @@ export function KioskApp({
         message: err instanceof Error ? err.message : String(err),
       });
     }
-  }, [finalImage, state.sessionId]);
+  }, [finalImage, state.sessionId, photoQueued]);
 
   // The upload starts by itself once the composite exists: no button, no waiting at the QR.
   const deliveryIdle = state.delivery.status === "idle";
@@ -405,13 +422,17 @@ export function KioskApp({
   }, [finalPhase, finalImage, deliveryIdle, deliver]);
 
   const chooseConsent = (consent: "yes" | "no") => {
-    // Stored first, sent when the photo is on the server, retried until it lands. Whatever
-    // happens here never affects the guest's own download link.
+    // Stored once the photo is queued, sent when it is on the server, retried until it lands.
+    // Whatever happens here never affects the guest's own download link.
     const sessionId = state.sessionId;
-    void consentRef.current?.then(async (c) => {
-      await c.enqueue(sessionId, consent === "yes");
-      await c.processDue(true);
-    });
+    void photoQueued(sessionId)
+      .done.then(() => consentRef.current)
+      .then(async (c) => {
+        if (!c) return;
+        await c.enqueue(sessionId, consent === "yes");
+        await c.processDue(true);
+        photoQueuedRef.current.delete(sessionId);
+      });
     dispatch({ type: "SET_CONSENT", consent });
   };
 
