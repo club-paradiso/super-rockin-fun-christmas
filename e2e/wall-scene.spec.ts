@@ -184,7 +184,7 @@ for (const shape of SHAPES) {
       })
       .toBeGreaterThanOrEqual(expected);
     // The wall gets its own large copy, not the 640 px staff thumbnail.
-    const first = page.getByTestId("wall-photo").first().locator("img");
+    const first = page.getByTestId("wall-photo").first().getByTestId("wall-photo-image");
     const natural = await first.evaluate((img: HTMLImageElement) => img.naturalHeight);
     expect(natural).toBeGreaterThan(640);
     if (process.env.SCREENSHOTS === "1") {

@@ -422,6 +422,7 @@ export function WallApp({
                     <img
                       src={url}
                       alt=""
+                      data-testid="wall-photo-image"
                       className="h-full w-full object-contain object-top"
                       style={{
                         paddingTop: place.box.y - place.y,
