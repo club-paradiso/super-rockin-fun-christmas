@@ -75,7 +75,7 @@ async function main() {
       svc.put({
         sessionId,
         kioskId: null,
-        frameId: i % 5 === 0 ? "village-window" : i % 2 ? "starlight-strip" : "snow-paper-strip",
+        frameId: ["navy-strip", "wood-window", "clothesline", "cream-strip"][i % 4]!,
         mime: "image/jpeg",
         data: images[i % images.length]!,
       }),
