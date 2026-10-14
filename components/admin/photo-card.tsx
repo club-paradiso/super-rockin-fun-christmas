@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { StaffPhotoView } from "@/lib/ops/admin";
 import type { ModerationAction } from "@/lib/ops/moderation";
 import { errorText, postJson } from "./api";
@@ -20,8 +20,11 @@ const ACTION_STYLE: Record<ModerationAction, string> = {
 
 /**
  * One photo with its allowed actions. Thumbnails come from the staff-only image proxy (small
- * review copy, never the full JPEG). Delete always goes through a confirmation dialog.
+ * review copy, never the full JPEG). Delete always goes through a confirmation dialog; hiding
+ * from the wall asks first and can be undone for a few seconds (Figma A2, A3).
  */
+const UNDO_HIDE_MS = 5_000;
+
 export function PhotoCard({
   photo,
   showRecovery = false,
@@ -36,7 +39,15 @@ export function PhotoCard({
   const [busy, setBusy] = useState<ModerationAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmHide, setConfirmHide] = useState(false);
+  const [undoHide, setUndoHide] = useState(false);
   const [shownNow, setShownNow] = useState(false);
+
+  useEffect(() => {
+    if (!undoHide) return;
+    const timer = setTimeout(() => setUndoHide(false), UNDO_HIDE_MS);
+    return () => clearTimeout(timer);
+  }, [undoHide]);
 
   const actions = primaryOnly
     ? photo.actions.filter((a) => a === "approve" || a === "reject")
@@ -51,8 +62,16 @@ export function PhotoCard({
     });
     setBusy(null);
     setConfirmDelete(false);
+    setConfirmHide(false);
     if (!res.ok) setError(errorText(res.error));
+    setUndoHide(res.ok && action === "hide");
     router.refresh();
+  }
+
+  function ask(action: ModerationAction) {
+    if (action === "delete") setConfirmDelete(true);
+    else if (action === "hide") setConfirmHide(true);
+    else void run(action);
   }
 
   async function showNow() {
@@ -122,7 +141,7 @@ export function PhotoCard({
               key={a}
               type="button"
               disabled={busy !== null}
-              onClick={() => (a === "delete" ? setConfirmDelete(true) : run(a))}
+              onClick={() => ask(a)}
               className={`admin-btn ${ACTION_STYLE[a]} ${primaryOnly ? "flex-1 min-h-16 text-xl" : ""}`}
               data-testid={`action-${a}`}
             >
@@ -141,8 +160,36 @@ export function PhotoCard({
             </button>
           )}
         </div>
+        {undoHide && (
+          <div
+            role="status"
+            className="flex items-center justify-between gap-3 rounded-xl bg-ink p-3"
+            data-testid="undo-hide"
+          >
+            <span className="text-base">{photo.sessionShort} 사진을 숨겼어요.</span>
+            <button
+              type="button"
+              className="admin-btn admin-btn-quiet min-h-12"
+              disabled={busy !== null}
+              onClick={() => run("unhide")}
+            >
+              되돌리기
+            </button>
+          </div>
+        )}
         {showRecovery && photo.canShowQrAgain && <QrRecovery photoId={photo.id} />}
       </div>
+      <ConfirmDialog
+        open={confirmHide}
+        title={`${photo.sessionShort} 사진을 미디어월에서 숨길까요?`}
+        confirmLabel="숨기기"
+        danger
+        busy={busy === "hide"}
+        onConfirm={() => run("hide")}
+        onCancel={() => setConfirmHide(false)}
+      >
+        이 사진만 바로 빠지고, 다른 사진은 그대로 돌아가요.
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirmDelete}
         title="사진을 삭제할까요?"
