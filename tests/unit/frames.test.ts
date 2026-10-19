@@ -24,14 +24,18 @@ function backgroundColors(frame: FrameDefinition) {
 }
 
 describe("frame definitions", () => {
+  it("supports two through six output slots", () => {
+    expect(new Set(FRAMES.map((f) => f.slots.length))).toEqual(new Set([2, 3, 4, 5, 6]));
+  });
   it("have unique ids and fall back to the default", () => {
     expect(new Set(FRAMES.map((f) => f.id)).size).toBe(FRAMES.length);
     expect(getFrame("nope").id).toBe(DEFAULT_FRAME_ID);
   });
 
   describe.each(FRAMES.map((f) => [f.id, f] as const))("%s", (_, frame) => {
-    it("has one slot per shot", () => {
-      expect(frame.slots).toHaveLength(KIOSK_CONFIG.shotsPerSession);
+    it("requires between one and six photos, never more than captured", () => {
+      expect(frame.slots.length).toBeGreaterThanOrEqual(1);
+      expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
     });
 
     it("uses the capture aspect ratio for every slot (preview = result)", () => {
