@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, enrollKiosk } from "./helpers";
+import { SHOOT_TIMEOUT, enrollKiosk, selectDefaultFour } from "./helpers";
 
 /**
  * Phase 4 real-resolution screenshots (SCREENSHOTS=1 only): every booth screen at 1280×800 and
@@ -55,7 +55,8 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await expect(page.getByTestId("screen-frame")).toBeVisible();
   await page.waitForTimeout(800); // frame thumbnails
   await shot(page, "booth-1280x800-05-frame");
-  await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await page.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(page);
   await expect(page.getByTestId("final-image")).toBeVisible();
   await shot(page, "booth-1280x800-06-final");
   await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
@@ -102,7 +103,8 @@ for (const frame of ["starlight-strip", "snow-paper-strip", "village-window"]) {
     await shootToReview(page);
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
     await page.getByTestId(`frame-option-${frame}`).click();
-    await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+    await page.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(page);
     const img = page.getByTestId("final-image");
     await expect(img).toBeVisible();
     const b64 = await img.evaluate(async (el: HTMLImageElement) => {
