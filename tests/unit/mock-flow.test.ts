@@ -58,11 +58,13 @@ describe("mock camera flow", () => {
     expect(state.phase).toBe("final");
 
     const frame = getFrame(state.frameId);
-    const images = state.selectedShotIndices.map((i) => state.shots[i]!).map((s) => ({
-      source: s!.canvas as unknown as CanvasImageSource,
-      width: s!.width,
-      height: s!.height,
-    }));
+    const images = state.selectedShotIndices
+      .map((i) => state.shots[i]!)
+      .map((s) => ({
+        source: s!.canvas as unknown as CanvasImageSource,
+        width: s!.width,
+        height: s!.height,
+      }));
     const output = composeFrame(frame, images, {
       createCanvas: factory,
       context: { dateLabel: "2026.12.24" },

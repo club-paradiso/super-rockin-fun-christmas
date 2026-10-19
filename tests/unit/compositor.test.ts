@@ -43,7 +43,11 @@ describe("composeFrame", () => {
     "%s output has the frame's exact dimensions",
     (_, frame) => {
       const { factory } = fakeCanvasFactory();
-      const canvas = composeFrame(frame, Array.from({ length: frame.slots.length }, (_, i) => photo(i)), { createCanvas: factory, context: ctx });
+      const canvas = composeFrame(
+        frame,
+        Array.from({ length: frame.slots.length }, (_, i) => photo(i)),
+        { createCanvas: factory, context: ctx },
+      );
       expect([canvas.width, canvas.height]).toEqual([frame.outputWidth, frame.outputHeight]);
     },
   );

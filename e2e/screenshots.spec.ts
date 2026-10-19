@@ -104,7 +104,7 @@ for (const frame of ["starlight-strip", "snow-paper-strip", "village-window"]) {
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
     await page.getByTestId(`frame-option-${frame}`).click();
     await page.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
-  await selectDefaultFour(page);
+    await selectDefaultFour(page);
     const img = page.getByTestId("final-image");
     await expect(img).toBeVisible();
     const b64 = await img.evaluate(async (el: HTMLImageElement) => {

@@ -244,7 +244,12 @@ describe("reset", () => {
 
 describe("per-template ordered photo selection", () => {
   const selectState = (frameId: string) =>
-    run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "SELECT_FRAME", frameId }, { type: "CONFIRM_FRAME" });
+    run(
+      toReview(),
+      { type: "CONFIRM_SHOTS" },
+      { type: "SELECT_FRAME", frameId },
+      { type: "CONFIRM_FRAME" },
+    );
 
   it.each([
     ["two-stars", [4, 1]],
@@ -274,7 +279,12 @@ describe("per-template ordered photo selection", () => {
 
   it("changing frame resets selection; returning from final preserves it until frame changes", () => {
     let state = selectState("two-stars");
-    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 4 }, { type: "TOGGLE_SHOT_SELECTION", index: 2 }, { type: "CONFIRM_SELECTION" });
+    state = run(
+      state,
+      { type: "TOGGLE_SHOT_SELECTION", index: 4 },
+      { type: "TOGGLE_SHOT_SELECTION", index: 2 },
+      { type: "CONFIRM_SELECTION" },
+    );
     expect(state.phase).toBe("final");
     state = run(state, { type: "BACK_TO_SELECTION" });
     expect(state.selectedShotIndices).toEqual([4, 2]);

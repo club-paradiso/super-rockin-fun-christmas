@@ -16,7 +16,7 @@ app has not been deployed or tried on real devices, and it is not production-rea
 
 | Area                                                                           | State               |
 | ------------------------------------------------------------------------------ | ------------------- |
-| Kiosk: camera → countdown → 6 shots → review/retake → frame → photo selection                    | ✅ Phase 1          |
+| Kiosk: camera → countdown → 6 shots → review/retake → frame → photo selection  | ✅ Phase 1          |
 | Secure upload, private storage, QR → `/p/[token]`, offline queue, retention    | ✅ Phase 2          |
 | Staff login (Supabase Auth email code + allowlist)                             | ✅ Phase 3          |
 | Moderation queue, photo library, audited state machine                         | ✅ Phase 3          |

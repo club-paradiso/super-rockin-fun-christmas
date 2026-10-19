@@ -244,8 +244,7 @@ export function KioskApp({
   // ── Final composite ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== "final" || !images) return;
-    if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey)
-      return;
+    if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey) return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
@@ -271,7 +270,14 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [state.phase, state.frameId, selectionKey, images, finalImage?.frameId, finalImage?.selectionKey]);
+  }, [
+    state.phase,
+    state.frameId,
+    selectionKey,
+    images,
+    finalImage?.frameId,
+    finalImage?.selectionKey,
+  ]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
@@ -777,7 +783,9 @@ function Screen(p: ScreenProps) {
       return (
         <Stage testId="screen-select" className="gap-5">
           <Title>6장 중 {required}장을 골라주세요</Title>
-          <Lead>선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.</Lead>
+          <Lead>
+            선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.
+          </Lead>
           <div className="grid w-full max-w-5xl grid-cols-3 gap-3">
             {state.shots.map((shot, index) => {
               const order = selected.indexOf(index);
@@ -854,7 +862,9 @@ function Screen(p: ScreenProps) {
             <button
               type="button"
               className="btn-primary min-w-80"
-              disabled={!p.finalImage || p.finalImage.selectionKey !== state.selectedShotIndices.join("-")}
+              disabled={
+                !p.finalImage || p.finalImage.selectionKey !== state.selectedShotIndices.join("-")
+              }
               onClick={p.onRequestDelivery}
             >
               휴대폰으로 받기

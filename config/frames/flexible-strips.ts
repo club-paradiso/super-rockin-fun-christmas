@@ -5,12 +5,7 @@ import type { FrameDefinition, FrameSlot } from "@/lib/compositor/types";
  * All sessions capture 6 photos, but each frame consumes exactly its own slot count.
  * A constant 2:6 strip aspect keeps mobile delivery and the existing wall predictable.
  */
-function flexibleStrip(
-  id: string,
-  label: string,
-  count: number,
-  paper: boolean,
-): FrameDefinition {
+function flexibleStrip(id: string, label: string, count: number, paper: boolean): FrameDefinition {
   const gap = 22;
   const available = 3225;
   const height = Math.min(810, Math.floor((available - (count - 1) * gap) / count));

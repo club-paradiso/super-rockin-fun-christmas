@@ -159,7 +159,7 @@ test("cloud down: the guest can leave without a QR and still answer the wall que
     await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
     await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
-  await selectDefaultFour(kiosk);
+    await selectDefaultFour(kiosk);
     await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
     await expect(kiosk.getByTestId("delivery-qr-pending")).toBeVisible();
     const session = (await kiosk.getByTestId("session-code").textContent())!
