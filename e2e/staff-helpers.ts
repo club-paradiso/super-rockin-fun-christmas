@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, type Browser, type Page } from "@playwright/test";
 import { MAILPIT_URL } from "./env";
-import { SHOOT_TIMEOUT } from "./helpers";
+import { SHOOT_TIMEOUT, selectDefaultFour } from "./helpers";
 
 const service = () =>
   createClient(process.env.SUPABASE_TEST_URL!, process.env.SUPABASE_TEST_SERVICE_ROLE_KEY!, {
@@ -83,7 +83,8 @@ export async function kioskPhotoToQr(kiosk: Page) {
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(kiosk);
   await expect(kiosk.getByTestId("final-image")).toBeVisible();
   await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
