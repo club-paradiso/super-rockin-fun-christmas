@@ -8,7 +8,7 @@ test.use({
   launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
 });
 
-test("getUserMedia path reaches review with four captures", async ({ page }) => {
+test("getUserMedia path reaches review with six captures", async ({ page }) => {
   await enrollKiosk(page);
   await page.goto("/kiosk");
   await expect(page.getByTestId("mock-badge")).toHaveCount(0);
@@ -19,7 +19,7 @@ test("getUserMedia path reaches review with four captures", async ({ page }) => 
     .toBeGreaterThan(0);
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 30_000 });
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
   }
 });
