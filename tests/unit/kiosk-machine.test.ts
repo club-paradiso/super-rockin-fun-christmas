@@ -252,7 +252,7 @@ describe("per-template ordered photo selection", () => {
     ["starlight-strip", [5, 2, 0, 1]],
     ["five-lights", [5, 4, 3, 2, 1]],
     ["six-lights", [5, 4, 3, 2, 1, 0]],
-  ])("%s finishes only with the exact selected count", (frameId, indexes) => {
+  ] as const)("%s finishes only with the exact selected count", (frameId, indexes) => {
     let state = selectState(frameId);
     expect(state.phase).toBe("select");
     expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("select");
