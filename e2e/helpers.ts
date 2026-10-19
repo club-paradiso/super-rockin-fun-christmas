@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { ENROLL_SECRET, USE_SUPABASE } from "./env";
 
-export const SHOOT_TIMEOUT = 30_000;
+export const SHOOT_TIMEOUT = 45_000;
 
 let enrolledCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | null = null;
 
@@ -27,7 +27,7 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
   enrolledCookies = (await page.context().cookies()).filter((c) => c.name === "ftl_kiosk");
 }
 
-export async function shootFourWithMock(page: Page) {
+export async function shootSixWithMock(page: Page) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
@@ -40,7 +40,8 @@ export async function shootFourWithMock(page: Page) {
 export async function toFinal(page: Page) {
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();
-  await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await page.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(page);
   await expect(page.getByTestId("final-image")).toBeVisible();
 }
 
@@ -107,4 +108,11 @@ export async function photoIdForToken(token: string): Promise<string> {
   const { data, error } = await db.from("photos").select("id").eq("token_hash", hash).single();
   if (error) throw error;
   return (data as { id: string }).id;
+}
+
+/** The existing four-photo templates take an ordered subset of all six captures. */
+export async function selectDefaultFour(page: Page) {
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  for (const index of [0, 1, 2, 3]) await page.getByTestId(`select-shot-${index}`).click();
+  await page.getByTestId("confirm-selection").click();
 }
