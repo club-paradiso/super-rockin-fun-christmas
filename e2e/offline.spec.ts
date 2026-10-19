@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, shootFourWithMock, storedPhotos, toFinal } from "./helpers";
+import { enrollKiosk, shootSixWithMock, storedPhotos, toFinal } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -33,7 +33,7 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
   page,
   context,
 }) => {
-  await shootFourWithMock(page);
+  await shootSixWithMock(page);
   await toFinal(page);
   const before = (await storedPhotos()).length;
 
@@ -67,7 +67,7 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
 test("reload while queued: the photo survives in IndexedDB and uploads after restart", async ({
   page,
 }) => {
-  await shootFourWithMock(page);
+  await shootSixWithMock(page);
   await toFinal(page);
   const before = (await storedPhotos()).length;
 
@@ -108,7 +108,7 @@ test("offline: the guest still answers the wall question, and the answer lands w
   page,
   context,
 }) => {
-  await shootFourWithMock(page);
+  await shootSixWithMock(page);
   await toFinal(page);
 
   await context.setOffline(true);
