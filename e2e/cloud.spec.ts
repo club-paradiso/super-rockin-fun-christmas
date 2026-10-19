@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { expect, test, type Page } from "@playwright/test";
 import { CLOUD_PORT, CLOUD_PROXY_PORT, HUB_CLOUD_PORT, HUB_SETUP_CODE, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, tokenFromUrl } from "./helpers";
+import { SHOOT_TIMEOUT, selectDefaultFour, tokenFromUrl } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, kioskPhotoToQr, newPage } from "./staff-helpers";
 
 /**
@@ -129,7 +129,8 @@ test("cloud down: 'QR 준비 중', never a fake QR; the QR appears by itself whe
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(kiosk);
   await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
 
   await expect(kiosk.getByTestId("delivery-qr-pending")).toBeVisible();
@@ -157,7 +158,8 @@ test("cloud down: the guest can leave without a QR and still answer the wall que
     await kiosk.getByRole("button", { name: "촬영 시작" }).click();
     await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-    await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+    await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(kiosk);
     await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
     await expect(kiosk.getByTestId("delivery-qr-pending")).toBeVisible();
     const session = (await kiosk.getByTestId("session-code").textContent())!
