@@ -4,7 +4,7 @@ FOLLOW THE LIGHTS is a web-based four-cut photo booth and participatory media-wa
 
 > 한 사람의 순간이 모여, 공동체의 크리스마스 풍경이 됩니다.
 
-Guests take a four-cut photo at the booth and scan a QR code to save it on their own phone. There is
+Guests capture six photos, then choose the exact number required by their selected frame (2–6), at the booth and scan a QR code to save it on their own phone. There is
 no login, phone number, email, or app. Only if they choose to, the photo can appear on the shared
 Christmas Village media wall after staff review. There is **no printing**.
 
@@ -16,7 +16,7 @@ app has not been deployed or tried on real devices, and it is not production-rea
 
 | Area                                                                           | State               |
 | ------------------------------------------------------------------------------ | ------------------- |
-| Kiosk: camera → countdown → 4 shots → review/retake → frame                    | ✅ Phase 1          |
+| Kiosk: camera → countdown → 6 shots → review/retake → frame → photo selection                    | ✅ Phase 1          |
 | Secure upload, private storage, QR → `/p/[token]`, offline queue, retention    | ✅ Phase 2          |
 | Staff login (Supabase Auth email code + allowlist)                             | ✅ Phase 3          |
 | Moderation queue, photo library, audited state machine                         | ✅ Phase 3          |
