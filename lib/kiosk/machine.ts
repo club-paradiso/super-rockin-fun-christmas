@@ -1,4 +1,5 @@
 import type { CameraErrorKind } from "@/lib/camera/types";
+import { getFrame } from "@/config/frames";
 
 /**
  * Pure kiosk session state machine. No timers, no camera, no DOM: the KioskApp component runs
@@ -18,6 +19,7 @@ export type KioskPhase =
   | "capturing"
   | "review"
   | "frame"
+  | "select"
   | "final"
   | "delivery"
   | "consent"
@@ -47,6 +49,8 @@ export interface KioskState<Shot> {
   retakeIndex: number | null;
   remaining: number;
   frameId: string;
+  /** Zero-based capture indexes in the exact order they fill the chosen template. */
+  selectedShotIndices: number[];
   cameraError: CameraErrorKind | null;
   captureFailures: number;
   delivery: DeliveryState;
@@ -70,6 +74,9 @@ export type KioskAction<Shot> =
   | { type: "CONFIRM_SHOTS" }
   | { type: "SELECT_FRAME"; frameId: string }
   | { type: "CONFIRM_FRAME" }
+  | { type: "TOGGLE_SHOT_SELECTION"; index: number }
+  | { type: "CONFIRM_SELECTION" }
+  | { type: "BACK_TO_SELECTION" }
   | { type: "BACK_TO_FRAME" }
   | { type: "REQUEST_DELIVERY" }
   | { type: "DELIVERY_QR_PENDING" }
@@ -103,6 +110,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     retakeIndex: null,
     remaining: init.countdownSeconds,
     frameId: init.frameId,
+    selectedShotIndices: [],
     cameraError: null,
     captureFailures: 0,
     delivery: { status: "idle" },
@@ -212,6 +220,7 @@ export function kioskReducer<Shot>(
         ...state,
         phase: "countdown",
         shots: state.shots.map(() => null),
+        selectedShotIndices: [],
         shotIndex: 0,
         retakeIndex: null,
         remaining: state.countdownSeconds,
@@ -222,13 +231,42 @@ export function kioskReducer<Shot>(
       return { ...state, phase: "frame" };
 
     case "SELECT_FRAME":
-      return state.phase === "frame" ? { ...state, frameId: action.frameId } : state;
+      return state.phase === "frame"
+        ? { ...state, frameId: getFrame(action.frameId).id, selectedShotIndices: [] }
+        : state;
 
     case "CONFIRM_FRAME":
-      return state.phase === "frame" ? { ...state, phase: "final" } : state;
+      return state.phase === "frame" && capturedCount(state) === state.shotCount
+        ? { ...state, phase: "select", selectedShotIndices: [] }
+        : state;
+
+    case "TOGGLE_SHOT_SELECTION": {
+      if (state.phase !== "select") return state;
+      const index = action.index;
+      if (!Number.isInteger(index) || index < 0 || index >= state.shotCount || !state.shots[index])
+        return state;
+      const selected = state.selectedShotIndices;
+      if (selected.includes(index)) {
+        return { ...state, selectedShotIndices: selected.filter((i) => i !== index) };
+      }
+      if (selected.length >= getFrame(state.frameId).slots.length) return state;
+      return { ...state, selectedShotIndices: [...selected, index] };
+    }
+
+    case "CONFIRM_SELECTION":
+      return state.phase === "select" &&
+        state.selectedShotIndices.length === getFrame(state.frameId).slots.length &&
+        state.selectedShotIndices.every((i) => state.shots[i] !== null)
+        ? { ...state, phase: "final" }
+        : state;
+
+    case "BACK_TO_SELECTION":
+      return state.phase === "final" ? { ...state, phase: "select" } : state;
 
     case "BACK_TO_FRAME":
-      return state.phase === "final" ? { ...state, phase: "frame" } : state;
+      return state.phase === "select" || state.phase === "final"
+        ? { ...state, phase: "frame", selectedShotIndices: [] }
+        : state;
 
     case "REQUEST_DELIVERY":
       return state.phase === "final" || state.phase === "consent"
