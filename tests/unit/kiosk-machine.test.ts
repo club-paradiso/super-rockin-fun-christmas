@@ -13,7 +13,7 @@ const SESSION = "11111111-2222-4333-8444-555555555555";
 
 function init(): S {
   return createInitialState<string>({
-    shotCount: 4,
+    shotCount: 6,
     countdownSeconds: 3,
     frameId: "starlight-strip",
   });
@@ -33,7 +33,7 @@ const shoot = (s: S, label: string) =>
 
 function toReview(): S {
   let s = run(toReady(), { type: "BEGIN_SHOOTING" });
-  for (let i = 0; i < 4; i++) s = shoot(s, `shot-${i}`);
+  for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
   return s;
 }
 
@@ -62,15 +62,15 @@ describe("countdown", () => {
   });
 });
 
-describe("exactly four captures", () => {
-  it("goes to review after the fourth shot, in order", () => {
+describe("exactly six captures", () => {
+  it("goes to review after the sixth shot, in order", () => {
     const s = toReview();
     expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3"]);
-    expect(capturedCount(s)).toBe(4);
+    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3", "shot-4", "shot-5"]);
+    expect(capturedCount(s)).toBe(6);
   });
 
-  it("rejects a stray fifth frame", () => {
+  it("rejects a stray seventh frame", () => {
     const s = toReview();
     expect(run(s, { type: "SHOT_CAPTURED", shot: "extra" })).toBe(s);
   });
@@ -80,7 +80,7 @@ describe("exactly four captures", () => {
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
-  it("only confirms when all four exist", () => {
+  it("only confirms when all six exist", () => {
     const s = toReview();
     expect(run(s, { type: "CONFIRM_SHOTS" }).phase).toBe("frame");
   });
@@ -92,19 +92,19 @@ describe("retake", () => {
     expect([s.phase, s.shotIndex, s.retakeIndex]).toEqual(["countdown", 2, 2]);
     s = shoot(s, "new-2");
     expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "new-2", "shot-3"]);
+    expect(s.shots).toEqual(["shot-0", "shot-1", "new-2", "shot-3", "shot-4", "shot-5"]);
     expect(s.retakeIndex).toBeNull();
   });
 
   it("retake all clears every shot and starts from the first", () => {
     const s = run(toReview(), { type: "RETAKE_ALL" });
-    expect(s.shots).toEqual([null, null, null, null]);
+    expect(s.shots).toEqual([null, null, null, null, null, null]);
     expect([s.phase, s.shotIndex]).toEqual(["countdown", 0]);
   });
 
   it("ignores out-of-range retakes", () => {
     const s = toReview();
-    expect(run(s, { type: "RETAKE", index: 4 })).toBe(s);
+    expect(run(s, { type: "RETAKE", index: 6 })).toBe(s);
   });
 });
 
@@ -131,7 +131,14 @@ describe("failures", () => {
 });
 
 describe("delivery and consent are independent", () => {
-  const toFinal = () => run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME" });
+  const toFinal = () =>
+    run(
+      toReview(),
+      { type: "CONFIRM_SHOTS" },
+      { type: "CONFIRM_FRAME" },
+      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      { type: "CONFIRM_SELECTION" },
+    );
 
   it("declining the wall keeps the delivered link", () => {
     let s = run(
@@ -212,6 +219,8 @@ describe("reset", () => {
       { type: "CONFIRM_SHOTS" },
       { type: "SELECT_FRAME", frameId: "village-window" },
       { type: "CONFIRM_FRAME" },
+      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      { type: "CONFIRM_SELECTION" },
       { type: "REQUEST_DELIVERY" },
       { type: "DELIVERY_SUCCEEDED", token: "t", url: "u", expiresAt: "e" },
       { type: "TO_CONSENT" },
@@ -230,5 +239,46 @@ describe("reset", () => {
     const a = run(init(), { type: "START", sessionId: "a" });
     const b = run(a, { type: "RESET" }, { type: "START", sessionId: "b" });
     expect([a.sessionId, b.sessionId]).toEqual(["a", "b"]);
+  });
+});
+
+describe("per-template ordered photo selection", () => {
+  const selectState = (frameId: string) =>
+    run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "SELECT_FRAME", frameId }, { type: "CONFIRM_FRAME" });
+
+  it.each([
+    ["two-stars", [4, 1]],
+    ["three-moments", [3, 0, 5]],
+    ["starlight-strip", [5, 2, 0, 1]],
+    ["five-lights", [5, 4, 3, 2, 1]],
+    ["six-lights", [5, 4, 3, 2, 1, 0]],
+  ])("%s finishes only with the exact selected count", (frameId, indexes) => {
+    let state = selectState(frameId);
+    expect(state.phase).toBe("select");
+    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("select");
+    for (const index of indexes) state = run(state, { type: "TOGGLE_SHOT_SELECTION", index });
+    expect(state.selectedShotIndices).toEqual(indexes);
+    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("final");
+  });
+
+  it("ignores duplicate/out-of-range choices and limits to template slots", () => {
+    let state = selectState("two-stars");
+    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 0 });
+    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 1 });
+    expect(run(state, { type: "TOGGLE_SHOT_SELECTION", index: 2 })).toBe(state);
+    expect(run(state, { type: "TOGGLE_SHOT_SELECTION", index: 6 })).toBe(state);
+    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 0 });
+    expect(state.selectedShotIndices).toEqual([1]);
+    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("select");
+  });
+
+  it("changing frame resets selection; returning from final preserves it until frame changes", () => {
+    let state = selectState("two-stars");
+    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 4 }, { type: "TOGGLE_SHOT_SELECTION", index: 2 }, { type: "CONFIRM_SELECTION" });
+    expect(state.phase).toBe("final");
+    state = run(state, { type: "BACK_TO_SELECTION" });
+    expect(state.selectedShotIndices).toEqual([4, 2]);
+    state = run(state, { type: "BACK_TO_FRAME" }, { type: "SELECT_FRAME", frameId: "six-lights" });
+    expect(state.selectedShotIndices).toEqual([]);
   });
 });
