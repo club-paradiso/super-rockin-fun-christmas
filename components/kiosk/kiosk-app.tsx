@@ -49,6 +49,7 @@ export interface Shot {
 
 interface FinalImage {
   frameId: string;
+  selectionKey: string;
   blob: Blob;
   url: string;
   width: number;
@@ -223,13 +224,14 @@ export function KioskApp({
   }, []);
 
   // ── Frame picker thumbnails: the guest's real photos in every frame ──────────────────────
+  const selectionKey = state.selectedShotIndices.join("-");
   const showThumbs = state.phase === "frame";
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!showThumbs || !images || !fontsSettled) return out;
     const dateLabel = formatDateLabel(new Date());
     for (const frame of FRAMES) {
-      const canvas = composeFrame(frame, images, {
+      const canvas = composeFrame(frame, images.slice(0, frame.slots.length), {
         createCanvas: createDomCanvas,
         context: { dateLabel },
         scale: 0.2,
@@ -242,13 +244,16 @@ export function KioskApp({
   // ── Final composite ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== "final" || !images) return;
-    if (finalImage?.frameId === state.frameId) return;
+    if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey)
+      return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
+    const chosen = state.selectedShotIndices.map((index) => images[index]!);
+    if (chosen.length !== frame.slots.length) return;
     // A font that failed to load must not block the guest: compose with the fallback face.
     void (fontsRef.current ?? Promise.resolve(false)).then(async () => {
       if (cancelled) return;
-      const canvas = composeFrame(frame, images, {
+      const canvas = composeFrame(frame, chosen, {
         createCanvas: createDomCanvas,
         context: { dateLabel: formatDateLabel(new Date()) },
       }) as HTMLCanvasElement;
@@ -256,6 +261,7 @@ export function KioskApp({
       if (cancelled) return;
       setFinalImage({
         frameId: frame.id,
+        selectionKey,
         blob,
         url: trackUrl(URL.createObjectURL(blob)),
         width: canvas.width,
@@ -265,7 +271,7 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [state.phase, state.frameId, images, finalImage?.frameId]);
+  }, [state.phase, state.frameId, selectionKey, images, finalImage?.frameId, finalImage?.selectionKey]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
@@ -678,7 +684,7 @@ function Screen(p: ScreenProps) {
         <Stage testId="screen-review" className="gap-6">
           <Title>잘 나왔나요?</Title>
           <p className="text-xl text-mist">마음에 들지 않는 사진을 누르면 그 사진만 다시 찍어요.</p>
-          <div className="grid w-full max-w-4xl grid-cols-2 gap-4">
+          <div className="grid w-full max-w-5xl grid-cols-3 gap-3 md:gap-4">
             {state.shots.map((shot, i) => (
               <button
                 type="button"
@@ -722,7 +728,8 @@ function Screen(p: ScreenProps) {
       return (
         <Stage testId="screen-frame" className="gap-6">
           <Title>프레임을 골라 주세요</Title>
-          <div className="flex w-full max-w-5xl flex-wrap items-end justify-center gap-6">
+          <Lead>어떤 프레임을 골라도 6번 촬영해요. 사진 선택 수는 프레임마다 달라요.</Lead>
+          <div className="grid max-h-[65dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -736,7 +743,7 @@ function Screen(p: ScreenProps) {
                     selected ? "border-amber bg-amber/10" : "border-transparent"
                   }`}
                 >
-                  <div className="flex h-[44dvh] items-center">
+                  <div className="flex h-[23dvh] items-center justify-center">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
                       <img
@@ -748,7 +755,8 @@ function Screen(p: ScreenProps) {
                       <div className="h-full w-40 animate-pulse rounded-md bg-dusk" />
                     )}
                   </div>
-                  <span className="text-2xl font-semibold text-cream">{frame.label}</span>
+                  <span className="text-xl font-semibold text-cream">{frame.label}</span>
+                  <span className="text-base text-mist">6장 중 {frame.slots.length}장 선택</span>
                 </button>
               );
             })}
@@ -758,17 +766,77 @@ function Screen(p: ScreenProps) {
             className="btn-primary min-w-80"
             onClick={() => dispatch({ type: "CONFIRM_FRAME" })}
           >
-            이 프레임으로 할게요
+            이 프레임으로 사진 고르기
           </button>
         </Stage>
       );
+
+    case "select": {
+      const required = getFrame(state.frameId).slots.length;
+      const selected = state.selectedShotIndices;
+      return (
+        <Stage testId="screen-select" className="gap-5">
+          <Title>6장 중 {required}장을 골라주세요</Title>
+          <Lead>선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.</Lead>
+          <div className="grid w-full max-w-5xl grid-cols-3 gap-3">
+            {state.shots.map((shot, index) => {
+              const order = selected.indexOf(index);
+              const picked = order >= 0;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  data-testid={`select-shot-${index}`}
+                  aria-pressed={picked}
+                  aria-label={`${index + 1}번째 사진 ${picked ? "선택 해제" : "선택"}`}
+                  onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
+                  className={`relative overflow-hidden rounded-xl border-4 transition ${picked ? "border-amber" : "border-cream/20"}`}
+                  style={{ aspectRatio: String(aspect) }}
+                >
+                  {shot && (
+                    // eslint-disable-next-line @next/next/no-img-element -- local object URL
+                    <img src={shot.url} alt="" className="h-full w-full object-cover" />
+                  )}
+                  <span className="absolute bottom-2 left-2 rounded-lg bg-ink/80 px-3 py-1 text-lg text-cream">
+                    {picked ? `✓ ${order + 1}번째 선택` : `사진 ${index + 1}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-lg text-mist" data-testid="selection-progress">
+            선택한 사진: {selected.length} / {required}
+            {selected.length === required ? " · 완료할 수 있어요" : " · 사진을 더 골라주세요"}
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              className="btn-primary min-w-80"
+              data-testid="confirm-selection"
+              disabled={selected.length !== required}
+              onClick={() => dispatch({ type: "CONFIRM_SELECTION" })}
+            >
+              이 사진으로 완성하기
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
+            >
+              프레임 바꾸기
+            </button>
+          </div>
+        </Stage>
+      );
+    }
 
     case "final":
       return (
         <Stage testId="screen-final" className="gap-6">
           <Title>완성됐어요!</Title>
           <div className="flex h-[58dvh] items-center">
-            {p.finalImage?.frameId === state.frameId ? (
+            {p.finalImage?.frameId === state.frameId &&
+            p.finalImage.selectionKey === state.selectedShotIndices.join("-") ? (
               // eslint-disable-next-line @next/next/no-img-element -- local object URL
               <img
                 src={p.finalImage.url}
@@ -786,7 +854,7 @@ function Screen(p: ScreenProps) {
             <button
               type="button"
               className="btn-primary min-w-80"
-              disabled={!p.finalImage}
+              disabled={!p.finalImage || p.finalImage.selectionKey !== state.selectedShotIndices.join("-")}
               onClick={p.onRequestDelivery}
             >
               휴대폰으로 받기
@@ -794,12 +862,19 @@ function Screen(p: ScreenProps) {
             <button
               type="button"
               className="btn-secondary"
+              onClick={() => dispatch({ type: "BACK_TO_SELECTION" })}
+            >
+              사진 다시 고르기
+            </button>
+            <button
+              type="button"
+              className="btn-quiet"
               onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
             >
               프레임 바꾸기
             </button>
           </div>
-          {p.finalImage && (
+          {p.finalImage && p.finalImage.selectionKey === state.selectedShotIndices.join("-") && (
             <a
               href={p.finalImage.url}
               download={`follow-the-lights-${state.sessionId.slice(0, 8)}.jpg`}
