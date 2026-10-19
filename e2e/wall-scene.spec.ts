@@ -9,7 +9,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT } from "./helpers";
+import { SHOOT_TIMEOUT, selectDefaultFour } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
@@ -109,7 +109,8 @@ async function boothPhoto(frame: "starlight-strip" | "village-window") {
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
   await kiosk.getByTestId(`frame-option-${frame}`).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(kiosk);
   await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
   const short = (await kiosk.getByTestId("session-code").textContent())!.replace("세션", "").trim();
