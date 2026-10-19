@@ -85,3 +85,11 @@ Figma와 코드는 **자동으로 동기화되지 않는다.** Figma에서 바�
 
 Noto Sans KR 은 SIL Open Font License 1.1 이다. 인쇄물·앱·이미지에 자유롭게 쓸 수 있고, 글꼴 파일을
 함께 배포해도 된다(`node_modules/@fontsource-variable/noto-sans-kr/LICENSE`).
+
+## 2026-10-19 · Six captures with per-template selection
+
+- Figma: [six-shot screen](https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU?node-id=7-502), [flexible template library](https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU?node-id=241-5597), [staff settings concept](https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU?node-id=246-5154).
+- The kiosk captures exactly six photos and allows individual retakes. Each frame's `slots.length` is the exact number of photos guests must select, in order, before generating output.
+- Templates supporting 2/3/5/6 slots are defined in `config/frames/flexible-strips.ts`; classic four-slot templates are unchanged. Frame selection count is currently maintained in code, **not an operational staff-admin setting**. The Figma admin editor is a design specification only.
+- The original Figma designs use a 600 × 1800 composition; code exports a 1200 × 3600 image (2× resolution). The Figma decorations and new code variants need final parity QA before the event.
+- Source of truth: `KIOSK_CONFIG.shotsPerSession = 6`; selection is `KioskState.selectedShotIndices`; the compositor continues enforcing `images.length === frame.slots.length`.
