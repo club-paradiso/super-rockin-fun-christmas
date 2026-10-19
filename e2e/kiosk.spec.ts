@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, photoForToken, shootFourWithMock, toFinal, tokenFromUrl } from "./helpers";
+import { enrollKiosk, photoForToken, shootSixWithMock, selectDefaultFour, toFinal, tokenFromUrl } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("happy path: 4 shots → composite → authenticated upload → QR → phone page → consent YES → PENDING", async ({
+test("happy path: 6 shots → composite → authenticated upload → QR → phone page → consent YES → PENDING", async ({
   page,
   context,
 }) => {
-  await shootFourWithMock(page);
-  for (let i = 0; i < 4; i++) {
+  await shootSixWithMock(page);
+  for (let i = 0; i < 6; i++) {
     const img = page.getByTestId(`review-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     const [w, h] = await img.evaluate((el: HTMLImageElement) => [
@@ -21,7 +21,8 @@ test("happy path: 4 shots → composite → authenticated upload → QR → phon
   }
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await page.getByTestId("frame-option-village-window").click();
-  await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+  await page.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
+  await selectDefaultFour(page);
   const finalImage = page.getByTestId("final-image");
   const dims = await finalImage.evaluate(async (el: HTMLImageElement) => {
     await el.decode();
@@ -88,7 +89,7 @@ test("happy path: 4 shots → composite → authenticated upload → QR → phon
 test("decline path: consent NO leaves the download working and nothing queued for the wall", async ({
   page,
 }) => {
-  await shootFourWithMock(page);
+  await shootSixWithMock(page);
   await toFinal(page);
   await page.getByRole("button", { name: "휴대폰으로 받기" }).click();
   const phoneUrl = (await page.getByTestId("qr-code").getAttribute("data-url"))!;
@@ -104,11 +105,11 @@ test("decline path: consent NO leaves the download working and nothing queued fo
   expect((await photoForToken(tokenFromUrl(phoneUrl)))!.moderationStatus).toBe("NONE");
 });
 
-test("retaking one shot keeps the other three", async ({ page }) => {
-  await shootFourWithMock(page);
+test("retaking one shot keeps the other five", async ({ page }) => {
+  await shootSixWithMock(page);
   const srcs = async () =>
     Promise.all(
-      [0, 1, 2, 3].map((i) =>
+      [0, 1, 2, 3, 4, 5].map((i) =>
         page.getByTestId(`review-shot-${i}`).locator("img").getAttribute("src"),
       ),
     );
@@ -117,7 +118,7 @@ test("retaking one shot keeps the other three", async ({ page }) => {
   await expect(page.getByText("2번째 사진 다시 찍기")).toBeVisible();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 30_000 });
   const after = await srcs();
-  expect([after[0], after[2], after[3]]).toEqual([before[0], before[2], before[3]]);
+  expect([after[0], after[2], after[3], after[4], after[5]]).toEqual([before[0], before[2], before[3], before[4], before[5]]);
   expect(after[1]).not.toBe(before[1]);
 });
 
