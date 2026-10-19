@@ -2,9 +2,18 @@ import type { FrameDefinition } from "@/lib/compositor/types";
 import { starlightStrip } from "./starlight-strip";
 import { snowPaperStrip } from "./snow-paper-strip";
 import { villageWindow } from "./village-window";
+import { twoStars, threeMoments, fiveLights, sixLights } from "./flexible-strips";
 
 /** Order here is the order on the kiosk frame picker. The first is the default. */
-export const FRAMES: readonly FrameDefinition[] = [starlightStrip, villageWindow, snowPaperStrip];
+export const FRAMES: readonly FrameDefinition[] = [
+  starlightStrip,
+  villageWindow,
+  snowPaperStrip,
+  twoStars,
+  threeMoments,
+  fiveLights,
+  sixLights,
+];
 
 export const DEFAULT_FRAME_ID = FRAMES[0]!.id;
 
