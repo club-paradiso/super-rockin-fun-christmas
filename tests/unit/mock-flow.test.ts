@@ -17,7 +17,7 @@ import { fakeCanvasFactory } from "../helpers/fake-canvas";
  * camera/compositor code the kiosk uses, driven the way KioskApp's effects drive them.
  */
 describe("mock camera flow", () => {
-  it("completes welcome → 4 captures → composite → reset", async () => {
+  it("completes welcome → 6 captures → ordered 4-photo composite → reset", async () => {
     const { factory } = fakeCanvasFactory();
     const camera = new MockCamera({ createCanvas: factory });
     let state: KioskState<CapturedFrame> = createInitialState({
@@ -49,14 +49,16 @@ describe("mock camera flow", () => {
     }
 
     expect(state.phase).toBe("review");
-    expect(camera.captureCount).toBe(4);
+    expect(camera.captureCount).toBe(6);
 
     dispatch({ type: "CONFIRM_SHOTS" });
     dispatch({ type: "CONFIRM_FRAME" });
+    for (const index of [0, 2, 4, 5]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
+    dispatch({ type: "CONFIRM_SELECTION" });
     expect(state.phase).toBe("final");
 
     const frame = getFrame(state.frameId);
-    const images = state.shots.map((s) => ({
+    const images = state.selectedShotIndices.map((i) => state.shots[i]!).map((s) => ({
       source: s!.canvas as unknown as CanvasImageSource,
       width: s!.width,
       height: s!.height,
