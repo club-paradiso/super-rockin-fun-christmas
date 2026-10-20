@@ -229,7 +229,7 @@ describe("reset", () => {
     const s = run(done, { type: "RESET" });
     expect(s.phase).toBe("welcome");
     expect(s.sessionId).toBe("");
-    expect(s.shots).toEqual([null, null, null, null]);
+    expect(s.shots).toEqual([null, null, null, null, null, null]);
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
     expect(s.retakeIndex).toBeNull();
