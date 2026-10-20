@@ -33,3 +33,6 @@ blob-report/
 supabase/.branches
 supabase/.temp
 .browser/
+
+# vercel cli project link (vercel link)
+.vercel/
