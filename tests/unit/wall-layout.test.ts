@@ -1,69 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { WALL_CONFIG } from "@/config/wall";
-import { clotheslineLayout, lineYAt, parseCanvas } from "@/lib/wall/layout";
+import { lineYAt, parseCanvas, wallLayout } from "@/lib/wall/layout";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
 
-/**
- * The clothesline scene on the LED shapes we might get (docs/ARCHITECTURE.md 1.8). The LED's
- * real input resolution is still unknown, so every candidate must produce a sane scene.
- */
-const CANVASES = {
-  "1920x1080 (16:9)": { width: 1920, height: 1080 },
-  "3840x2160 (4K 16:9)": { width: 3840, height: 2160 },
-  "3840x1080 (32:9)": { width: 3840, height: 1080 },
-  "4000x1000 (4:1)": { width: 4000, height: 1000 },
-  "5760x1080 (16:3)": { width: 5760, height: 1080 },
-  "1080x1920 (portrait)": { width: 1080, height: 1920 },
-};
-const layoutOf = (c: { width: number; height: number }, max?: number) =>
-  clotheslineLayout(c, WALL_CONFIG.scene, max);
+describe("wall layout (Figma composite v3)", () => {
+  const layout = wallLayout(WALL_CONFIG.scene);
 
-describe("clothesline layout", () => {
-  it("more photos on wider LEDs; the same readable height on every landscape shape", () => {
-    const counts = Object.fromEntries(
-      Object.entries(CANVASES).map(([k, c]) => [k, layoutOf(c).slots.length]),
-    );
-    expect(counts).toEqual({
-      "1920x1080 (16:9)": 3,
-      "3840x2160 (4K 16:9)": 3,
-      "3840x1080 (32:9)": 8,
-      "4000x1000 (4:1)": 9,
-      "5760x1080 (16:3)": 10,
-      "1080x1920 (portrait)": 2,
-    });
-    for (const [k, c] of Object.entries(CANVASES)) {
-      if (c.height > c.width) continue;
-      const h = layoutOf(c).slots[0]!.box.height;
-      expect(h / c.height, k).toBeCloseTo(WALL_CONFIG.scene.photoHeight, 2);
-    }
+  it("hangs five strips at the Figma clip points, on the line", () => {
+    expect(layout.slots.map((s) => s.x)).toEqual([640, 1150, 1900, 2440, 3250]);
+    expect(layout.slots.map((s) => s.tilt)).toEqual([-1.1, 0.6, -0.4, 1, -0.8]);
+    for (const s of layout.slots) expect(s.y).toBeCloseTo(lineYAt(WALL_CONFIG.scene.line, s.x), 6);
+    // Figma: the middle strip's top is at 324 (line 304 + 20); the first clip sits at y ≈ 256.
+    expect(layout.slots[2]!.box.y).toBeCloseTo(324, 6);
+    expect(layout.slots[0]!.y).toBeCloseTo(255.9, 1);
   });
 
-  for (const [name, canvas] of Object.entries(CANVASES)) {
-    it(`${name}: photos hang inside the window, on the line, without overlapping`, () => {
-      const l = layoutOf(canvas);
-      const w = l.window;
-      for (const s of l.slots) {
-        expect(s.box.x).toBeGreaterThanOrEqual(w.x);
-        expect(s.box.x + s.box.width).toBeLessThanOrEqual(w.x + w.width + 0.001);
-        expect(s.box.y + s.box.height).toBeLessThanOrEqual(w.y + w.height);
-        expect(s.y).toBeCloseTo(lineYAt(l.line, s.x), 6);
-        expect(Math.abs(s.tilt)).toBeLessThan(10);
-      }
-      for (let i = 1; i < l.slots.length; i++)
-        expect(l.slots[i]!.box.x).toBeGreaterThan(
-          l.slots[i - 1]!.box.x + l.slots[i - 1]!.box.width,
-        );
-      // The line sags towards the middle and stays inside the window.
-      const mid = (l.line.x0 + l.line.x1) / 2;
-      expect(lineYAt(l.line, mid)).toBeCloseTo(l.line.y0 + l.line.sag, 6);
-      expect(l.line.y0).toBeGreaterThan(w.y);
+  it("strips are 1:3 four-cuts that stay inside the picture without overlapping", () => {
+    for (const s of layout.slots) {
+      expect(s.box.width / s.box.height).toBeCloseTo(1 / 3, 2);
+      expect(s.box.x).toBeGreaterThan(0);
+      expect(s.box.x + s.box.width).toBeLessThan(layout.width);
+      expect(s.box.y + s.box.height).toBeLessThan(layout.height);
+    }
+    layout.slots.slice(1).forEach((s, i) => {
+      const prev = layout.slots[i]!;
+      expect(s.box.x).toBeGreaterThan(prev.box.x + prev.box.width);
     });
-  }
+  });
 
-  it("low-spec mode caps the number of photos", () => {
-    expect(layoutOf(CANVASES["4000x1000 (4:1)"], WALL_CONFIG.liteMaxSlots).slots).toHaveLength(
-      WALL_CONFIG.liteMaxSlots,
-    );
+  it("low-spec mode keeps four slots and leaves the middle empty", () => {
+    const lite = wallLayout(WALL_CONFIG.scene, WALL_CONFIG.liteSlots);
+    expect(lite.slots.map((s) => s.x)).toEqual([640, 1150, 2440, 3250]);
   });
 
   it("parses WALL_CANVAS / ?canvas=", () => {

@@ -1,4 +1,4 @@
-import { formatTime } from "@/components/admin/labels";
+import { formatTime, stateLabel } from "@/components/admin/labels";
 import { listAudit } from "@/lib/ops/admin";
 import { requireStaff } from "@/lib/staff-auth/page";
 
@@ -47,7 +47,7 @@ export default async function AuditPage() {
             <span className="text-mist">{e.actorLabel}</span>
             {e.fromState && e.toState && e.subjectType === "photo" && (
               <span>
-                {e.fromState} → {e.toState}
+                {stateLabel(e.fromState)} → {stateLabel(e.toState)}
               </span>
             )}
             <span className="font-mono text-sm text-mist">

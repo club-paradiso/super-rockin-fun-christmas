@@ -1,0 +1,13 @@
+<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Template/A &#194;&#183; Navy Strip">
+<g id="Light/Sparkle">
+<path id="Star" d="M3.00033 0L3.46707 2.53359L6.00066 3.00033L3.46707 3.46707L3.00033 6.00066L2.53359 3.46707L0 3.00033L2.53359 2.53359L3.00033 0Z" fill="#FFE3A3"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_2_3" x1="300" y1="0" x2="300" y2="1800" gradientUnits="userSpaceOnUse">
+<stop stop-color="#121A3D"/>
+<stop offset="1" stop-color="#070A1C"/>
+</linearGradient>
+</defs>
+</svg>

@@ -76,18 +76,24 @@ export async function enrollWithCode(kiosk: Page, code: string) {
   await kiosk.getByRole("button", { name: "이 기기 등록" }).click();
 }
 
-/** Mock-camera session up to a real QR. Returns guest URL + the short session code. */
-export async function kioskPhotoToQr(kiosk: Page) {
+/**
+ * Mock-camera session up to a real QR. Answers the wall question when it is asked (it is skipped
+ * while submissions are paused). Returns guest URL + the short session code.
+ */
+export async function kioskPhotoToQr(kiosk: Page, answer: "yes" | "no" = "no") {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 할게요" }).click();
-  await expect(kiosk.getByTestId("final-image")).toBeVisible();
-  await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
-  await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
-  const url = (await kiosk.getByTestId("qr-code").getAttribute("data-url"))!;
+  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  const consent = kiosk.getByTestId("screen-consent");
+  const qr = kiosk.getByTestId("qr-code");
+  await expect(consent.or(qr)).toBeVisible();
+  if (await consent.isVisible()) await kiosk.getByTestId(`consent-${answer}`).click();
+  await expect(qr.locator("svg")).toBeVisible();
+  const url = (await qr.getAttribute("data-url"))!;
   const session = (await kiosk.getByTestId("session-code").textContent())!
     .replace("세션", "")
     .trim();

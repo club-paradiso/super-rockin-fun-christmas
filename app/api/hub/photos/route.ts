@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { FRAMES } from "@/config/frames";
+import { isKnownFrameId } from "@/config/frames";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError } from "@/lib/server/http";
 import { hubRoute } from "@/lib/server/hub-route";
@@ -30,7 +30,7 @@ export const POST = hubRoute("hub_photo_put", async (request) => {
   const frameId = request.headers.get("x-frame-id") ?? "";
   if (!ALLOWED_MIME.has(mime)) return jsonError(415, "unsupported image type");
   if (!SESSION_ID_PATTERN.test(sessionId)) return jsonError(400, "invalid session id");
-  if (!FRAMES.some((f) => f.id === frameId)) return jsonError(400, "unknown frame");
+  if (!isKnownFrameId(frameId)) return jsonError(400, "unknown frame");
   let data: Uint8Array;
   try {
     data = await readBodyLimited(request, config.maxUploadBytes);

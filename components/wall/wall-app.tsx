@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
-import { clotheslineLayout } from "@/lib/wall/layout";
+import { wallLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
-import { Peg, WallScene } from "./wall-scene";
+import { Clip, WallScene } from "./wall-scene";
 
 const RELOAD_KEY = "ftl-wall-reloaded-at";
 
@@ -32,7 +32,7 @@ export function WallApp({
   canvas = null,
   lite = false,
 }: {
-  /** Fixed scene size (WALL_CANVAS / ?canvas=); null = the screen's own size. */
+  /** The LED's input size (WALL_CANVAS / ?canvas=); null = this screen. The scene is fitted into it. */
   canvas?: { width: number; height: number } | null;
   /** Low-spec mode: fades only, no twinkling, fewer photos. */
   lite?: boolean;
@@ -45,18 +45,12 @@ export function WallApp({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-  const size = canvas ?? viewport;
+  // The Figma scene has a fixed size and fixed slots; low-spec mode leaves the middle one empty.
   const layout = useMemo(
-    () =>
-      size &&
-      clotheslineLayout(
-        size,
-        WALL_CONFIG.scene,
-        lite ? Math.min(WALL_CONFIG.liteMaxSlots, WALL_CONFIG.scene.maxSlots) : undefined,
-      ),
-    [size, lite],
+    () => wallLayout(WALL_CONFIG.scene, lite ? WALL_CONFIG.liteSlots : undefined),
+    [lite],
   );
-  const slotCount = layout?.slots.length ?? 0;
+  const slotCount = layout.slots.length;
   const slotsRef = useRef(slotCount);
 
   const [feed, setFeed] = useState<WallFeed | null>(null);
@@ -323,10 +317,14 @@ export function WallApp({
     approvedCount: eligible.length,
   });
 
-  const unit = (layout?.height ?? 1000) / 1000;
+  const unit = layout.height / 1000;
+  // The scene is fitted into the screen; with WALL_CANVAS / ?canvas= into a box of the LED's input
+  // shape first (to see the letterboxing on another monitor).
+  const stage = canvas ?? viewport;
   const scale =
-    layout && viewport
-      ? Math.min(viewport.width / layout.width, viewport.height / layout.height)
+    stage && viewport
+      ? Math.min(stage.width / layout.width, stage.height / layout.height) *
+        (canvas ? Math.min(viewport.width / canvas.width, viewport.height / canvas.height) : 1)
       : 1;
 
   return (
@@ -336,7 +334,7 @@ export function WallApp({
       data-wall-mode={revoked ? "revoked" : (feed?.mode ?? "boot")}
       className="relative h-dvh w-full cursor-none overflow-hidden bg-[#0b0806]"
     >
-      {layout && viewport && (
+      {viewport && (
         <div
           className="absolute"
           style={{
@@ -385,7 +383,7 @@ export function WallApp({
                   data-testid="wall-empty"
                   className="absolute w-full text-center text-cream/80"
                   style={{
-                    top: layout.line.y0 + layout.line.sag + unit * 120,
+                    top: WALL_CONFIG.scene.line.y0 + unit * 260,
                     fontSize: unit * 40,
                   }}
                 >
@@ -418,12 +416,13 @@ export function WallApp({
                   <div
                     className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                   >
-                    <Peg unit={unit} />
+                    <Clip dropToStrip={place.box.y - place.y} />
                     {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={url}
                       alt=""
+                      data-testid="wall-photo-image"
                       className="h-full w-full object-contain object-top"
                       style={{
                         paddingTop: place.box.y - place.y,
