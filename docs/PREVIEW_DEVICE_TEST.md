@@ -23,7 +23,7 @@
 
 ## 1. 스태프 휴대폰: 로그인과 키오스크 등록 코드
 
-<!-- prettier-ignore: keep manually aligned device-check checklist table -->
+<!-- prettier-ignore -->
 
 | #   | 할 일                                                                  | 볼 것                                                         | 결과 |
 | --- | ---------------------------------------------------------------------- | ------------------------------------------------------------- | ---- |
@@ -85,7 +85,7 @@
 
 ## 5. TV·모니터 미디어월
 
-<!-- prettier-ignore: keep manually aligned device-check checklist table -->
+<!-- prettier-ignore -->
 
 **등록 코드:** 15분 후 만료되므로 1-4에서는 발급하지 않고 5-1 직전에 새로 발급한다.
 
