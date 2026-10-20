@@ -5,6 +5,10 @@
 `archive/afterglow-2026-10-07` points at `71a6e62`. The product tree contains only FOLLOW THE
 LIGHTS. `main` was created at the same commit as the base for this transition.
 
+2026-10-15: the brand is final (FOLLOW THE LIGHTS), so the owner had the earlier project's traces
+removed: the README history section, and the branches `archive/afterglow-2026-10-07` and
+`claude/interactive-music-media-design-qnq5m9`. Their commits are still in `main`'s history.
+
 ## D2 · Boring stack
 
 Next.js 16 App Router + TypeScript strict + Tailwind 4. One app, three surfaces. Supabase planned

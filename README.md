@@ -102,9 +102,3 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request, with no
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — phases and what is next
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — decision log
 - [`CLAUDE.md`](CLAUDE.md) — working rules for AI-assisted development
-
-## History
-
-This repository previously held **AFTERGLOW**, an interactive music installation concept. That
-work is preserved unchanged on the branch
-[`archive/afterglow-2026-10-07`](../../tree/archive/afterglow-2026-10-07) (commit `71a6e62`).
