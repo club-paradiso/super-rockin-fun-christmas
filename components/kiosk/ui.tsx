@@ -22,6 +22,65 @@ export function Stage({
   );
 }
 
+/** The event wordmark exported from Figma (Brand/Lockup), shared with the Navy Strip frame. */
+export function BrandLockup({ className = "" }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element -- static SVG, same origin, works offline
+  return <img src="/frames/navy-lockup.svg" alt="FOLLOW THE LIGHTS" className={className} />;
+}
+
+/** "3 / 6 ●●●○○○" — Figma Booth/Stepper. Done steps glow, the current one is gold. */
+export function Stepper({ step, total }: { step: number; total: number }) {
+  return (
+    <div className="flex items-center gap-[14px]" aria-label={`${total}단계 중 ${step}단계`}>
+      <span className="font-mono text-xl tracking-[0.08em] text-warm" data-testid="step-progress">
+        {step} / {total}
+      </span>
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={`h-4 w-4 rounded-full ${
+            i + 1 === step ? "bg-gold" : i + 1 < step ? "bg-warm" : "bg-warm/20"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Full-screen booth screen from the Figma 01 Platform frames: the night glow, the wordmark top
+ * left and the step dots top right (none on the attract screen).
+ */
+export function BoothScreen({
+  children,
+  testId,
+  progress,
+  className = "",
+}: {
+  children: React.ReactNode;
+  testId: string;
+  progress?: { step: number; total: number } | null;
+  className?: string;
+}) {
+  return (
+    <section
+      data-testid={testId}
+      className="booth-sky relative flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] pb-10 pt-[max(20px,4.4vh)]"
+    >
+      {progress && (
+        <header className="flex h-[max(56px,7.4vh)] items-center justify-between">
+          <BrandLockup className="h-[max(36px,4.6vh)] w-auto" />
+          <Stepper step={progress.step} total={progress.total} />
+        </header>
+      )}
+      <div className={`flex flex-1 flex-col items-center justify-center ${className}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export function Title({ children }: { children: React.ReactNode }) {
   return <h1 className="text-4xl font-bold leading-tight text-cream md:text-5xl">{children}</h1>;
 }

@@ -27,21 +27,46 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
   enrolledCookies = (await page.context().cookies()).filter((c) => c.name === "ftl_kiosk");
 }
 
-export async function shootFourWithMock(page: Page) {
+/** Attract → pick a frame (or keep the preselected one) → camera ready. */
+export async function startSession(page: Page, frame?: string) {
+  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  if (frame) await page.getByTestId(`frame-option-${frame}`).click();
+  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await expect(page.getByTestId("screen-ready")).toBeVisible();
+}
+
+export async function shootFourWithMock(page: Page, frame?: string) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await startSession(page, frame);
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("countdown-number")).toHaveText("3");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
-export async function toFinal(page: Page) {
+/** Review → the frame screen again, now with the guest's photos. */
+export async function toFrame(page: Page) {
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();
-  await page.getByRole("button", { name: "이 프레임으로 할게요" }).click();
+}
+
+/** Frame final → the wall question, with the finished strip beside it (upload already running). */
+export async function toConsent(page: Page, frame?: string) {
+  await toFrame(page);
+  if (frame) await page.getByTestId(`frame-option-${frame}`).click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await expect(page.getByTestId("screen-consent")).toBeVisible();
   await expect(page.getByTestId("final-image")).toBeVisible();
+}
+
+/** Answer the wall question and wait for the real QR. Returns the guest URL. */
+export async function answerForQr(page: Page, answer: "yes" | "no") {
+  await page.getByTestId(`consent-${answer}`).click();
+  await expect(page.getByTestId("delivery-ready")).toBeVisible();
+  const qr = page.getByTestId("qr-code");
+  await expect(qr.locator("svg")).toBeVisible();
+  return (await qr.getAttribute("data-url"))!;
 }
 
 export interface StoredPhoto {

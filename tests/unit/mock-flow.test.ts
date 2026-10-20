@@ -28,6 +28,7 @@ describe("mock camera flow", () => {
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
     dispatch({ type: "START", sessionId: crypto.randomUUID() });
+    dispatch({ type: "CONFIRM_PICK" });
     await camera.start();
     dispatch({ type: "CAMERA_READY" });
     dispatch({ type: "BEGIN_SHOOTING" });
@@ -52,8 +53,8 @@ describe("mock camera flow", () => {
     expect(camera.captureCount).toBe(4);
 
     dispatch({ type: "CONFIRM_SHOTS" });
-    dispatch({ type: "CONFIRM_FRAME" });
-    expect(state.phase).toBe("final");
+    dispatch({ type: "CONFIRM_FRAME", askConsent: true });
+    expect(state.phase).toBe("consent");
 
     const frame = getFrame(state.frameId);
     const images = state.shots.map((s) => ({
@@ -64,6 +65,7 @@ describe("mock camera flow", () => {
     const output = composeFrame(frame, images, {
       createCanvas: factory,
       context: { dateLabel: "2026.12.24" },
+      scale: KIOSK_CONFIG.outputScale,
     });
     expect([output.width, output.height]).toEqual([1200, 3600]);
 

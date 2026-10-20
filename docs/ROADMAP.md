@@ -2,8 +2,8 @@
 
 ## Phase 0 — repository rebuild ✅
 
-AFTERGLOW archived on `archive/afterglow-2026-10-07`. Next.js + TS + Tailwind, ESLint,
-Prettier, Vitest, Playwright.
+Repository rebuilt for FOLLOW THE LIGHTS. Next.js + TS + Tailwind, ESLint, Prettier, Vitest,
+Playwright.
 
 ## Phase 1 — first vertical slice ✅ (headless Chromium only)
 

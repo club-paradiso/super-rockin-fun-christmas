@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { FRAMES } from "@/config/frames";
+import { isKnownFrameId } from "@/config/frames";
 import { getCloudSync } from "@/lib/cloud/server";
 import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
 import { getServerConfig } from "@/lib/server/env";
@@ -48,7 +48,7 @@ export const POST = route("upload", async (request: Request) => {
   const frameId = request.headers.get("x-frame-id") ?? "";
   if (!ALLOWED_MIME.has(mime)) return jsonError(415, "unsupported image type");
   if (!SESSION_ID_PATTERN.test(sessionId)) return jsonError(400, "invalid session id");
-  if (!FRAMES.some((f) => f.id === frameId)) return jsonError(400, "unknown frame");
+  if (!isKnownFrameId(frameId)) return jsonError(400, "unknown frame");
 
   let data: Uint8Array;
   try {

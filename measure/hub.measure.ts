@@ -108,7 +108,7 @@ async function boothPhoto(n: number) {
     headers: {
       "content-type": "image/jpeg",
       "x-session-id": sessionId,
-      "x-frame-id": "starlight-strip",
+      "x-frame-id": "navy-strip",
       origin: ORIGIN,
     },
   });
