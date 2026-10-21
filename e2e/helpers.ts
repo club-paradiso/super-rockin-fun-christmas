@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { ENROLL_SECRET, USE_SUPABASE } from "./env";
 
-export const SHOOT_TIMEOUT = 30_000;
+export const SHOOT_TIMEOUT = 45_000;
 
 let enrolledCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | null = null;
 
@@ -36,7 +36,7 @@ export async function startSession(page: Page, frame?: string) {
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 }
 
-export async function shootFourWithMock(page: Page, frame?: string) {
+export async function shootSixWithMock(page: Page, frame?: string) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await startSession(page, frame);
@@ -45,17 +45,30 @@ export async function shootFourWithMock(page: Page, frame?: string) {
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
+/** Legacy test name alias; captures are now six. */
+export const shootFourWithMock = shootSixWithMock;
+
 /** Review → the frame screen again, now with the guest's photos. */
 export async function toFrame(page: Page) {
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();
 }
 
-/** Frame final → the wall question, with the finished strip beside it (upload already running). */
+/** Pick the first N of six shots (N = the selected frame's number of slots). */
+export async function selectDefaultPhotos(page: Page) {
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
+  if (!Number.isInteger(required) || required < 2 || required > 6) throw new Error("Invalid photo count");
+  for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
+  await page.getByTestId("confirm-selection").click();
+}
+
+/** Frame final → select photos → wall question. */
 export async function toConsent(page: Page, frame?: string) {
   await toFrame(page);
   if (frame) await page.getByTestId(`frame-option-${frame}`).click();
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
   await expect(page.getByTestId("final-image")).toBeVisible();
 }
