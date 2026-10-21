@@ -17,7 +17,7 @@ import { fakeCanvasFactory } from "../helpers/fake-canvas";
  * camera/compositor code the kiosk uses, driven the way KioskApp's effects drive them.
  */
 describe("mock camera flow", () => {
-  it("completes welcome → 6 captures → ordered 4-photo composite → reset", async () => {
+  it("completes welcome → 4 captures → composite → reset", async () => {
     const { factory } = fakeCanvasFactory();
     const camera = new MockCamera({ createCanvas: factory });
     let state: KioskState<CapturedFrame> = createInitialState({
@@ -28,6 +28,7 @@ describe("mock camera flow", () => {
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
     dispatch({ type: "START", sessionId: crypto.randomUUID() });
+    dispatch({ type: "CONFIRM_PICK" });
     await camera.start();
     dispatch({ type: "CAMERA_READY" });
     dispatch({ type: "BEGIN_SHOOTING" });
@@ -49,25 +50,22 @@ describe("mock camera flow", () => {
     }
 
     expect(state.phase).toBe("review");
-    expect(camera.captureCount).toBe(6);
+    expect(camera.captureCount).toBe(4);
 
     dispatch({ type: "CONFIRM_SHOTS" });
-    dispatch({ type: "CONFIRM_FRAME" });
-    for (const index of [0, 2, 4, 5]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
-    dispatch({ type: "CONFIRM_SELECTION" });
-    expect(state.phase).toBe("final");
+    dispatch({ type: "CONFIRM_FRAME", askConsent: true });
+    expect(state.phase).toBe("consent");
 
     const frame = getFrame(state.frameId);
-    const images = state.selectedShotIndices
-      .map((i) => state.shots[i]!)
-      .map((s) => ({
-        source: s!.canvas as unknown as CanvasImageSource,
-        width: s!.width,
-        height: s!.height,
-      }));
+    const images = state.shots.map((s) => ({
+      source: s!.canvas as unknown as CanvasImageSource,
+      width: s!.width,
+      height: s!.height,
+    }));
     const output = composeFrame(frame, images, {
       createCanvas: factory,
       context: { dateLabel: "2026.12.24" },
+      scale: KIOSK_CONFIG.outputScale,
     });
     expect([output.width, output.height]).toEqual([1200, 3600]);
 

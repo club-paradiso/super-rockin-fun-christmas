@@ -21,7 +21,8 @@ import {
   type CameraProvider,
   type CapturedFrame,
 } from "@/lib/camera";
-import { composeFrame, formatDateLabel } from "@/lib/compositor";
+import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
+import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
 import {
   capturedCount,
@@ -29,6 +30,7 @@ import {
   isShooting,
   kioskReducer,
   needsCamera,
+  progressStep,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -40,7 +42,7 @@ import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import { CameraPreview, Lead, ShotProgress, Stage, Title } from "./ui";
+import { BoothScreen, BrandLockup, CameraPreview } from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -215,46 +217,53 @@ export function KioskApp({
     [state.shots],
   );
 
-  // ── Brand font: loaded once, before any frame text is drawn (canvas does not wait for it) ─
+  // ── Brand font and frame artwork: loaded once, before any frame is drawn (canvas waits for
+  // neither). Both are bundled, so this is quick and works offline.
   const fontsRef = useRef<Promise<boolean> | null>(null);
-  const [fontsSettled, setFontsSettled] = useState(false);
+  const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
+  const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
   useEffect(() => {
     fontsRef.current ??= loadFrameFonts(FRAMES);
-    void fontsRef.current.then(() => setFontsSettled(true));
+    assetsRef.current ??= loadFrameAssets(FRAMES).then((r) => r.assets);
+    void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
   }, []);
 
-  // ── Frame picker thumbnails: the guest's real photos in every frame ──────────────────────
+  // ── Frame picker thumbnails: sample photos before shooting, the guest's own after ──────────
+  const placeholders = useMemo(() => (assets ? placeholderPhotos() : null), [assets]);
+  const thumbSource =
+    state.phase === "pick" ? placeholders : state.phase === "frame" ? images : null;
   const selectionKey = state.selectedShotIndices.join("-");
-  const showThumbs = state.phase === "frame";
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
-    if (!showThumbs || !images || !fontsSettled) return out;
-    const dateLabel = formatDateLabel(new Date());
+    if (!thumbSource || !assets) return out;
+    const context = { dateLabel: formatDateLabel(new Date()), assets };
     for (const frame of FRAMES) {
-      const canvas = composeFrame(frame, images.slice(0, frame.slots.length), {
+      const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
         createCanvas: createDomCanvas,
-        context: { dateLabel },
-        scale: 0.2,
+        context,
+        scale: KIOSK_CONFIG.thumbScale,
       }) as HTMLCanvasElement;
-      out[frame.id] = canvas.toDataURL("image/jpeg", 0.8);
+      out[frame.id] = canvas.toDataURL("image/jpeg", 0.85);
     }
     return out;
-  }, [showThumbs, images, fontsSettled]);
+  }, [thumbSource, assets]);
 
-  // ── Final composite ──────────────────────────────────────────────────────────────────────
+  // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
+  const finalPhase = state.phase === "consent" || state.phase === "delivery";
   useEffect(() => {
-    if (state.phase !== "final" || !images) return;
+    if (!finalPhase || !images) return;
     if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey) return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
-    // A font that failed to load must not block the guest: compose with the fallback face.
-    void (fontsRef.current ?? Promise.resolve(false)).then(async () => {
+    // A font or asset that failed to load must not block the guest: compose without it.
+    void Promise.all([fontsRef.current, assetsRef.current]).then(async ([, loaded]) => {
       if (cancelled) return;
       const canvas = composeFrame(frame, chosen, {
         createCanvas: createDomCanvas,
-        context: { dateLabel: formatDateLabel(new Date()) },
+        context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
+        scale: KIOSK_CONFIG.outputScale,
       }) as HTMLCanvasElement;
       const blob = await canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality);
       if (cancelled) return;
@@ -270,14 +279,7 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [
-    state.phase,
-    state.frameId,
-    selectionKey,
-    images,
-    finalImage?.frameId,
-    finalImage?.selectionKey,
-  ]);
+  }, [finalPhase, state.frameId, selectionKey, images, finalImage?.frameId, finalImage?.selectionKey]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
@@ -372,6 +374,22 @@ export function KioskApp({
     };
   }, [qrPending, state.sessionId, showQr]);
 
+  // The guest may answer the wall question while the strip is still being composed, before the
+  // photo is in the upload queue. The consent queue sends an answer as soon as its session has no
+  // queued upload, so storing it that early would send it for a session the server does not know
+  // yet, and the 404 would drop it. The answer is therefore stored once the photo is queued.
+  const photoQueuedRef = useRef(new Map<string, { done: Promise<void>; resolve: () => void }>());
+  const photoQueued = useCallback((sessionId: string) => {
+    let entry = photoQueuedRef.current.get(sessionId);
+    if (!entry) {
+      let resolve = () => {};
+      const done = new Promise<void>((r) => (resolve = r));
+      entry = { done, resolve };
+      photoQueuedRef.current.set(sessionId, entry);
+    }
+    return entry;
+  }, []);
+
   const deliver = useCallback(async () => {
     if (!finalImage || !queueRef.current) return;
     const sessionId = state.sessionId;
@@ -384,6 +402,7 @@ export function KioskApp({
         mime: finalImage.blob.type === "image/png" ? "image/png" : "image/jpeg",
         data: await finalImage.blob.arrayBuffer(),
       });
+      photoQueued(sessionId).resolve();
       const outcome = await queue.deliverNow(sessionId);
       if (outcome.ok) return; // the "uploaded" event shows the QR
       if (outcome.kind === "network" || outcome.kind === "server") {
@@ -399,28 +418,33 @@ export function KioskApp({
         message: err instanceof Error ? err.message : String(err),
       });
     }
-  }, [finalImage, state.sessionId]);
+  }, [finalImage, state.sessionId, photoQueued]);
 
-  const requestDelivery = () => {
-    dispatch({ type: "REQUEST_DELIVERY" });
-    // Already delivered (guest came back from consent): keep the same link.
-    if (state.delivery.status !== "ready") void deliver();
-  };
+  // The upload starts by itself once the composite exists: no button, no waiting at the QR.
+  const deliveryIdle = state.delivery.status === "idle";
+  useEffect(() => {
+    if (finalPhase && finalImage && deliveryIdle) void deliver();
+  }, [finalPhase, finalImage, deliveryIdle, deliver]);
 
   const chooseConsent = (consent: "yes" | "no") => {
-    // Stored first, sent when the photo is on the server, retried until it lands. Whatever
-    // happens here never affects the guest's own download link.
+    // Stored once the photo is queued, sent when it is on the server, retried until it lands.
+    // Whatever happens here never affects the guest's own download link.
     const sessionId = state.sessionId;
-    void consentRef.current?.then(async (c) => {
-      await c.enqueue(sessionId, consent === "yes");
-      await c.processDue(true);
-    });
+    void photoQueued(sessionId)
+      .done.then(() => consentRef.current)
+      .then(async (c) => {
+        if (!c) return;
+        await c.enqueue(sessionId, consent === "yes");
+        await c.processDue(true);
+        photoQueuedRef.current.delete(sessionId);
+      });
     dispatch({ type: "SET_CONSENT", consent });
   };
 
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
+  // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
   useIdleReset(
-    state.phase !== "welcome" && !isShooting(state.phase) && state.phase !== "complete",
+    state.phase !== "welcome" && !isShooting(state.phase),
     KIOSK_CONFIG.idleResetSeconds,
     reset,
   );
@@ -507,7 +531,6 @@ export function KioskApp({
         onConsent={chooseConsent}
         onReset={reset}
         onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
-        onRequestDelivery={requestDelivery}
         wallSubmissionsOpen={wallSubmissions === "open"}
       />
       {flash > 0 && state.phase === "capturing" && (
@@ -550,7 +573,6 @@ interface ScreenProps {
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onStart: () => void;
-  onRequestDelivery: () => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
 }
@@ -575,167 +597,47 @@ function Screen(p: ScreenProps) {
   const { state, dispatch } = p;
   const total = state.shotCount;
   const aspect = KIOSK_CONFIG.captureAspect;
+  const progress = progressStep(state.phase, p.wallSubmissionsOpen);
+  const sessionCode = state.sessionId.slice(0, 8);
 
   switch (state.phase) {
     case "welcome":
+      // The whole screen is the start button (Figma 01 시작: "화면을 눌러 시작").
       return (
-        <Stage testId="screen-welcome">
-          <p className="text-xl tracking-[0.4em] text-amber">CHRISTMAS VILLAGE 2026</p>
-          <Title>
-            <span className="block text-6xl tracking-[0.08em] md:text-7xl">FOLLOW THE LIGHTS</span>
-          </Title>
-          <Lead>한 사람의 순간이 모여, 공동체의 크리스마스 풍경이 됩니다.</Lead>
-          <button type="button" className="btn-primary min-w-80" onClick={p.onStart}>
-            네컷 찍기 시작
-          </button>
-          <p className="text-lg text-mist">
-            사진은 QR로 내 휴대폰에 저장해요 · 이름이나 연락처는 묻지 않아요
-          </p>
-        </Stage>
-      );
-
-    case "camera":
-      return (
-        <Stage testId="screen-camera">
-          <Title>카메라를 켜고 있어요</Title>
-          <Lead>허용을 묻는 창이 뜨면 &lsquo;허용&rsquo;을 눌러 주세요.</Lead>
-        </Stage>
-      );
-
-    case "camera-error": {
-      const copy = CAMERA_ERROR_COPY[state.cameraError ?? "failed"];
-      return (
-        <Stage testId="screen-camera-error">
-          <Title>{copy.title}</Title>
-          <Lead>{copy.lead}</Lead>
-          <div className="flex flex-wrap justify-center gap-4">
+        <section
+          data-testid="screen-welcome"
+          className="booth-sky flex min-h-dvh w-full cursor-pointer items-center px-[max(24px,6.25vw)] portrait:items-end portrait:pb-[6vh]"
+          onClick={p.onStart}
+        >
+          <div className="flex flex-col items-start gap-[max(16px,3vh)] portrait:w-full">
+            <BrandLockup className="h-[clamp(96px,16vh,170px)] w-auto" />
+            <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
+            <p className="booth-lead">
+              여섯 장을 찍고 마음에 드는 사진을 골라 휴대폰으로 받을 수 있어요. 원하시면 저 큰 화면에도 걸어드려요.
+            </p>
             <button
               type="button"
-              className="btn-primary"
-              onClick={() => dispatch({ type: "CAMERA_RETRY" })}
+              className="booth-btn-primary mt-[2vh] portrait:mt-[8vh] portrait:w-full"
+              onClick={p.onStart}
             >
-              다시 시도
-            </button>
-            <button type="button" className="btn-secondary" onClick={p.onReset}>
-              처음으로
+              화면을 눌러 시작
             </button>
           </div>
-        </Stage>
+        </section>
       );
-    }
 
-    case "ready":
+    case "pick":
+    case "frame": {
+      const pick = state.phase === "pick";
       return (
-        <Stage testId="screen-ready" className="gap-6">
-          <ShotProgress done={capturedCount(state)} total={total} />
-          <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror} />
-          <p className="text-2xl text-mist">
-            {total}번 찍어요. 매번 {state.countdownSeconds}초를 셀게요.
-          </p>
-          <button
-            type="button"
-            className="btn-primary min-w-80"
-            onClick={() => dispatch({ type: "BEGIN_SHOOTING" })}
-          >
-            촬영 시작
-          </button>
-          {p.guestCameraChoice && p.devices.length > 1 && (
-            <label className="flex items-center gap-3 text-base text-mist">
-              카메라
-              <select
-                className="rounded-lg bg-night px-3 py-2 text-cream"
-                value={p.deviceId ?? ""}
-                onChange={(e) => p.onSelectDevice(e.target.value)}
-              >
-                <option value="">기본 카메라</option>
-                {p.devices.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <BoothScreen testId={pick ? "screen-pick" : "screen-frame"} progress={progress}>
+          <h1 className="booth-title text-center">
+            {pick ? "마음에 드는 틀을 골라주세요" : "사진을 넣어 봤어요"}
+          </h1>
+          {!pick && (
+            <p className="booth-lead mt-3 text-center">다른 틀이 더 잘 어울리면 바꿔도 돼요.</p>
           )}
-        </Stage>
-      );
-
-    case "countdown":
-    case "capturing":
-      return (
-        <Stage testId="screen-shooting" className="gap-6">
-          <ShotProgress done={capturedCount(state)} total={total} />
-          <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              {state.phase === "countdown" ? (
-                <span
-                  key={`${state.shotIndex}-${state.remaining}`}
-                  data-testid="countdown-number"
-                  className="countdown-pop text-[10rem] font-bold leading-none text-cream drop-shadow-[0_0_30px_rgba(0,0,0,0.6)]"
-                >
-                  {state.remaining}
-                </span>
-              ) : null}
-            </div>
-          </CameraPreview>
-          <p className="text-3xl font-semibold text-cream">
-            {state.retakeIndex !== null
-              ? `${state.shotIndex + 1}번째 사진 다시 찍기`
-              : `${state.shotIndex + 1}번째 사진`}
-          </p>
-        </Stage>
-      );
-
-    case "review":
-      return (
-        <Stage testId="screen-review" className="gap-6">
-          <Title>잘 나왔나요?</Title>
-          <p className="text-xl text-mist">마음에 들지 않는 사진을 누르면 그 사진만 다시 찍어요.</p>
-          <div className="grid w-full max-w-5xl grid-cols-3 gap-3 md:gap-4">
-            {state.shots.map((shot, i) => (
-              <button
-                type="button"
-                key={i}
-                data-testid={`review-shot-${i}`}
-                onClick={() => dispatch({ type: "RETAKE", index: i })}
-                className="group relative overflow-hidden rounded-2xl border-2 border-cream/20 active:border-amber"
-                style={{ aspectRatio: String(aspect) }}
-                aria-label={`${i + 1}번째 사진 다시 찍기`}
-              >
-                {shot && (
-                  // eslint-disable-next-line @next/next/no-img-element -- local object URL
-                  <img src={shot.url} alt="" className="h-full w-full object-cover" />
-                )}
-                <span className="absolute bottom-2 right-2 rounded-lg bg-ink/75 px-3 py-1 text-lg text-cream">
-                  {i + 1} · 다시 찍기
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button
-              type="button"
-              className="btn-primary min-w-72"
-              onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
-            >
-              이대로 좋아요
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => dispatch({ type: "RETAKE_ALL" })}
-            >
-              전부 다시 찍기
-            </button>
-          </div>
-        </Stage>
-      );
-
-    case "frame":
-      return (
-        <Stage testId="screen-frame" className="gap-6">
-          <Title>프레임을 골라 주세요</Title>
-          <Lead>어떤 프레임을 골라도 6번 촬영해요. 사진 선택 수는 프레임마다 달라요.</Lead>
-          <div className="grid max-h-[65dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-[3vh] grid max-h-[66dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -745,346 +647,498 @@ function Screen(p: ScreenProps) {
                   data-testid={`frame-option-${frame.id}`}
                   aria-pressed={selected}
                   onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
-                  className={`flex flex-col items-center gap-3 rounded-2xl border-4 p-3 transition ${
-                    selected ? "border-amber bg-amber/10" : "border-transparent"
+                  className={`flex flex-col items-center gap-4 rounded-[20px] p-[14px] transition portrait:p-[10px] ${
+                    selected ? "border-[5px] border-warm bg-navy" : "border-2 border-white"
                   }`}
                 >
-                  <div className="flex h-[23dvh] items-center justify-center">
+                  <div className="flex h-[min(29vh,330px)] items-center justify-center portrait:h-[min(24vh,50vw)]">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
-                      <img
-                        src={p.thumbs[frame.id]}
-                        alt=""
-                        className="max-h-full w-auto rounded-md"
-                      />
+                      <img src={p.thumbs[frame.id]} alt="" className="max-h-full w-auto" />
                     ) : (
-                      <div className="h-full w-40 animate-pulse rounded-md bg-dusk" />
+                      <div className="aspect-[1/3] h-full animate-pulse bg-navy-700" />
                     )}
                   </div>
-                  <span className="text-xl font-semibold text-cream">{frame.label}</span>
-                  <span className="text-base text-mist">6장 중 {frame.slots.length}장 선택</span>
+                  <span
+                    className={`text-[clamp(26px,3.33vh,36px)] font-bold ${
+                      selected ? "text-warm" : "text-glow"
+                    }`}
+                  >
+                    {frame.label}
+                  </span>
+                  <span className="text-lg text-mist">{frame.slots.length}컷 템플릿</span>
                 </button>
               );
             })}
           </div>
+          <div className="mt-[3vh] flex w-full justify-end portrait:mt-auto">
+            <button
+              type="button"
+              className="booth-btn-primary portrait:w-full"
+              onClick={() =>
+                dispatch(
+                  pick
+                    ? { type: "CONFIRM_PICK" }
+                    : { type: "CONFIRM_FRAME", askConsent: p.wallSubmissionsOpen },
+                )
+              }
+            >
+              {pick ? "이 틀로 찍기" : "이 틀로 할게요"}
+            </button>
+          </div>
+        </BoothScreen>
+      );
+    }
+
+    case "camera":
+      return (
+        <BoothScreen testId="screen-camera" progress={progress} className="gap-6 text-center">
+          <h1 className="booth-title">카메라를 켜고 있어요</h1>
+          <p className="booth-lead">허용을 묻는 창이 뜨면 &lsquo;허용&rsquo;을 눌러 주세요.</p>
+        </BoothScreen>
+      );
+
+    case "camera-error": {
+      const copy = CAMERA_ERROR_COPY[state.cameraError ?? "failed"];
+      return (
+        <BoothScreen testId="screen-camera-error" progress={progress} className="gap-6 text-center">
+          <h1 className="booth-title">{copy.title}</h1>
+          <p className="booth-lead">{copy.lead}</p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              type="button"
+              className="booth-btn-primary"
+              onClick={() => dispatch({ type: "CAMERA_RETRY" })}
+            >
+              다시 시도
+            </button>
+            <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
+              처음으로
+            </button>
+          </div>
+        </BoothScreen>
+      );
+    }
+
+    case "ready":
+    case "countdown":
+    case "capturing": {
+      const shooting = state.phase !== "ready";
+      return (
+        <BoothScreen
+          testId={shooting ? "screen-shooting" : "screen-ready"}
+          progress={progress}
+          className="flex-row items-center gap-[max(24px,2.1vw)] portrait:flex-col portrait:justify-center"
+        >
+          <div className="flex-[1.6] portrait:w-full portrait:flex-none">
+            <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                {state.phase === "countdown" ? (
+                  <span
+                    key={`${state.shotIndex}-${state.remaining}`}
+                    data-testid="countdown-number"
+                    className="countdown-pop text-[clamp(120px,30vh,320px)] font-bold leading-none text-gold drop-shadow-[0_0_30px_rgba(0,0,0,0.6)]"
+                  >
+                    {state.remaining}
+                  </span>
+                ) : null}
+              </div>
+            </CameraPreview>
+          </div>
+          <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG from Figma */}
+            <img
+              src="/kiosk/lights-camera-action.svg"
+              alt="LIGHTS, CAMERA, ACTION!"
+              className="h-[max(56px,8.4vh)] w-auto portrait:h-[max(44px,5vh)]"
+            />
+            <p className="booth-title" data-testid="shot-label">
+              {state.retakeIndex !== null
+                ? `${state.shotIndex + 1}번째 사진 다시 찍기`
+                : `${state.shotIndex + 1}번째 사진`}
+            </p>
+            <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
+            <p className="booth-lead">
+              카메라를 보고 웃어주세요.
+              <br />
+              숫자가 0이 되면 찍혀요.
+            </p>
+            {!shooting && (
+              <>
+                <button
+                  type="button"
+                  className="booth-btn-primary"
+                  onClick={() => dispatch({ type: "BEGIN_SHOOTING" })}
+                >
+                  촬영 시작
+                </button>
+                <p className="booth-caption">
+                  {total}번 찍어요. 매번 {state.countdownSeconds}초를 셀게요.
+                </p>
+                {p.guestCameraChoice && p.devices.length > 1 && (
+                  <label className="flex items-center gap-3 text-base text-ink-400">
+                    카메라
+                    <select
+                      className="rounded-lg bg-navy px-3 py-2 text-glow"
+                      value={p.deviceId ?? ""}
+                      onChange={(e) => p.onSelectDevice(e.target.value)}
+                    >
+                      <option value="">기본 카메라</option>
+                      {p.devices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
+          </div>
+        </BoothScreen>
+      );
+    }
+
+    case "review":
+      return (
+        <BoothScreen testId="screen-review" progress={progress}>
+          <h1 className="booth-title">잘 나왔나요?</h1>
+          <div className="mt-[3vh] grid w-full grid-cols-4 gap-[max(12px,1.1vw)] portrait:grid-cols-2">
+            {state.shots.map((shot, i) => (
+              <div key={i} className="flex flex-col gap-[1.6vh]">
+                <div
+                  className="overflow-hidden rounded-xl bg-navy-700"
+                  style={{ aspectRatio: String(aspect) }}
+                  data-testid={`review-shot-${i}`}
+                >
+                  {shot && (
+                    // eslint-disable-next-line @next/next/no-img-element -- local object URL
+                    <img
+                      src={shot.url}
+                      alt={`${i + 1}번째 사진`}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: "RETAKE", index: i })}
+                  className="min-h-[max(56px,7.6vh)] rounded-full bg-navy text-[clamp(20px,2.6vh,28px)] font-bold text-warm active:scale-[0.98]"
+                  aria-label={`${i + 1}번째 사진 다시 찍기`}
+                >
+                  다시 찍기
+                </button>
+              </div>
+            ))}
+          </div>
           <button
             type="button"
-            className="btn-primary min-w-80"
-            onClick={() => dispatch({ type: "CONFIRM_FRAME" })}
+            className="booth-btn-primary mt-[4vh] portrait:mt-auto portrait:w-full"
+            onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
           >
-            이 프레임으로 사진 고르기
+            이대로 좋아요
           </button>
-        </Stage>
+        </BoothScreen>
       );
 
     case "select": {
       const required = getFrame(state.frameId).slots.length;
       const selected = state.selectedShotIndices;
       return (
-        <Stage testId="screen-select" className="gap-5">
-          <Title>6장 중 {required}장을 골라주세요</Title>
-          <Lead>
+        <BoothScreen testId="screen-select" progress={progress}>
+          <h1 className="booth-title text-center">6장 중 {required}장을 골라주세요</h1>
+          <p className="booth-lead mt-3 text-center" data-testid="select-required" data-required={required}>
             선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.
-          </Lead>
-          <div className="grid w-full max-w-5xl grid-cols-3 gap-3">
+          </p>
+          <div className="mt-[3vh] grid w-full max-w-5xl grid-cols-3 gap-3 overflow-y-auto portrait:grid-cols-2">
             {state.shots.map((shot, index) => {
               const order = selected.indexOf(index);
-              const picked = order >= 0;
               return (
                 <button
                   key={index}
                   type="button"
                   data-testid={`select-shot-${index}`}
-                  aria-pressed={picked}
-                  aria-label={`${index + 1}번째 사진 ${picked ? "선택 해제" : "선택"}`}
+                  aria-label={`${index + 1}번째 사진 ${order >= 0 ? "선택 해제" : "선택"}`}
+                  aria-pressed={order >= 0}
                   onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
-                  className={`relative overflow-hidden rounded-xl border-4 transition ${picked ? "border-amber" : "border-cream/20"}`}
-                  style={{ aspectRatio: String(aspect) }}
+                  className={`relative rounded-xl border-4 p-1 transition ${order >= 0 ? "border-warm" : "border-white/30"}`}
                 >
                   {shot && (
-                    // eslint-disable-next-line @next/next/no-img-element -- local object URL
-                    <img src={shot.url} alt="" className="h-full w-full object-cover" />
+                    // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
+                    <img src={shot.url} alt="" className="w-full rounded-lg object-cover" style={{ aspectRatio: String(aspect) }} />
                   )}
-                  <span className="absolute bottom-2 left-2 rounded-lg bg-ink/80 px-3 py-1 text-lg text-cream">
-                    {picked ? `✓ ${order + 1}번째 선택` : `사진 ${index + 1}`}
+                  <span className="absolute left-2 top-2 rounded-full bg-navy px-3 py-1 text-xl font-bold text-warm">
+                    {order >= 0 ? order + 1 : index + 1}
                   </span>
                 </button>
               );
             })}
           </div>
-          <p className="text-lg text-mist" data-testid="selection-progress">
-            선택한 사진: {selected.length} / {required}
-            {selected.length === required ? " · 완료할 수 있어요" : " · 사진을 더 골라주세요"}
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="mt-5 flex w-full max-w-5xl justify-between gap-4">
+            <button type="button" className="booth-btn-secondary" onClick={() => dispatch({ type: "BACK_TO_FRAME" })}>프레임 바꾸기</button>
             <button
               type="button"
-              className="btn-primary min-w-80"
               data-testid="confirm-selection"
+              className="booth-btn-primary"
               disabled={selected.length !== required}
-              onClick={() => dispatch({ type: "CONFIRM_SELECTION" })}
-            >
-              이 사진으로 완성하기
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
-            >
-              프레임 바꾸기
-            </button>
+              onClick={() => dispatch({ type: "CONFIRM_SELECTION", askConsent: p.wallSubmissionsOpen })}
+            >이 사진으로 완성하기</button>
           </div>
-        </Stage>
-      );
-    }
-
-    case "final":
-      return (
-        <Stage testId="screen-final" className="gap-6">
-          <Title>완성됐어요!</Title>
-          <div className="flex h-[58dvh] items-center">
-            {p.finalImage?.frameId === state.frameId &&
-            p.finalImage.selectionKey === state.selectedShotIndices.join("-") ? (
-              // eslint-disable-next-line @next/next/no-img-element -- local object URL
-              <img
-                src={p.finalImage.url}
-                alt="완성된 네컷 사진"
-                data-testid="final-image"
-                data-width={p.finalImage.width}
-                data-height={p.finalImage.height}
-                className="max-h-full w-auto rounded-lg shadow-[0_0_60px_rgba(255,207,138,0.2)]"
-              />
-            ) : (
-              <p className="text-2xl text-mist">사진을 만들고 있어요…</p>
-            )}
-          </div>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button
-              type="button"
-              className="btn-primary min-w-80"
-              disabled={
-                !p.finalImage || p.finalImage.selectionKey !== state.selectedShotIndices.join("-")
-              }
-              onClick={p.onRequestDelivery}
-            >
-              휴대폰으로 받기
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => dispatch({ type: "BACK_TO_SELECTION" })}
-            >
-              사진 다시 고르기
-            </button>
-            <button
-              type="button"
-              className="btn-quiet"
-              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
-            >
-              프레임 바꾸기
-            </button>
-          </div>
-          {p.finalImage && p.finalImage.selectionKey === state.selectedShotIndices.join("-") && (
-            <a
-              href={p.finalImage.url}
-              download={`follow-the-lights-${state.sessionId.slice(0, 8)}.jpg`}
-              className="btn-quiet"
-              data-testid="local-download"
-            >
-              이 기기에 파일로 저장
-            </a>
-          )}
-        </Stage>
-      );
-
-    case "delivery": {
-      const d = state.delivery;
-      return (
-        <Stage testId="screen-delivery" className="gap-6">
-          {d.status === "ready" && p.qrSvg ? (
-            <>
-              <p className="text-xl font-semibold text-amber" data-testid="delivery-ready">
-                사진 준비 완료
-              </p>
-              <Title>휴대폰 카메라로 QR을 비춰 주세요</Title>
-              <div
-                data-testid="qr-code"
-                data-url={d.url}
-                className="w-[min(44dvh,80vw)] rounded-2xl bg-white p-4"
-                // QR markup comes from the qrcode library, generated locally from our own URL.
-                dangerouslySetInnerHTML={{ __html: p.qrSvg }}
-              />
-              <Lead>로그인이나 전화번호 없이 바로 저장할 수 있어요.</Lead>
-              <button
-                type="button"
-                className="btn-primary min-w-80"
-                onClick={() =>
-                  dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
-                }
-              >
-                다 받았어요
-              </button>
-              {/* Small reference staff can look up in /admin → 최근 세션 if the QR gets lost. */}
-              <p className="font-mono text-base text-mist/70" data-testid="session-code">
-                세션 {state.sessionId.slice(0, 8)}
-              </p>
-            </>
-          ) : d.status === "qr-pending" ? (
-            <div data-testid="delivery-qr-pending" className="flex flex-col items-center gap-8">
-              <Title>QR을 준비하고 있어요</Title>
-              <Lead>
-                사진은 안전하게 저장했어요. 인터넷이 조금 느려서 QR이 늦어지고 있어요. 잠시만
-                기다리면 이 화면에 QR이 나와요.
-              </Lead>
-              <button
-                type="button"
-                className="btn-secondary"
-                data-testid="qr-pending-continue"
-                onClick={() =>
-                  dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
-                }
-              >
-                QR 없이 다음으로
-              </button>
-              {/* Without a QR this is how staff find the photo later (최근 세션 → QR 다시 보여주기). */}
-              <p className="font-mono text-base text-mist/70" data-testid="session-code">
-                세션 {state.sessionId.slice(0, 8)}
-              </p>
-            </div>
-          ) : d.status === "queued" ? (
-            <div data-testid="delivery-queued" className="flex flex-col items-center gap-8">
-              <Title>
-                {d.reason === "auth" ? "도우미를 불러 주세요" : "네트워크 연결을 확인하고 있어요"}
-              </Title>
-              <Lead>
-                {d.reason === "auth"
-                  ? "이 기기 등록이 필요해요. 사진은 이 기기에 안전하게 보관 중이에요."
-                  : "사진은 이 기기에 안전하게 저장했어요. 연결되면 자동으로 보내고 QR을 보여 드릴게요."}
-              </Lead>
-              <div className="flex flex-wrap justify-center gap-4">
-                <button type="button" className="btn-primary" onClick={p.onRetryDelivery}>
-                  다시 시도
-                </button>
-                {/* The photo is safe on this device and uploads later, so the wall question
-                    still makes sense: the answer waits with it (ConsentQueue). */}
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  data-testid="queued-continue"
-                  onClick={() =>
-                    dispatch(p.wallSubmissionsOpen ? { type: "TO_CONSENT" } : { type: "FINISH" })
-                  }
-                >
-                  QR 없이 다음으로
-                </button>
-              </div>
-            </div>
-          ) : d.status === "failed" ? (
-            <>
-              <Title>사진을 보내지 못했어요</Title>
-              <Lead>도우미에게 알려 주세요.</Lead>
-              <div className="flex flex-wrap justify-center gap-4">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => dispatch({ type: "FINISH" })}
-                >
-                  그만하기
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <Title>사진을 보내고 있어요</Title>
-              <Lead>잠시만 기다려 주세요.</Lead>
-            </>
-          )}
-        </Stage>
+        </BoothScreen>
       );
     }
 
     case "consent":
       return (
-        <Stage testId="screen-consent" className="gap-8">
-          <Title>
-            내 사진을 Christmas Village
-            <br />
-            미디어월에도 보여줄까요?
-          </Title>
-          <Lead>
-            운영진이 확인한 사진만 보여져요. 어떤 선택을 해도 내 휴대폰 사진에는 영향이 없어요.
-          </Lead>
-          {/* Equal size and weight on purpose: neither answer is the "right" one. */}
-          <div className="grid w-full max-w-3xl grid-cols-1 gap-5 md:grid-cols-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              data-testid="consent-yes"
-              onClick={() => p.onConsent("yes")}
-            >
-              네, 함께 보여주세요
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              data-testid="consent-no"
-              onClick={() => p.onConsent("no")}
-            >
-              아니요, 사진만 저장할게요
-            </button>
+        <BoothScreen
+          testId="screen-consent"
+          progress={progress}
+          className="flex-row items-center justify-center gap-[max(32px,4vw)] portrait:flex-col portrait:gap-[3vh]"
+        >
+          <FinalPreview finalImage={p.finalImage} frameId={state.frameId} />
+          <div className="flex max-w-[44rem] flex-col items-start gap-[max(14px,2.2vh)] portrait:w-full portrait:max-w-none portrait:items-center portrait:text-center">
+            <h1 className="booth-title">
+              이 사진을 미디어월에
+              <br />
+              띄워도 될까요?
+            </h1>
+            <p className="booth-lead">
+              미디어월에 다른 분들 사진과 함께 돌아가며 보여요.
+              <br />
+              아니요를 눌러도 사진은 받을 수 있어요.
+            </p>
+            {/* Equal size and weight on purpose: neither answer is the "right" one. */}
+            <div className="flex w-full max-w-[30rem] flex-col gap-[max(14px,2.6vh)] portrait:max-w-none">
+              <button
+                type="button"
+                className="booth-btn-secondary w-full"
+                data-testid="consent-yes"
+                onClick={() => p.onConsent("yes")}
+              >
+                네, 띄워주세요
+              </button>
+              <button
+                type="button"
+                className="booth-btn-secondary w-full"
+                data-testid="consent-no"
+                onClick={() => p.onConsent("no")}
+              >
+                아니요, 저만 볼게요
+              </button>
+            </div>
+            <p className="booth-caption text-[clamp(18px,2.2vh,24px)]">
+              {/* Figma: "행사가 끝나면 지워져요". Not what retention does yet (hub 24 h / event end,
+                  cloud PHOTO_RETENTION_DAYS); the church decides the period (docs/STATUS.md). */}
+              사진은 정해진 기간이 지나면 지워져요.
+              <br />
+              띄운 뒤에도 안내 봉사자에게 말하면 바로 내려드려요.
+            </p>
           </div>
-        </Stage>
+        </BoothScreen>
       );
 
-    case "complete":
-      return (
-        <Stage testId="screen-complete">
-          <Title>함께해 주셔서 고마워요</Title>
-          <Lead>
-            {state.consent === "yes"
-              ? "확인이 끝나면 마을의 밤 풍경 속에 사진이 나타나요."
-              : "메리 크리스마스! 따뜻한 밤 보내세요."}
-          </Lead>
-          {state.delivery.status === "ready" && p.qrSvg && (
-            <div className="flex items-center gap-5 rounded-2xl bg-night/70 p-4">
+    case "delivery": {
+      const d = state.delivery;
+      if (d.status === "ready" && p.qrSvg) {
+        return (
+          <BoothScreen
+            testId="screen-delivery"
+            progress={progress}
+            className="flex-row items-center justify-center gap-[max(40px,6.25vw)] portrait:flex-col portrait:gap-[2.4vh] portrait:text-center"
+          >
+            {/* Portrait (iPad): title, lead, QR, button — the column dissolves into the screen's. */}
+            <div
+              className="flex flex-col items-start gap-[max(16px,2.6vh)] portrait:contents"
+              data-testid="delivery-ready"
+            >
+              <h1 className="booth-title portrait:order-1">휴대폰으로 사진을 받아 가세요</h1>
+              <p className="booth-lead portrait:order-2">
+                휴대폰 카메라로 QR을 비춰 주세요.
+                {state.consent === "yes" && (
+                  <>
+                    <br />
+                    잠시 뒤 큰 화면에서 내 사진을 찾아보세요.
+                  </>
+                )}
+              </p>
+              <button
+                type="button"
+                className="booth-btn-secondary portrait:order-4 portrait:w-full"
+                onClick={p.onReset}
+              >
+                다 받았어요
+              </button>
+              <p className="booth-caption portrait:order-5">잠시 뒤 처음 화면으로 돌아가요</p>
+            </div>
+            <div className="flex flex-col items-center gap-5 rounded-[28px] bg-glow p-[max(24px,3.7vh)] portrait:order-3">
               <div
-                className="w-36 rounded-lg bg-white p-2"
+                data-testid="qr-code"
+                data-url={d.url}
+                className="w-[clamp(220px,30vh,320px)] rounded-xl bg-white p-3"
+                // QR markup comes from the qrcode library, generated locally from our own URL.
                 dangerouslySetInnerHTML={{ __html: p.qrSvg }}
               />
-              <p className="max-w-56 text-left text-lg text-mist">
-                아직 못 받으셨다면 지금 QR을 비춰 주세요.
+              <p className="text-center text-[clamp(20px,2.6vh,28px)] font-bold leading-[1.35] text-[#0b1026]">
+                휴대폰으로 찍으면
+                <br />
+                사진 파일을 받을 수 있어요
+              </p>
+              {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
+              <p className="font-mono text-lg text-[#4b5068]" data-testid="session-code">
+                세션 {sessionCode}
               </p>
             </div>
+          </BoothScreen>
+        );
+      }
+      return (
+        <BoothScreen testId="screen-delivery" progress={progress} className="gap-6 text-center">
+          {d.status === "qr-pending" ? (
+            <div data-testid="delivery-qr-pending" className="flex flex-col items-center gap-6">
+              <h1 className="booth-title">QR을 준비하고 있어요</h1>
+              <p className="booth-lead">
+                사진은 안전하게 저장했어요. 인터넷이 조금 느려서 QR이 늦어지고 있어요.
+                <br />
+                잠시만 기다리면 이 화면에 QR이 나와요.
+              </p>
+              {/* Without a QR this is how staff find the photo later (최근 세션 → QR 다시 보여주기). */}
+              <button
+                type="button"
+                className="booth-btn-secondary"
+                data-testid="qr-pending-continue"
+                onClick={p.onReset}
+              >
+                QR 없이 처음으로
+              </button>
+              <p className="font-mono text-lg text-ink-400" data-testid="session-code">
+                세션 {sessionCode}
+              </p>
+            </div>
+          ) : d.status === "queued" ? (
+            <div data-testid="delivery-queued" className="flex flex-col items-center gap-6">
+              <h1 className="booth-title">
+                {d.reason === "auth" ? "도우미를 불러 주세요" : "사진을 보내고 있어요"}
+              </h1>
+              <p className="booth-lead">
+                {d.reason === "auth" ? (
+                  "이 기기 등록이 필요해요. 사진은 이 기기에 안전하게 보관 중이에요."
+                ) : (
+                  <>
+                    사진은 이 기기에 안전하게 저장했어요.
+                    <br />
+                    연결되면 자동으로 보내고 QR을 보여 드릴게요.
+                  </>
+                )}
+              </p>
+              <div className="flex flex-wrap justify-center gap-4">
+                <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
+                  다시 시도
+                </button>
+                {/* The photo and the wall answer are safe on this device and go out later. */}
+                <button
+                  type="button"
+                  className="booth-btn-secondary"
+                  data-testid="queued-continue"
+                  onClick={p.onReset}
+                >
+                  QR 없이 처음으로
+                </button>
+              </div>
+              <p className="font-mono text-lg text-ink-400" data-testid="session-code">
+                세션 {sessionCode}
+              </p>
+            </div>
+          ) : d.status === "failed" ? (
+            <>
+              <h1 className="booth-title">사진을 보내지 못했어요</h1>
+              <p className="booth-lead">도우미에게 알려 주세요.</p>
+              <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
+                처음으로
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="booth-title">사진을 보내고 있어요</h1>
+              <p className="booth-lead">잠시만 기다려 주세요.</p>
+            </>
           )}
-          <button type="button" className="btn-primary min-w-72" onClick={p.onReset}>
-            처음으로
-          </button>
-          <CompleteCountdown seconds={KIOSK_CONFIG.completeResetSeconds} onDone={p.onReset} />
-        </Stage>
+        </BoothScreen>
       );
+    }
   }
 }
 
-/** Mounted fresh on the complete screen, so its timer always starts from the full count. */
-function CompleteCountdown({ seconds, onDone }: { seconds: number; onDone: () => void }) {
-  const [left, setLeft] = useState(seconds);
-  useEffect(() => {
-    const started = Date.now();
-    const timer = setInterval(() => {
-      const remaining = seconds - Math.floor((Date.now() - started) / 1000);
-      setLeft(Math.max(0, remaining));
-      if (remaining <= 0) {
-        clearInterval(timer);
-        onDone();
-      }
-    }, 250);
-    return () => clearInterval(timer);
-  }, [seconds, onDone]);
+/** The finished strip, shown beside the wall question. */
+function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; frameId: string }) {
   return (
-    <p className="text-lg text-mist" data-testid="complete-countdown">
-      {left}초 후 처음 화면으로 돌아가요
-    </p>
+    <div className="flex h-[min(66vh,720px)] items-center portrait:h-[36vh]">
+      {finalImage?.frameId === frameId ? (
+        // eslint-disable-next-line @next/next/no-img-element -- local object URL
+        <img
+          src={finalImage.url}
+          alt="완성된 사진"
+          data-testid="final-image"
+          data-width={finalImage.width}
+          data-height={finalImage.height}
+          className="max-h-full w-auto shadow-[0_0_60px_rgba(255,227,163,0.18)]"
+        />
+      ) : (
+        <div
+          className="aspect-[1/3] h-full animate-pulse bg-navy-700"
+          aria-label="사진을 만들고 있어요"
+        />
+      )}
+    </div>
   );
+}
+
+/** Six small boxes beside the camera: ✓ done, gold outline = this shot. */
+function ShotStrip({ state, current }: { state: State; current: number }) {
+  return (
+    <div
+      className="flex gap-3"
+      aria-label={`${state.shotCount}장 중 ${capturedCount(state)}장 촬영`}
+    >
+      {state.shots.map((shot, i) => (
+        <span
+          key={i}
+          className={`flex aspect-[4/3] w-[max(56px,5.6vh)] items-center justify-center rounded-md font-mono text-sm ${
+            i === current
+              ? "border-2 border-warm bg-navy-700 text-warm"
+              : shot
+                ? "bg-navy-700 text-warm"
+                : "bg-navy text-ink-400"
+          }`}
+        >
+          {shot && i !== current ? "✓" : i + 1}
+        </span>
+      ))}
+      <span className="sr-only" data-testid="shot-progress">
+        {capturedCount(state)} / {state.shotCount}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Sample photos for the frame picker before shooting (Figma Photo/Slot: a navy gradient). The
+ * same compositor draws them, so the thumbnail is the frame the guest will get.
+ */
+function placeholderPhotos(): ComposeImage[] {
+  return [1, 2, 3, 4, 5, 6].map((n) => {
+    const canvas = createDomCanvas(400, 300) as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createLinearGradient(0, 0, 400, 300);
+    gradient.addColorStop(0, "#3a4370");
+    gradient.addColorStop(0.71, "#232a52");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 400, 300);
+    ctx.fillStyle = "#8a8fa6";
+    ctx.font = "18px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`PHOTO ${n}`, 200, 156);
+    return { source: canvas, width: 400, height: 300 };
+  });
 }
 
 function StatusBadges({

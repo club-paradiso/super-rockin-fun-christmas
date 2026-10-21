@@ -4,6 +4,7 @@ import {
   capturedCount,
   createInitialState,
   kioskReducer,
+  progressStep,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -13,9 +14,9 @@ const SESSION = "11111111-2222-4333-8444-555555555555";
 
 function init(): S {
   return createInitialState<string>({
-    shotCount: 6,
+    shotCount: 4,
     countdownSeconds: 3,
-    frameId: "starlight-strip",
+    frameId: "navy-strip",
   });
 }
 
@@ -24,7 +25,7 @@ function run(state: S, ...actions: KioskAction<string>[]): S {
 }
 
 const toReady = (s = init()) =>
-  run(s, { type: "START", sessionId: SESSION }, { type: "CAMERA_READY" });
+  run(s, { type: "START", sessionId: SESSION }, { type: "CONFIRM_PICK" }, { type: "CAMERA_READY" });
 const ticks = (n: number) => Array.from({ length: n }, () => ({ type: "TICK" }) as const);
 
 /** Count down and capture one shot. */
@@ -33,7 +34,7 @@ const shoot = (s: S, label: string) =>
 
 function toReview(): S {
   let s = run(toReady(), { type: "BEGIN_SHOOTING" });
-  for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
+  for (let i = 0; i < 4; i++) s = shoot(s, `shot-${i}`);
   return s;
 }
 
@@ -62,15 +63,15 @@ describe("countdown", () => {
   });
 });
 
-describe("exactly six captures", () => {
-  it("goes to review after the sixth shot, in order", () => {
+describe("exactly four captures", () => {
+  it("goes to review after the fourth shot, in order", () => {
     const s = toReview();
     expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3", "shot-4", "shot-5"]);
-    expect(capturedCount(s)).toBe(6);
+    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3"]);
+    expect(capturedCount(s)).toBe(4);
   });
 
-  it("rejects a stray seventh frame", () => {
+  it("rejects a stray fifth frame", () => {
     const s = toReview();
     expect(run(s, { type: "SHOT_CAPTURED", shot: "extra" })).toBe(s);
   });
@@ -80,7 +81,7 @@ describe("exactly six captures", () => {
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
-  it("only confirms when all six exist", () => {
+  it("only confirms when all four exist", () => {
     const s = toReview();
     expect(run(s, { type: "CONFIRM_SHOTS" }).phase).toBe("frame");
   });
@@ -92,19 +93,19 @@ describe("retake", () => {
     expect([s.phase, s.shotIndex, s.retakeIndex]).toEqual(["countdown", 2, 2]);
     s = shoot(s, "new-2");
     expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "new-2", "shot-3", "shot-4", "shot-5"]);
+    expect(s.shots).toEqual(["shot-0", "shot-1", "new-2", "shot-3"]);
     expect(s.retakeIndex).toBeNull();
   });
 
   it("retake all clears every shot and starts from the first", () => {
     const s = run(toReview(), { type: "RETAKE_ALL" });
-    expect(s.shots).toEqual([null, null, null, null, null, null]);
+    expect(s.shots).toEqual([null, null, null, null]);
     expect([s.phase, s.shotIndex]).toEqual(["countdown", 0]);
   });
 
   it("ignores out-of-range retakes", () => {
     const s = toReview();
-    expect(run(s, { type: "RETAKE", index: 6 })).toBe(s);
+    expect(run(s, { type: "RETAKE", index: 4 })).toBe(s);
   });
 });
 
@@ -130,85 +131,97 @@ describe("failures", () => {
   });
 });
 
-describe("delivery and consent are independent", () => {
-  const toFinal = () =>
-    run(
-      toReview(),
-      { type: "CONFIRM_SHOTS" },
-      { type: "CONFIRM_FRAME" },
-      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
-      { type: "CONFIRM_SELECTION" },
-    );
+describe("frame first, then again with the photos", () => {
+  it("start → pick a frame → camera; the choice is preselected after shooting", () => {
+    let s = run(init(), { type: "START", sessionId: SESSION });
+    expect(s.phase).toBe("pick");
+    s = run(s, { type: "SELECT_FRAME", frameId: "clothesline" }, { type: "CONFIRM_PICK" });
+    expect([s.phase, s.frameId]).toEqual(["camera", "clothesline"]);
+    s = run(s, { type: "CAMERA_READY" }, { type: "BEGIN_SHOOTING" });
+    for (let i = 0; i < 4; i++) s = shoot(s, `shot-${i}`);
+    s = run(s, { type: "CONFIRM_SHOTS" });
+    expect([s.phase, s.frameId]).toEqual(["frame", "clothesline"]);
+    s = run(s, { type: "SELECT_FRAME", frameId: "cream-strip" });
+    expect(s.frameId).toBe("cream-strip");
+  });
 
-  it("declining the wall keeps the delivered link", () => {
-    let s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_STARTED" },
-      {
-        type: "DELIVERY_SUCCEEDED",
-        token: "t",
-        url: "https://x/p/t",
-        expiresAt: "2026-12-27T00:00:00Z",
-      },
-      { type: "TO_CONSENT" },
-      { type: "SET_CONSENT", consent: "no" },
-    );
-    expect(s.phase).toBe("complete");
+  it("does not start the camera or change the frame from other screens", () => {
+    const welcome = init();
+    expect(run(welcome, { type: "CONFIRM_PICK" })).toBe(welcome);
+    const review = toReview();
+    expect(run(review, { type: "SELECT_FRAME", frameId: "x" })).toBe(review);
+  });
+
+  it("asks the wall question unless submissions are paused", () => {
+    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(frame, { type: "CONFIRM_FRAME", askConsent: true }).phase).toBe("consent");
+    expect(run(frame, { type: "CONFIRM_FRAME", askConsent: false }).phase).toBe("delivery");
+  });
+});
+
+describe("delivery and consent are independent", () => {
+  const toConsent = () =>
+    run(toReview(), { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME", askConsent: true });
+  const ready = {
+    type: "DELIVERY_SUCCEEDED",
+    token: "t",
+    url: "https://x/p/t",
+    expiresAt: "2026-12-27T00:00:00Z",
+  } as const;
+
+  it("the upload runs while the guest answers; declining keeps the link", () => {
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, ready);
+    expect([s.phase, s.delivery.status]).toEqual(["consent", "ready"]);
+    s = run(s, { type: "SET_CONSENT", consent: "no" });
+    expect(s.phase).toBe("delivery");
     expect(s.consent).toBe("no");
     expect(s.delivery).toMatchObject({ status: "ready", token: "t" });
     s = run(s, { type: "SET_CONSENT", consent: "yes" });
-    expect(s.consent).toBe("no"); // answer is final once complete
+    expect(s.consent).toBe("no"); // answered once; the QR screen cannot change it
+  });
+
+  it("the QR may arrive after the answer", () => {
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, { type: "SET_CONSENT", consent: "yes" });
+    expect([s.phase, s.delivery.status]).toEqual(["delivery", "uploading"]);
+    s = run(s, ready);
+    expect(s.delivery.status).toBe("ready");
   });
 
   it("hub + cloud: QR pending → link arrives → ready; pending never replaces a ready QR", () => {
-    let s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_STARTED" },
-      { type: "DELIVERY_QR_PENDING" },
-    );
+    let s = run(toConsent(), { type: "DELIVERY_STARTED" }, { type: "DELIVERY_QR_PENDING" });
     expect(s.delivery).toEqual({ status: "qr-pending" });
-    s = run(s, {
-      type: "DELIVERY_SUCCEEDED",
-      token: "t",
-      url: "https://x/p/t",
-      expiresAt: "2026-12-27T00:00:00Z",
-    });
+    s = run(s, ready);
     expect(s.delivery).toMatchObject({ status: "ready", url: "https://x/p/t" });
     s = run(s, { type: "DELIVERY_QR_PENDING" });
     expect(s.delivery.status).toBe("ready");
   });
 
-  it("QR pending: the guest can still answer the wall question", () => {
+  it("offline: the photo waits on the device and the guest still answers", () => {
     const s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_QR_PENDING" },
-      { type: "TO_CONSENT" },
+      toConsent(),
+      { type: "DELIVERY_QUEUED", reason: "network" },
       { type: "SET_CONSENT", consent: "yes" },
     );
-    expect([s.phase, s.consent]).toEqual(["complete", "yes"]);
+    expect([s.phase, s.consent, s.delivery.status]).toEqual(["delivery", "yes", "queued"]);
   });
 
-  it("a failed delivery can still finish the session", () => {
-    const s = run(
-      toFinal(),
-      { type: "REQUEST_DELIVERY" },
-      { type: "DELIVERY_FAILED", message: "offline" },
-      { type: "FINISH" },
-    );
-    expect(s.phase).toBe("complete");
-    expect(s.consent).toBeNull();
+  it("ignores delivery events before the frame is final", () => {
+    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(frame, ready)).toBe(frame);
+    expect(run(frame, { type: "DELIVERY_STARTED" })).toBe(frame);
   });
+});
 
-  it("frame choice can change from the final preview", () => {
-    const s = run(
-      toFinal(),
-      { type: "BACK_TO_FRAME" },
-      { type: "SELECT_FRAME", frameId: "village-window" },
-    );
-    expect([s.phase, s.frameId]).toEqual(["frame", "village-window"]);
+describe("progress", () => {
+  it("counts six steps, or five while the wall question is skipped", () => {
+    expect(progressStep("welcome", true)).toBeNull();
+    expect(progressStep("pick", true)).toEqual({ step: 1, total: 6 });
+    expect(progressStep("countdown", true)).toEqual({ step: 2, total: 6 });
+    expect(progressStep("review", true)).toEqual({ step: 3, total: 6 });
+    expect(progressStep("frame", true)).toEqual({ step: 4, total: 6 });
+    expect(progressStep("consent", true)).toEqual({ step: 5, total: 6 });
+    expect(progressStep("delivery", true)).toEqual({ step: 6, total: 6 });
+    expect(progressStep("delivery", false)).toEqual({ step: 5, total: 5 });
   });
 });
 
@@ -217,78 +230,24 @@ describe("reset", () => {
     const done = run(
       toReview(),
       { type: "CONFIRM_SHOTS" },
-      { type: "SELECT_FRAME", frameId: "village-window" },
-      { type: "CONFIRM_FRAME" },
-      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
-      { type: "CONFIRM_SELECTION" },
-      { type: "REQUEST_DELIVERY" },
+      { type: "SELECT_FRAME", frameId: "wood-window" },
+      { type: "CONFIRM_FRAME", askConsent: true },
       { type: "DELIVERY_SUCCEEDED", token: "t", url: "u", expiresAt: "e" },
-      { type: "TO_CONSENT" },
       { type: "SET_CONSENT", consent: "yes" },
     );
     const s = run(done, { type: "RESET" });
     expect(s.phase).toBe("welcome");
     expect(s.sessionId).toBe("");
-    expect(s.shots).toEqual([null, null, null, null, null, null]);
+    expect(s.shots).toEqual([null, null, null, null]);
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
     expect(s.retakeIndex).toBeNull();
+    expect(s.frameId).toBe("wood-window"); // last choice becomes the next default
   });
 
   it("each START begins a new session id", () => {
     const a = run(init(), { type: "START", sessionId: "a" });
     const b = run(a, { type: "RESET" }, { type: "START", sessionId: "b" });
     expect([a.sessionId, b.sessionId]).toEqual(["a", "b"]);
-  });
-});
-
-describe("per-template ordered photo selection", () => {
-  const selectState = (frameId: string) =>
-    run(
-      toReview(),
-      { type: "CONFIRM_SHOTS" },
-      { type: "SELECT_FRAME", frameId },
-      { type: "CONFIRM_FRAME" },
-    );
-
-  it.each([
-    ["two-stars", [4, 1]],
-    ["three-moments", [3, 0, 5]],
-    ["starlight-strip", [5, 2, 0, 1]],
-    ["five-lights", [5, 4, 3, 2, 1]],
-    ["six-lights", [5, 4, 3, 2, 1, 0]],
-  ] as const)("%s finishes only with the exact selected count", (frameId, indexes) => {
-    let state = selectState(frameId);
-    expect(state.phase).toBe("select");
-    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("select");
-    for (const index of indexes) state = run(state, { type: "TOGGLE_SHOT_SELECTION", index });
-    expect(state.selectedShotIndices).toEqual(indexes);
-    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("final");
-  });
-
-  it("ignores duplicate/out-of-range choices and limits to template slots", () => {
-    let state = selectState("two-stars");
-    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 0 });
-    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 1 });
-    expect(run(state, { type: "TOGGLE_SHOT_SELECTION", index: 2 })).toBe(state);
-    expect(run(state, { type: "TOGGLE_SHOT_SELECTION", index: 6 })).toBe(state);
-    state = run(state, { type: "TOGGLE_SHOT_SELECTION", index: 0 });
-    expect(state.selectedShotIndices).toEqual([1]);
-    expect(run(state, { type: "CONFIRM_SELECTION" }).phase).toBe("select");
-  });
-
-  it("changing frame resets selection; returning from final preserves it until frame changes", () => {
-    let state = selectState("two-stars");
-    state = run(
-      state,
-      { type: "TOGGLE_SHOT_SELECTION", index: 4 },
-      { type: "TOGGLE_SHOT_SELECTION", index: 2 },
-      { type: "CONFIRM_SELECTION" },
-    );
-    expect(state.phase).toBe("final");
-    state = run(state, { type: "BACK_TO_SELECTION" });
-    expect(state.selectedShotIndices).toEqual([4, 2]);
-    state = run(state, { type: "BACK_TO_FRAME" }, { type: "SELECT_FRAME", frameId: "six-lights" });
-    expect(state.selectedShotIndices).toEqual([]);
   });
 });

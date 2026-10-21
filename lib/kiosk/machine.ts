@@ -6,24 +6,27 @@ import { getFrame } from "@/config/frames";
  * effects in response to phases and dispatches the results back here. That keeps every rule
  * (exactly N shots, retake, reset) unit-testable.
  *
- * welcome → camera → ready → countdown ⇄ capturing → review → frame → final
- *         → delivery (QR) → consent → complete → (reset) welcome
+ * welcome → pick (frame) → camera → ready → countdown ⇄ capturing → review
+ *         → frame (again, with the guest's photos) → consent → delivery (QR) → (reset) welcome
+ *
+ * The upload starts as soon as the frame is final, so it runs while the guest answers the wall
+ * question; delivery events are accepted in both the consent and delivery phases. The wall
+ * question is skipped while staff pause submissions (CONFIRM_FRAME askConsent: false).
  */
 
 export type KioskPhase =
   | "welcome"
+  | "pick" // choose a frame before shooting
   | "camera" // requesting permission / starting the camera
   | "camera-error"
   | "ready" // live preview, waiting for the guest to press start
   | "countdown"
   | "capturing"
   | "review"
-  | "frame"
-  | "select"
-  | "final"
-  | "delivery"
+  | "frame" // choose again, now with the guest's own photos in every frame
+  | "select" // order exactly the number of shots the chosen frame requires
   | "consent"
-  | "complete";
+  | "delivery";
 
 export type DeliveryState =
   | { status: "idle" }
@@ -49,7 +52,6 @@ export interface KioskState<Shot> {
   retakeIndex: number | null;
   remaining: number;
   frameId: string;
-  /** Zero-based capture indexes in the exact order they fill the chosen template. */
   selectedShotIndices: number[];
   cameraError: CameraErrorKind | null;
   captureFailures: number;
@@ -60,6 +62,8 @@ export interface KioskState<Shot> {
 export type KioskAction<Shot> =
   /** The guest pressed start: a new session (and upload idempotency key) begins. */
   | { type: "START"; sessionId: string }
+  /** Frame chosen before shooting: turn the camera on. */
+  | { type: "CONFIRM_PICK" }
   | { type: "CAMERA_READY" }
   | { type: "CAMERA_FAILED"; kind: CameraErrorKind }
   | { type: "CAMERA_RETRY" }
@@ -73,20 +77,17 @@ export type KioskAction<Shot> =
   | { type: "RETAKE_ALL" }
   | { type: "CONFIRM_SHOTS" }
   | { type: "SELECT_FRAME"; frameId: string }
-  | { type: "CONFIRM_FRAME" }
+  /** The frame is final. askConsent is false while staff pause wall submissions. */
+  | { type: "CONFIRM_FRAME"; askConsent: boolean }
   | { type: "TOGGLE_SHOT_SELECTION"; index: number }
-  | { type: "CONFIRM_SELECTION" }
-  | { type: "BACK_TO_SELECTION" }
+  | { type: "CONFIRM_SELECTION"; askConsent: boolean }
   | { type: "BACK_TO_FRAME" }
-  | { type: "REQUEST_DELIVERY" }
   | { type: "DELIVERY_QR_PENDING" }
   | { type: "DELIVERY_STARTED" }
   | { type: "DELIVERY_SUCCEEDED"; token: string; url: string; expiresAt: string }
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
-  | { type: "TO_CONSENT" }
   | { type: "SET_CONSENT"; consent: Exclude<WallConsent, null> }
-  | { type: "FINISH" }
   | { type: "RESET" };
 
 export interface KioskInit {
@@ -137,8 +138,11 @@ export function kioskReducer<Shot>(
 
     case "START":
       return state.phase === "welcome"
-        ? { ...state, phase: "camera", sessionId: action.sessionId, cameraError: null }
+        ? { ...state, phase: "pick", sessionId: action.sessionId, cameraError: null }
         : state;
+
+    case "CONFIRM_PICK":
+      return state.phase === "pick" ? { ...state, phase: "camera" } : state;
 
     case "CAMERA_READY":
       return state.phase === "camera" ? { ...state, phase: "ready", cameraError: null } : state;
@@ -220,7 +224,6 @@ export function kioskReducer<Shot>(
         ...state,
         phase: "countdown",
         shots: state.shots.map(() => null),
-        selectedShotIndices: [],
         shotIndex: 0,
         retakeIndex: null,
         remaining: state.countdownSeconds,
@@ -231,7 +234,7 @@ export function kioskReducer<Shot>(
       return { ...state, phase: "frame" };
 
     case "SELECT_FRAME":
-      return state.phase === "frame"
+      return state.phase === "pick" || state.phase === "frame"
         ? { ...state, frameId: getFrame(action.frameId).id, selectedShotIndices: [] }
         : state;
 
@@ -246,9 +249,8 @@ export function kioskReducer<Shot>(
       if (!Number.isInteger(index) || index < 0 || index >= state.shotCount || !state.shots[index])
         return state;
       const selected = state.selectedShotIndices;
-      if (selected.includes(index)) {
+      if (selected.includes(index))
         return { ...state, selectedShotIndices: selected.filter((i) => i !== index) };
-      }
       if (selected.length >= getFrame(state.frameId).slots.length) return state;
       return { ...state, selectedShotIndices: [...selected, index] };
     }
@@ -256,30 +258,23 @@ export function kioskReducer<Shot>(
     case "CONFIRM_SELECTION":
       return state.phase === "select" &&
         state.selectedShotIndices.length === getFrame(state.frameId).slots.length &&
+        new Set(state.selectedShotIndices).size === state.selectedShotIndices.length &&
         state.selectedShotIndices.every((i) => state.shots[i] !== null)
-        ? { ...state, phase: "final" }
+        ? { ...state, phase: action.askConsent ? "consent" : "delivery" }
         : state;
 
-    case "BACK_TO_SELECTION":
-      return state.phase === "final" ? { ...state, phase: "select" } : state;
-
     case "BACK_TO_FRAME":
-      return state.phase === "select" || state.phase === "final"
+      return state.phase === "select"
         ? { ...state, phase: "frame", selectedShotIndices: [] }
         : state;
 
-    case "REQUEST_DELIVERY":
-      return state.phase === "final" || state.phase === "consent"
-        ? { ...state, phase: "delivery" }
-        : state;
-
     case "DELIVERY_STARTED":
-      return state.phase === "delivery" && state.delivery.status !== "ready"
+      return uploading(state) && state.delivery.status !== "ready"
         ? { ...state, delivery: { status: "uploading" } }
         : state;
 
     case "DELIVERY_SUCCEEDED":
-      if (state.phase !== "delivery") return state;
+      if (!uploading(state)) return state;
       return {
         ...state,
         delivery: {
@@ -291,36 +286,59 @@ export function kioskReducer<Shot>(
       };
 
     case "DELIVERY_QR_PENDING":
-      return state.phase === "delivery" && state.delivery.status !== "ready"
+      return uploading(state) && state.delivery.status !== "ready"
         ? { ...state, delivery: { status: "qr-pending" } }
         : state;
 
     case "DELIVERY_QUEUED":
-      return state.phase === "delivery" && state.delivery.status !== "ready"
+      return uploading(state) && state.delivery.status !== "ready"
         ? { ...state, delivery: { status: "queued", reason: action.reason } }
         : state;
 
     case "DELIVERY_FAILED":
-      return state.phase === "delivery"
+      return uploading(state)
         ? { ...state, delivery: { status: "failed", message: action.message } }
-        : state;
-
-    case "TO_CONSENT":
-      return state.phase === "delivery" || state.phase === "final"
-        ? { ...state, phase: "consent" }
         : state;
 
     case "SET_CONSENT":
       // Consent is independent of delivery: answering either way never touches the photo link.
       return state.phase === "consent"
-        ? { ...state, consent: action.consent, phase: "complete" }
+        ? { ...state, consent: action.consent, phase: "delivery" }
         : state;
+  }
+}
 
-    case "FINISH":
-      // Leave without answering consent (e.g. delivery failed). Consent stays null = not shown.
-      return ["final", "delivery", "consent"].includes(state.phase)
-        ? { ...state, phase: "complete" }
-        : state;
+/** The photo is final and on its way: the consent and delivery screens. */
+function uploading<Shot>(state: KioskState<Shot>): boolean {
+  return state.phase === "consent" || state.phase === "delivery";
+}
+
+/**
+ * "N / 6" in the screen header (Figma: 틀 → 촬영 → 확인 → 틀 다시 → 미디어월 → 받기). Without the
+ * wall question the guest sees five steps. Null on the attract screen.
+ */
+export function progressStep(
+  phase: KioskPhase,
+  askConsent: boolean,
+): { step: number; total: number } | null {
+  const total = askConsent ? 7 : 6;
+  switch (phase) {
+    case "welcome":
+      return null;
+    case "pick":
+      return { step: 1, total };
+    case "review":
+      return { step: 3, total };
+    case "frame":
+      return { step: 4, total };
+    case "select":
+      return { step: 5, total };
+    case "consent":
+      return { step: 6, total };
+    case "delivery":
+      return { step: total, total };
+    default:
+      return { step: 2, total }; // camera, ready, countdown, capturing, camera-error
   }
 }
 

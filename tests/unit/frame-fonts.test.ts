@@ -1,22 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import { FRAMES } from "@/config/frames";
 import { frameFontRequests, loadFrameFonts } from "@/lib/compositor/fonts";
+import type { FrameDefinition } from "@/lib/compositor/types";
 
 describe("frame fonts", () => {
   it("asks for each weight and size the frames draw, once, in the bundled face", () => {
     const requests = frameFontRequests(FRAMES);
     const specs = requests.map((r) => r.spec);
     expect(new Set(specs).size).toBe(specs.length);
-    expect(specs).toContain('700 64px "Noto Sans KR Variable"');
-    expect(specs).toContain('700 56px "Noto Sans KR Variable"');
-    for (const r of requests) expect(r.text).not.toContain("{date}");
-    const caption = requests.find((r) => r.spec === '500 32px "Noto Sans KR Variable"');
-    expect(caption?.text).toContain("크리스마스");
+    // Latin titles are outlined SVGs from Figma; only the Korean line is live text.
+    expect(specs).toEqual(['400 20px "Noto Sans KR Variable"']);
+    expect(requests[0]!.text).toContain("별빛을 따라 오신 걸 환영해요");
   });
 
   it("fills the date token with the digits it will draw", () => {
-    const dated = frameFontRequests(FRAMES).find((r) => r.text.includes("Christmas Village 2026"));
-    expect(dated?.text).toContain("0123456789.");
+    const dated: FrameDefinition = {
+      ...FRAMES[0]!,
+      decorations: [{ type: "text", text: "{date}", x: 0, y: 0, size: 20, color: "#fff" }],
+    };
+    expect(frameFontRequests([dated])[0]?.text).toContain("0123456789.");
   });
 
   it("resolves true once every face is loaded", async () => {

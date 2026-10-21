@@ -7,6 +7,7 @@ import {
   formatDateLabel,
   seededRandom,
   type ComposeImage,
+  type FrameDefinition,
 } from "@/lib/compositor";
 import { fakeCanvasFactory, type FakeCanvas } from "../helpers/fake-canvas";
 
@@ -20,7 +21,7 @@ const ctx = { dateLabel: "2026.12.24" };
 
 describe("composeFrame", () => {
   it("receives four images and draws each into its own slot, in order", () => {
-    const frame = getFrame("starlight-strip");
+    const frame = getFrame("navy-strip");
     const { factory, created } = fakeCanvasFactory();
     composeFrame(frame, four(), { createCanvas: factory, context: ctx });
     const draws = created[0]!.callsTo("drawImage");
@@ -43,49 +44,107 @@ describe("composeFrame", () => {
     "%s output has the frame's exact dimensions",
     (_, frame) => {
       const { factory } = fakeCanvasFactory();
-      const canvas = composeFrame(
-        frame,
-        Array.from({ length: frame.slots.length }, (_, i) => photo(i)),
-        { createCanvas: factory, context: ctx },
-      );
+      const canvas = composeFrame(frame, four(), { createCanvas: factory, context: ctx });
       expect([canvas.width, canvas.height]).toEqual([frame.outputWidth, frame.outputHeight]);
     },
   );
 
   it("renders scaled thumbnails at the requested fraction", () => {
-    const frame = getFrame("starlight-strip");
+    const frame = getFrame("navy-strip");
     const canvas = composeFrame(frame, four(), {
       createCanvas: fakeCanvasFactory().factory,
       context: ctx,
       scale: 0.2,
     });
-    expect([canvas.width, canvas.height]).toEqual([240, 720]);
+    expect([canvas.width, canvas.height]).toEqual([120, 360]);
   });
 
   it("never stretches: a 16:9 photo is cropped to the 4:3 slot", () => {
-    const frame = getFrame("starlight-strip");
+    const frame = getFrame("navy-strip");
     const { factory, created } = fakeCanvasFactory();
     composeFrame(frame, [photo(0, 1920, 1080), photo(1), photo(2), photo(3)], {
       createCanvas: factory,
       context: ctx,
     });
     const [, sx, sy, sw, sh] = created[0]!.callsTo("drawImage")[0]!.args as number[];
-    expect([sx, sy, sw, sh]).toEqual([240, 0, 1440, 1080]);
+    // Slots are thirds of a pixel (466.667 × 350), so compare to a millionth.
+    [240, 0, 1440, 1080].forEach((v, i) => expect([sx, sy, sw, sh][i]).toBeCloseTo(v, 6));
     expect(sw! / sh!).toBeCloseTo(frame.slots[0]!.width / frame.slots[0]!.height, 6);
   });
 
   it("fills the {date} token", () => {
+    const frame: FrameDefinition = {
+      ...getFrame("navy-strip"),
+      decorations: [
+        {
+          type: "text",
+          text: "Christmas Village 2026 · {date}",
+          x: 0,
+          y: 0,
+          size: 20,
+          color: "#fff",
+        },
+      ],
+    };
     const { factory, created } = fakeCanvasFactory();
-    composeFrame(getFrame("starlight-strip"), four(), { createCanvas: factory, context: ctx });
+    composeFrame(frame, four(), { createCanvas: factory, context: ctx });
     const texts = created[0]!.callsTo("fillText").map((c) => c.args[0]);
     expect(texts).toContain("Christmas Village 2026 · 2026.12.24");
     expect(texts.join(" ")).not.toContain("{date}");
   });
 
+  it("stacks photos where the frame places them: each clothesline crosses the photo above", () => {
+    const { factory, created } = fakeCanvasFactory();
+    composeFrame(getFrame("clothesline"), four(), { createCanvas: factory, context: ctx });
+    const calls = created[0]!.calls;
+    const photoAt = (id: number) =>
+      calls.findIndex((c) => c.name === "drawImage" && (c.args[0] as { id?: number }).id === id);
+    const at = [0, 1, 2, 3].map(photoAt);
+    expect(at.every((i, n) => i > 0 && (n === 0 || i > at[n - 1]!))).toBe(true);
+    // The next row's line and card are filled between two photos, not all after them.
+    const fillsBetween = calls.slice(at[0]! + 1, at[1]!).filter((c) => c.name === "fill");
+    expect(fillsBetween.length).toBeGreaterThanOrEqual(2);
+    // Every photo turns with its polaroid.
+    expect(calls.slice(0, at[0]!).map((c) => c.name)).toContain("rotate");
+  });
+
+  it("draws loaded assets at their box and skips missing ones", () => {
+    const frame = getFrame("navy-strip");
+    const lockup = {
+      source: { id: "lockup" } as unknown as CanvasImageSource,
+      width: 511,
+      height: 84,
+    };
+    const render = (assets?: Map<string, ComposeImage>) => {
+      const { factory, created } = fakeCanvasFactory();
+      composeFrame(frame, four(), { createCanvas: factory, context: { ...ctx, assets } });
+      return created[0]!.callsTo("drawImage");
+    };
+    expect(render()).toHaveLength(4);
+    const draws = render(new Map([["/frames/navy-lockup.svg", lockup]]));
+    const logo = draws.find((d) => (d.args[0] as { id?: string }).id === "lockup");
+    expect(logo?.args.slice(1)).toEqual([91, 1580, 418, 69]);
+  });
+
+  it("refuses a frame that places a slot twice", () => {
+    const frame: FrameDefinition = {
+      ...getFrame("navy-strip"),
+      decorations: [
+        { type: "photo", slot: 0 },
+        { type: "photo", slot: 0 },
+        { type: "photo", slot: 2 },
+        { type: "photo", slot: 3 },
+      ],
+    };
+    expect(() =>
+      composeFrame(frame, four(), { createCanvas: fakeCanvasFactory().factory, context: ctx }),
+    ).toThrow(CompositionError);
+  });
+
   it("is deterministic: same inputs produce the same draw sequence", () => {
     const render = () => {
       const { factory, created } = fakeCanvasFactory();
-      composeFrame(getFrame("village-window"), four(), { createCanvas: factory, context: ctx });
+      composeFrame(getFrame("clothesline"), four(), { createCanvas: factory, context: ctx });
       return JSON.stringify((created[0] as FakeCanvas).calls);
     };
     expect(render()).toBe(render());

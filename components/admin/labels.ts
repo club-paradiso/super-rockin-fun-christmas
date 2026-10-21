@@ -3,13 +3,18 @@ import type { KioskHealth } from "@/lib/ops/kiosks";
 import type { ModerationStatus } from "@/lib/storage/types";
 
 export const STATUS_LABEL: Record<ModerationStatus, string> = {
-  NONE: "미신청",
+  NONE: "미디어월 안 띄움",
   PENDING: "검수 대기",
   APPROVED: "승인됨",
   REJECTED: "반려됨",
   HIDDEN: "숨김",
   DELETED: "삭제됨",
 };
+
+/** Korean label for a stored moderation state (audit rows keep the raw value). */
+export function stateLabel(state: string): string {
+  return STATUS_LABEL[state as ModerationStatus] ?? state;
+}
 
 export const STATUS_TONE: Record<ModerationStatus, string> = {
   NONE: "bg-dusk text-mist",

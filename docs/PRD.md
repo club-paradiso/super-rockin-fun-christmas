@@ -19,10 +19,14 @@ children through older adults, on unreliable venue Wi-Fi, without collecting per
 ## 3. Core experience
 
 ```
-WELCOME → CAMERA → COUNTDOWN → 4-CUT CAPTURE → REVIEW → (RETAKE) → FRAME → FINAL PHOTO
-       → GET ON MY PHONE → QR → DOWNLOAD
-separately:  PUBLIC MEDIA WALL CONSENT → MODERATION → APPROVED → MEDIA WALL
+ATTRACT → PICK A FRAME → CAMERA → COUNTDOWN → 4-CUT CAPTURE → REVIEW → (RETAKE)
+       → FRAME AGAIN (with the guest's photos) → MEDIA WALL QUESTION → QR → DOWNLOAD
+separately:  WALL "YES" → MODERATION → APPROVED → MEDIA WALL
 ```
+
+The header shows the step, `N / 6` (five steps while staff pause wall submissions, because the
+question is skipped). The upload starts when the frame is final, while the guest answers the wall
+question, so the QR is usually ready the moment it is answered.
 
 Download and public consent are independent. Saying no to the wall never affects the download.
 
@@ -30,18 +34,24 @@ Download and public consent are independent. Saying no to the wall never affects
 
 ### Kiosk (`/kiosk`)
 
-Screens: welcome, camera permission, preview, countdown, capture progress, review, retake (one or
-all), frame selection, final preview, phone delivery, QR, media-wall consent, complete, auto reset.
+Screens (Figma `01 Platform — Booth & Admin`, 01–07): attract ("화면을 눌러 시작"), frame choice
+("이 틀로 찍기"), camera permission, preview and countdown, review with one retake button per photo,
+frame choice again with the guest's photos in every frame ("사진을 넣어 봤어요", the first choice
+preselected, "이 틀로 할게요"), media-wall question beside the finished strip, QR ("휴대폰으로 사진을
+받아 가세요", session code under the QR, "다 받았어요"), auto reset.
 
 - Exactly four captures per session; visible progress (`2 / 4`).
 - Preview crop and mirror equal the saved photo.
 - Camera errors (denied, missing, unsupported, failed, disconnected) have plain-language screens
   with retry and "start over".
-- Idle sessions reset; the complete screen returns to welcome automatically.
+- Idle sessions reset; the QR screen returns to the attract screen after the same idle time.
 
 ### Four-cut engine
 
 - Frames are data (`FrameDefinition`: id, name, output size, background, slots, decorations).
+- Exactly four frames, Figma `02 네컷 Templates` A–D: 남색 (Navy Strip), 창틀 (Wood Window),
+  빨랫줄 (Clothesline), 크림 (Cream Strip). 600 × 1800 design, saved at 2× (1200 × 3600), four
+  4:3 photos with square corners, no QR inside the image.
 - Deterministic output; photos are cover-cropped, never stretched.
 
 ### Phone delivery (`/p/[token]`)
@@ -51,20 +61,23 @@ all), frame selection, final preview, phone delivery, QR, media-wall consent, co
 
 ### Public consent
 
-- "내 사진을 Christmas Village 미디어월에도 보여줄까요?" → "네, 함께 보여주세요" /
-  "아니요, 사진만 저장할게요", equal visual weight.
+- Asked before the QR: "이 사진을 미디어월에 띄워도 될까요?" → "네, 띄워주세요" /
+  "아니요, 저만 볼게요", same size and style. The screen says "아니요를 눌러도 사진은 받을 수 있어요." The QR screen adds "잠시 뒤 큰 화면에서 내 사진을 찾아보세요." only after a yes.
 
 ### Moderation (`/admin`) — Phase 3
 
 States: `PENDING`, `APPROVED`, `REJECTED`, `HIDDEN`, `DELETED`. Human review only.
 Functions: pending list, approve, reject, hide, restore, delete, recent sessions, kiosk/wall/
 storage health. Emergency: PAUSE SUBMISSIONS, PAUSE MEDIA WALL, SHOW HOLDING SCREEN.
+Hiding a photo from the wall asks first ("<세션> 사진을 미디어월에서 숨길까요?") and offers a 5-second
+undo ("<세션> 사진을 숨겼어요." [되돌리기]). Labels are Korean, in the audit log too.
 
 ### Media wall (`/wall`) — Phase 4
 
 Screen states: `BOOT`, `EMPTY`, `ACTIVE`, `OFFLINE`, `MAINTENANCE`. Photo lifecycle:
 `ENTER → VISIBLE → EXIT → COOLDOWN`. Photos appear inside a Christmas Village night scene —
-explicitly not a slideshow.
+explicitly not a slideshow: the Figma `03 Media Wall` picture (3840 × 1080, a window on Jeju at
+night) with five strips clipped to its clothesline, fitted to the screen without stretching.
 
 ## 5. Out of scope
 

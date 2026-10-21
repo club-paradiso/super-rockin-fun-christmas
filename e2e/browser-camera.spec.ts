@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk } from "./helpers";
+import { enrollKiosk, startSession } from "./helpers";
 
 // Exercises the real BrowserCamera (getUserMedia) against Chromium's built-in fake webcam.
 // This proves the browser code path, not any particular physical camera.
@@ -8,18 +8,17 @@ test.use({
   launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
 });
 
-test("getUserMedia path reaches review with six captures", async ({ page }) => {
+test("getUserMedia path reaches review with four captures", async ({ page }) => {
   await enrollKiosk(page);
   await page.goto("/kiosk");
   await expect(page.getByTestId("mock-badge")).toHaveCount(0);
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await startSession(page);
   await expect
     .poll(() => page.getByTestId("camera-preview").evaluate((v: HTMLVideoElement) => v.videoWidth))
     .toBeGreaterThan(0);
   await page.getByRole("button", { name: "촬영 시작" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 30_000 });
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
   }
 });
@@ -34,7 +33,8 @@ test("camera permission denied shows a clear error and a way back", async ({ bro
       Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
   });
   await page.goto("/kiosk");
-  await page.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(page.getByTestId("screen-camera-error")).toBeVisible();
   await expect(page.getByText("카메라 사용이 허용되지 않았어요")).toBeVisible();
   await page.getByRole("button", { name: "처음으로" }).click();

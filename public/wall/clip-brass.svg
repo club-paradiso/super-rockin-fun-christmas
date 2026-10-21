@@ -1,0 +1,25 @@
+<svg width="37" height="70" viewBox="0 0 37 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="&#236;&#181;&#156;&#236;&#162;&#133; &#194;&#183; Wall / Composite preview v3 (&#235;&#179;&#132;&#235;&#185;&#155; &#235;&#172;&#188;&#234;&#184;&#184; + &#237;&#152;&#188;&#237;&#149;&#169; &#237;&#148;&#132;&#235;&#160;&#136;&#236;&#158;&#132; 5&#236;&#158;&#165;)">
+<g id="Wall/Clip &#226;&#128;&#148; brass" filter="url(#filter0_d_2_4)">
+<rect id="Brass" x="7" y="2.7998" width="22.4" height="56" rx="4.2" fill="url(#paint0_linear_2_4)"/>
+<rect id="Hinge" x="7" y="23.7998" width="22.4" height="2.8" fill="#3A2A18" fill-opacity="0.8"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_2_4" x="0" y="-0.000195503" width="36.4" height="70" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4.2"/>
+<feGaussianBlur stdDeviation="3.5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.012 0 0 0 0 0.024 0 0 0 0 0.075 0 0 0 0.53 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_2_4"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_2_4" result="shape"/>
+</filter>
+<linearGradient id="paint0_linear_2_4" x1="7" y1="30.7998" x2="29.4" y2="30.7998" gradientUnits="userSpaceOnUse">
+<stop stop-color="#6E5333"/>
+<stop offset="0.35" stop-color="#D9B57A"/>
+<stop offset="0.55" stop-color="#F0D9A8"/>
+<stop offset="1" stop-color="#7A5C38"/>
+</linearGradient>
+</defs>
+</svg>

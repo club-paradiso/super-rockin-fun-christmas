@@ -9,13 +9,14 @@ import {
   type Page,
 } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, selectDefaultFour } from "./helpers";
+import { SHOOT_TIMEOUT } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
- * The clothesline wall scene (docs/ARCHITECTURE.md 1.8) on the LED shapes we might get. The real
- * LED resolution is not known yet, so each candidate is opened with ?canvas=WxH (as staff would
- * at the LED) and must hang the expected number of photos.
+ * The Figma wall (D65: one 3840 × 1080 picture, five strips on the line) on the LED shapes we
+ * might get. The real LED resolution is not known yet, so each candidate is opened with
+ * ?canvas=WxH (as staff would at the LED): the scene must keep its shape, fit inside, and hang
+ * five photos.
  *
  * Photos: two real booth sessions (mock camera, strip and window frames) plus generated strips
  * uploaded through the kiosk API, all approved by staff. SCREENSHOTS=1 also saves full-size
@@ -27,10 +28,10 @@ test.describe.configure({ mode: "serial" });
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const PIN = "482913";
 const SHAPES = [
-  { width: 1920, height: 1080, slots: 3 },
-  { width: 3840, height: 1080, slots: 8 },
-  { width: 3840, height: 2160, slots: 3 },
-  { width: 4000, height: 1000, slots: 9 },
+  { width: 1920, height: 1080, slots: 5 },
+  { width: 3840, height: 1080, slots: 5 },
+  { width: 3840, height: 2160, slots: 5 },
+  { width: 4000, height: 1000, slots: 5 },
 ];
 let staff: Page;
 let kiosk: Page;
@@ -102,21 +103,19 @@ async function approve(request: APIRequestContext, sessionId: string) {
   approved++;
 }
 
-async function boothPhoto(frame: "starlight-strip" | "village-window") {
+async function boothPhoto(frame: "navy-strip" | "wood-window") {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "네컷 찍기 시작" }).click();
+  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByTestId(`frame-option-${frame}`).click();
+  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByTestId(`frame-option-${frame}`).click();
-  await kiosk.getByRole("button", { name: "이 프레임으로 사진 고르기" }).click();
-  await selectDefaultFour(kiosk);
-  await kiosk.getByRole("button", { name: "휴대폰으로 받기" }).click();
+  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
   const short = (await kiosk.getByTestId("session-code").textContent())!.replace("세션", "").trim();
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await kiosk.getByTestId("consent-yes").click();
-  await expect(kiosk.getByTestId("screen-complete")).toBeVisible();
   const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
     photos: { sessionId: string }[];
   };
@@ -133,7 +132,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
   await enrollWithCode(kiosk, await createEnrollmentCode(staff, "장면 부스"));
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 
-  for (const frame of ["starlight-strip", "village-window"] as const)
+  for (const frame of ["navy-strip", "wood-window"] as const)
     await approve(staff.request, await boothPhoto(frame));
 
   for (let n = 0; n < 9; n++) {
@@ -143,7 +142,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
       headers: {
         "content-type": "image/jpeg",
         "x-session-id": sessionId,
-        "x-frame-id": "starlight-strip",
+        "x-frame-id": "navy-strip",
         origin: ORIGIN,
       },
     });
@@ -172,7 +171,12 @@ for (const shape of SHAPES) {
     await page.goto(`/wall?canvas=${shape.width}x${shape.height}`);
     const scene = page.getByTestId("wall-scene");
     await expect(scene).toHaveAttribute("data-slots", String(shape.slots));
-    await expect(page.getByTestId("wall-line")).toHaveCount(1);
+    await expect(page.getByTestId("wall-background")).toBeVisible();
+    // Fitted, never stretched: the 32:9 picture keeps its shape and stays on screen.
+    const box = (await page.getByTestId("wall-background").boundingBox())!;
+    expect(box.width / box.height).toBeCloseTo(3840 / 1080, 2);
+    expect(box.width).toBeLessThanOrEqual(shape.width + 1);
+    expect(box.height).toBeLessThanOrEqual(shape.height + 1);
     const expected = Math.min(shape.slots, approved);
     await expect
       .poll(() => page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]').count(), {
@@ -180,7 +184,7 @@ for (const shape of SHAPES) {
       })
       .toBeGreaterThanOrEqual(expected);
     // The wall gets its own large copy, not the 640 px staff thumbnail.
-    const first = page.getByTestId("wall-photo").first().locator("img");
+    const first = page.getByTestId("wall-photo").first().getByTestId("wall-photo-image");
     const natural = await first.evaluate((img: HTMLImageElement) => img.naturalHeight);
     expect(natural).toBeGreaterThan(640);
     if (process.env.SCREENSHOTS === "1") {
@@ -195,16 +199,13 @@ for (const shape of SHAPES) {
   });
 }
 
-test("low-spec mode: at most 4 photos, no twinkling", async () => {
+test("low-spec mode: four photos, fades only", async () => {
   const page = await wallCtx.newPage();
   await page.setViewportSize({ width: 1600, height: 400 });
   await page.goto("/wall?canvas=4000x1000&lite=1");
-  await expect(page.getByTestId("wall-scene")).toHaveAttribute("data-slots", "4");
-  const anim = await page
-    .locator(".wall-star")
-    .first()
-    .evaluate((el) => getComputedStyle(el).animationName);
-  expect(anim).toBe("none");
+  const scene = page.getByTestId("wall-scene");
+  await expect(scene).toHaveAttribute("data-slots", "4");
+  await expect(scene).toHaveClass(/wall-lite/);
   await page.close();
 });
 
