@@ -1,3 +1,4 @@
+import { selectDefaultPhotos } from "./helpers";
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
@@ -59,6 +60,7 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await page.waitForTimeout(800); // frame thumbnails
   await shot(page, "booth-1280x800-06-frame");
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
   await expect(page.getByTestId("final-image")).toBeVisible();
   await shot(page, "booth-1280x800-07-consent");
   await page.getByTestId("consent-yes").click();
@@ -92,13 +94,14 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await shot(page, "booth-1920x1080-02-frame");
 });
 
-for (const frame of ["navy-strip", "wood-window", "clothesline", "cream-strip"]) {
+for (const frame of ["navy-strip", "wood-window", "clothesline", "cream-strip", "two-stars", "three-moments", "five-lights", "six-lights"]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);
     await shootToReview(page);
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
     await page.getByTestId(`frame-option-${frame}`).click();
     await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
     const img = page.getByTestId("final-image");
     await expect(img).toBeVisible();
     const b64 = await img.evaluate(async (el: HTMLImageElement) => {

@@ -1,3 +1,4 @@
+import { selectDefaultPhotos } from "./helpers";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
@@ -103,6 +104,7 @@ async function shootAndAnswer(answer: "yes" | "no") {
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId(`consent-${answer}`).click();
 }
 
