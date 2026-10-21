@@ -94,14 +94,23 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await shot(page, "booth-1920x1080-02-frame");
 });
 
-for (const frame of ["navy-strip", "wood-window", "clothesline", "cream-strip", "two-stars", "three-moments", "five-lights", "six-lights"]) {
+for (const frame of [
+  "navy-strip",
+  "wood-window",
+  "clothesline",
+  "cream-strip",
+  "two-stars",
+  "three-moments",
+  "five-lights",
+  "six-lights",
+]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);
     await shootToReview(page);
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
     await page.getByTestId(`frame-option-${frame}`).click();
     await page.getByRole("button", { name: "이 틀로 할게요" }).click();
-  await selectDefaultPhotos(page);
+    await selectDefaultPhotos(page);
     const img = page.getByTestId("final-image");
     await expect(img).toBeVisible();
     const b64 = await img.evaluate(async (el: HTMLImageElement) => {

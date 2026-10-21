@@ -16,16 +16,34 @@ function flexibleStrip(id: string, label: string, count: number, paper: boolean)
   const ink = paper ? "#121a3d" : "#f2c14e";
   const on = paper ? "#f7f1e3" : "#070a1c";
   return {
-    id, name: label, label, outputWidth: 600, outputHeight: 1800,
+    id,
+    name: label,
+    label,
+    outputWidth: 600,
+    outputHeight: 1800,
     background: { type: "solid", color: paper ? "#f7f1e3" : "#070a1c" },
     slots,
     decorations: [
       ...slots.map((_, slot) => ({ type: "photo" as const, slot })),
       { type: "rect", x: 248, y: 1555, width: 104, height: 2, color: ink },
-      { type: "image", src: paper ? "/frames/cream-lockup.svg" : "/frames/navy-lockup.svg",
-        x: 90, y: 1600, width: 420, height: 69, brand: { color: ink, on } },
-      { type: "text", text: "Christmas Village 2026 · {date}", x: 300, y: 1720,
-        size: 16, color: ink, align: "center" },
+      {
+        type: "image",
+        src: paper ? "/frames/cream-lockup.svg" : "/frames/navy-lockup.svg",
+        x: 90,
+        y: 1600,
+        width: 420,
+        height: 69,
+        brand: { color: ink, on },
+      },
+      {
+        type: "text",
+        text: "Christmas Village 2026 · {date}",
+        x: 300,
+        y: 1720,
+        size: 16,
+        color: ink,
+        align: "center",
+      },
     ],
   };
 }

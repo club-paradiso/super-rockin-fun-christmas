@@ -39,9 +39,12 @@ function toReview(): S {
 }
 
 const selectFour = (frame: S, askConsent: boolean) =>
-  run(frame, { type: "CONFIRM_FRAME", askConsent }, ...[0, 1, 2, 3].map(
-    (index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const,
-  ), { type: "CONFIRM_SELECTION", askConsent });
+  run(
+    frame,
+    { type: "CONFIRM_FRAME", askConsent },
+    ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+    { type: "CONFIRM_SELECTION", askConsent },
+  );
 
 describe("countdown", () => {
   it("counts 3 → 2 → 1 → capturing", () => {
@@ -261,30 +264,48 @@ describe("reset", () => {
 });
 
 describe("ordered selection", () => {
-  const prepare = (id = "navy-strip") => run(toReview(),
-    { type: "CONFIRM_SHOTS" }, { type: "SELECT_FRAME", frameId: id },
-    { type: "CONFIRM_FRAME", askConsent: true });
+  const prepare = (id = "navy-strip") =>
+    run(
+      toReview(),
+      { type: "CONFIRM_SHOTS" },
+      { type: "SELECT_FRAME", frameId: id },
+      { type: "CONFIRM_FRAME", askConsent: true },
+    );
   it("cannot confirm early and preserves selection order", () => {
     let s = prepare();
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
     s = run(s, ...[5, 1, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
     expect(s.selectedShotIndices).toEqual([5, 1, 3]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
-    s = run(s, { type: "TOGGLE_SHOT_SELECTION", index: 0 }, { type: "CONFIRM_SELECTION", askConsent: true });
+    s = run(
+      s,
+      { type: "TOGGLE_SHOT_SELECTION", index: 0 },
+      { type: "CONFIRM_SELECTION", askConsent: true },
+    );
     expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [5, 1, 3, 0]]);
   });
   it("accepts a 2-slot or a 6-slot template and prevents overflow", () => {
     let two = prepare("two-stars");
-    two = run(two, ...[2, 4, 5].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
+    two = run(
+      two,
+      ...[2, 4, 5].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+    );
     expect(two.selectedShotIndices).toEqual([2, 4]);
     expect(run(two, { type: "CONFIRM_SELECTION", askConsent: false }).phase).toBe("delivery");
     let six = prepare("six-lights");
-    six = run(six, ...[5, 4, 3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
+    six = run(
+      six,
+      ...[5, 4, 3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+    );
     expect(run(six, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
   it("deselects, and back returns to frame without uploading", () => {
-    const s = run(prepare(), { type: "TOGGLE_SHOT_SELECTION", index: 2 },
-      { type: "TOGGLE_SHOT_SELECTION", index: 2 }, { type: "BACK_TO_FRAME" });
+    const s = run(
+      prepare(),
+      { type: "TOGGLE_SHOT_SELECTION", index: 2 },
+      { type: "TOGGLE_SHOT_SELECTION", index: 2 },
+      { type: "BACK_TO_FRAME" },
+    );
     expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["frame", [], "idle"]);
   });
 });

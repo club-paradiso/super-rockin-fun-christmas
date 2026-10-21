@@ -127,7 +127,13 @@ test("retaking one shot keeps the other five", async ({ page }) => {
   await expect(page.getByText("2번째 사진 다시 찍기")).toBeVisible();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 30_000 });
   const after = await srcs();
-  expect([after[0], after[2], after[3], after[4], after[5]]).toEqual([before[0], before[2], before[3], before[4], before[5]]);
+  expect([after[0], after[2], after[3], after[4], after[5]]).toEqual([
+    before[0],
+    before[2],
+    before[3],
+    before[4],
+    before[5],
+  ]);
   expect(after[1]).not.toBe(before[1]);
 });
 

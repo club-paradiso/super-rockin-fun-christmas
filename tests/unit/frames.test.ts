@@ -29,7 +29,12 @@ describe("frame definitions", () => {
   });
 
   it("provides 2 through 6 output slots", () => {
-    expect(FRAMES.slice(4).map((f) => f.id)).toEqual(["two-stars", "three-moments", "five-lights", "six-lights"]);
+    expect(FRAMES.slice(4).map((f) => f.id)).toEqual([
+      "two-stars",
+      "three-moments",
+      "five-lights",
+      "six-lights",
+    ]);
     expect(new Set(FRAMES.map((f) => f.slots.length))).toEqual(new Set([2, 3, 4, 5, 6]));
   });
 

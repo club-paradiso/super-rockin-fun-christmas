@@ -279,7 +279,14 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [finalPhase, state.frameId, selectionKey, images, finalImage?.frameId, finalImage?.selectionKey]);
+  }, [
+    finalPhase,
+    state.frameId,
+    selectionKey,
+    images,
+    finalImage?.frameId,
+    finalImage?.selectionKey,
+  ]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
@@ -613,7 +620,8 @@ function Screen(p: ScreenProps) {
             <BrandLockup className="h-[clamp(96px,16vh,170px)] w-auto" />
             <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
             <p className="booth-lead">
-              여섯 장을 찍고 마음에 드는 사진을 골라 휴대폰으로 받을 수 있어요. 원하시면 저 큰 화면에도 걸어드려요.
+              여섯 장을 찍고 마음에 드는 사진을 골라 휴대폰으로 받을 수 있어요. 원하시면 저 큰
+              화면에도 걸어드려요.
             </p>
             <button
               type="button"
@@ -847,7 +855,11 @@ function Screen(p: ScreenProps) {
       return (
         <BoothScreen testId="screen-select" progress={progress}>
           <h1 className="booth-title text-center">6장 중 {required}장을 골라주세요</h1>
-          <p className="booth-lead mt-3 text-center" data-testid="select-required" data-required={required}>
+          <p
+            className="booth-lead mt-3 text-center"
+            data-testid="select-required"
+            data-required={required}
+          >
             선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.
           </p>
           <div className="mt-[3vh] grid w-full max-w-5xl grid-cols-3 gap-3 overflow-y-auto portrait:grid-cols-2">
@@ -865,7 +877,12 @@ function Screen(p: ScreenProps) {
                 >
                   {shot && (
                     // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
-                    <img src={shot.url} alt="" className="w-full rounded-lg object-cover" style={{ aspectRatio: String(aspect) }} />
+                    <img
+                      src={shot.url}
+                      alt=""
+                      className="w-full rounded-lg object-cover"
+                      style={{ aspectRatio: String(aspect) }}
+                    />
                   )}
                   <span className="absolute left-2 top-2 rounded-full bg-navy px-3 py-1 text-xl font-bold text-warm">
                     {order >= 0 ? order + 1 : index + 1}
@@ -875,14 +892,24 @@ function Screen(p: ScreenProps) {
             })}
           </div>
           <div className="mt-5 flex w-full max-w-5xl justify-between gap-4">
-            <button type="button" className="booth-btn-secondary" onClick={() => dispatch({ type: "BACK_TO_FRAME" })}>프레임 바꾸기</button>
+            <button
+              type="button"
+              className="booth-btn-secondary"
+              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
+            >
+              프레임 바꾸기
+            </button>
             <button
               type="button"
               data-testid="confirm-selection"
               className="booth-btn-primary"
               disabled={selected.length !== required}
-              onClick={() => dispatch({ type: "CONFIRM_SELECTION", askConsent: p.wallSubmissionsOpen })}
-            >이 사진으로 완성하기</button>
+              onClick={() =>
+                dispatch({ type: "CONFIRM_SELECTION", askConsent: p.wallSubmissionsOpen })
+              }
+            >
+              이 사진으로 완성하기
+            </button>
           </div>
         </BoothScreen>
       );
