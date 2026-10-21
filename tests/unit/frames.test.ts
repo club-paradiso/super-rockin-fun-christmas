@@ -19,13 +19,23 @@ function contrast(a: string, b: string) {
 }
 
 describe("frame definitions", () => {
-  it("are exactly the four Figma templates, A–D", () => {
-    expect(FRAMES.map((f) => [f.id, f.label])).toEqual([
+  it("preserves four Figma templates and adds four flexible templates", () => {
+    expect(FRAMES.slice(0, 4).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],
       ["wood-window", "창틀"],
       ["clothesline", "빨랫줄"],
       ["cream-strip", "크림"],
     ]);
+  });
+
+  it("provides 2 through 6 output slots", () => {
+    expect(FRAMES.slice(4).map((f) => f.id)).toEqual([
+      "two-stars",
+      "three-moments",
+      "five-lights",
+      "six-lights",
+    ]);
+    expect(new Set(FRAMES.map((f) => f.slots.length))).toEqual(new Set([2, 3, 4, 5, 6]));
   });
 
   it("still accept retired ids on upload, so queued photos survive a deploy", () => {
@@ -41,8 +51,9 @@ describe("frame definitions", () => {
   });
 
   describe.each(FRAMES.map((f) => [f.id, f] as const))("%s", (_, frame) => {
-    it("has one slot per shot", () => {
-      expect(frame.slots).toHaveLength(KIOSK_CONFIG.shotsPerSession);
+    it("uses two to six shots without exceeding captured photos", () => {
+      expect(frame.slots.length).toBeGreaterThanOrEqual(2);
+      expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
     });
 
     it("uses the capture aspect ratio for every slot (preview = result)", () => {

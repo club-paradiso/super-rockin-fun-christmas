@@ -144,8 +144,8 @@ test("PAUSE SUBMISSIONS: photography and QR keep working, wall consent is skippe
 
   const { url } = await kioskPhotoToQr(kiosk); // fresh page load picks up the setting
   await expect(kiosk.locator("main")).toHaveAttribute("data-wall-submissions", "paused");
-  // The wall question was skipped: five steps, straight from the frame to the QR.
-  await expect(kiosk.getByTestId("step-progress")).toHaveText("5 / 5");
+  // The wall question was skipped: six steps, including photo selection, before the QR.
+  await expect(kiosk.getByTestId("step-progress")).toHaveText("6 / 6");
   expect((await kiosk.request.get(`${url}/image`)).status()).toBe(200);
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
   await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();

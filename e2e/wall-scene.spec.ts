@@ -1,3 +1,4 @@
+import { selectDefaultPhotos } from "./helpers";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -112,6 +113,7 @@ async function boothPhoto(frame: "navy-strip" | "wood-window") {
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
   const short = (await kiosk.getByTestId("session-code").textContent())!.replace("세션", "").trim();

@@ -1,3 +1,4 @@
+import { selectDefaultPhotos } from "./helpers";
 import { expect, test } from "@playwright/test";
 import { enrollKiosk, shootFourWithMock, storedPhotos, toFrame } from "./helpers";
 
@@ -39,6 +40,7 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
 
   await context.setOffline(true);
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
   await page.getByTestId("consent-no").click();
   await expect(page.getByTestId("delivery-queued")).toBeVisible();
   await expect(page.getByText("사진을 보내고 있어요")).toBeVisible();
@@ -75,6 +77,7 @@ test("reload while queued: the photo survives in IndexedDB and uploads after res
   // Server unreachable for uploads only (page itself still loads).
   await page.route("**/api/photos", (route) => route.abort("internetdisconnected"));
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
   await page.getByTestId("consent-no").click();
   await expect(page.getByTestId("delivery-queued")).toBeVisible();
   const [queued] = await idbQueue(page);
@@ -116,6 +119,7 @@ test("offline: the guest still answers the wall question, and the answer lands w
   // The upload starts with the wall question on screen; offline, it waits on the device.
   await context.setOffline(true);
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
   await page.getByTestId("consent-yes").click();
   await expect(page.getByTestId("delivery-queued")).toBeVisible();

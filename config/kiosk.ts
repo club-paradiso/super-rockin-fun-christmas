@@ -1,6 +1,6 @@
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
-  shotsPerSession: 4,
+  shotsPerSession: 6,
   countdownSeconds: 3,
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview

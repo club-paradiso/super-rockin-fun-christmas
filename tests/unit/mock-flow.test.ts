@@ -17,13 +17,13 @@ import { fakeCanvasFactory } from "../helpers/fake-canvas";
  * camera/compositor code the kiosk uses, driven the way KioskApp's effects drive them.
  */
 describe("mock camera flow", () => {
-  it("completes welcome → 4 captures → composite → reset", async () => {
+  it("completes welcome → 6 captures → composite → reset", async () => {
     const { factory } = fakeCanvasFactory();
     const camera = new MockCamera({ createCanvas: factory });
     let state: KioskState<CapturedFrame> = createInitialState({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
-      frameId: "starlight-strip",
+      frameId: "navy-strip",
     });
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
@@ -50,18 +50,23 @@ describe("mock camera flow", () => {
     }
 
     expect(state.phase).toBe("review");
-    expect(camera.captureCount).toBe(4);
+    expect(camera.captureCount).toBe(6);
 
     dispatch({ type: "CONFIRM_SHOTS" });
     dispatch({ type: "CONFIRM_FRAME", askConsent: true });
+    expect(state.phase).toBe("select");
+    for (const index of [5, 1, 2, 0]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
+    dispatch({ type: "CONFIRM_SELECTION", askConsent: true });
     expect(state.phase).toBe("consent");
 
     const frame = getFrame(state.frameId);
-    const images = state.shots.map((s) => ({
-      source: s!.canvas as unknown as CanvasImageSource,
-      width: s!.width,
-      height: s!.height,
-    }));
+    const images = state.selectedShotIndices
+      .map((i) => state.shots[i])
+      .map((s) => ({
+        source: s!.canvas as unknown as CanvasImageSource,
+        width: s!.width,
+        height: s!.height,
+      }));
     const output = composeFrame(frame, images, {
       createCanvas: factory,
       context: { dateLabel: "2026.12.24" },

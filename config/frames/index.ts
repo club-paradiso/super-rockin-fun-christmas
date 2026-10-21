@@ -3,9 +3,19 @@ import { clothesline } from "./clothesline";
 import { creamStrip } from "./cream-strip";
 import { navyStrip } from "./navy-strip";
 import { woodWindow } from "./wood-window";
+import { twoStars, threeMoments, fiveLights, sixLights } from "./flexible-strips";
 
 /** Picker order = Figma order (Template A–D). The first one is preselected. */
-export const FRAMES: readonly FrameDefinition[] = [navyStrip, woodWindow, clothesline, creamStrip];
+export const FRAMES: readonly FrameDefinition[] = [
+  navyStrip,
+  woodWindow,
+  clothesline,
+  creamStrip,
+  twoStars,
+  threeMoments,
+  fiveLights,
+  sixLights,
+];
 
 export const DEFAULT_FRAME_ID = FRAMES[0]!.id;
 

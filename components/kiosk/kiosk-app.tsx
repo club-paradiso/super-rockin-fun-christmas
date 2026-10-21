@@ -51,6 +51,7 @@ export interface Shot {
 
 interface FinalImage {
   frameId: string;
+  selectionKey: string;
   blob: Blob;
   url: string;
   width: number;
@@ -231,12 +232,13 @@ export function KioskApp({
   const placeholders = useMemo(() => (assets ? placeholderPhotos() : null), [assets]);
   const thumbSource =
     state.phase === "pick" ? placeholders : state.phase === "frame" ? images : null;
+  const selectionKey = state.selectedShotIndices.join("-");
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!thumbSource || !assets) return out;
     const context = { dateLabel: formatDateLabel(new Date()), assets };
     for (const frame of FRAMES) {
-      const canvas = composeFrame(frame, thumbSource, {
+      const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
         createCanvas: createDomCanvas,
         context,
         scale: KIOSK_CONFIG.thumbScale,
@@ -250,13 +252,15 @@ export function KioskApp({
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
   useEffect(() => {
     if (!finalPhase || !images) return;
-    if (finalImage?.frameId === state.frameId) return;
+    if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey) return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
+    const chosen = state.selectedShotIndices.map((index) => images[index]!);
+    if (chosen.length !== frame.slots.length) return;
     // A font or asset that failed to load must not block the guest: compose without it.
     void Promise.all([fontsRef.current, assetsRef.current]).then(async ([, loaded]) => {
       if (cancelled) return;
-      const canvas = composeFrame(frame, images, {
+      const canvas = composeFrame(frame, chosen, {
         createCanvas: createDomCanvas,
         context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
         scale: KIOSK_CONFIG.outputScale,
@@ -265,6 +269,7 @@ export function KioskApp({
       if (cancelled) return;
       setFinalImage({
         frameId: frame.id,
+        selectionKey,
         blob,
         url: trackUrl(URL.createObjectURL(blob)),
         width: canvas.width,
@@ -274,7 +279,14 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [finalPhase, state.frameId, images, finalImage?.frameId]);
+  }, [
+    finalPhase,
+    state.frameId,
+    selectionKey,
+    images,
+    finalImage?.frameId,
+    finalImage?.selectionKey,
+  ]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
@@ -608,7 +620,8 @@ function Screen(p: ScreenProps) {
             <BrandLockup className="h-[clamp(96px,16vh,170px)] w-auto" />
             <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
             <p className="booth-lead">
-              네 장을 찍으면 휴대폰으로 바로 받을 수 있어요. 원하시면 저 큰 화면에도 걸어드려요.
+              여섯 장을 찍고 마음에 드는 사진을 골라 휴대폰으로 받을 수 있어요. 원하시면 저 큰
+              화면에도 걸어드려요.
             </p>
             <button
               type="button"
@@ -632,7 +645,7 @@ function Screen(p: ScreenProps) {
           {!pick && (
             <p className="booth-lead mt-3 text-center">다른 틀이 더 잘 어울리면 바꿔도 돼요.</p>
           )}
-          <div className="mt-[3vh] flex flex-wrap items-end justify-center gap-[max(16px,2.8vh)] portrait:flex-nowrap portrait:gap-4">
+          <div className="mt-[3vh] grid max-h-[66dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -646,9 +659,7 @@ function Screen(p: ScreenProps) {
                     selected ? "border-[5px] border-warm bg-navy" : "border-2 border-white"
                   }`}
                 >
-                  <div
-                    className={`flex items-center ${pick ? "h-[max(300px,52vh)]" : "h-[max(280px,47vh)]"} portrait:h-[min(37vh,53vw)]`}
-                  >
+                  <div className="flex h-[min(29vh,330px)] items-center justify-center portrait:h-[min(24vh,50vw)]">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
                       <img src={p.thumbs[frame.id]} alt="" className="max-h-full w-auto" />
@@ -663,6 +674,7 @@ function Screen(p: ScreenProps) {
                   >
                     {frame.label}
                   </span>
+                  <span className="text-lg text-mist">{frame.slots.length}컷 템플릿</span>
                 </button>
               );
             })}
@@ -836,6 +848,72 @@ function Screen(p: ScreenProps) {
           </button>
         </BoothScreen>
       );
+
+    case "select": {
+      const required = getFrame(state.frameId).slots.length;
+      const selected = state.selectedShotIndices;
+      return (
+        <BoothScreen testId="screen-select" progress={progress}>
+          <h1 className="booth-title text-center">6장 중 {required}장을 골라주세요</h1>
+          <p
+            className="booth-lead mt-3 text-center"
+            data-testid="select-required"
+            data-required={required}
+          >
+            선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.
+          </p>
+          <div className="mt-[3vh] grid w-full max-w-5xl grid-cols-3 gap-3 overflow-y-auto portrait:grid-cols-2">
+            {state.shots.map((shot, index) => {
+              const order = selected.indexOf(index);
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  data-testid={`select-shot-${index}`}
+                  aria-label={`${index + 1}번째 사진 ${order >= 0 ? "선택 해제" : "선택"}`}
+                  aria-pressed={order >= 0}
+                  onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
+                  className={`relative rounded-xl border-4 p-1 transition ${order >= 0 ? "border-warm" : "border-white/30"}`}
+                >
+                  {shot && (
+                    // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
+                    <img
+                      src={shot.url}
+                      alt=""
+                      className="w-full rounded-lg object-cover"
+                      style={{ aspectRatio: String(aspect) }}
+                    />
+                  )}
+                  <span className="absolute left-2 top-2 rounded-full bg-navy px-3 py-1 text-xl font-bold text-warm">
+                    {order >= 0 ? order + 1 : index + 1}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-5 flex w-full max-w-5xl justify-between gap-4">
+            <button
+              type="button"
+              className="booth-btn-secondary"
+              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
+            >
+              프레임 바꾸기
+            </button>
+            <button
+              type="button"
+              data-testid="confirm-selection"
+              className="booth-btn-primary"
+              disabled={selected.length !== required}
+              onClick={() =>
+                dispatch({ type: "CONFIRM_SELECTION", askConsent: p.wallSubmissionsOpen })
+              }
+            >
+              이 사진으로 완성하기
+            </button>
+          </div>
+        </BoothScreen>
+      );
+    }
 
     case "consent":
       return (
@@ -1025,7 +1103,7 @@ function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; 
         // eslint-disable-next-line @next/next/no-img-element -- local object URL
         <img
           src={finalImage.url}
-          alt="완성된 네컷 사진"
+          alt="완성된 사진"
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
@@ -1041,7 +1119,7 @@ function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; 
   );
 }
 
-/** Four small boxes beside the camera: ✓ done, gold outline = this shot. */
+/** Six small boxes beside the camera: ✓ done, gold outline = this shot. */
 function ShotStrip({ state, current }: { state: State; current: number }) {
   return (
     <div
@@ -1074,7 +1152,7 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
  * same compositor draws them, so the thumbnail is the frame the guest will get.
  */
 function placeholderPhotos(): ComposeImage[] {
-  return [1, 2, 3, 4].map((n) => {
+  return [1, 2, 3, 4, 5, 6].map((n) => {
     const canvas = createDomCanvas(400, 300) as HTMLCanvasElement;
     const ctx = canvas.getContext("2d")!;
     const gradient = ctx.createLinearGradient(0, 0, 400, 300);

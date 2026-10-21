@@ -8,9 +8,13 @@ describe("frame fonts", () => {
     const requests = frameFontRequests(FRAMES);
     const specs = requests.map((r) => r.spec);
     expect(new Set(specs).size).toBe(specs.length);
-    // Latin titles are outlined SVGs from Figma; only the Korean line is live text.
-    expect(specs).toEqual(['400 20px "Noto Sans KR Variable"']);
+    // The four approved frames use 400/20; optional 2–6-slot frames add a 500/16 date caption.
+    expect(specs).toEqual([
+      '400 20px "Noto Sans KR Variable"',
+      '500 16px "Noto Sans KR Variable"',
+    ]);
     expect(requests[0]!.text).toContain("별빛을 따라 오신 걸 환영해요");
+    expect(requests[1]!.text).toContain("Christmas Village 2026");
   });
 
   it("fills the date token with the digits it will draw", () => {
