@@ -57,13 +57,20 @@ describe("server config", () => {
     expect(problems({ ...PROD, KIOSK_SESSION_SECRET: "short" }).join()).toMatch(
       /KIOSK_SESSION_SECRET/,
     );
-    expect(problems({ ...PROD, KIOSK_ENROLL_SECRET: "short" }).join()).toMatch(
-      /KIOSK_ENROLL_SECRET/,
-    );
     const same = "x".repeat(40);
     expect(
       problems({ ...PROD, KIOSK_SESSION_SECRET: same, KIOSK_ENROLL_SECRET: same }).join(),
     ).toMatch(/differ/);
+  });
+
+  it("allows an operator-chosen kiosk password without a minimum length", () => {
+    const config = parseServerConfig({ ...PROD, KIOSK_ENROLL_SECRET: "1234" });
+    expect(config.kioskAuth).toMatchObject({ mode: "required", enrollSecret: "1234" });
+    expect(problems({ ...PROD, KIOSK_ENROLL_SECRET: "1234" })).toEqual([]);
+    expect(parseServerConfig({ ...PROD, KIOSK_ENROLL_SECRET: " " }).kioskAuth).toMatchObject({
+      mode: "required",
+      enrollSecret: null,
+    });
   });
 
   it("never allows disabling kiosk auth in production", () => {
