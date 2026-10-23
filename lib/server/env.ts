@@ -38,7 +38,7 @@ export interface ServerConfig {
     | {
         mode: "required";
         sessionSecret: string;
-        /** Phase 2 shared secret (legacy). Null = only one-time staff codes can enroll kiosks. */
+        /** Operator-chosen kiosk enrollment password. Null = one-time-code enrollment only. */
         enrollSecret: string | null;
         sessionDays: number;
       }
@@ -205,9 +205,6 @@ export function parseServerConfig(env: Env): ServerConfig {
       problems.push(
         "KIOSK_SESSION_SECRET must be at least 32 characters (openssl rand -base64 48)",
       );
-    }
-    if (enrollSecret !== null && enrollSecret.length < 20) {
-      problems.push("KIOSK_ENROLL_SECRET must be at least 20 characters (or unset it)");
     }
     if (sessionSecret && sessionSecret === enrollSecret) {
       problems.push("KIOSK_SESSION_SECRET and KIOSK_ENROLL_SECRET must differ");
