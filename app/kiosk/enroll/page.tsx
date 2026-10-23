@@ -12,12 +12,12 @@ export const metadata: Metadata = {
 };
 
 const ERRORS: Record<string, string> = {
-  "401": "등록 코드가 맞지 않거나, 이미 사용됐거나, 만료됐어요.",
+  "401": "등록 코드 또는 비밀번호가 틀렸거나, 등록 코드가 이미 사용됐거나 만료됐어요.",
   "409": "이 환경에서는 기기 등록이 꺼져 있어요 (개발 모드).",
   "429": "시도가 너무 많아요. 15분 뒤에 다시 해 주세요.",
 };
 
-/** Staff-only. Enrolls this browser as a kiosk with an HttpOnly session cookie. */
+/** Enroll this browser using an operator password or a staff-issued one-time code. */
 export default async function EnrollPage({
   searchParams,
 }: {
@@ -26,7 +26,7 @@ export default async function EnrollPage({
   const { error, next } = await searchParams;
   const toWall = next === "wall";
   const config = getServerConfig();
-  const legacySecret = config.kioskAuth.mode === "required" && !!config.kioskAuth.enrollSecret;
+  const sharedPasswordEnabled = config.kioskAuth.mode === "required" && !!config.kioskAuth.enrollSecret;
   const auth = await authenticateKiosk((await cookies()).get(KIOSK_COOKIE)?.value ?? null);
 
   return (
@@ -62,49 +62,23 @@ export default async function EnrollPage({
           </section>
         ) : (
           <div className="flex flex-col gap-8">
-            <form
-              method="post"
-              action="/api/kiosk/enroll"
-              className="flex flex-col gap-5"
-              data-testid="enroll-code-form"
-            >
-              {toWall && <input type="hidden" name="next" value="wall" />}
-              <label className="flex flex-col gap-2 text-lg">
-                등록 코드
-                <input
-                  name="code"
-                  required
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  placeholder="예: K7QM-3XRP"
-                  className="rounded-xl bg-night px-4 py-4 text-center font-mono text-3xl tracking-[0.2em] text-cream"
-                />
-              </label>
-              <p className="text-base text-mist">
-                운영 화면(/admin → 키오스크)에서 만든 일회용 코드예요. 15분 동안 한 번만 쓸 수
-                있어요.
+            {typeof error === "string" && (
+              <p role="alert" className="rounded-xl border border-alert/40 p-4 text-lg text-alert">
+                {ERRORS[error] ?? "등록하지 못했어요."}
               </p>
-              {typeof error === "string" && (
-                <p role="alert" className="text-lg text-alert">
-                  {ERRORS[error] ?? "등록하지 못했어요."}
+            )}
+
+            {sharedPasswordEnabled && (
+              <section className="rounded-2xl border border-amber/40 p-6">
+                <h2 className="text-xl font-semibold">운영자 비밀번호로 등록</h2>
+                <p className="mt-2 text-base text-mist">
+                  운영자가 정한 등록 비밀번호를 입력하면 바로 사용할 수 있어요. 기기마다 처음 한 번만
+                  등록하면 돼요.
                 </p>
-              )}
-              <button type="submit" className="btn-primary">
-                이 기기 등록
-              </button>
-            </form>
-            {legacySecret && (
-              <details
-                className="rounded-2xl border border-cream/15 p-4"
-                data-testid="enroll-secret-details"
-              >
-                <summary className="cursor-pointer text-lg text-mist">
-                  공유 비밀번호로 등록 (구버전)
-                </summary>
                 <form
                   method="post"
                   action="/api/kiosk/enroll"
-                  className="mt-4 flex flex-col gap-5"
+                  className="mt-5 flex flex-col gap-5"
                   data-testid="enroll-form"
                 >
                   {toWall && <input type="hidden" name="next" value="wall" />}
@@ -114,7 +88,7 @@ export default async function EnrollPage({
                       name="label"
                       required
                       maxLength={40}
-                      placeholder="예: 본당 입구 키오스크"
+                      placeholder={toWall ? "예: 로비 미디어월" : "예: 본당 입구 아이패드"}
                       className="rounded-xl bg-night px-4 py-4 text-xl text-cream"
                     />
                   </label>
@@ -128,12 +102,43 @@ export default async function EnrollPage({
                       className="rounded-xl bg-night px-4 py-4 text-xl text-cream"
                     />
                   </label>
-                  <button type="submit" className="btn-secondary">
+                  <button type="submit" className="btn-primary">
                     비밀번호로 등록
                   </button>
                 </form>
-              </details>
+              </section>
             )}
+
+            <section className="rounded-2xl border border-cream/15 p-6">
+              <h2 className="text-xl font-semibold">
+                {sharedPasswordEnabled ? "일회용 코드로 등록 (예비)" : "일회용 코드로 등록"}
+              </h2>
+              <form
+                method="post"
+                action="/api/kiosk/enroll"
+                className="mt-5 flex flex-col gap-5"
+                data-testid="enroll-code-form"
+              >
+                {toWall && <input type="hidden" name="next" value="wall" />}
+                <label className="flex flex-col gap-2 text-lg">
+                  등록 코드
+                  <input
+                    name="code"
+                    required
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    placeholder="예: K7QM-3XRP"
+                    className="rounded-xl bg-night px-4 py-4 text-center font-mono text-3xl tracking-[0.2em] text-cream"
+                  />
+                </label>
+                <p className="text-base text-mist">
+                  운영 화면(/admin → 키오스크)에서 만든 코드예요. 15분 동안 한 번만 쓸 수 있어요.
+                </p>
+                <button type="submit" className={sharedPasswordEnabled ? "btn-secondary" : "btn-primary"}>
+                  이 기기 등록
+                </button>
+              </form>
+            </section>
           </div>
         )}
       </div>
