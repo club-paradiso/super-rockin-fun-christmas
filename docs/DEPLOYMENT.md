@@ -43,7 +43,7 @@ Next.js server is the only thing that talks to Supabase.
 | `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                         |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                    |
 | `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                   |
-| `KIOSK_ENROLL_SECRET`       | ≥ 20 random chars, different from the above (**Sensitive**)                         |
+| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)                         |
 | `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically               |
 | `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub |
 | `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                     |
@@ -71,8 +71,9 @@ device enrollment only, **not** staff authentication or permission to approve ph
 
 1. In Vercel → `follow-the-lights` → Settings → Environment Variables, create
    `KIOSK_ENROLL_SECRET` for **Production** as an encrypted/sensitive server-side value.
-   The operator chooses the value. Use a unique **20+ character passphrase** with high entropy;
-   do not reuse a staff PIN, event password, or `KIOSK_SESSION_SECRET`.
+   The operator chooses the value; **there is no minimum length enforced by the server**.
+   Prefer a unique, hard-to-guess passphrase and do not reuse a staff PIN, event password,
+   or `KIOSK_SESSION_SECRET`. Short numeric codes are easier to guess over the internet.
    Do not put it in source code, QR codes, screenshots, or public documentation.
 2. Redeploy **Production** after saving the environment variable. Merely editing the variable
    does not retroactively update existing deployments.
@@ -189,6 +190,7 @@ A preview for real-device testing, without a hub. Checklist: `docs/PREVIEW_DEVIC
   different version numbers. They are re-runnable, so a later `supabase db push` is harmless.
 - Env vars (Production): `PUBLIC_BASE_URL`, `PHOTO_STORE`, `SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `KIOSK_SESSION_SECRET`, `CRON_SECRET`,
-  `NEXT_PUBLIC_CAMERA_MODE`, `PHOTO_LINK_TTL_HOURS=72`, `PHOTO_RETENTION_DAYS=30`. Not set on
-  purpose: `KIOSK_ENROLL_SECRET` (kiosks use one-time codes), `HUB_SYNC_SECRET` (no hub yet),
+  `NEXT_PUBLIC_CAMERA_MODE`, `PHOTO_LINK_TTL_HOURS=72`, `PHOTO_RETENTION_DAYS=30`,
+  `KIOSK_ENROLL_SECRET` (operator-selected). Not set on
+  purpose: `HUB_SYNC_SECRET` (no hub yet),
   `KIOSK_AUTH_DISABLED`.
