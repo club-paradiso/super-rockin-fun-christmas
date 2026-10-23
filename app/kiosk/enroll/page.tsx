@@ -26,7 +26,8 @@ export default async function EnrollPage({
   const { error, next } = await searchParams;
   const toWall = next === "wall";
   const config = getServerConfig();
-  const sharedPasswordEnabled = config.kioskAuth.mode === "required" && !!config.kioskAuth.enrollSecret;
+  const sharedPasswordEnabled =
+    config.kioskAuth.mode === "required" && !!config.kioskAuth.enrollSecret;
   const auth = await authenticateKiosk((await cookies()).get(KIOSK_COOKIE)?.value ?? null);
 
   return (
@@ -134,7 +135,10 @@ export default async function EnrollPage({
                 <p className="text-base text-mist">
                   운영 화면(/admin → 키오스크)에서 만든 코드예요. 15분 동안 한 번만 쓸 수 있어요.
                 </p>
-                <button type="submit" className={sharedPasswordEnabled ? "btn-secondary" : "btn-primary"}>
+                <button
+                  type="submit"
+                  className={sharedPasswordEnabled ? "btn-secondary" : "btn-primary"}
+                >
                   이 기기 등록
                 </button>
               </form>
