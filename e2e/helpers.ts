@@ -9,7 +9,7 @@ export const SHOOT_TIMEOUT = 45_000;
 let enrolledCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | null = null;
 
 /**
- * Staff enrollment through the real UI (legacy shared-secret form). The first call per worker
+ * Staff enrollment through the real UI (operator password form). The first call per worker
  * enrolls for real; later calls reuse that kiosk session, so the suite stays under the
  * production enrollment rate limit (10 / 15 min / IP). The secret is typed, never in page JS.
  */
@@ -19,7 +19,6 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
     return;
   }
   await page.goto("/kiosk/enroll");
-  await page.getByText("공유 비밀번호로 등록 (구버전)").click();
   await page.getByLabel("기기 이름").fill(label);
   await page.getByLabel("등록 비밀번호").fill(ENROLL_SECRET);
   await page.getByRole("button", { name: "비밀번호로 등록" }).click();
