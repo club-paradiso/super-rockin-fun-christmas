@@ -63,11 +63,33 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<origin>/api/cron/retention
 Limits to know: Vercel functions accept ≤ 4.5 MB request bodies, which is why the upload cap is
 4 MB (a four-cut JPEG is about 0.3–1.5 MB). On the Hobby plan, cron runs at most once a day.
 
-## 3. Enroll the kiosk
+## 3. Enroll the kiosk (operator password first)
 
-1. Staff: `/admin` → 키오스크 → name → **일회용 등록 코드 만들기**.
-2. Kiosk device: open `https://<origin>/kiosk/enroll`, type the code, then press **이 기기 등록**.
-3. Open `/kiosk` in full screen and allow the camera. In /admin the kiosk turns **온라인**.
+The default kiosk setup supports two enrollment methods. **An operator-selected shared password is
+the primary path when configured; one-time staff-issued codes remain the fallback.** This is kiosk
+device enrollment only, **not** staff authentication or permission to approve photos for the wall.
+
+1. In Vercel → `follow-the-lights` → Settings → Environment Variables, create
+   `KIOSK_ENROLL_SECRET` for **Production** as an encrypted/sensitive server-side value.
+   The operator chooses the value. Use a unique **20+ character passphrase** with high entropy;
+   do not reuse a staff PIN, event password, or `KIOSK_SESSION_SECRET`.
+   Do not put it in source code, QR codes, screenshots, or public documentation.
+2. Redeploy **Production** after saving the environment variable. Merely editing the variable
+   does not retroactively update existing deployments.
+3. On the iPad in Safari, open `https://follow-the-lights.vercel.app/kiosk/enroll`,
+   enter a descriptive **기기 이름** and **등록 비밀번호**, then select **비밀번호로 등록**.
+   A successful registration issues a Secure, HttpOnly, SameSite=Lax session cookie and
+   forwards the device to `/kiosk`. The kiosk row is persisted and remains revocable.
+4. For a wall display use `/kiosk/enroll?next=wall` on the wall browser.
+5. One-time fallback: staff can still open `/admin` → 키오스크 → generate a single-use
+   enrollment code (valid 15 minutes); type it in the separate code form.
+
+The password is server-validated, rate-limited, and never sent to public JavaScript.
+**Changing the shared password prevents new enrollments with the old password but does not
+revoke previously enrolled devices.** Revoke compromised devices individually in admin.
+The production setting is intentionally absent until an operator explicitly chooses it;
+without it, only one-time-code registration is offered. This does not bypass SMTP/OTP
+requirements for staff login, or certify physical camera and QR behavior.
 
 ## 4. REAL-PHONE CELLULAR TEST (the Phase 2 gate)
 
