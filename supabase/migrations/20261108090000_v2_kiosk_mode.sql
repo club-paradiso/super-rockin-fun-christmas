@@ -7,8 +7,10 @@ alter table public.event_settings
     check (kiosk_default_mode in ('standard', 'easy'));
 
 -- ── settings update: one audited call, now with the start mode ──────────────────────────────
--- The previous signature is dropped so there is exactly one way to change settings.
-drop function if exists public.ftl_settings_update(boolean, boolean, boolean, text, boolean, text, text, uuid);
+-- The previous 8-argument signature is KEPT for now: this migration is applied before the new code
+-- is deployed, and the running code still calls it (emergency switches must keep working in
+-- between). It never touches kiosk_default_mode. A follow-up migration drops it once the new code
+-- is live, so there is again exactly one way to change settings.
 
 create or replace function public.ftl_settings_update(
   p_pause_submissions boolean,

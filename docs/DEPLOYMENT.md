@@ -192,7 +192,11 @@ Rollback: remove `WALL_HOSTS` and redeploy (the domain can stay; it then serves 
 No new env vars. The phone page lives on `PUBLIC_BASE_URL` (`/m/…`). With a hub, the cloud needs
 `HUB_SYNC_SECRET` (already required for the QR copy) and the hub pulls phone photos every 15 s.
 Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
-schema change). Apply it before deploying this code — the settings function signature changes.
+schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
+and keeps the 8-argument one, so the code still running keeps working (emergency switches
+included) until the new code is live. After the 2.0 deploy, a follow-up migration drops the
+8-argument function (not written yet on purpose: `supabase db push` before the deploy would break
+the running code).
 
 ## Preview deployment (2026-10-14)
 
