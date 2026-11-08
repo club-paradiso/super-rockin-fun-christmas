@@ -10,6 +10,10 @@ Christmas Village media wall after staff review. There is **no printing**.
 
 ## Status
 
+FOLLOW THE LIGHTS 2.0 (2026-11-08): see [`docs/IMPLEMENTATION_REPORT.md`](docs/IMPLEMENTATION_REPORT.md)
+and [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md). The paragraph and table below are the earlier
+phase summary; [`docs/STATUS.md`](docs/STATUS.md) is the source of truth.
+
 **Phase 4 is done in software: the media wall shows approved, consented photos in a night-village
 scene and obeys the emergency switches. Phases 1–4 are tested against a local Supabase stack. The
 app has not been deployed or tried on real devices, and it is not production-ready.**
@@ -24,17 +28,21 @@ app has not been deployed or tried on real devices, and it is not production-rea
 | Kiosk management: one-time enrollment codes, heartbeat, revoke                 | ✅ Phase 3          |
 | Emergency switches (pause submissions / wall / holding screen)                 | ✅ Phase 3 + 4      |
 | `/wall` media wall: approved + consented only, enrolled display, offline cache | ✅ Phase 4          |
+| 2.0: "내 사진으로 참여하기" phone upload → same review queue (D66)             | ✅ 2.0 (software)   |
+| 2.0: easy mode (large type, fewer choices) + staff default (D67)               | ✅ 2.0 (software)   |
+| 2.0: dedicated wall hostname (`WALL_HOSTS`, D68) — domain not attached yet     | ⏳ needs approval   |
 | Real phones, staff devices, wall screen, camera, iPad, MY4CUT                  | ❌ **not verified** |
 
 ## Surfaces
 
-| Route           | Who          | What                                                                                                 |
-| --------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
-| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device                                          |
-| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                  |
-| `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                |
-| `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, emergency, audit — see [`docs/ADMIN.md`](docs/ADMIN.md) |
-| `/wall`         | Display      | Media wall. Requires an enrolled display (`/kiosk/enroll?next=wall`)                                 |
+| Route           | Who          | What                                                                                                                                                       |
+| --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device                                                                                                |
+| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                                                                        |
+| `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                                                                      |
+| `/m/[token]`    | Guest phones | "내 사진으로 참여하기": send one own photo for wall review (booth QR, 15 min) — [`docs/MOBILE_UPLOAD_ARCHITECTURE.md`](docs/MOBILE_UPLOAD_ARCHITECTURE.md) |
+| `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, emergency, audit — see [`docs/ADMIN.md`](docs/ADMIN.md)                                                       |
+| `/wall`         | Display      | Media wall. Requires an enrolled display (`/kiosk/enroll?next=wall`)                                                                                       |
 
 ## Quick start (development)
 

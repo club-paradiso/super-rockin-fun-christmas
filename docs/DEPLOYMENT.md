@@ -43,7 +43,7 @@ Next.js server is the only thing that talks to Supabase.
 | `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                         |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                    |
 | `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                   |
-| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)                         |
+| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)    |
 | `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically               |
 | `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub |
 | `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                     |
@@ -171,6 +171,28 @@ Before the event, a person must do this on the actual wall screen at the venue:
 - check readability and brightness from where guests stand, and leave it running for an hour.
 
 Until then: `REAL_WALL_DISPLAY_TEST: NOT VERIFIED`.
+
+## 8. Dedicated media-wall address (D68) — needs approval, not done
+
+Same deployment, a second hostname (`docs/MEDIA_WALL_ARCHITECTURE.md`). Steps for the person who
+approves production changes:
+
+1. Vercel → project `follow-the-lights` → Settings → Domains → add `follow-the-lights-wall.vercel.app`
+   (or another free `*.vercel.app` name if that one is taken; no cost).
+2. Environment Variables → `WALL_HOSTS=follow-the-lights-wall.vercel.app` (Production and Preview).
+   `PUBLIC_BASE_URL` stays the booth address: wall-host pages for staff and guests redirect there.
+3. Redeploy (`WALL_HOSTS` is read at build time).
+4. Check: `/` on the wall address shows the wall enrollment notice; `/admin` there redirects to the
+   booth address. Enroll the wall display at `https://<wall address>/kiosk/enroll?next=wall`.
+
+Rollback: remove `WALL_HOSTS` and redeploy (the domain can stay; it then serves the normal app).
+
+## 9. Phone uploads (D66)
+
+No new env vars. The phone page lives on `PUBLIC_BASE_URL` (`/m/…`). With a hub, the cloud needs
+`HUB_SYNC_SECRET` (already required for the QR copy) and the hub pulls phone photos every 15 s.
+Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
+schema change). Apply it before deploying this code — the settings function signature changes.
 
 ## Preview deployment (2026-10-14)
 
