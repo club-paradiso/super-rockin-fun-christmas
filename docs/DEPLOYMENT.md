@@ -203,9 +203,9 @@ by anon or authenticated.
 Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
 schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
 and keeps the 8-argument one, so the code still running keeps working (emergency switches
-included) until the new code is live. After the 2.0 deploy, a follow-up migration drops the
-8-argument function (not written yet on purpose: `supabase db push` before the deploy would break
-the running code).
+included) until the new code is live. After the 2.0 deploy, `20261109090000_v2_drop_old_settings_fn.sql`
+drops the 8-argument function (written only after #29/#30 were live and the deployed addresses
+were checked, 2026-11-08).
 
 ## Preview deployment (2026-10-14)
 
