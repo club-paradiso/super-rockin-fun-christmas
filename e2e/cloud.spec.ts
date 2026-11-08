@@ -2,7 +2,8 @@ import { selectDefaultPhotos } from "./helpers";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
-import { expect, test, type Page } from "@playwright/test";
+import sharp from "sharp";
+import { devices, expect, test, type Page } from "@playwright/test";
 import { CLOUD_PORT, CLOUD_PROXY_PORT, HUB_CLOUD_PORT, HUB_SETUP_CODE, USE_SUPABASE } from "./env";
 import { SHOOT_TIMEOUT, tokenFromUrl } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, kioskPhotoToQr, newPage } from "./staff-helpers";
@@ -98,7 +99,7 @@ test("setup: staff and an enrolled booth on the hub", async ({ browser }) => {
 /** Booth session up to the wall question's answer (the QR screen follows). */
 async function shootAndAnswer(answer: "yes" | "no") {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
@@ -189,6 +190,74 @@ test("cloud down: the wall answer is kept and the guest can leave without a QR",
       { timeout: 60_000, intervals: [3_000] },
     )
     .toContain("밀린 일이 없어요");
+});
+
+test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes down to the hub, cloud copy gone", async ({
+  browser,
+}) => {
+  await kiosk.goto("/kiosk?camera=mock");
+  await kiosk.getByTestId("start-mobile").click();
+  const qr = kiosk.getByTestId("mobile-qr");
+  await expect(qr.locator("svg")).toBeVisible();
+  // Guests' phones are on cellular data: the QR is the cloud's phone page, not the hub.
+  const url = (await qr.getAttribute("data-url"))!;
+  expect(url.startsWith(`${CLOUD}/m/u1.`)).toBe(true);
+  await expect(kiosk.getByTestId("mobile-lan-note")).toHaveCount(0);
+  const sessionId = decodeURIComponent(url.split("/m/")[1]!).split(".")[1]!;
+
+  const context = await browser.newContext({ ...devices["Pixel 7"] });
+  const guest = await context.newPage();
+  await guest.goto(url);
+  const buffer = await sharp({
+    create: { width: 1200, height: 900, channels: 3, background: "#3366aa" },
+  })
+    .jpeg()
+    .toBuffer();
+  await guest
+    .getByTestId("mobile-file")
+    .setInputFiles({ name: "a.jpg", mimeType: "image/jpeg", buffer });
+  await guest.getByTestId("mobile-consent").check();
+  await guest.getByTestId("mobile-submit").click();
+  await expect(guest.getByTestId("mobile-done")).toBeVisible();
+  await context.close();
+
+  // The booth hears about it through the hub, which takes the photo in at once.
+  await expect(kiosk.getByTestId("mobile-received")).toBeVisible({ timeout: 20_000 });
+  await expect
+    .poll(
+      async () => {
+        const r = (await rows(".data-e2e-hub-cloud")).find((x) => x.sessionId === sessionId) as
+          (Row & { frameId: string }) | undefined;
+        return r ? `${r.frameId}/${r.moderationStatus}/${r.wallConsent}` : "missing";
+      },
+      { timeout: 30_000 },
+    )
+    .toBe("phone-photo/PENDING/true");
+  // The cloud keeps nothing once the hub has it.
+  await expect
+    .poll(async () => (await cloudRow(sessionId))?.moderationStatus, { timeout: 30_000 })
+    .toBe("DELETED");
+
+  await staff.goto("/admin/moderation?source=mobile");
+  await expect(staff.locator('[data-source="mobile"]').first()).toBeVisible();
+  await staff.goto("/admin");
+  await expect(staff.getByTestId("inbox-status")).toContainText("정상");
+});
+
+test("내 사진으로 참여하기 offline: the booth says the internet is needed, never shows a dead QR", async () => {
+  await closeProxy();
+  try {
+    await kiosk.goto("/kiosk?camera=mock");
+    await kiosk.getByTestId("start-mobile").click();
+    await expect(kiosk.getByTestId("mobile-failed")).toHaveAttribute("data-reason", "offline");
+    await expect(kiosk.getByTestId("mobile-qr")).toHaveCount(0);
+  } finally {
+    await openProxy();
+  }
+  await kiosk.getByRole("button", { name: "다시 시도" }).click();
+  await expect(kiosk.getByTestId("mobile-qr").locator("svg")).toBeVisible({ timeout: 15_000 });
+  await kiosk.getByTestId("go-home").click();
+  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
 });
 
 test("staff delete on the hub kills the cloud link too", async () => {

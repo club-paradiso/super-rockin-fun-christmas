@@ -210,7 +210,7 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
           await client.query(`set local role ${role}`);
           await expect(
             client.query(
-              "select public.ftl_settings_update(true, null, null, null, false, null, null, gen_random_uuid())",
+              "select public.ftl_settings_update(true, null, null, null, false, null, null, null, gen_random_uuid())",
             ),
           ).rejects.toThrow(/permission denied/);
         } finally {

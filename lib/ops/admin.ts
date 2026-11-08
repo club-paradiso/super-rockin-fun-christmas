@@ -1,6 +1,8 @@
 import "server-only";
 import { getFrame } from "@/config/frames";
-import { getCloudSync } from "@/lib/cloud/server";
+import { photoSource, type PhotoSource } from "@/config/mobile";
+import { getCloudSync, getHubInbox } from "@/lib/cloud/server";
+import type { HubInboxStatus } from "@/lib/cloud/inbox";
 import { getServerConfig } from "@/lib/server/env";
 import { opsStatus, type OpsStatus } from "./backup-server";
 import type { CloudSyncStatus } from "@/lib/cloud/sync";
@@ -26,6 +28,8 @@ export interface StaffPhotoView {
   createdAt: string;
   frameId: string;
   frameLabel: string;
+  /** Booth camera, or a guest's own phone photo (D66). */
+  source: PhotoSource;
   status: ModerationStatus;
   wallConsent: boolean;
   wallEligible: boolean;
@@ -50,18 +54,22 @@ export function toStaffPhotoView(
     id: row.id,
     createdAt: row.createdAt,
     frameId: row.frameId,
-    frameLabel: getFrame(row.frameId).label,
+    frameLabel: photoSource(row) === "mobile" ? "휴대폰 사진" : getFrame(row.frameId).label,
+    source: photoSource(row),
     status: row.moderationStatus,
     wallConsent: row.wallConsent,
     wallEligible: isWallEligible(row),
     kioskId: row.kioskId,
     kioskLabel: row.kioskId ? (kioskLabels.get(row.kioskId) ?? null) : null,
     sessionShort: row.sessionId.slice(0, 8),
-    linkActive: !deleted && new Date(row.tokenExpiresAt).getTime() > now,
+    // A phone photo has no guest link (the guest already has the photo).
+    linkActive:
+      photoSource(row) === "booth" && !deleted && new Date(row.tokenExpiresAt).getTime() > now,
     tokenExpiresAt: row.tokenExpiresAt,
     deleted,
     actions: availableActions(row),
-    canShowQrAgain: !deleted && new Date(row.retentionExpiresAt).getTime() > now,
+    canShowQrAgain:
+      photoSource(row) === "booth" && !deleted && new Date(row.retentionExpiresAt).getTime() > now,
   };
 }
 
@@ -113,6 +121,8 @@ export interface PhotoQuery {
   window?: PhotoWindow;
   kioskId?: string;
   sessionShort?: string;
+  /** Only booth or only phone photos (D66). */
+  source?: PhotoSource;
   limit?: number;
 }
 
@@ -131,12 +141,18 @@ export async function listStaffPhotos(q: PhotoQuery): Promise<StaffPhotoView[]> 
     }),
     kioskLabelMap(),
   ]);
-  return rows.map((r) => toStaffPhotoView(r, labels));
+  const views = rows.map((r) => toStaffPhotoView(r, labels));
+  return q.source ? views.filter((v) => v.source === q.source) : views;
 }
 
 /** The moderation queue: consented AND pending, oldest first so nobody waits forever. */
-export async function pendingQueue(limit = 60): Promise<StaffPhotoView[]> {
-  const rows = await listStaffPhotos({ statuses: ["PENDING"], wallConsent: true, limit: 200 });
+export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<StaffPhotoView[]> {
+  const rows = await listStaffPhotos({
+    statuses: ["PENDING"],
+    wallConsent: true,
+    limit: 200,
+    source,
+  });
   return rows.reverse().slice(0, limit);
 }
 
@@ -159,6 +175,10 @@ export interface Overview {
   cloud: CloudSyncStatus | null;
   /** Hub only: USB backup and free disk space. */
   ops: OpsStatus | null;
+  /** Hub with a cloud only: phone photos coming down from the cloud inbox (D66). */
+  inbox: HubInboxStatus | null;
+  /** Review queue split by where the photos came from (D66). */
+  pendingBySource: Record<PhotoSource, number>;
   /** What gets deleted when, as configured (shown so staff can tell guests). */
   retention:
     | { where: "cloud"; days: number }
@@ -180,14 +200,16 @@ function retentionView(): Overview["retention"] {
 /** Only measured values. Anything we cannot measure is absent, not shown as green. */
 export async function getOverview(): Promise<Overview> {
   const backend = getBackend();
-  const [stats, kiosks, lastRetention, settings, cloud, ops] = await Promise.all([
+  const [stats, kiosks, lastRetention, settings, cloud, ops, pending] = await Promise.all([
     getPhotoService().stats(),
     backend.kiosks.list(),
     backend.retentionRuns.latest(),
     backend.settings.get(),
     getCloudSync()?.status() ?? null,
     opsStatus(),
+    getPhotoService().list({ statuses: ["PENDING"], limit: 500 }),
   ]);
+  const phone = pending.filter((r) => photoSource(r) === "mobile").length;
   const views = kiosks.map((k) => toStaffKioskView(k));
   const count = (h: KioskHealth) => views.filter((v) => v.health === h).length;
   return {
@@ -209,6 +231,8 @@ export async function getOverview(): Promise<Overview> {
     settings,
     cloud,
     ops,
+    inbox: getHubInbox()?.status() ?? null,
+    pendingBySource: { booth: pending.length - phone, mobile: phone },
     retention: retentionView(),
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BoothFooter, useKioskChrome } from "./chrome";
 
 /** Full-screen stage every kiosk screen sits on. */
 export function Stage({
@@ -48,6 +49,24 @@ export function Stepper({ step, total }: { step: number; total: number }) {
   );
 }
 
+/** Easy mode: "2 / 6단계 · 사진 확인" in words, large, with a progress bar. */
+export function EasyStep({ step, total, label }: { step: number; total: number; label: string }) {
+  return (
+    <div className="flex flex-col items-end gap-2" data-testid="easy-step">
+      <p className="text-[clamp(24px,3.4vh,38px)] font-bold text-glow">
+        <span className="text-gold">{step}단계</span> · {label}
+        <span className="sr-only">
+          {" "}
+          ({total}단계 중 {step}단계)
+        </span>
+      </p>
+      <div className="h-3 w-[min(36vw,320px)] overflow-hidden rounded-full bg-navy-700" aria-hidden>
+        <div className="h-full bg-gold" style={{ width: `${(step / total) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Full-screen booth screen from the Figma 01 Platform frames: the night glow, the wordmark top
  * left and the step dots top right (none on the attract screen).
@@ -63,20 +82,27 @@ export function BoothScreen({
   progress?: { step: number; total: number } | null;
   className?: string;
 }) {
+  const chrome = useKioskChrome();
+  const easy = chrome?.mode === "easy";
   return (
     <section
       data-testid={testId}
-      className="booth-sky relative flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] pb-10 pt-[max(20px,4.4vh)]"
+      className="booth-sky relative flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] pb-[max(20px,3vh)] pt-[max(20px,4.4vh)]"
     >
-      {progress && (
-        <header className="flex h-[max(56px,7.4vh)] items-center justify-between">
+      {(progress || (easy && chrome?.easyStep)) && (
+        <header className="flex min-h-[max(56px,7.4vh)] items-center justify-between gap-4">
           <BrandLockup className="h-[max(36px,4.6vh)] w-auto" />
-          <Stepper step={progress.step} total={progress.total} />
+          {easy && chrome?.easyStep ? (
+            <EasyStep {...chrome.easyStep} />
+          ) : (
+            progress && <Stepper step={progress.step} total={progress.total} />
+          )}
         </header>
       )}
       <div className={`flex flex-1 flex-col items-center justify-center ${className}`}>
         {children}
       </div>
+      <BoothFooter />
     </section>
   );
 }

@@ -42,7 +42,7 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await hideMockBadge(page);
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
   await shot(page, "booth-1280x800-01-welcome");
-  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   await page.waitForTimeout(800); // frame thumbnails
   await shot(page, "booth-1280x800-02-pick");

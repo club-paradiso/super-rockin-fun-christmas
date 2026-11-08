@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import { parseWallHosts, wallHostRedirects, wallHostRewrites } from "./lib/wall/host";
+
+/** Dedicated media-wall address(es) (D68), read at build time. Unset = no change at all. */
+const wallHosts = parseWallHosts(process.env.WALL_HOSTS);
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -18,6 +22,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  async rewrites() {
+    return { beforeFiles: wallHostRewrites(wallHosts), afterFiles: [], fallback: [] };
+  },
+  async redirects() {
+    return wallHostRedirects(wallHosts, process.env.PUBLIC_BASE_URL?.trim() || null);
   },
 };
 

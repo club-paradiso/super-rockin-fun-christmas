@@ -33,7 +33,7 @@ test("camera permission denied shows a clear error and a way back", async ({ bro
       Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
   });
   await page.goto("/kiosk");
-  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await page.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(page.getByTestId("screen-camera-error")).toBeVisible();
   await expect(page.getByText("카메라 사용이 허용되지 않았어요")).toBeVisible();

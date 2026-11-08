@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
-import { wallLayout } from "@/lib/wall/layout";
+import { MOBILE_FRAME_ID } from "@/config/mobile";
+import { PHONE_CARD, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
@@ -124,6 +125,16 @@ export function WallApp({
     [fresh, revoked, feed],
   );
   const allowed = useMemo(() => new Set(eligible), [eligible]);
+  // Which photos came from a guest's phone (D66): they hang as a card instead of a strip.
+  const phonePhotos = useMemo(
+    () =>
+      new Set(
+        feed?.mode === "live"
+          ? feed.photos.filter((p) => p.frameId === MOBILE_FRAME_ID).map((p) => p.id)
+          : [],
+      ),
+    [feed],
+  );
   const showNow = useMemo(
     () => new Set(fresh && !revoked && feed?.mode === "live" ? feed.showNow : []),
     [fresh, revoked, feed],
@@ -397,6 +408,56 @@ export function WallApp({
               const url =
                 slot.photoId && allowed.has(slot.photoId) ? images.get(slot.photoId) : null;
               if (!place || !slot.photoId || !slot.phase || !url) return null;
+              if (phonePhotos.has(slot.photoId)) {
+                const card = phoneCardBox(place);
+                return (
+                  <figure
+                    key={`${i}-${slot.photoId}`}
+                    data-testid="wall-photo"
+                    data-photo-id={slot.photoId}
+                    data-phase={slot.phase}
+                    data-kind="phone"
+                    className="absolute"
+                    style={{
+                      left: card.x,
+                      top: place.y,
+                      width: card.width,
+                      height: card.height + (card.y - place.y),
+                      transform: `rotate(${place.tilt}deg)`,
+                      transformOrigin: "50% 0",
+                    }}
+                  >
+                    <div
+                      className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
+                    >
+                      <Clip dropToStrip={card.y - place.y} />
+                      <div
+                        className="absolute inset-x-0 bottom-0 flex flex-col bg-[#f7efe0]"
+                        style={{
+                          top: card.y - place.y,
+                          padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
+                          boxShadow: "0 12px 24px rgba(0,0,0,0.55)",
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL from our server */}
+                        <img
+                          src={url}
+                          alt=""
+                          data-testid="wall-photo-image"
+                          className="w-full bg-[#1c2756] object-contain"
+                          style={{ height: PHONE_CARD.photoHeight }}
+                        />
+                        <p
+                          className="flex flex-1 items-center justify-center font-bold text-[#121a3d]"
+                          style={{ fontSize: 17, letterSpacing: "0.24em" }}
+                        >
+                          FOLLOW THE LIGHTS
+                        </p>
+                      </div>
+                    </div>
+                  </figure>
+                );
+              }
               return (
                 <figure
                   key={`${i}-${slot.photoId}`}

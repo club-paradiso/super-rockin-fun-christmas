@@ -8,7 +8,7 @@ import { MODERATION_STATES, type ModerationStatus } from "@/lib/storage/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET ?status=PENDING,APPROVED&window=6h&kiosk=<uuid>&session=3f2a9c&limit=60 */
+/** GET ?status=PENDING,APPROVED&window=6h&kiosk=<uuid>&session=3f2a9c&source=mobile&limit=60 */
 export const GET = staffRoute("admin_photos", async (request) => {
   const q = new URL(request.url).searchParams;
   const statuses = q
@@ -22,6 +22,8 @@ export const GET = staffRoute("admin_photos", async (request) => {
     window: window && window in PHOTO_WINDOWS ? (window as PhotoWindow) : undefined,
     kioskId: isUuid(kiosk) ? kiosk : undefined,
     sessionShort: q.get("session") ?? undefined,
+    source:
+      q.get("source") === "mobile" ? "mobile" : q.get("source") === "booth" ? "booth" : undefined,
     limit: Number(q.get("limit")) || undefined,
   });
   return NextResponse.json({ photos }, { headers: NO_STORE });

@@ -27,6 +27,7 @@ import { loadFrameFonts } from "@/lib/compositor/fonts";
 import {
   capturedCount,
   createInitialState,
+  easyStep,
   isShooting,
   kioskReducer,
   needsCamera,
@@ -41,6 +42,9 @@ import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
+import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
+import type { KioskMode } from "@/lib/storage/types";
+import { GuestHelp, KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { BoothScreen, BrandLockup, CameraPreview } from "./ui";
 
@@ -74,9 +78,12 @@ function readStoredDevice(): string | undefined {
 export function KioskApp({
   cameraMode,
   initialWallSubmissions = "open",
+  initialMode = "standard",
   staffHelp = false,
 }: {
   cameraMode: CameraMode;
+  /** Staff default start mode (settings, D67); refreshed by heartbeats. */
+  initialMode?: KioskMode;
   /** From event settings at page load; refreshed by heartbeats and upload responses. */
   initialWallSubmissions?: "open" | "paused";
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
@@ -87,8 +94,13 @@ export function KioskApp({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       frameId: DEFAULT_FRAME_ID,
+      mode: initialMode,
     }),
   );
+  const [helpOpen, setHelpOpen] = useState(false);
+  // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
+  const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
+  const [confirmHome, setConfirmHome] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -127,6 +139,9 @@ export function KioskApp({
     urlsRef.current.clear();
     setFinalImage(null);
     setQrSvg(null);
+    setMobileQr(null);
+    setHelpOpen(false);
+    setConfirmHome(false);
     dispatch({ type: "RESET" });
   }, []);
 
@@ -282,6 +297,7 @@ export function KioskApp({
   }, [
     finalPhase,
     state.frameId,
+    state.selectedShotIndices,
     selectionKey,
     images,
     finalImage?.frameId,
@@ -450,9 +466,11 @@ export function KioskApp({
 
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
-  useIdleReset(
+  // Easy mode leaves twice as long before giving up on an unattended screen.
+  const idleSeconds = KIOSK_CONFIG.idleResetSeconds * (state.mode === "easy" ? 2 : 1);
+  const idle = useIdleReset(
     state.phase !== "welcome" && !isShooting(state.phase),
-    KIOSK_CONFIG.idleResetSeconds,
+    idleSeconds,
     reset,
   );
 
@@ -482,6 +500,109 @@ export function KioskApp({
     await (await consentRef.current)?.processDue(true);
   }, []);
 
+  // ── "내 사진으로 참여하기" (D66): a QR for the guest's phone; the photo never touches the booth ──
+  const mobileLoading = state.phase === "mobile" && state.mobile.status === "loading";
+  useEffect(() => {
+    if (!mobileLoading) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    (async () => {
+      try {
+        const res = await fetch("/api/mobile/sessions", {
+          method: "POST",
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
+        if (res.status === 409) return dispatch({ type: "MOBILE_FAILED", reason: "paused" });
+        if (res.status === 503) return dispatch({ type: "MOBILE_FAILED", reason: "offline" });
+        if (!res.ok) return dispatch({ type: "MOBILE_FAILED", reason: "error" });
+        const body = (await res.json()) as {
+          sessionId: string;
+          url: string;
+          expiresAt: string;
+          via: "cloud" | "lan";
+        };
+        const svg = await makeQrSvg(body.url);
+        setMobileQr({ sessionId: body.sessionId, svg });
+        dispatch({ type: "MOBILE_READY", ...body });
+      } catch {
+        dispatch({ type: "MOBILE_FAILED", reason: navigator.onLine ? "error" : "offline" });
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [mobileLoading]);
+
+  // While the QR is on screen: has the phone sent the photo? And the QR's own time limit.
+  const mobileWaiting = state.phase === "mobile" && state.mobile.status === "ready";
+  const mobileSession = state.mobile.status === "ready" ? state.mobile.sessionId : null;
+  const mobileExpires = state.mobile.status === "ready" ? state.mobile.expiresAt : null;
+  useEffect(() => {
+    if (!mobileWaiting || !mobileSession || !mobileExpires) return;
+    let stopped = false;
+    let inFlight = false;
+    const ask = async () => {
+      if (inFlight || stopped) return;
+      inFlight = true;
+      try {
+        const res = await fetch("/api/mobile/sessions/status", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionId: mobileSession }),
+        });
+        if (!res.ok || stopped) return;
+        const { status } = (await res.json()) as { status: string };
+        if (status === "received") dispatch({ type: "MOBILE_RECEIVED", sessionId: mobileSession });
+      } catch {
+        // Offline for a moment: ask again on the next tick.
+      } finally {
+        inFlight = false;
+      }
+    };
+    const poll = setInterval(() => void ask(), MOBILE_UPLOAD_CONFIG.statusPollSeconds * 1000);
+    // A QR past its time cannot be used: replace it with a fresh one.
+    const expire = setTimeout(
+      () => dispatch({ type: "MOBILE_RETRY" }),
+      Math.max(0, new Date(mobileExpires).getTime() - Date.now()),
+    );
+    return () => {
+      stopped = true;
+      clearInterval(poll);
+      clearTimeout(expire);
+    };
+  }, [mobileWaiting, mobileSession, mobileExpires]);
+
+  // ── Shared screen chrome: mode, way home, help ───────────────────────────────────────────
+  // These screens carry their own way home ("처음으로", "다 받았어요"): no second one in the footer.
+  const ownHomeButton =
+    state.phase === "camera-error" ||
+    state.phase === "delivery" ||
+    (state.phase === "mobile" &&
+      (state.mobile.status === "received" || state.mobile.status === "failed"));
+  const midSession = state.phase !== "welcome" && !ownHomeButton;
+  const requestHome = useCallback(() => {
+    // Nothing to lose on these screens: go straight home. Elsewhere, ask first.
+    if (state.phase === "mobile") reset();
+    else setConfirmHome(true);
+  }, [state.phase, reset]);
+  const chrome: KioskChrome = useMemo(
+    () => ({
+      mode: state.mode,
+      easyStep: easyStep(state.phase, wallSubmissions === "open"),
+      toggleMode: () =>
+        dispatch({ type: "SET_MODE", mode: state.mode === "easy" ? "standard" : "easy" }),
+      goHome: midSession ? requestHome : null,
+      openHelp: () => setHelpOpen(true),
+      quiet: isShooting(state.phase),
+    }),
+    [state.mode, state.phase, wallSubmissions, midSession, requestHome],
+  );
+
   // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
   useEffect(() => {
@@ -502,8 +623,13 @@ export function KioskApp({
           body: JSON.stringify(heartbeatRef.current),
         });
         if (!stopped && res.ok) {
-          const data = (await res.json()) as { wallSubmissions?: "open" | "paused" };
+          const data = (await res.json()) as {
+            wallSubmissions?: "open" | "paused";
+            kioskDefaultMode?: KioskMode;
+          };
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
+          if (data.kioskDefaultMode === "standard" || data.kioskDefaultMode === "easy")
+            dispatch({ type: "SET_DEFAULT_MODE", mode: data.kioskDefaultMode });
         }
       } catch {
         // Offline: the queue badge already tells staff; the next beat will retry.
@@ -518,47 +644,104 @@ export function KioskApp({
   }, []);
 
   return (
-    <main
-      className="relative min-h-dvh select-none overflow-hidden"
-      data-phase={state.phase}
-      data-wall-submissions={wallSubmissions}
-    >
-      <Screen
-        state={state}
-        dispatch={dispatch}
-        stream={stream}
-        devices={devices}
-        deviceId={deviceId}
-        onSelectDevice={selectDevice}
-        guestCameraChoice={!staffHelp}
-        thumbs={thumbs}
-        finalImage={finalImage}
-        qrSvg={qrSvg}
-        onRetryDelivery={deliver}
-        onConsent={chooseConsent}
-        onReset={reset}
-        onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
-        wallSubmissionsOpen={wallSubmissions === "open"}
-      />
-      {flash > 0 && state.phase === "capturing" && (
-        <div
-          key={flash}
-          className="capture-flash pointer-events-none fixed inset-0 bg-cream"
-          aria-hidden
-        />
-      )}
-      <StatusBadges cameraMode={cameraMode} online={online} queue={queueStatus} />
-      {staffHelp && (
-        <HelpPanel
-          listDevices={listDevices}
+    <KioskChromeContext.Provider value={chrome}>
+      <main
+        className={`relative min-h-dvh select-none overflow-hidden ${state.mode === "easy" ? "kiosk-easy" : ""}`}
+        data-phase={state.phase}
+        data-mode={state.mode}
+        data-wall-submissions={wallSubmissions}
+      >
+        <Screen
+          state={state}
+          dispatch={dispatch}
+          stream={stream}
+          devices={devices}
           deviceId={deviceId}
           onSelectDevice={selectDevice}
-          loadQueue={loadQueue}
-          onSendNow={sendNow}
+          guestCameraChoice={!staffHelp}
+          thumbs={thumbs}
+          finalImage={finalImage}
+          qrSvg={qrSvg}
+          onRetryDelivery={deliver}
+          onConsent={chooseConsent}
           onReset={reset}
+          onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
+          onStartMobile={() => dispatch({ type: "START_MOBILE" })}
+          mobileQrSvg={
+            mobileQr &&
+            state.mobile.status === "ready" &&
+            mobileQr.sessionId === state.mobile.sessionId
+              ? mobileQr.svg
+              : null
+          }
+          onToggleMode={chrome.toggleMode}
+          onOpenHelp={chrome.openHelp}
+          wallSubmissionsOpen={wallSubmissions === "open"}
         />
-      )}
-    </main>
+        {idle.warning && (
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-center gap-6 bg-navy/95 px-6 py-5 text-center"
+            role="status"
+            aria-live="polite"
+            data-testid="idle-warning"
+          >
+            <p className="booth-lead">
+              {idle.secondsLeft}초 뒤 처음 화면으로 돌아가요. 계속하려면 화면을 눌러 주세요.
+            </p>
+            <button type="button" className="booth-btn-secondary" onClick={idle.bump}>
+              계속할게요
+            </button>
+          </div>
+        )}
+        {helpOpen && <GuestHelp onClose={() => setHelpOpen(false)} />}
+        {confirmHome && (
+          <KioskDialog
+            title="처음 화면으로 갈까요?"
+            onClose={() => setConfirmHome(false)}
+            testId="confirm-home"
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="booth-btn-secondary"
+                  onClick={() => setConfirmHome(false)}
+                >
+                  계속 찍을게요
+                </button>
+                <button
+                  type="button"
+                  className="booth-btn-primary"
+                  data-testid="confirm-home-yes"
+                  onClick={reset}
+                >
+                  처음으로 갈게요
+                </button>
+              </>
+            }
+          >
+            <p className="booth-lead">지금까지 찍은 사진은 지워지고 저장되지 않아요.</p>
+          </KioskDialog>
+        )}
+        {flash > 0 && state.phase === "capturing" && (
+          <div
+            key={flash}
+            className="capture-flash pointer-events-none fixed inset-0 bg-cream"
+            aria-hidden
+          />
+        )}
+        <StatusBadges cameraMode={cameraMode} online={online} queue={queueStatus} />
+        {staffHelp && (
+          <HelpPanel
+            listDevices={listDevices}
+            deviceId={deviceId}
+            onSelectDevice={selectDevice}
+            loadQueue={loadQueue}
+            onSendNow={sendNow}
+            onReset={reset}
+          />
+        )}
+      </main>
+    </KioskChromeContext.Provider>
   );
 }
 
@@ -580,6 +763,10 @@ interface ScreenProps {
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onStart: () => void;
+  onStartMobile: () => void;
+  mobileQrSvg: string | null;
+  onToggleMode: () => void;
+  onOpenHelp: () => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
 }
@@ -608,30 +795,97 @@ function Screen(p: ScreenProps) {
   const sessionCode = state.sessionId.slice(0, 8);
 
   switch (state.phase) {
-    case "welcome":
-      // The whole screen is the start button (Figma 01 시작: "화면을 눌러 시작").
+    case "welcome": {
+      // Two clear choices (2.0): take photos here, or send a photo from your own phone. The
+      // screen mode is chosen here too, and can be changed on every screen.
+      const easy = state.mode === "easy";
       return (
         <section
           data-testid="screen-welcome"
-          className="booth-sky flex min-h-dvh w-full cursor-pointer items-center px-[max(24px,6.25vw)] portrait:items-end portrait:pb-[6vh]"
-          onClick={p.onStart}
+          className="booth-sky flex min-h-dvh w-full flex-col justify-center gap-[max(20px,4vh)] px-[max(24px,6.25vw)] py-[max(24px,5vh)]"
         >
-          <div className="flex flex-col items-start gap-[max(16px,3vh)] portrait:w-full">
-            <BrandLockup className="h-[clamp(96px,16vh,170px)] w-auto" />
+          <div className="flex flex-col items-start gap-[max(12px,2vh)]">
+            <BrandLockup className="h-[clamp(80px,13vh,150px)] w-auto" />
             <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
-            <p className="booth-lead">
-              여섯 장을 찍고 마음에 드는 사진을 골라 휴대폰으로 받을 수 있어요. 원하시면 저 큰
-              화면에도 걸어드려요.
-            </p>
+            {!easy && (
+              <p className="booth-lead">
+                사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.
+              </p>
+            )}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-[max(16px,2vw)] portrait:grid-cols-1">
             <button
               type="button"
-              className="booth-btn-primary mt-[2vh] portrait:mt-[8vh] portrait:w-full"
+              className="welcome-choice welcome-choice-primary"
+              data-testid="start-camera"
               onClick={p.onStart}
             >
-              화면을 눌러 시작
+              <span className="welcome-choice-icon" aria-hidden>
+                📸
+              </span>
+              <span className="welcome-choice-title">여기서 사진 찍기</span>
+              <span className="welcome-choice-lead">
+                {easy ? "부스 카메라로 찍어요" : "여섯 장 찍고 골라서 휴대폰으로 받아요"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="welcome-choice"
+              data-testid="start-mobile"
+              disabled={!p.wallSubmissionsOpen}
+              onClick={p.onStartMobile}
+            >
+              <span className="welcome-choice-icon" aria-hidden>
+                📱
+              </span>
+              <span className="welcome-choice-title">내 사진으로 참여하기</span>
+              <span className="welcome-choice-lead">
+                {p.wallSubmissionsOpen
+                  ? easy
+                    ? "휴대폰 사진을 보내요"
+                    : "휴대폰에 있는 사진을 미디어월로 보내요"
+                  : "지금은 사진 접수를 잠시 멈췄어요"}
+              </span>
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div
+              role="radiogroup"
+              aria-label="화면 크기"
+              className="flex rounded-full border-2 border-gold/60 p-1"
+            >
+              {(["standard", "easy"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={state.mode === m}
+                  data-testid={`mode-${m}`}
+                  onClick={() => state.mode !== m && p.onToggleMode()}
+                  className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
+                    state.mode === m ? "bg-gold text-[#0b1026]" : "text-glow"
+                  }`}
+                >
+                  {m === "standard" ? "기본 화면" : "가+ 쉬운 화면"}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="booth-chrome-btn"
+              onClick={p.onOpenHelp}
+              data-testid="welcome-help"
+            >
+              <span aria-hidden>?</span> 도움말
             </button>
           </div>
         </section>
+      );
+    }
+
+    case "mobile":
+      return (
+        <MobileScreen state={state} qrSvg={p.mobileQrSvg} onReset={p.onReset} dispatch={dispatch} />
       );
 
     case "pick":
@@ -1095,6 +1349,138 @@ function Screen(p: ScreenProps) {
   }
 }
 
+/** "내 사진으로 참여하기" on the booth: a QR, three steps, and what happens after (D66). */
+function MobileScreen({
+  state,
+  qrSvg,
+  onReset,
+  dispatch,
+}: {
+  state: State;
+  qrSvg: string | null;
+  onReset: () => void;
+  dispatch: React.Dispatch<Action>;
+}) {
+  const m = state.mobile;
+  const easy = state.mode === "easy";
+  if (m.status === "received") {
+    return (
+      <BoothScreen testId="screen-mobile" className="gap-6 text-center">
+        <div data-testid="mobile-received" className="flex flex-col items-center gap-6">
+          <p className="text-[clamp(64px,12vh,120px)] leading-none text-gold" aria-hidden>
+            ✓
+          </p>
+          <h1 className="booth-title">사진이 도착했어요</h1>
+          <p className="booth-lead">
+            운영팀이 확인한 뒤 미디어월에 걸어 드려요.
+            <br />
+            확인에는 시간이 조금 걸릴 수 있어요.
+          </p>
+          <button type="button" className="booth-btn-primary" onClick={onReset}>
+            처음으로
+          </button>
+        </div>
+      </BoothScreen>
+    );
+  }
+  if (m.status === "failed") {
+    const copy = {
+      offline: {
+        title: "지금은 인터넷이 연결되지 않았어요",
+        lead: "내 사진 보내기는 인터넷이 필요해요. 사진 찍기는 지금도 할 수 있어요.",
+      },
+      paused: {
+        title: "지금은 사진 접수를 잠시 멈췄어요",
+        lead: "잠시 뒤 다시 시도해 주세요. 사진 찍기는 지금도 할 수 있어요.",
+      },
+      error: { title: "QR을 만들지 못했어요", lead: "다시 시도를 눌러 주세요." },
+    }[m.reason];
+    return (
+      <BoothScreen testId="screen-mobile" className="gap-6 text-center">
+        <div
+          data-testid="mobile-failed"
+          data-reason={m.reason}
+          className="flex flex-col items-center gap-6"
+        >
+          <h1 className="booth-title">{copy.title}</h1>
+          <p className="booth-lead">{copy.lead}</p>
+          <div className="flex flex-wrap justify-center gap-4">
+            {m.reason !== "paused" && (
+              <button
+                type="button"
+                className="booth-btn-primary"
+                onClick={() => dispatch({ type: "MOBILE_RETRY" })}
+              >
+                다시 시도
+              </button>
+            )}
+            <button type="button" className="booth-btn-secondary" onClick={onReset}>
+              처음으로
+            </button>
+          </div>
+        </div>
+      </BoothScreen>
+    );
+  }
+  const ready = m.status === "ready" && qrSvg;
+  return (
+    <BoothScreen
+      testId="screen-mobile"
+      className="flex-row items-center justify-center gap-[max(40px,6vw)] portrait:flex-col portrait:gap-[3vh]"
+    >
+      <div className="flex max-w-[48rem] flex-col items-start gap-[max(14px,2.4vh)] portrait:items-center portrait:text-center">
+        <h1 className="booth-title">휴대폰으로 QR을 찍어 주세요</h1>
+        <ol className="flex flex-col gap-[max(10px,1.6vh)]" aria-label="순서">
+          {[
+            "휴대폰 카메라로 QR을 찍어요",
+            "열린 화면에서 사진 한 장을 골라요",
+            "안내를 읽고 ‘미디어월로 보내기’를 눌러요",
+          ].map((text, i) => (
+            <li key={text} className="booth-lead flex items-center gap-4 text-left">
+              <span className="flex h-[max(40px,5vh)] w-[max(40px,5vh)] shrink-0 items-center justify-center rounded-full bg-gold font-bold text-[#0b1026]">
+                {i + 1}
+              </span>
+              {text}
+            </li>
+          ))}
+        </ol>
+        {!easy && (
+          <p className="booth-caption">
+            운영팀이 확인한 사진만 미디어월에 걸려요. 회원가입이나 앱 설치는 필요 없어요.
+          </p>
+        )}
+        {m.status === "ready" && m.via === "lan" && (
+          <p className="booth-caption text-warm" data-testid="mobile-lan-note">
+            휴대폰이 행사장 와이파이에 연결되어 있어야 열려요.
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col items-center gap-4 rounded-[28px] bg-glow p-[max(24px,3.7vh)]">
+        {ready ? (
+          <div
+            data-testid="mobile-qr"
+            data-url={m.status === "ready" ? m.url : undefined}
+            className="w-[clamp(220px,32vh,340px)] rounded-xl bg-white p-3"
+            // QR markup comes from the qrcode library, generated locally from our own URL.
+            dangerouslySetInnerHTML={{ __html: qrSvg }}
+          />
+        ) : (
+          <div
+            className="flex aspect-square w-[clamp(220px,32vh,340px)] items-center justify-center rounded-xl bg-white text-xl text-[#4b5068]"
+            role="status"
+          >
+            QR을 만들고 있어요…
+          </div>
+        )}
+        <p className="text-center text-[clamp(18px,2.4vh,26px)] font-bold leading-[1.35] text-[#0b1026]">
+          사진이 도착하면
+          <br />이 화면이 바뀌어요
+        </p>
+      </div>
+    </BoothScreen>
+  );
+}
+
 /** The finished strip, shown beside the wall question. */
 function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; frameId: string }) {
   return (
@@ -1240,21 +1626,46 @@ function useOnline(): boolean {
   );
 }
 
-/** Reset an abandoned session after `seconds` with no touch. */
+/** Seconds before an idle reset when the booth starts warning. */
+const IDLE_WARNING_SECONDS = 15;
+
+/**
+ * Reset an abandoned session after `seconds` with no touch. For the last few seconds it says so
+ * (`warning`), so a slow guest is never surprised; any touch starts the time again.
+ */
 function useIdleReset(enabled: boolean, seconds: number, onIdle: () => void) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const bumpRef = useRef<() => void>(() => {});
   useEffect(() => {
     if (!enabled || !(seconds > 0)) return;
-    let timer = setTimeout(onIdle, seconds * 1000);
+    let deadline = Date.now() + seconds * 1000;
+    const tick = setInterval(() => {
+      const left = Math.ceil((deadline - Date.now()) / 1000);
+      if (left <= 0) {
+        clearInterval(tick);
+        setSecondsLeft(null);
+        onIdle();
+        return;
+      }
+      setSecondsLeft(left <= IDLE_WARNING_SECONDS ? left : null);
+    }, 250);
     const bump = () => {
-      clearTimeout(timer);
-      timer = setTimeout(onIdle, seconds * 1000);
+      deadline = Date.now() + seconds * 1000;
+      setSecondsLeft(null);
     };
+    bumpRef.current = bump;
     window.addEventListener("pointerdown", bump);
     window.addEventListener("keydown", bump);
     return () => {
-      clearTimeout(timer);
+      clearInterval(tick);
+      setSecondsLeft(null);
       window.removeEventListener("pointerdown", bump);
       window.removeEventListener("keydown", bump);
     };
   }, [enabled, seconds, onIdle]);
+  return {
+    warning: enabled && secondsLeft !== null,
+    secondsLeft: secondsLeft ?? 0,
+    bump: () => bumpRef.current(),
+  };
 }

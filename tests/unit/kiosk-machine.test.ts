@@ -3,6 +3,7 @@ import {
   MAX_CAPTURE_FAILURES,
   capturedCount,
   createInitialState,
+  easyStep,
   kioskReducer,
   progressStep,
   type KioskAction,
@@ -307,5 +308,124 @@ describe("ordered selection", () => {
       { type: "BACK_TO_FRAME" },
     );
     expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["frame", [], "idle"]);
+  });
+});
+
+describe("easy mode (D67): same machine, fewer choices", () => {
+  const easy = () =>
+    createInitialState<string>({
+      shotCount: 6,
+      countdownSeconds: 3,
+      frameId: "navy-strip",
+      mode: "easy",
+    });
+
+  it("starts in the staff default and counts longer", () => {
+    const s = easy();
+    expect([s.mode, s.defaultMode, s.countdownSeconds]).toEqual(["easy", "easy", 5]);
+    expect(init().mode).toBe("standard");
+  });
+
+  it("goes straight to the camera (frame chosen after shooting)", () => {
+    const s = run(easy(), { type: "START", sessionId: SESSION });
+    expect(s.phase).toBe("camera");
+    expect(s.frameId).toBe("navy-strip");
+  });
+
+  it("the whole flow still needs six shots and the right number of selected photos", () => {
+    let s = run(easy(), { type: "START", sessionId: SESSION }, { type: "CAMERA_READY" });
+    s = run(s, { type: "BEGIN_SHOOTING" });
+    expect(s.remaining).toBe(5);
+    for (let i = 0; i < 6; i++) s = shoot(s, `e-${i}`);
+    expect(s.phase).toBe("review");
+    s = run(s, { type: "CONFIRM_SHOTS" });
+    expect(s.phase).toBe("frame");
+    s = run(
+      s,
+      { type: "CONFIRM_FRAME", askConsent: true },
+      { type: "CONFIRM_SELECTION", askConsent: true },
+    );
+    expect(s.phase).toBe("select"); // nothing selected: refused
+  });
+
+  it("the guest can switch at any time; a running countdown keeps its number", () => {
+    let s = run(toReady(), { type: "BEGIN_SHOOTING" }, { type: "TICK" });
+    expect(s.remaining).toBe(2);
+    s = run(s, { type: "SET_MODE", mode: "easy" });
+    expect([s.mode, s.remaining, s.countdownSeconds]).toEqual(["easy", 2, 5]);
+    s = shoot(s, "a");
+    expect(s.remaining).toBe(5);
+    s = run(s, { type: "SET_MODE", mode: "standard" });
+    expect(s.countdownSeconds).toBe(3);
+  });
+
+  it("RESET returns the next guest to the staff default", () => {
+    let s = run(init(), { type: "SET_MODE", mode: "easy" }, { type: "START", sessionId: SESSION });
+    expect(s.phase).toBe("camera");
+    s = run(s, { type: "RESET" });
+    expect([s.mode, s.countdownSeconds, s.phase]).toEqual(["standard", 3, "welcome"]);
+  });
+
+  it("a new staff default applies on the welcome screen at once, otherwise to the next guest", () => {
+    expect(run(init(), { type: "SET_DEFAULT_MODE", mode: "easy" })).toMatchObject({
+      mode: "easy",
+      defaultMode: "easy",
+      countdownSeconds: 5,
+    });
+    let s = run(toReady(), { type: "SET_DEFAULT_MODE", mode: "easy" });
+    expect([s.mode, s.defaultMode]).toEqual(["standard", "easy"]);
+    s = run(s, { type: "RESET" });
+    expect(s.mode).toBe("easy");
+  });
+
+  it("names every step in words", () => {
+    expect(easyStep("welcome", true)).toBeNull();
+    expect(easyStep("camera", true)).toMatchObject({ step: 1, label: "촬영 준비" });
+    expect(easyStep("review", true)).toMatchObject({ step: 2, label: "사진 확인" });
+    expect(easyStep("consent", true)).toMatchObject({ step: 5, total: 6 });
+    expect(easyStep("delivery", false)).toMatchObject({ step: 5, total: 5 });
+  });
+});
+
+describe("내 사진으로 참여하기 (D66) on the booth", () => {
+  const READY = {
+    type: "MOBILE_READY",
+    sessionId: SESSION,
+    url: "https://x/m/u1.a",
+    expiresAt: "2026-12-24T10:15:00Z",
+    via: "cloud",
+  } as const;
+
+  it("welcome → QR → photo received", () => {
+    let s = run(init(), { type: "START_MOBILE" });
+    expect([s.phase, s.mobile.status]).toEqual(["mobile", "loading"]);
+    s = run(s, READY);
+    expect(s.mobile).toMatchObject({ status: "ready", sessionId: SESSION });
+    s = run(s, { type: "MOBILE_RECEIVED", sessionId: SESSION });
+    expect(s.mobile.status).toBe("received");
+    expect(run(s, { type: "RESET" })).toMatchObject({
+      phase: "welcome",
+      mobile: { status: "idle" },
+    });
+  });
+
+  it("a late answer about another QR changes nothing", () => {
+    const s = run(init(), { type: "START_MOBILE" }, READY);
+    expect(run(s, { type: "MOBILE_RECEIVED", sessionId: "other" })).toBe(s);
+  });
+
+  it("failure reasons are kept for the screen; retry asks for a new QR", () => {
+    let s = run(init(), { type: "START_MOBILE" }, { type: "MOBILE_FAILED", reason: "offline" });
+    expect(s.mobile).toEqual({ status: "failed", reason: "offline" });
+    s = run(s, { type: "MOBILE_RETRY" });
+    expect(s.mobile.status).toBe("loading");
+  });
+
+  it("only from the welcome screen, and never touches the camera session", () => {
+    const ready = toReady();
+    expect(run(ready, { type: "START_MOBILE" })).toBe(ready);
+    const s = run(init(), { type: "START_MOBILE" });
+    expect(s.sessionId).toBe("");
+    expect(progressStep("mobile", true)).toBeNull();
   });
 });

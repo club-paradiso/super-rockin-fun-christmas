@@ -1,5 +1,6 @@
 import type { CameraErrorKind } from "@/lib/camera/types";
 import { getFrame } from "@/config/frames";
+import type { KioskMode } from "@/lib/storage/types";
 
 /**
  * Pure kiosk session state machine. No timers, no camera, no DOM: the KioskApp component runs
@@ -12,6 +13,13 @@ import { getFrame } from "@/config/frames";
  * The upload starts as soon as the frame is final, so it runs while the guest answers the wall
  * question; delivery events are accepted in both the consent and delivery phases. The wall
  * question is skipped while staff pause submissions (CONFIRM_FRAME askConsent: false).
+ *
+ * FOLLOW THE LIGHTS 2.0:
+ *  - welcome → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
+ *    waits for the photo; no camera, no upload from the booth itself.
+ *  - Easy mode (D67) is the same machine with fewer choices: START skips the frame pick before
+ *    shooting (the frame is chosen afterwards, with the guest's own photos), and every countdown
+ *    is longer. The mode is per guest: RESET returns to the staff default.
  */
 
 export type KioskPhase =
@@ -26,7 +34,8 @@ export type KioskPhase =
   | "frame" // choose again, now with the guest's own photos in every frame
   | "select" // order exactly the number of shots the chosen frame requires
   | "consent"
-  | "delivery";
+  | "delivery"
+  | "mobile"; // "내 사진으로 참여하기": QR for the guest's phone (D66)
 
 export type DeliveryState =
   | { status: "idle" }
@@ -40,11 +49,26 @@ export type DeliveryState =
 
 export type WallConsent = "yes" | "no" | null;
 
+/** "내 사진으로 참여하기" on the booth (D66). The photo itself never passes through the booth. */
+export type MobileState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; sessionId: string; url: string; expiresAt: string; via: "cloud" | "lan" }
+  | { status: "received" }
+  /** offline: no internet for the cloud QR; paused: staff paused submissions. */
+  | { status: "failed"; reason: "offline" | "paused" | "error" };
+
+/** Seconds counted before each shot, by mode. Easy mode leaves more time to get ready. */
+export const COUNTDOWN_BY_MODE: Record<KioskMode, number> = { standard: 3, easy: 5 };
+
 export interface KioskState<Shot> {
   phase: KioskPhase;
   sessionId: string;
   shotCount: number;
+  /** Seconds per countdown for this guest (depends on the mode). */
   countdownSeconds: number;
+  /** The configured standard-mode countdown, kept so a mode switch can go back to it. */
+  standardCountdown: number;
   shots: (Shot | null)[];
   /** Index of the shot the countdown / capture is for. */
   shotIndex: number;
@@ -57,6 +81,11 @@ export interface KioskState<Shot> {
   captureFailures: number;
   delivery: DeliveryState;
   consent: WallConsent;
+  /** This guest's screen mode (D67). */
+  mode: KioskMode;
+  /** Staff default (settings); every new guest starts in it. */
+  defaultMode: KioskMode;
+  mobile: MobileState;
 }
 
 export type KioskAction<Shot> =
@@ -88,24 +117,51 @@ export type KioskAction<Shot> =
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
   | { type: "SET_CONSENT"; consent: Exclude<WallConsent, null> }
+  /** The guest switches between the standard and easy screen. Allowed at any time. */
+  | { type: "SET_MODE"; mode: KioskMode }
+  /** Staff changed the default start mode (settings refresh). */
+  | { type: "SET_DEFAULT_MODE"; mode: KioskMode }
+  /** "내 사진으로 참여하기" from the welcome screen. */
+  | { type: "START_MOBILE" }
+  | {
+      type: "MOBILE_READY";
+      sessionId: string;
+      url: string;
+      expiresAt: string;
+      via: "cloud" | "lan";
+    }
+  | { type: "MOBILE_FAILED"; reason: "offline" | "paused" | "error" }
+  /** The phone sent the photo for the QR on screen. */
+  | { type: "MOBILE_RECEIVED"; sessionId: string }
+  /** QR expired or the guest asked for a new one. */
+  | { type: "MOBILE_RETRY" }
   | { type: "RESET" };
 
 export interface KioskInit {
   shotCount: number;
+  /** Standard-mode countdown. Easy mode uses COUNTDOWN_BY_MODE.easy (never shorter). */
   countdownSeconds: number;
   frameId: string;
+  /** Staff default start mode; "standard" when omitted. */
+  mode?: KioskMode;
+}
+
+function countdownFor(mode: KioskMode, standard: number): number {
+  return mode === "easy" ? Math.max(standard, COUNTDOWN_BY_MODE.easy) : standard;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
 export const MAX_CAPTURE_FAILURES = 3;
 
 export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
+  const mode = init.mode ?? "standard";
   return {
     phase: "welcome",
     /** Empty until START; a session only exists once a guest begins. */
     sessionId: "",
     shotCount: init.shotCount,
-    countdownSeconds: init.countdownSeconds,
+    countdownSeconds: countdownFor(mode, init.countdownSeconds),
+    standardCountdown: init.countdownSeconds,
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
     retakeIndex: null,
@@ -116,6 +172,9 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     captureFailures: 0,
     delivery: { status: "idle" },
     consent: null,
+    mode,
+    defaultMode: mode,
+    mobile: { status: "idle" },
   };
 }
 
@@ -131,14 +190,79 @@ export function kioskReducer<Shot>(
     case "RESET":
       return createInitialState<Shot>({
         shotCount: state.shotCount,
-        countdownSeconds: state.countdownSeconds,
+        countdownSeconds: state.standardCountdown,
         // Keep the last frame choice as the next default; nothing personal lives in it.
         frameId: state.frameId,
+        // The next guest starts in the staff default, whatever this guest chose.
+        mode: state.defaultMode,
       });
 
-    case "START":
+    case "SET_MODE":
+      if (state.mode === action.mode) return state;
+      // A countdown already running keeps its number; the next one uses the new length.
+      return {
+        ...state,
+        mode: action.mode,
+        countdownSeconds: countdownFor(action.mode, state.standardCountdown),
+      };
+
+    case "SET_DEFAULT_MODE":
+      if (state.defaultMode === action.mode) return state;
+      // Nobody is using the booth: show the new default right away.
       return state.phase === "welcome"
-        ? { ...state, phase: "pick", sessionId: action.sessionId, cameraError: null }
+        ? {
+            ...state,
+            defaultMode: action.mode,
+            mode: action.mode,
+            countdownSeconds: countdownFor(action.mode, state.standardCountdown),
+          }
+        : { ...state, defaultMode: action.mode };
+
+    case "START":
+      if (state.phase !== "welcome") return state;
+      // Easy mode: straight to the camera with the current frame; it is chosen after shooting.
+      return {
+        ...state,
+        phase: state.mode === "easy" ? "camera" : "pick",
+        sessionId: action.sessionId,
+        cameraError: null,
+      };
+
+    case "START_MOBILE":
+      return state.phase === "welcome"
+        ? { ...state, phase: "mobile", mobile: { status: "loading" } }
+        : state;
+
+    case "MOBILE_READY":
+      return state.phase === "mobile" && state.mobile.status === "loading"
+        ? {
+            ...state,
+            mobile: {
+              status: "ready",
+              sessionId: action.sessionId,
+              url: action.url,
+              expiresAt: action.expiresAt,
+              via: action.via,
+            },
+          }
+        : state;
+
+    case "MOBILE_FAILED":
+      return state.phase === "mobile" && state.mobile.status === "loading"
+        ? { ...state, mobile: { status: "failed", reason: action.reason } }
+        : state;
+
+    case "MOBILE_RECEIVED":
+      // Only for the QR on screen: a late answer about an earlier QR changes nothing.
+      return state.phase === "mobile" &&
+        state.mobile.status === "ready" &&
+        state.mobile.sessionId === action.sessionId
+        ? { ...state, mobile: { status: "received" } }
+        : state;
+
+    case "MOBILE_RETRY":
+      return state.phase === "mobile" && state.mobile.status !== "loading"
+        ? { ...state, mobile: { status: "loading" } }
         : state;
 
     case "CONFIRM_PICK":
@@ -324,6 +448,7 @@ export function progressStep(
   const total = askConsent ? 7 : 6;
   switch (phase) {
     case "welcome":
+    case "mobile":
       return null;
     case "pick":
       return { step: 1, total };
@@ -339,6 +464,40 @@ export function progressStep(
       return { step: total, total };
     default:
       return { step: 2, total }; // camera, ready, countdown, capturing, camera-error
+  }
+}
+
+/**
+ * Easy mode (D67): the step as words, so the guest always knows where they are. No frame pick
+ * before shooting, so one step fewer than the standard dots.
+ */
+export function easyStep(
+  phase: KioskPhase,
+  askConsent: boolean,
+): { step: number; total: number; label: string } | null {
+  const total = askConsent ? 6 : 5;
+  switch (phase) {
+    case "welcome":
+    case "mobile":
+      return null;
+    case "pick":
+    case "camera":
+    case "camera-error":
+    case "ready":
+      return { step: 1, total, label: "촬영 준비" };
+    case "countdown":
+    case "capturing":
+      return { step: 1, total, label: "사진 찍기" };
+    case "review":
+      return { step: 2, total, label: "사진 확인" };
+    case "frame":
+      return { step: 3, total, label: "사진 꾸미기" };
+    case "select":
+      return { step: 4, total, label: "사진 고르기" };
+    case "consent":
+      return { step: 5, total, label: "미디어월 참여" };
+    case "delivery":
+      return { step: total, total, label: "휴대폰으로 받기" };
   }
 }
 

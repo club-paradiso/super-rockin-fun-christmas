@@ -28,7 +28,7 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
 
 /** Attract → pick a frame (or keep the preselected one) → camera ready. */
 export async function startSession(page: Page, frame?: string) {
-  await page.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   if (frame) await page.getByTestId(`frame-option-${frame}`).click();
   await page.getByRole("button", { name: "이 틀로 찍기" }).click();

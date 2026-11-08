@@ -55,7 +55,7 @@ export default async function OverviewPage() {
         <Tile
           label="검수 대기"
           value={`${o.pendingCount}`}
-          sub="미디어월 신청 사진"
+          sub={`현장 ${o.pendingBySource.booth} · 휴대폰 ${o.pendingBySource.mobile}`}
           href="/admin/moderation"
           testId="tile-pending"
         />
@@ -92,6 +92,27 @@ export default async function OverviewPage() {
                 인터넷이 돌아오면 자동으로 보내요. 사진은 이 노트북에 안전하게 있어요.
                 {o.cloud.lastError && ` 마지막 오류: ${o.cloud.lastError}`}
               </span>
+            </p>
+          )}
+        </section>
+      )}
+      {o.inbox && (
+        <section className="admin-card p-4" data-testid="inbox-status">
+          <h2 className="mb-2 text-xl font-bold">휴대폰 사진 받기 (인터넷)</h2>
+          {o.inbox.lastError ? (
+            <p className="text-lg">
+              <span className="text-alert">인터넷 너머 사진함에 연결하지 못했어요.</span>
+              <br />
+              <span className="text-base text-mist">
+                방문객이 보낸 사진은 사진함에서 기다려요. 연결되면 자동으로 가져와요. 마지막 오류:{" "}
+                {o.inbox.lastError}
+              </span>
+            </p>
+          ) : (
+            <p className="text-lg">
+              {o.inbox.lastPullAt
+                ? `정상 · 마지막 확인 ${formatTime(o.inbox.lastPullAt)} · 허브를 켠 뒤 받은 사진 ${o.inbox.imported}장`
+                : "아직 확인 전이에요 (허브가 켜진 뒤 15초 안에 확인해요)."}
             </p>
           )}
         </section>
