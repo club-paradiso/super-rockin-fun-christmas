@@ -6,11 +6,11 @@
 부스·관리자·방문객 페이지는 부스 주소로 넘어간다. 별도 코드베이스·Vercel 프로젝트·데이터베이스는
 만들지 않았다.
 
-| 용도                | 주소                                                                | 상태                                              |
-| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------- |
-| 포토부스·관리자     | `https://follow-the-lights.vercel.app`                              | 기존 (미리보기 배포)                              |
-| 미디어월 (클라우드) | 예: `https://follow-the-lights-wall.vercel.app` → `/`가 곧 미디어월 | **코드 구현됨, 주소 연결은 승인 대기** (아래 4절) |
-| 미디어월 (현장)     | `http://<허브 LAN 주소>:3000/wall`                                  | 기존. 인터넷 없이 동작                            |
+| 용도                | 주소                                                                | 상태                                            |
+| ------------------- | ------------------------------------------------------------------- | ----------------------------------------------- |
+| 포토부스·관리자     | `https://follow-the-lights.vercel.app`                              | 기존 (미리보기 배포)                            |
+| 미디어월 (클라우드) | 예: `https://follow-the-lights-wall.vercel.app` → `/`가 곧 미디어월 | **도메인 연결됨, 병합·배포 후 적용** (아래 4절) |
+| 미디어월 (현장)     | `http://<허브 LAN 주소>:3000/wall`                                  | 기존. 인터넷 없이 동작                          |
 
 ## 2. 두 안 비교 (요구사항 4.1)
 
@@ -38,19 +38,16 @@
 - 벽 기기 인증: 벽 주소에서 `/kiosk/enroll?next=wall`로 등록. 쿠키가 그 호스트에만 있으므로 부스
   주소에서 쓸 수 없고, 관리자 → 키오스크에서 따로 해제할 수 있다.
 
-## 4. 주소 연결 — 남은 마지막 단계 (승인 필요, 실행하지 않음)
+## 4. 주소 연결 (2026-11-08, 승인 후 실행)
 
-프로덕션 설정 변경이라 이 작업에서는 하지 않았다. 확인한 사실: Vercel 프로젝트
-`follow-the-lights`(prj_dhd55IH2RtWnevBn0ZyAukp1YGYn)에는 지금 `follow-the-lights.vercel.app` 하나만
-연결돼 있다(2026-11-08, Vercel API 읽기). `follow-the-lights-wall.vercel.app`이 비어 있는지는 이
-세션의 네트워크 정책 때문에 직접 열어 보지 못했다 — **미검증**.
-
-1. Vercel → 프로젝트 `follow-the-lights` → Settings → Domains → `follow-the-lights-wall.vercel.app` 추가
-   (이미 다른 프로젝트가 쓰면 거절된다 → 다른 이름 선택)
-2. Settings → Environment Variables → `WALL_HOSTS=follow-the-lights-wall.vercel.app` (Production·Preview)
-3. 다시 배포 (rewrite는 빌드 때 정해진다)
-4. 확인: `https://follow-the-lights-wall.vercel.app/` → "이 화면은 아직 미디어월로 등록되지 않았어요",
-   `/admin` → 부스 주소의 관리자 로그인으로 이동
+- 확인한 사실(Vercel API): `follow-the-lights-wall.vercel.app`은 비어 있었고, 프로젝트
+  `follow-the-lights`에 추가해 verified 상태다. `WALL_HOSTS=follow-the-lights-wall.vercel.app`을
+  Production에 설정했다(다른 변수와 같이 Production만).
+- 아직 적용 전: rewrite는 빌드 때 정해진다. 이 PR이 `main`에 병합되면 프로덕션이 다시 빌드되면서
+  적용된다. 그 전까지 이 주소는 지금 앱을 그대로 보여 준다.
+- 병합 후 확인할 것 (**미검증**): `https://follow-the-lights-wall.vercel.app/` → "이 화면은 아직
+  미디어월로 등록되지 않았어요", `/admin` → 부스 주소의 관리자 로그인으로 이동.
+- 되돌리기: `WALL_HOSTS`를 지우고 재배포(도메인은 남겨도 됨).
 
 ## 5. 실시간 갱신·장애
 

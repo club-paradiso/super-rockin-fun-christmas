@@ -172,10 +172,15 @@ Before the event, a person must do this on the actual wall screen at the venue:
 
 Until then: `REAL_WALL_DISPLAY_TEST: NOT VERIFIED`.
 
-## 8. Dedicated media-wall address (D68) — needs approval, not done
+## 8. Dedicated media-wall address (D68)
 
-Same deployment, a second hostname (`docs/MEDIA_WALL_ARCHITECTURE.md`). Steps for the person who
-approves production changes:
+Same deployment, a second hostname (`docs/MEDIA_WALL_ARCHITECTURE.md`).
+
+Done 2026-11-08 (approved by the owner): steps 1 and 2 below, via the Vercel API.
+`follow-the-lights-wall.vercel.app` was free and is verified on project `follow-the-lights`;
+`WALL_HOSTS` is set for Production (like every other variable here; preview deployments have none).
+Step 3 happens when this code is merged to `main` (production redeploys); until then the wall
+address serves the current app unchanged. Step 4 is not verified yet.
 
 1. Vercel → project `follow-the-lights` → Settings → Domains → add `follow-the-lights-wall.vercel.app`
    (or another free `*.vercel.app` name if that one is taken; no cost).
@@ -191,6 +196,10 @@ Rollback: remove `WALL_HOSTS` and redeploy (the domain can stay; it then serves 
 
 No new env vars. The phone page lives on `PUBLIC_BASE_URL` (`/m/…`). With a hub, the cloud needs
 `HUB_SYNC_SECRET` (already required for the QR copy) and the hub pulls phone photos every 15 s.
+Preview Supabase (`follow-the-lights-preview`): applied 2026-11-08 (approved), before any deploy;
+checked afterwards: column default `standard`, both settings functions present, neither executable
+by anon or authenticated.
+
 Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
 schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
 and keeps the 8-argument one, so the code still running keeps working (emergency switches
