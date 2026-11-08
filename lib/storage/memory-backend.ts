@@ -180,9 +180,11 @@ export class MemoryPhotoRepository implements PhotoRepository {
           (!f.since || r.createdAt >= f.since) &&
           (!f.before || r.createdAt < f.before) &&
           (!f.kioskId || r.kioskId === f.kioskId) &&
+          (!f.kioskless || r.kioskId === null) &&
+          (!f.frameId || r.frameId === f.frameId) &&
           (!f.sessionShort || r.sessionId.startsWith(f.sessionShort.toLowerCase())),
       )
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1) * (f.oldestFirst ? -1 : 1))
       .slice(0, f.limit)
       .map((r) => ({ ...r }));
   }

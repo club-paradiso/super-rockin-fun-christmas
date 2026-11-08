@@ -44,6 +44,27 @@ const call = async (
     }),
   );
 
+describe("cloud inbox is not crowded out by booth QR copies (Codex review on #29)", () => {
+  it("finds a phone photo behind more than 500 newer booth copies", async () => {
+    const backend = createMemoryBackend();
+    let t = new Date("2026-12-24T10:00:00Z");
+    const svc = new PhotoService(backend, { linkTtlHours: 72, retentionDays: 30, now: () => t });
+    const phone = uuid();
+    await svc.putMobile({ sessionId: phone, kioskId: null, data: JPEG, submissionsPaused: false });
+    for (let i = 0; i < 520; i++) {
+      t = new Date(t.getTime() + 1000);
+      await svc.put({
+        sessionId: uuid(),
+        kioskId: null,
+        frameId: "starlight-strip",
+        mime: "image/jpeg",
+        data: JPEG,
+      });
+    }
+    expect((await svc.mobileInbox(50)).map((r) => r.sessionId)).toEqual([phone]);
+  });
+});
+
 describe("cloud side: /api/hub/uploads/*", () => {
   const r = {
     session: () => import("@/app/api/hub/uploads/session/route"),
@@ -216,6 +237,29 @@ describe("hub side: HubInbox", () => {
     cloud.items.set(bad, new Uint8Array([1, 2, 3, 4]));
     await inbox.pull();
     expect(await backend.photos.findBySessionId(bad)).toBeNull();
+  });
+
+  it("a photo half-stored when the hub stopped (row, no consent yet) is finished, not dropped", async () => {
+    const a = uuid();
+    cloud.items.set(a, JPEG);
+    // The hub stops between putMobile's two writes: the row exists, the consent step never ran.
+    const transition = backend.photos.transition.bind(backend.photos);
+    let failOnce = true;
+    backend.photos.transition = async (t) => {
+      if (failOnce) {
+        failOnce = false;
+        throw new Error("hub stopped");
+      }
+      return transition(t);
+    };
+    await expect(inbox.pull()).rejects.toThrow("hub stopped");
+    expect((await backend.photos.findBySessionId(a))!.moderationStatus).toBe("NONE");
+    expect(cloud.items.has(a)).toBe(true); // not acknowledged: the cloud keeps it
+
+    await inbox.pull();
+    const row = (await backend.photos.findBySessionId(a))!;
+    expect(row).toMatchObject({ moderationStatus: "PENDING", wallConsent: true });
+    expect(cloud.items.has(a)).toBe(false);
   });
 
   it("concurrent pulls share one pass (no double import)", async () => {

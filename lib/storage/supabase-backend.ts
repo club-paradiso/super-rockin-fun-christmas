@@ -278,8 +278,12 @@ class SupabasePhotoRepository implements PhotoRepository {
     if (f.since) q = q.gte("created_at", f.since);
     if (f.before) q = q.lt("created_at", f.before);
     if (f.kioskId) q = q.eq("kiosk_id", f.kioskId);
+    if (f.kioskless) q = q.is("kiosk_id", null);
+    if (f.frameId) q = q.eq("frame_id", f.frameId);
     if (f.sessionShort) q = q.like("session_short", `${f.sessionShort.toLowerCase()}%`);
-    const { data, error } = await q.order("created_at", { ascending: false }).limit(f.limit);
+    const { data, error } = await q
+      .order("created_at", { ascending: !!f.oldestFirst })
+      .limit(f.limit);
     if (error) throw new SupabaseError("list photos", error);
     return (data as Row[]).map(toPhoto);
   }

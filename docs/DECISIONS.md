@@ -625,3 +625,20 @@ Required: the wall must have its own web address. Not required: a second codebas
   That is GitHub Actions allocation (billing/spending limit or an outage), not this code. Separately,
   `main` did fail `prettier --check` on two files (`app/kiosk/enroll/page.tsx`, `docs/DEPLOYMENT.md`),
   which CI would have caught once runners worked; fixed here.
+
+## D70 · Phone-upload inbox fixes from the Codex review of #29
+
+Two real defects in D66, both found by the Codex review that finished just after #29 merged, both
+reproduced by tests that fail on the old code:
+
+- **The cloud inbox could lose phone photos behind booth QR copies.** `mobileInbox` read the newest
+  500 kioskless `NONE`/`PENDING` rows and only then picked phone photos. The cloud keeps a QR copy of
+  every booth photo (also kioskless, `NONE`) for the retention period, so after 500 of them a phone
+  photo never reached the hub. The query now filters by `frame_id = 'phone-photo'` and
+  `kiosk_id is null` and sorts oldest first before the limit (`PhotoListFilter.frameId`,
+  `kioskless`, `oldestFirst`; all backends, contract-tested on Supabase).
+- **A half-stored import was acknowledged as done.** `putMobile` writes the row, then the audited
+  consent transition. If the hub stopped in between, the next pass saw the row, skipped it and let
+  the cloud delete its copy: the photo stayed `NONE` without consent, invisible to review. The hub
+  now finishes an existing row (`PhotoService.completeMobile`) before acknowledging; a photo
+  deleted on the hub stays deleted.
