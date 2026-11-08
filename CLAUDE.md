@@ -51,11 +51,21 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   and SHOW HOLDING SCREEN are applied on the server, and so are the opening hours (`wallOpen` in
   `lib/wall/hours.ts`, D62): outside them the feed is `closed` and sends no ids. Never give the
   wall anon database access, tokens or storage URLs.
-- **The cloud is only a QR copy** (D40, D43, D57). A hub with `CLOUD_BASE_URL` shows the cloud's
+- **Phone uploads (D66) are ordinary photos** with `frame_id = 'phone-photo'` (`config/mobile.ts`):
+  one per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
+  `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
+  as PENDING only through `PhotoService.putMobile` with explicit consent. No guest link, no QR
+  reissue. Never add a path that makes one APPROVED or wall-visible outside `lib/ops/moderation.ts`.
+- **The cloud is only a QR copy** (D40, D43, D57) **plus a transient phone-upload inbox** (D66): the
+  hub takes each phone photo (`HubInbox`) and the cloud deletes it on `ack`. A hub with `CLOUD_BASE_URL` shows the cloud's
   guest link and never stores it; consent, moderation and exposures never go to the cloud. All
   cloud calls go through `CloudSync` (one call per photo at a time: a second upload would reissue
   the token and kill a scanned QR). A hub delete must reach the cloud (`markDeleted`). The cloud's
   `/api/hub/*` only touches copies with `kioskId` null; a copy deleted there is final (410).
+- **The dedicated wall address is a hostname, not a second app** (D68): `WALL_HOSTS` +
+  `lib/wall/host.ts` in `next.config.ts`. No second database, no wall-only backend.
+- **Easy mode is a view, not a fork** (D67): `mode` lives in `lib/kiosk/machine.ts`; never duplicate
+  the shooting, selection, consent or upload rules for it.
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
@@ -66,6 +76,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 app/kiosk              booth (server gate: config + enrollment) → components/kiosk
 app/kiosk/enroll       staff device enrollment
 app/p/[token]          phone download page + image route (server reads private bucket)
+app/m/[token]          "내 사진으로 참여하기" phone page (D66): pick, turn/crop, consent, upload
+app/api/mobile         booth QR session + status (kiosk cookie), phone upload (QR token only)
+lib/mobile             upload QR token, server re-encoding (sharp), phone-side resize/crop
 app/api/photos         upload (kiosk auth, idempotent per session) and consent
 app/api/kiosk          enroll / signout / help (booth help mode: kiosk cookie + staff PIN, D59)
                        · app/api/operator/kiosks: list / revoke
@@ -77,10 +90,13 @@ app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
 app/wall               media wall (server gate: config + enrolled display) → components/wall
 app/api/wall           wall feed (ordered eligible ids) + exposure report + image proxy (kiosk cookie)
 lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches),
-                       clothesline layout (any LED shape, D61), watchdog, opening hours (D62)
-app/api/hub            cloud side of the hub's QR copy: put / reissue / delete (Bearer HUB_SYNC_SECRET)
+                       clothesline layout + phone-photo card, watchdog, opening hours (D62),
+                       dedicated wall hostname rules (host.ts, D68)
+app/api/hub            cloud side of the hub's QR copy: put / reissue / delete (Bearer HUB_SYNC_SECRET),
+                       and the phone-upload inbox: uploads/session|status|list|image|ack (D66)
 app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a cloud)
 lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)
+                       + HubInbox (phone photos down from the cloud inbox, D66)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models,
                        hub retention (D47/D58: rules in hub-retention.ts, timer in -server.ts),
                        USB backup + disk status (D60: backup.ts, backup-server.ts), event close (D64)

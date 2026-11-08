@@ -104,6 +104,7 @@ const toSettings = (r: Row): EventSettings => ({
       ? { start: r.wall_hours_start as string, end: r.wall_hours_end as string }
       : null,
   wallForce: (r.wall_force as EventSettings["wallForce"]) ?? "auto",
+  kioskDefaultMode: (r.kiosk_default_mode as EventSettings["kioskDefaultMode"]) ?? "standard",
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -468,6 +469,7 @@ class SupabaseSettingsRepository implements SettingsRepository {
       p_set_wall_hours: patch.wallHours !== undefined,
       p_wall_hours_start: patch.wallHours?.start ?? null,
       p_wall_hours_end: patch.wallHours?.end ?? null,
+      p_kiosk_default_mode: patch.kioskDefaultMode ?? null,
       p_actor_id: staffUserId,
     });
     return toSettings(rows[0]!);

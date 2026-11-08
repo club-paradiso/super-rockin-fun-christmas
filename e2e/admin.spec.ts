@@ -60,7 +60,7 @@ test("one-time code enrolls a fresh kiosk, and cannot be reused", async ({ brows
   const other = await newPage(browser);
   await enrollWithCode(other, usedCode);
   await expect(
-    other.getByText("등록 코드가 맞지 않거나, 이미 사용됐거나, 만료됐어요."),
+    other.getByText("등록 코드 또는 비밀번호가 틀렸거나, 등록 코드가 이미 사용됐거나 만료됐어요."),
   ).toBeVisible();
   await other.goto("/kiosk");
   await expect(other.getByTestId("kiosk-not-enrolled")).toBeVisible();

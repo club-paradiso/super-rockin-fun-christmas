@@ -334,7 +334,7 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
         body: JSON.stringify({ queueDepth: 4, camera: "error" }),
       }),
     );
-    expect(await beat.json()).toEqual({ wallSubmissions: "open" });
+    expect(await beat.json()).toEqual({ wallSubmissions: "open", kioskDefaultMode: "standard" });
     const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;
     expect(kiosk).toMatchObject({ queueDepth: 4, cameraState: "error", enrolledVia: "code" });
 

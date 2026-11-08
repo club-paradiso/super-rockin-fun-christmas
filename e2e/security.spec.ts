@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("a browser that is not enrolled cannot use the kiosk or upload", async ({ page, request }) => {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("kiosk-not-enrolled")).toBeVisible();
-  await expect(page.getByRole("button", { name: "화면을 눌러 시작" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "여기서 사진 찍기" })).toHaveCount(0);
 
   const res = await request.post("/api/photos", {
     headers: {

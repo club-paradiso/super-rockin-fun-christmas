@@ -210,7 +210,7 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
           await client.query(`set local role ${role}`);
           await expect(
             client.query(
-              "select public.ftl_settings_update(true, null, null, null, false, null, null, gen_random_uuid())",
+              "select public.ftl_settings_update(true, null, null, null, false, null, null, null, gen_random_uuid())",
             ),
           ).rejects.toThrow(/permission denied/);
         } finally {
@@ -219,14 +219,23 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
       },
     );
 
-    it("there is exactly one settings function (the pre-2-4b signature is gone)", async () => {
+    it("settings functions: the 2.0 signature, plus only the 2-4b one during the deploy (D67)", async () => {
       const { rows } = await client.query(
-        "select pg_get_function_identity_arguments(p.oid) as args from pg_proc p " +
-          "join pg_namespace n on n.oid = p.pronamespace " +
+        "select pg_get_function_identity_arguments(p.oid) as args, " +
+          "has_function_privilege('anon', p.oid, 'execute') as anon, " +
+          "has_function_privilege('authenticated', p.oid, 'execute') as authed " +
+          "from pg_proc p join pg_namespace n on n.oid = p.pronamespace " +
           "where n.nspname = 'public' and p.proname = 'ftl_settings_update'",
       );
-      expect(rows).toHaveLength(1);
-      expect(rows[0].args).toMatch(/p_wall_force text/);
+      const args = rows.map((r: { args: string }) => r.args);
+      // The 2.0 function, with the booth start mode.
+      expect(args.some((a: string) => /p_kiosk_default_mode text/.test(a))).toBe(true);
+      // The pre-2-4b (4-argument) signature is gone. The 2-4b one stays only until the 2.0 code is
+      // deployed (20261108090000_v2_kiosk_mode.sql); a follow-up migration drops it.
+      expect(rows.length).toBeLessThanOrEqual(2);
+      for (const a of args) expect(a).toMatch(/p_wall_force text/);
+      for (const r of rows as { anon: boolean; authed: boolean }[])
+        expect([r.anon, r.authed]).toEqual([false, false]);
     });
 
     it("audit_events is append-only, even for the database owner", async () => {

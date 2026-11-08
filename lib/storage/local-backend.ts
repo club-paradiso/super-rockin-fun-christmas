@@ -91,6 +91,8 @@ class FileDb {
         ...db.settings,
         wallHours: db.settings.wallHours ?? null,
         wallForce: db.settings.wallForce ?? "auto",
+        // Files written before D67 have no start mode.
+        kioskDefaultMode: db.settings.kioskDefaultMode ?? "standard",
       };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isMobilePhoto, MOBILE_FRAME_ID } from "@/config/mobile";
 import { isWallEligible, planModeration, type ModerationAction } from "@/lib/ops/moderation";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
@@ -66,6 +67,24 @@ export interface PurgeResult {
 export type ConsentResult =
   | { ok: true; wallConsent: boolean; moderationStatus: ModerationStatus }
   | { ok: false; reason: "not_found" | "paused" };
+
+export interface PutMobileInput {
+  /** The QR's session id (lib/mobile/token.ts): one photo per QR. */
+  sessionId: string;
+  /** The booth that showed the QR (cloud-only), or null (hub-issued QR, or a hub import). */
+  kioskId: string | null;
+  /** Already normalized by lib/mobile/image.ts: our own JPEG, no metadata. */
+  data: Uint8Array;
+  /** PAUSE SUBMISSIONS: a new phone photo is refused; a retry of one already stored is not. */
+  submissionsPaused: boolean;
+}
+
+export type PutMobileResult =
+  | { ok: true; photoId: string; moderationStatus: ModerationStatus; duplicate: boolean }
+  | { ok: false; reason: "paused" | "closed" };
+
+/** What the booth (or the hub on its behalf) may learn about a QR: nothing about the photo. */
+export type MobileStatus = "waiting" | "received" | "closed";
 
 export type ModerateResult =
   | { ok: true; row: PhotoRow; changed: boolean }
@@ -199,6 +218,124 @@ export class PhotoService {
     });
     if (!updated) throw new DuplicateSessionError();
     return { token, photo: toGuestPhoto(updated), duplicate: true };
+  }
+
+  // ── phone upload (D66) ───────────────────────────────────────────────────────────────────
+
+  /**
+   * A guest's own photo, sent from their phone through a booth QR, with their explicit wall
+   * consent (the phone page cannot submit without it). Stored like a booth photo — private
+   * object, audited state, same retention — but with no guest link: they already have the photo.
+   * It enters review as PENDING through the audited consent transition; nothing here can make it
+   * APPROVED. Idempotent per QR session: a retry returns the same photo, never a second one.
+   */
+  async putMobile(input: PutMobileInput): Promise<PutMobileResult> {
+    const existing = await this.backend.photos.findBySessionId(input.sessionId);
+    if (existing) return this.resumeMobile(existing, input.kioskId);
+    if (input.submissionsPaused) return { ok: false, reason: "paused" };
+
+    const created = this.now();
+    const id = randomUUID();
+    const month = created.toISOString().slice(0, 7);
+    const objectPath = `${month}/${id}.jpg`;
+    await this.backend.objects.put(objectPath, input.data, "image/jpeg");
+    let thumbPath: string | null = null;
+    const thumb = await this.makeThumb(input.data);
+    if (thumb) {
+      const path = `${month}/${id}.thumb.jpg`;
+      try {
+        await this.backend.objects.put(path, thumb, "image/jpeg");
+        thumbPath = path;
+      } catch {
+        // Made lazily on first staff view instead.
+      }
+    }
+    const row: PhotoRow = {
+      id,
+      sessionId: input.sessionId,
+      kioskId: input.kioskId,
+      frameId: MOBILE_FRAME_ID,
+      mime: "image/jpeg",
+      bytes: input.data.byteLength,
+      objectPath,
+      thumbPath,
+      // No download link for a phone photo: a random token nobody ever sees, already expired.
+      tokenHash: hashToken(newToken()),
+      tokenExpiresAt: created.toISOString(),
+      retentionExpiresAt: new Date(
+        created.getTime() + this.opts.retentionDays * 86_400_000,
+      ).toISOString(),
+      wallConsent: false,
+      moderationStatus: "NONE",
+      deletedAt: null,
+      objectDeletedAt: null,
+      createdAt: created.toISOString(),
+      updatedAt: created.toISOString(),
+    };
+    const inserted = await this.backend.photos.insert(row);
+    if (inserted === "conflict") {
+      await this.removeObjects(row).catch(() => undefined);
+      const winner = await this.backend.photos.findBySessionId(input.sessionId);
+      if (!winner) throw new Error("Session conflict but no row found");
+      return this.resumeMobile(winner, input.kioskId);
+    }
+    return this.consentMobile(row, input.kioskId, false);
+  }
+
+  /** The same QR again (a lost response, or a hub import retried). Never a second photo. */
+  private async resumeMobile(row: PhotoRow, kioskId: string | null): Promise<PutMobileResult> {
+    if (isGone(row) || !isMobilePhoto(row)) return { ok: false, reason: "closed" };
+    if (row.moderationStatus === "NONE" && !row.wallConsent)
+      return this.consentMobile(row, kioskId, true);
+    return { ok: true, photoId: row.id, moderationStatus: row.moderationStatus, duplicate: true };
+  }
+
+  private async consentMobile(
+    row: PhotoRow,
+    kioskId: string | null,
+    duplicate: boolean,
+  ): Promise<PutMobileResult> {
+    const updated = await this.backend.photos.transition({
+      photoId: row.id,
+      from: "NONE",
+      to: "PENDING",
+      wallConsent: true,
+      actor: kioskId ? { type: "kiosk", id: kioskId } : { type: "system", id: null },
+      action: "mobile_upload_consent",
+    });
+    const current = updated ?? (await this.backend.photos.getById(row.id));
+    if (!current || isGone(current)) return { ok: false, reason: "closed" };
+    return { ok: true, photoId: current.id, moderationStatus: current.moderationStatus, duplicate };
+  }
+
+  /** Has the phone sent the photo for this QR yet? Only the QR's own booth may ask. */
+  async mobileStatus(sessionId: string, kioskId: string | null): Promise<MobileStatus> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    if (!row) return "waiting";
+    if (!isMobilePhoto(row) || row.kioskId !== kioskId) return "waiting";
+    return isGone(row) ? "closed" : "received";
+  }
+
+  /**
+   * Cloud side of the hub inbox (D66): phone photos sent through hub-issued QRs (kioskId null),
+   * still here and waiting for the hub to take them, oldest first.
+   */
+  async mobileInbox(limit = 50): Promise<PhotoRow[]> {
+    const rows = await this.backend.photos.list({
+      statuses: ["NONE", "PENDING"],
+      limit: 500,
+    });
+    return rows
+      .filter((r) => isMobilePhoto(r) && r.kioskId === null && !isGone(r))
+      .reverse()
+      .slice(0, limit);
+  }
+
+  /** Bytes of an inbox photo for the hub. Null when it is not (or no longer) in the inbox. */
+  async mobileInboxImage(sessionId: string): Promise<Uint8Array | null> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    if (!row || !isMobilePhoto(row) || row.kioskId !== null || isGone(row)) return null;
+    return this.backend.objects.get(row.objectPath);
   }
 
   // ── guest delivery ───────────────────────────────────────────────────────────────────────
@@ -383,8 +520,9 @@ export class PhotoService {
     { ok: true; token: string; tokenExpiresAt: string } | { ok: false; reason: "absent" | "gone" }
   > {
     const row = await this.backend.photos.findBySessionId(sessionId);
-    // A kiosk's own photo is invisible here: "absent", like a session that never existed.
-    if (!row || row.kioskId !== null) return { ok: false, reason: "absent" };
+    // A kiosk's own photo is invisible here: "absent", like a session that never existed. A
+    // phone photo never has a guest link, so it is invisible to the QR path too.
+    if (!row || row.kioskId !== null || isMobilePhoto(row)) return { ok: false, reason: "absent" };
     if (isGone(row)) return { ok: false, reason: "gone" };
     const nowMs = this.now().getTime();
     const expires = Math.min(
@@ -405,7 +543,11 @@ export class PhotoService {
    * Staff deleted the photo on the hub: remove the cloud copy and kill its guest link. Same order
    * as a staff delete (tombstone first, then bytes). Idempotent; unknown sessions are a no-op.
    */
-  async deleteForHub(sessionId: string): Promise<"deleted" | "absent" | "retry"> {
+  async deleteForHub(
+    sessionId: string,
+    /** "hub_import": the hub took a phone photo from the inbox (D66); same delete otherwise. */
+    action: "hub_delete" | "hub_import" = "hub_delete",
+  ): Promise<"deleted" | "absent" | "retry"> {
     const row = await this.backend.photos.findBySessionId(sessionId);
     if (!row || row.kioskId !== null) return "absent";
     if (!isGone(row)) {
@@ -415,7 +557,7 @@ export class PhotoService {
         to: "DELETED",
         deletedAt: this.now().toISOString(),
         actor: { type: "system", id: null },
-        action: "hub_delete",
+        action,
       });
       // Lost a race with another change: the hub's sync worker will simply try again.
       if (!marked) return "retry";

@@ -1,8 +1,9 @@
 import "server-only";
 import { getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
-import { getBackend } from "@/lib/storage/server";
+import { getBackend, getPhotoService } from "@/lib/storage/server";
 import { HttpCloudClient } from "./client";
+import { HubInbox } from "./inbox";
 import { CloudSync } from "./sync";
 
 /**
@@ -21,6 +22,28 @@ export function getCloudSync(): CloudSync | null {
   return g.__ftlCloudSync;
 }
 
+function cloudClient(): HttpCloudClient | null {
+  const cfg = getServerConfig().cloudSync;
+  if (!cfg) return null;
+  const g = globalThis as { __ftlCloudClient?: HttpCloudClient };
+  g.__ftlCloudClient ??= new HttpCloudClient(cfg.baseUrl, cfg.secret, cfg.timeoutMs);
+  return g.__ftlCloudClient;
+}
+
+/** Hub with a cloud: phone uploads arrive through the cloud inbox (D66). Null otherwise. */
+export function getHubInbox(): HubInbox | null {
+  const client = cloudClient();
+  if (!client) return null;
+  const g = globalThis as { __ftlHubInbox?: HubInbox };
+  g.__ftlHubInbox ??= new HubInbox(getPhotoService(), getBackend(), client);
+  return g.__ftlHubInbox;
+}
+
+/** Hub with a cloud: ask the cloud for a phone-upload QR (D66). Null without a cloud. */
+export function getCloudInboxClient() {
+  return cloudClient();
+}
+
 /** Background retries (instrumentation.ts). Uploads and deletes queued while offline go out. */
 export function startCloudSyncWorker(intervalMs = 15_000) {
   const g = globalThis as { __ftlCloudWorker?: ReturnType<typeof setInterval> };
@@ -33,6 +56,9 @@ export function startCloudSyncWorker(intervalMs = 15_000) {
     sync
       .processDue()
       .catch((e) => logEvent("cloud_sync_failed", { message: String(e) }, "warn"))
+      // Phone photos waiting in the cloud come down to the hub (D66).
+      .then(() => getHubInbox()?.pull())
+      .catch((e) => logEvent("hub_inbox_failed", { message: String(e) }, "warn"))
       .finally(() => (running = false));
   }, intervalMs);
   g.__ftlCloudWorker.unref?.();
@@ -43,7 +69,11 @@ export function resetCloudSyncForTests() {
   const g = globalThis as {
     __ftlCloudSync?: CloudSync;
     __ftlCloudWorker?: ReturnType<typeof setInterval>;
+    __ftlHubInbox?: HubInbox;
+    __ftlCloudClient?: HttpCloudClient;
   };
+  delete g.__ftlHubInbox;
+  delete g.__ftlCloudClient;
   if (g.__ftlCloudWorker) clearInterval(g.__ftlCloudWorker);
   delete g.__ftlCloudWorker;
   delete g.__ftlCloudSync;

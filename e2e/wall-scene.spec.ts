@@ -106,7 +106,7 @@ async function approve(request: APIRequestContext, sessionId: string) {
 
 async function boothPhoto(frame: "navy-strip" | "wood-window") {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByTestId(`frame-option-${frame}`).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "촬영 시작" }).click();

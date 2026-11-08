@@ -147,7 +147,7 @@ async function holdCorner(page: Page, ms: number) {
 
 test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, start over", async () => {
   await kiosk.goto("/kiosk?camera=mock");
-  await kiosk.getByRole("button", { name: "화면을 눌러 시작" }).click();
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
 

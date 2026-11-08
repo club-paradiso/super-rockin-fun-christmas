@@ -43,7 +43,7 @@ Next.js server is the only thing that talks to Supabase.
 | `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                         |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                    |
 | `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                   |
-| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)                         |
+| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)    |
 | `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically               |
 | `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub |
 | `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                     |
@@ -171,6 +171,41 @@ Before the event, a person must do this on the actual wall screen at the venue:
 - check readability and brightness from where guests stand, and leave it running for an hour.
 
 Until then: `REAL_WALL_DISPLAY_TEST: NOT VERIFIED`.
+
+## 8. Dedicated media-wall address (D68)
+
+Same deployment, a second hostname (`docs/MEDIA_WALL_ARCHITECTURE.md`).
+
+Done 2026-11-08 (approved by the owner): steps 1 and 2 below, via the Vercel API.
+`follow-the-lights-wall.vercel.app` was free and is verified on project `follow-the-lights`;
+`WALL_HOSTS` is set for Production (like every other variable here; preview deployments have none).
+Step 3 happens when this code is merged to `main` (production redeploys); until then the wall
+address serves the current app unchanged. Step 4 is not verified yet.
+
+1. Vercel → project `follow-the-lights` → Settings → Domains → add `follow-the-lights-wall.vercel.app`
+   (or another free `*.vercel.app` name if that one is taken; no cost).
+2. Environment Variables → `WALL_HOSTS=follow-the-lights-wall.vercel.app` (Production and Preview).
+   `PUBLIC_BASE_URL` stays the booth address: wall-host pages for staff and guests redirect there.
+3. Redeploy (`WALL_HOSTS` is read at build time).
+4. Check: `/` on the wall address shows the wall enrollment notice; `/admin` there redirects to the
+   booth address. Enroll the wall display at `https://<wall address>/kiosk/enroll?next=wall`.
+
+Rollback: remove `WALL_HOSTS` and redeploy (the domain can stay; it then serves the normal app).
+
+## 9. Phone uploads (D66)
+
+No new env vars. The phone page lives on `PUBLIC_BASE_URL` (`/m/…`). With a hub, the cloud needs
+`HUB_SYNC_SECRET` (already required for the QR copy) and the hub pulls phone photos every 15 s.
+Preview Supabase (`follow-the-lights-preview`): applied 2026-11-08 (approved), before any deploy;
+checked afterwards: column default `standard`, both settings functions present, neither executable
+by anon or authenticated.
+
+Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
+schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
+and keeps the 8-argument one, so the code still running keeps working (emergency switches
+included) until the new code is live. After the 2.0 deploy, a follow-up migration drops the
+8-argument function (not written yet on purpose: `supabase db push` before the deploy would break
+the running code).
 
 ## Preview deployment (2026-10-14)
 

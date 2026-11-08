@@ -69,7 +69,11 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
   const headers: Record<string, string> = { ...NO_STORE };
   if (auth.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, auth.renewCookie);
   return NextResponse.json(
-    { wallSubmissions: settings.pauseSubmissions ? "paused" : "open" },
+    {
+      wallSubmissions: settings.pauseSubmissions ? "paused" : "open",
+      // Staff default start mode (D67); the booth applies it to the next guest.
+      kioskDefaultMode: settings.kioskDefaultMode,
+    },
     { headers },
   );
 });

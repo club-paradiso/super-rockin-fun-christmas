@@ -73,8 +73,8 @@ export default async function EnrollPage({
               <section className="rounded-2xl border border-amber/40 p-6">
                 <h2 className="text-xl font-semibold">운영자 비밀번호로 등록</h2>
                 <p className="mt-2 text-base text-mist">
-                  운영자가 정한 등록 비밀번호를 입력하면 바로 사용할 수 있어요. 기기마다 처음 한 번만
-                  등록하면 돼요.
+                  운영자가 정한 등록 비밀번호를 입력하면 바로 사용할 수 있어요. 기기마다 처음 한
+                  번만 등록하면 돼요.
                 </p>
                 <form
                   method="post"

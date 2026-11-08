@@ -539,3 +539,89 @@ as the design source.
   switches layout with the screen's orientation (`portrait:`), and text and buttons scale with the
   narrower side.
 - **Not done here:** the admin "지금 미디어월" side panel of A2/A3.
+
+## D66 · 내 사진으로 참여하기: one phone photo per booth QR, reviewed like any booth photo
+
+FOLLOW THE LIGHTS 2.0. A guest who does not want to use the booth camera can send one photo from
+their own phone to the wall review queue (`docs/MOBILE_UPLOAD_ARCHITECTURE.md`).
+
+- **The QR is a signed, stateless token** (`lib/mobile/token.ts`): `u1.<session>.<expiry>.<kiosk>.<mac>`,
+  HMAC with a key derived from `KIOSK_SESSION_SECRET` under its own label (it can never be a kiosk
+  cookie). 15 minutes. Issuing a QR writes nothing; the first photo creates the row. The session id
+  is the photo's `session_id`, which is unique: **one photo per QR**, a retry is idempotent, a used
+  QR cannot add a second photo, and a deleted one cannot bring it back.
+- **The photo is our own JPEG.** The phone shrinks and re-encodes it before sending (2048 px, so
+  the request stays far below Vercel's 4.5 MB limit on LTE; HEIC that the browser cannot decode
+  gets a plain explanation). The server never trusts that: signature check, sharp decode with a
+  pixel limit, EXIF orientation applied, every metadata block dropped (EXIF, GPS, XMP), re-encoded
+  (`lib/mobile/image.ts`). No remote URL is ever fetched.
+- **Same rules as the booth.** A phone photo is a `photos` row with `frame_id = 'phone-photo'`
+  (no schema change, valid under the existing check), private object, same retention. It enters
+  review as `PENDING` with `wall_consent` through the audited transition (`mobile_upload_consent`);
+  `lib/ops/moderation.ts` and `wall_eligible_photos` decide everything after that. It has **no guest
+  link** (the guest already has the photo), so `/p/…` and QR reissue never serve it.
+- **Consent is explicit and is the only purpose.** The phone page cannot submit without the
+  checkbox; the server refuses without `x-wall-consent: yes`. PAUSE SUBMISSIONS refuses new phone
+  photos and new QRs (a phone photo is nothing but a wall submission); booth photos and QR
+  downloads are untouched.
+- **With a hub, the cloud is a transient inbox.** Guests' phones are on cellular data and cannot
+  reach the venue LAN, so the hub asks the cloud for the QR (`/api/hub/uploads/session`). The photo
+  waits in the cloud until the hub takes it (`HubInbox`: list → image → store on the hub → ack →
+  the cloud deletes its copy, audited `hub_import`). Crash-safe: storing is keyed by session id;
+  the cloud copy goes only after the hub has it (or has already deleted it). Moderation, exposures
+  and the wall stay on the hub. This extends D40/D43: the cloud may now hold a phone photo **until
+  the hub takes it**, never longer than the cloud's retention.
+- **Offline.** No internet → the booth says "지금은 인터넷이 연결되지 않았어요" instead of a QR that
+  cannot work. Photos already in the cloud inbox wait; nothing is shown anywhere until staff approve
+  it on the hub. A hub without a cloud serves the QR itself (LAN), and the booth says the phone must
+  be on the event Wi-Fi.
+- **The wall hangs a phone photo as a card** (`phoneCardBox`), not in a 1:3 strip box that would
+  shrink a landscape photo to a stamp. Same clip points, same rotation and timings.
+- **Not decided here:** the retention period and the age rule are the church's (docs/STATUS.md);
+  the phone page states only what the system enforces.
+
+## D67 · Easy mode is a per-guest view of the same booth, with a staff default
+
+- One machine (`lib/kiosk/machine.ts`): `mode` is state, not a fork. Easy mode skips the frame pick
+  before shooting (the frame is still chosen afterwards, with the guest's own photos), counts 5
+  seconds instead of 3, doubles the idle time, shows the step in words ("2단계 · 사진 확인"), and
+  enlarges type, contrast and targets (CSS `.kiosk-easy`, ≥ 76 px chrome buttons). Selection count,
+  consent and delivery rules are the same code.
+- Guests switch at any time (welcome switch, footer button on every screen). `RESET` returns to the
+  staff default, `event_settings.kiosk_default_mode` ('standard' | 'easy'), set in 관리자 → 설정 and
+  audited through the one settings function (migration `20261108090000_v2_kiosk_mode.sql`). The
+  heartbeat carries it to booths within a minute.
+- No age question, no classification of people. Voice guidance was considered and not built:
+  browser speech differs per device and the venue is loud; a staff helper is the better aid.
+- Every screen also has "도움말" (QR scanning, saving, camera trouble, calling a helper), "처음으로"
+  (asks first while photos would be lost), and a warning 15 seconds before an idle reset.
+
+## D68 · The dedicated wall address is a second hostname on the same deployment
+
+Required: the wall must have its own web address. Not required: a second codebase or database.
+
+- **Option A (chosen): same Next.js app, host-based routing.** `WALL_HOSTS` (build time) makes `/`
+  on those hosts render `/wall` and sends `/admin`, `/kiosk`, `/m/…`, `/p/…` to `PUBLIC_BASE_URL`
+  (`lib/wall/host.ts`, `next.config.ts`; no middleware, so no extra function invocations). The wall
+  keeps its renderer, scheduler, rotation, exposure log, show-now, pause, hours and enrollment.
+  Kiosk cookies are host-only, so a display enrolled on the wall host has its own revocable session.
+- **Option B (separate Vercel project / frontend):** better fault isolation for the frontend only —
+  the backend, database and moderation would still be shared, so a backend outage still stops the
+  wall. Costs a second project's builds and settings, duplicates env and secrets, and gives the
+  on-site hub nothing (the hub has no Vercel). Not worth it at one event.
+- **On the hub** the wall stays at `http://<hub>/wall`, the same renderer; nothing depends on the
+  cloud. The cloud wall address only matters if the wall is ever run from Vercel.
+- **Not done here (needs approval):** adding the hostname (e.g. `follow-the-lights-wall.vercel.app`)
+  to the Vercel project and setting `WALL_HOSTS` is a production change (docs/DEPLOYMENT.md "8").
+
+## D69 · Next.js security patch; the 2026-10-23 CI failures were runner allocation, not code
+
+- `next@16.4.0` is covered by critical advisories (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r,
+  GHSA-673q-mjm6-r5xr; `npm audit`), and its build stopped with a security notice. Updated to
+  16.4.5 (and `eslint-config-next`), `npm audit --omit=dev` 0. Patch release, no API change seen in
+  the full test run.
+- CI runs 90–96 (2026-10-23, PRs #26–#28 and their merges) ended 1–3 s after start with all three
+  jobs failed, `runner_id: 0`, no steps and no downloadable log (404): no runner was ever assigned.
+  That is GitHub Actions allocation (billing/spending limit or an outage), not this code. Separately,
+  `main` did fail `prettier --check` on two files (`app/kiosk/enroll/page.tsx`, `docs/DEPLOYMENT.md`),
+  which CI would have caught once runners worked; fixed here.

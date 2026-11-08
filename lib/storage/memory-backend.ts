@@ -391,6 +391,7 @@ export class MemorySettingsRepository implements SettingsRepository {
     showHoldingScreen: false,
     wallHours: null,
     wallForce: "auto",
+    kioskDefaultMode: "standard",
     updatedAt: now(),
     updatedBy: null,
   };
@@ -408,6 +409,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         show_holding_screen: s.showHoldingScreen,
         wall_hours: s.wallHours ? `${s.wallHours.start}-${s.wallHours.end}` : null,
         wall_force: s.wallForce,
+        kiosk_default_mode: s.kioskDefaultMode,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
@@ -418,6 +420,7 @@ export class MemorySettingsRepository implements SettingsRepository {
           ? before.wallHours
           : patch.wallHours && { ...patch.wallHours },
       wallForce: patch.wallForce ?? before.wallForce,
+      kioskDefaultMode: patch.kioskDefaultMode ?? before.kioskDefaultMode,
       updatedAt: now(),
       updatedBy: staffUserId,
     };

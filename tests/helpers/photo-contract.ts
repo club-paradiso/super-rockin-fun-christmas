@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { MOBILE_FRAME_ID } from "@/config/mobile";
+import { isWallEligible } from "@/lib/ops/moderation";
 import { DuplicateSessionError, PhotoService } from "@/lib/storage/photo-service";
 import { hashToken, newToken } from "@/lib/storage/token";
 import type { StorageBackend } from "@/lib/storage/types";
@@ -266,6 +268,109 @@ export function photoServiceContract(
       const kioskPhoto = await put({ sessionId: kioskSession });
       expect(await svc.deleteForHub(kioskSession)).toBe("absent");
       expect((await svc.resolve(kioskPhoto.token)).ok).toBe(true);
+    });
+
+    // ── phone uploads (D66) ────────────────────────────────────────────────────────────────
+    const putMobile = (over: Partial<Parameters<PhotoService["putMobile"]>[0]> = {}) =>
+      svc.putMobile({
+        sessionId: SESSION,
+        kioskId: KIOSK,
+        data: JPEG,
+        submissionsPaused: false,
+        ...over,
+      });
+
+    it("phone photo: stored privately, PENDING with consent through an audited transition", async () => {
+      const result = await putMobile();
+      expect(result).toMatchObject({ ok: true, moderationStatus: "PENDING", duplicate: false });
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(row).toMatchObject({
+        frameId: MOBILE_FRAME_ID,
+        mime: "image/jpeg",
+        wallConsent: true,
+        moderationStatus: "PENDING",
+        kioskId: KIOSK,
+      });
+      // Not on the wall until a person approves it.
+      expect(isWallEligible(row)).toBe(false);
+      expect((await svc.wallPhotos(500)).some((p) => p.id === row.id)).toBe(false);
+      const [event] = await backend.audit.list({
+        subjectType: "photo",
+        subjectId: row.id,
+        limit: 1,
+      });
+      expect(event).toMatchObject({
+        action: "mobile_upload_consent",
+        fromState: "NONE",
+        toState: "PENDING",
+        actorType: KIOSK ? "kiosk" : "system",
+      });
+    });
+
+    it("phone photo: no guest link, no QR reissue", async () => {
+      await putMobile({ kioskId: null });
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(new Date(row.tokenExpiresAt).getTime()).toBeLessThanOrEqual(now.getTime());
+      expect(await svc.reissueForHub(SESSION)).toEqual({ ok: false, reason: "absent" });
+    });
+
+    it("phone photo: one per QR — a retry returns the same photo", async () => {
+      const first = await putMobile();
+      const again = await putMobile({ data: new Uint8Array([0xff, 0xd8, 0xff, 9, 0xff, 0xd9]) });
+      expect(again).toMatchObject({ ok: true, duplicate: true });
+      expect(first.ok && again.ok && first.photoId === again.photoId).toBe(true);
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(Array.from((await backend.objects.get(row.objectPath))!)).toEqual(Array.from(JPEG));
+    });
+
+    it("phone photo: refused while submissions are paused; a booth session id is never reused", async () => {
+      expect(await putMobile({ submissionsPaused: true })).toEqual({ ok: false, reason: "paused" });
+      expect(await backend.photos.findBySessionId(SESSION)).toBeNull();
+      await put();
+      expect(await putMobile()).toEqual({ ok: false, reason: "closed" });
+    });
+
+    it("phone photo: approve → wall; delete → gone and never comes back", async () => {
+      const r = await putMobile();
+      if (!r.ok) throw new Error("not stored");
+      // The audit log stores the actor id only; any id stands in for a staff member here.
+      const staff = uuid();
+      const approved = await svc.moderate(r.photoId, "approve", staff);
+      expect(approved.ok).toBe(true);
+      expect((await svc.wallPhotos(500)).some((p) => p.id === r.photoId)).toBe(true);
+      expect(await svc.moderate(r.photoId, "delete", staff)).toMatchObject({ ok: true });
+      expect((await svc.wallPhotos(500)).some((p) => p.id === r.photoId)).toBe(false);
+      expect(await putMobile()).toEqual({ ok: false, reason: "closed" });
+      expect(await svc.mobileStatus(SESSION, KIOSK)).toBe("closed");
+    });
+
+    it("phone photo: status for the QR's own booth only", async () => {
+      expect(await svc.mobileStatus(SESSION, KIOSK)).toBe("waiting");
+      await putMobile();
+      expect(await svc.mobileStatus(SESSION, KIOSK)).toBe("received");
+      if (KIOSK !== OTHER) expect(await svc.mobileStatus(SESSION, OTHER)).toBe("waiting");
+    });
+
+    it("hub inbox: hub-issued phone photos only, taken with hub_import", async () => {
+      await putMobile({ kioskId: null });
+      const inbox = await svc.mobileInbox(500);
+      expect(inbox.some((r) => r.sessionId === SESSION)).toBe(true);
+      expect(Array.from((await svc.mobileInboxImage(SESSION))!)).toEqual(Array.from(JPEG));
+      // A booth's own QR copy is never in the inbox.
+      const booth = uuid();
+      await put({ sessionId: booth, kioskId: null });
+      expect((await svc.mobileInbox(500)).some((r) => r.sessionId === booth)).toBe(false);
+      expect(await svc.mobileInboxImage(booth)).toBeNull();
+      expect(await svc.deleteForHub(SESSION, "hub_import")).toBe("deleted");
+      expect((await svc.mobileInbox(500)).some((r) => r.sessionId === SESSION)).toBe(false);
+      expect(await svc.mobileInboxImage(SESSION)).toBeNull();
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      const [event] = await backend.audit.list({
+        subjectType: "photo",
+        subjectId: row.id,
+        limit: 1,
+      });
+      expect(event).toMatchObject({ action: "hub_import", actorType: "system" });
     });
   });
 }

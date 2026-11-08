@@ -1,5 +1,6 @@
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
+import { KioskModeForm } from "@/components/admin/kiosk-mode-form";
 import { WALL_CONFIG } from "@/config/wall";
 import { wallOpen } from "@/lib/wall/hours";
 import { formatTime } from "@/components/admin/labels";
@@ -34,6 +35,7 @@ export default async function SettingsPage() {
         wallStatus={wallOpen(settings, new Date(), WALL_CONFIG.timeZone)}
       />
       <WallHoursForm hours={settings.wallHours} timeZone={WALL_CONFIG.timeZone} />
+      <KioskModeForm mode={settings.kioskDefaultMode} />
       <p className="text-base text-mist">
         마지막 변경: {formatTime(settings.updatedAt)}
         {updater ? ` · ${updater.displayName}` : ""}

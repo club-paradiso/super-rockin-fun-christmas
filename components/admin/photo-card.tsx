@@ -87,6 +87,7 @@ export function PhotoCard({
       data-testid="photo-card"
       data-photo-id={photo.id}
       data-status={photo.status}
+      data-source={photo.source}
     >
       <div className="flex h-72 items-center justify-center bg-ink">
         {photo.deleted ? (
@@ -109,6 +110,14 @@ export function PhotoCard({
           >
             {STATUS_LABEL[photo.status]}
           </span>
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-bold ${
+              photo.source === "mobile" ? "bg-ember text-ink" : "bg-cream/10"
+            }`}
+            data-testid="photo-source"
+          >
+            {photo.source === "mobile" ? "휴대폰 사진" : "현장 촬영"}
+          </span>
           {photo.wallConsent && (
             <span className="rounded-full bg-cream/10 px-3 py-1 text-sm">미디어월 동의</span>
           )}
@@ -117,7 +126,7 @@ export function PhotoCard({
           )}
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-mist">
-          <dt>촬영</dt>
+          <dt>{photo.source === "mobile" ? "접수" : "촬영"}</dt>
           <dd className="text-cream">{formatTime(photo.createdAt)}</dd>
           <dt>프레임</dt>
           <dd className="text-cream">{photo.frameLabel}</dd>
@@ -127,7 +136,11 @@ export function PhotoCard({
           <dd className="font-mono text-cream">{photo.sessionShort}</dd>
           <dt>링크</dt>
           <dd className="text-cream">
-            {photo.linkActive ? `유효 (${formatTime(photo.tokenExpiresAt)}까지)` : "만료/삭제"}
+            {photo.source === "mobile"
+              ? "없음 (방문객 휴대폰 사진)"
+              : photo.linkActive
+                ? `유효 (${formatTime(photo.tokenExpiresAt)}까지)`
+                : "만료/삭제"}
           </dd>
         </dl>
         {error && (
@@ -199,7 +212,9 @@ export function PhotoCard({
         onConfirm={() => run("delete")}
         onCancel={() => setConfirmDelete(false)}
       >
-        이미지가 즉시 지워지고, 방문객의 QR 링크도 더 이상 열리지 않아요. 되돌릴 수 없어요.
+        {photo.source === "mobile"
+          ? "이미지가 즉시 지워지고 미디어월에도 다시 나오지 않아요. 되돌릴 수 없어요."
+          : "이미지가 즉시 지워지고, 방문객의 QR 링크도 더 이상 열리지 않아요. 되돌릴 수 없어요."}
       </ConfirmDialog>
     </article>
   );

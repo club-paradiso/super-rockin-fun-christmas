@@ -193,9 +193,88 @@ body {
   .booth-btn-secondary {
     @apply border-[3px] border-gold bg-navy-700 text-glow;
   }
+  /* Booth screen chrome (2.0): way home, help, screen mode. ≥ 56 px (WCAG 2.2 target size). */
+  .booth-chrome-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-warm/40 bg-navy/70 font-semibold text-glow transition active:scale-[0.98];
+    min-height: max(56px, 6.4vh);
+    padding: 0 max(20px, 2vw);
+    font-size: clamp(18px, 2.3vh, 26px);
+  }
+  .booth-chrome-btn-easy {
+    @apply border-[3px] border-glow bg-navy-700 font-bold;
+    min-height: max(76px, 9vh);
+    font-size: clamp(24px, 3.2vh, 36px);
+  }
+  /* Welcome: the two big choices. Equal size; the camera one is the gold primary. */
+  .welcome-choice {
+    @apply flex flex-col items-start justify-center gap-[max(8px,1.2vh)] rounded-[32px] border-[3px] border-gold bg-navy-700 text-left text-glow transition active:scale-[0.99] disabled:border-ink-400 disabled:opacity-60;
+    min-height: max(180px, 30vh);
+    padding: max(24px, 3.4vh) max(24px, 2.6vw);
+  }
+  .welcome-choice-primary {
+    @apply bg-gold text-[#0b1026];
+  }
+  .welcome-choice-icon {
+    font-size: clamp(40px, 7vh, 80px);
+    line-height: 1;
+  }
+  .welcome-choice-title {
+    font-size: clamp(30px, min(5vh, 4.4vw), 56px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .welcome-choice-lead {
+    font-size: clamp(18px, min(2.5vh, 2.4vw), 28px);
+    font-weight: 500;
+    line-height: 1.4;
+    opacity: 0.92;
+  }
   .btn-quiet {
     @apply inline-flex min-h-14 items-center justify-center rounded-xl px-6 text-lg text-mist underline-offset-4 active:underline;
   }
+}
+
+/* Easy mode (D67): larger type, brighter text, bigger targets, same layout and the same flow
+   rules. Contrast: glow (#fff7e6) and warm (#ffe3a3) on the night background are above 12:1;
+   captions move from ink-400 to a light grey (about 10:1). */
+.kiosk-easy .booth-title {
+  font-size: clamp(34px, min(6.6vh, 6vw), 76px);
+  line-height: 1.25;
+}
+.kiosk-easy .booth-lead {
+  font-size: clamp(22px, min(3.4vh, 3.4vw), 38px);
+  color: var(--color-glow);
+  opacity: 1;
+}
+.kiosk-easy .booth-caption {
+  font-size: clamp(19px, min(2.6vh, 2.6vw), 28px);
+  color: #d5d8e6;
+}
+.kiosk-easy .booth-btn-primary,
+.kiosk-easy .booth-btn-secondary {
+  min-height: max(80px, min(12vh, 11vw));
+  font-size: clamp(26px, min(4vh, 4vw), 44px);
+}
+.kiosk-easy .booth-btn-secondary {
+  border-color: var(--color-glow);
+}
+.kiosk-easy .welcome-choice {
+  min-height: max(220px, 36vh);
+}
+.kiosk-easy .welcome-choice-title {
+  font-size: clamp(36px, min(6.2vh, 5.4vw), 68px);
+}
+.kiosk-easy .welcome-choice-lead {
+  font-size: clamp(22px, min(3.2vh, 3vw), 34px);
+}
+/* Keyboard focus is always visible (WCAG 2.4.7 / 2.4.13). */
+main button:focus-visible,
+main a:focus-visible,
+main input:focus-visible,
+.kiosk-dialog button:focus-visible {
+  outline: 4px solid var(--color-gold);
+  outline-offset: 3px;
 }
 
 @keyframes flash {
