@@ -63,7 +63,12 @@ export class HubInbox {
   /** True when this item is finished (stored and acknowledged), false to stop the pass. */
   private async takeOne(sessionId: string): Promise<boolean> {
     const existing = await this.backend.photos.findBySessionId(sessionId);
-    if (!existing) {
+    if (existing) {
+      // Taken in before, but maybe only half (the hub stopped between storing the row and
+      // recording the guest's consent): finish it before the cloud copy is let go. A photo
+      // deleted here stays deleted.
+      await this.service.completeMobile(sessionId, null);
+    } else {
       const image = await this.client.inboxImage(sessionId);
       if (!image.ok) {
         if (image.gone) return true; // deleted in the cloud meanwhile: nothing to take

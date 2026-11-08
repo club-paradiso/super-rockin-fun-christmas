@@ -91,7 +91,13 @@ export interface PhotoListFilter {
   /** Captured strictly before this instant. */
   before?: string;
   kioskId?: string;
+  /** Only rows with no kiosk (hub copies and hub-issued phone photos on the cloud). */
+  kioskless?: boolean;
+  /** Only this frame id (e.g. phone photos, D66). */
+  frameId?: string;
   sessionShort?: string;
+  /** Oldest first instead of newest first. */
+  oldestFirst?: boolean;
   limit: number;
 }
 

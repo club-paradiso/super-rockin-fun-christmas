@@ -351,6 +351,32 @@ export function photoServiceContract(
       if (KIOSK !== OTHER) expect(await svc.mobileStatus(SESSION, OTHER)).toBe("waiting");
     });
 
+    it("list filters: frame id, kioskless, oldest first — applied before the limit", async () => {
+      const phone = SESSION;
+      await putMobile({ kioskId: null });
+      now = new Date(now.getTime() + 60_000);
+      for (let i = 0; i < 3; i++) {
+        await put({ sessionId: uuid(), kioskId: null });
+        now = new Date(now.getTime() + 60_000);
+      }
+      const onlyPhone = await backend.photos.list({
+        frameId: MOBILE_FRAME_ID,
+        kioskless: true,
+        limit: 500,
+      });
+      expect(onlyPhone.some((r) => r.sessionId === phone)).toBe(true);
+      expect(onlyPhone.every((r) => r.frameId === MOBILE_FRAME_ID && r.kioskId === null)).toBe(
+        true,
+      );
+      const oldest = await backend.photos.list({ kioskless: true, oldestFirst: true, limit: 500 });
+      for (let i = 1; i < oldest.length; i++)
+        expect(oldest[i - 1]!.createdAt <= oldest[i]!.createdAt).toBe(true);
+      if (KIOSK) {
+        const withKiosk = await backend.photos.list({ kioskless: true, limit: 500 });
+        expect(withKiosk.some((r) => r.kioskId !== null)).toBe(false);
+      }
+    });
+
     it("hub inbox: hub-issued phone photos only, taken with hub_import", async () => {
       await putMobile({ kioskId: null });
       const inbox = await svc.mobileInbox(500);

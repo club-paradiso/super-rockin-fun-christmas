@@ -308,6 +308,16 @@ export class PhotoService {
     return { ok: true, photoId: current.id, moderationStatus: current.moderationStatus, duplicate };
   }
 
+  /**
+   * Finish a phone photo whose row exists but whose consent step never ran (the process stopped
+   * between the two writes of putMobile). Idempotent; "closed" for a deleted or non-phone row.
+   * Null when there is no row for this session.
+   */
+  async completeMobile(sessionId: string, kioskId: string | null): Promise<PutMobileResult | null> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    return row ? this.resumeMobile(row, kioskId) : null;
+  }
+
   /** Has the phone sent the photo for this QR yet? Only the QR's own booth may ask. */
   async mobileStatus(sessionId: string, kioskId: string | null): Promise<MobileStatus> {
     const row = await this.backend.photos.findBySessionId(sessionId);
@@ -321,14 +331,16 @@ export class PhotoService {
    * still here and waiting for the hub to take them, oldest first.
    */
   async mobileInbox(limit = 50): Promise<PhotoRow[]> {
+    // Filtered in the query, before the limit: the cloud also holds thousands of booth QR copies
+    // (kioskless, NONE), and a phone photo must never be crowded out of the inbox by them.
     const rows = await this.backend.photos.list({
       statuses: ["NONE", "PENDING"],
-      limit: 500,
+      frameId: MOBILE_FRAME_ID,
+      kioskless: true,
+      oldestFirst: true,
+      limit,
     });
-    return rows
-      .filter((r) => isMobilePhoto(r) && r.kioskId === null && !isGone(r))
-      .reverse()
-      .slice(0, limit);
+    return rows.filter((r) => !isGone(r));
   }
 
   /** Bytes of an inbox photo for the hub. Null when it is not (or no longer) in the inbox. */
