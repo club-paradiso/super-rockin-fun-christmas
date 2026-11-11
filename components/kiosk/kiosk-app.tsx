@@ -51,7 +51,7 @@ import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import type { KioskMode } from "@/lib/storage/types";
-import { GuestHelp, KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
+import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { BoothScreen, BrandLockup, CameraPreview } from "./ui";
 
@@ -105,7 +105,6 @@ export function KioskApp({
       mode: initialMode,
     }),
   );
-  const [helpOpen, setHelpOpen] = useState(false);
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
@@ -202,7 +201,6 @@ export function KioskApp({
     setFinalImage(null);
     setQrSvg(null);
     setMobileQr(null);
-    setHelpOpen(false);
     setConfirmHome(false);
     dispatch({ type: "RESET" });
   }, []);
@@ -660,7 +658,6 @@ export function KioskApp({
       toggleMode: () =>
         dispatch({ type: "SET_MODE", mode: state.mode === "easy" ? "standard" : "easy" }),
       goHome: midSession ? requestHome : null,
-      openHelp: () => setHelpOpen(true),
       quiet: isShooting(state.phase),
     }),
     [state.mode, state.phase, wallSubmissions, midSession, requestHome],
@@ -738,7 +735,6 @@ export function KioskApp({
               : null
           }
           onToggleMode={chrome.toggleMode}
-          onOpenHelp={chrome.openHelp}
           wallSubmissionsOpen={wallSubmissions === "open"}
           videoNotice={canRecordVideo}
         />
@@ -757,7 +753,6 @@ export function KioskApp({
             </button>
           </div>
         )}
-        {helpOpen && <GuestHelp onClose={() => setHelpOpen(false)} />}
         {confirmHome && (
           <KioskDialog
             title="처음 화면으로 갈까요?"
@@ -830,7 +825,6 @@ interface ScreenProps {
   onStartMobile: () => void;
   mobileQrSvg: string | null;
   onToggleMode: () => void;
-  onOpenHelp: () => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
@@ -936,14 +930,6 @@ function Screen(p: ScreenProps) {
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              className="booth-chrome-btn"
-              onClick={p.onOpenHelp}
-              data-testid="welcome-help"
-            >
-              <span aria-hidden>?</span> 도움말
-            </button>
           </div>
         </section>
       );

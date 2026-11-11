@@ -821,3 +821,21 @@ Not verified: any real device (booth touch screen, phones, the LED wall); colour
 the venue's light; the lockup's relative sizes against the Figma file (the spec gave the fonts and
 letter-spacing, the size ratios were chosen here); the staff login email on a real Supabase
 project.
+
+## D74 · No guest help on the booth; the wall take-down line moves to the phone page
+
+User decision (2026-11-11): staff are at the booth for the whole event, so the booth's guest help
+is removed.
+
+- Removed: the "도움말" button on the welcome screen and in the footer ("도움이 필요해요" in easy
+  mode), the help dialog (`GuestHelp`), its state and its E2E check.
+- Kept: staff help mode (D59: corner hold + name + PIN). The name is similar but it is the staff
+  recovery tool. "처음으로" and "쉬운 화면" stay.
+- The dialog told guests how to have a photo taken off the wall. That is the way to withdraw
+  consent, so it must stay somewhere: `/p/[token]` now ends with "미디어월에 걸린 사진을 내리고
+  싶으면 부스 직원에게 말씀해 주세요." The cloud copy has no wall consent (D40), so the line shows
+  for every guest, whatever they answered.
+- The "how to scan the QR" and "how to save the photo" tips are gone from the screen; staff
+  explain them.
+
+Not verified: whether guests get stuck on site without the on-screen tips.

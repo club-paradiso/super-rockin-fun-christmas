@@ -43,6 +43,9 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
         <p className="text-center text-sm text-ink/75">
           {expires}까지 열 수 있어요. 꼭 저장해 주세요.
         </p>
+        <p className="text-center text-sm text-ink/75 [word-break:keep-all]">
+          미디어월에 걸린 사진을 내리고 싶으면 부스 직원에게 말씀해 주세요.
+        </p>
       </div>
     </main>
   );
