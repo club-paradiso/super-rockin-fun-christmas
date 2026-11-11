@@ -1,3 +1,5 @@
+import type { VideoMime } from "@/lib/video/format";
+
 /**
  * Storage ports. Services (photo-service.ts, lib/ops/*) hold every rule; backends only implement
  * these narrow interfaces. Backends: memory (tests), local files (dev, single-PC kiosk),
@@ -18,6 +20,8 @@ export const MODERATION_STATES = [
 export type ModerationStatus = (typeof MODERATION_STATES)[number];
 
 export type PhotoMime = "image/jpeg" | "image/png";
+/** Anything the private bucket may hold: photos and their derived JPEGs, and session videos. */
+export type ObjectMime = PhotoMime | VideoMime;
 
 export type ActorType = "staff" | "kiosk" | "system";
 /** Who did something. `id` is a stable identity (auth user id / kiosk id), never a name. */
@@ -49,6 +53,13 @@ export interface PhotoRow {
   deletedAt: string | null;
   /** When the stored object(s) were actually removed. */
   objectDeletedAt: string | null;
+  /**
+   * Session video (D72), or null when the session has none. The object lives next to the photo
+   * at a derived path (photo-service.ts) and is removed with it. Never part of anything the wall
+   * receives.
+   */
+  videoMime: VideoMime | null;
+  videoBytes: number | null;
   createdAt: string;
   updatedAt: string;
   /** Hub only: state of the QR copy in the cloud (docs/ARCHITECTURE.md 1.5). Absent elsewhere. */
@@ -66,6 +77,12 @@ export interface CloudCopy {
   nextAttemptAt: string;
   lastError: string | null;
   syncedAt: string | null;
+  /**
+   * The session video's cloud copy (D72); absent when there is nothing to send. It follows the
+   * photo copy (only sent while `state` is SYNCED) and is best-effort: DROPPED = given up, the
+   * guest page simply has no video.
+   */
+  video?: "PENDING" | "SYNCED" | "DROPPED";
 }
 
 export type PhotoPatch = Partial<Pick<PhotoRow, "tokenHash" | "tokenExpiresAt">>;
@@ -132,6 +149,8 @@ export interface PhotoRepository {
     staffUserId: string,
   ): Promise<PhotoRow | null>;
   setThumbPath(id: string, path: string): Promise<void>;
+  /** Unaudited bookkeeping, like the thumbnail: the session's video is stored (D72). */
+  setVideo(id: string, video: { mime: VideoMime; bytes: number }): Promise<void>;
   markObjectsDeleted(id: string, atIso: string): Promise<void>;
   /** Rows whose retention has passed and that are not deleted yet. */
   listRetentionDue(nowIso: string, limit: number): Promise<PhotoRow[]>;
@@ -143,13 +162,13 @@ export interface PhotoRepository {
   listWallEligible(limit: number): Promise<WallEligibleRow[]>;
   /** Hub only. Unaudited bookkeeping of the cloud copy (not a decision by anyone). */
   setCloud(id: string, cloud: CloudCopy): Promise<void>;
-  /** Hub only. Rows whose cloud upload or delete is due, oldest first. */
+  /** Hub only. Rows whose cloud upload, video upload or delete is due, oldest first. */
   listCloudDue(nowIso: string, limit: number): Promise<PhotoRow[]>;
   stats(): Promise<PhotoStats>;
 }
 
 export interface ObjectStorage {
-  put(path: string, data: Uint8Array, mime: PhotoMime): Promise<void>;
+  put(path: string, data: Uint8Array, mime: ObjectMime): Promise<void>;
   /** Null when the object does not exist. */
   get(path: string): Promise<Uint8Array | null>;
   /** Idempotent: removing a missing object succeeds. */
@@ -391,4 +410,6 @@ export interface GuestPhoto {
   bytes: number;
   createdAt: string;
   tokenExpiresAt: string;
+  /** The session video the server really has, or null. Never a path. */
+  video: { mime: VideoMime; bytes: number } | null;
 }

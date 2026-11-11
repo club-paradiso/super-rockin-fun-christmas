@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { findGuestPhoto } from "@/lib/storage/guest";
 import { SavePhoto } from "./save-photo";
+import { SaveVideo } from "./save-video";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,10 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
           className="max-h-[70dvh] w-auto rounded-lg shadow-[0_0_60px_rgba(255,200,120,0.18)]"
         />
         <SavePhoto imageUrl={src} mime={photo.mime} />
+        {/* Only when the server really has this session's video (D72). */}
+        {photo.video && (
+          <SaveVideo videoUrl={`/p/${encodeURIComponent(token)}/video`} mime={photo.video.mime} />
+        )}
         <p className="text-center text-sm text-mist">
           {expires}까지 열 수 있어요. 꼭 저장해 주세요.
         </p>

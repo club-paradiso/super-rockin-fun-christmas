@@ -1,3 +1,4 @@
+import type { VideoMime } from "@/lib/video/format";
 import type {
   AuditEvent,
   CloudCopy,
@@ -156,6 +157,9 @@ export class MemoryPhotoRepository implements PhotoRepository {
   async setThumbPath(id: string, path: string) {
     if (this.rows.has(id)) this.patch(id, { thumbPath: path });
   }
+  async setVideo(id: string, video: { mime: VideoMime; bytes: number }) {
+    if (this.rows.has(id)) this.patch(id, { videoMime: video.mime, videoBytes: video.bytes });
+  }
   async markObjectsDeleted(id: string, atIso: string) {
     if (this.rows.has(id)) this.patch(id, { objectDeletedAt: atIso });
   }
@@ -196,7 +200,9 @@ export class MemoryPhotoRepository implements PhotoRepository {
     return [...this.rows.values()]
       .filter(
         (r) =>
-          (r.cloud?.state === "PENDING" || r.cloud?.state === "DELETE_PENDING") &&
+          (r.cloud?.state === "PENDING" ||
+            r.cloud?.state === "DELETE_PENDING" ||
+            (r.cloud?.state === "SYNCED" && r.cloud.video === "PENDING")) &&
           r.cloud.nextAttemptAt <= nowIso,
       )
       .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))

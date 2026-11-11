@@ -664,5 +664,91 @@ Product decision (user, 2026-11-11): "포즈 가이드를 선택하면 추천 �
   only: there are no pose illustrations and none were invented.
 - After a camera reconnect the guest is back on the ready screen and chooses again; the shots
   already taken are kept as before.
+- In easy mode the ready screen leaves out the "LIGHTS, CAMERA, ACTION!" wordmark and the empty
+  shot strip (both return during the countdown): with two start buttons and the notices, the large
+  type did not fit 1280 × 800 otherwise (checked with screenshots at 1280 × 800 and 1080 × 1920).
 - **Not verified:** how 10 s feels at a real booth with a queue (six shots now take about 70 s),
   and whether the pose band over the preview is readable from where guests stand.
+
+## D72 · Session video: a silent highlight reel behind the same QR (user confirmation pending)
+
+User request (2026-11-11): "QR 코드로 사진 다운받을 때, 촬영 영상도 같이 다운받을 수 있도록". The
+choices below were made to implement it and are **waiting for the user's confirmation**.
+
+What was decided:
+
+1. **Silent video only.** The booth never asks for a microphone (`getUserMedia({ audio: false })`,
+   unchanged) and the recorder is given the camera stream as it is.
+2. **A highlight reel, one file per session.** For each shot only the last
+   `KIOSK_CONFIG.videoSecondsPerShot` (3) seconds of the countdown plus the capture moment are
+   recorded, with one MediaRecorder that is paused between shots (`lib/kiosk/recorder.ts`). Retakes
+   append while the reel is under `videoMaxSeconds` (30) and one more segment still fits under the
+   size cap. Target bitrate `videoBitsPerSecond` (1 Mbit/s).
+3. **Size cap `videoMaxBytes` = 3 500 000, hard.** The cloud runs on Vercel, where request bodies
+   above about 4.5 MB fail. Enforced on the booth (a video over the cap is dropped whole, never
+   trimmed), in `PhotoService.attachVideo`, in both upload routes (413), and by a column check.
+4. **MP4 when the booth's browser can record it, else WebM.** Servers accept only those two and
+   check the container's magic bytes (`lib/video/format.ts`).
+5. **Strictly best-effort.** Nothing in photography, the photo upload, wall consent or QR delivery
+   waits for the video or reads its result. Unsupported, failed or oversized means the session has
+   no video. The guest page shows "영상 저장" only when the server really has one.
+6. **Guests are told** on the ready screen: "촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지
+   않아요." The line is shown only when this booth's browser can record.
+7. **Phone uploads (D66) never have a video; the media wall never receives one**, nor a URL or a
+   flag about it (`WallPhoto` and `wall_eligible_photos` are unchanged; tested).
+
+How it is built:
+
+- **Storage.** The video is an object next to the photo at a derived path
+  (`<photo>.video.mp4|webm`, `videoPath` in `photo-service.ts`); the row records only
+  `videoMime` / `videoBytes` (migration `20261111090000_session_video.sql`, which also lets the
+  private bucket hold the two video types). Because the path is derived, every place that removes
+  a photo's image removes the video too — staff delete, DELETED moderation, retention, hub
+  retention, event close, `deleteForHub` — even a video whose row was never updated. `setVideo` is
+  unaudited bookkeeping like the thumbnail path: it is not a decision about the photo.
+- **Kiosk → server.** `POST /api/photos/video` (kiosk cookie only): raw bytes, `x-session-id`,
+  after the photo exists (404 before). Idempotent per session: the first video stays. It touches
+  no token, state or consent.
+- **Not queued offline.** The durable IndexedDB queue stays reserved for the photo and the wall
+  answer. The finished video is kept in memory (at most three sessions), sent when the photo's
+  upload succeeds, tried three times (3 s and 10 s apart), then dropped: the guest sees nothing,
+  the booth console gets one line, and the server logs every refusal it sees
+  (`upload_video_refused`, `upload_video_too_large`, `upload_video_storage_failed`). A reload or a
+  long outage loses the video, never the photo.
+- **Hub + cloud.** `CloudCopy.video` (PENDING → SYNCED | DROPPED). `CloudSync.trackVideo` sends it
+  with `putVideo` → `POST /api/hub/photos/video` (Bearer `HUB_SYNC_SECRET`, hub copies only, 410
+  once the copy is deleted) under the same per-photo lock, only after the photo copy is SYNCED. It
+  never calls `put` or `reissue`, so the guest token is never reissued and a scanned QR keeps
+  working. The QR never waits for it. Retries use the same backoff; after 8 tries or a final
+  refusal the video is DROPPED.
+- **Guest.** `GET`/`HEAD /p/[token]/video`: same uniform 404 as the image for unknown, expired
+  and deleted links and for photos without a video; `Content-Type`, `Content-Length`,
+  `Accept-Ranges`, single byte ranges (206/416), and the image route's `private, no-store`.
+  The page adds a secondary "영상 저장" (`save-video.tsx`, same share-or-download approach as the
+  photo); the photo stays the one primary action.
+- **USB backup includes videos.** The backup mirrors the hub's `objects/` folder, so videos are
+  copied with the photos and removed from the stick when the hub deletes them. Up to 3.5 MB more
+  per session on the laptop and the stick.
+
+Choices the request left open (also for the user to confirm):
+
+- The video is the raw camera picture: **not mirrored** (the photo is) and not cropped to 4:3.
+  Mirroring would need a second canvas pipeline running during the shoot.
+- Recording ends when the guest confirms the shots ("이대로 좋아요"); a session abandoned before
+  that has no video. A camera reconnect mid-session starts the reel over.
+- Staff pages do not show or play the video; moderation is about the photo. Deleting the photo
+  deletes the video.
+- The guest page is rendered once: if the phone opens the link before the video has arrived
+  (normally a second or two after the photo), the button appears on a reload.
+- Storage statistics (`storedBytes`) still count photos only.
+
+Known limit: the video route sets `Content-Length` (unit-tested at the handler), but Next.js
+16.4.5's own Node server (`next start`, i.e. the hub) removes that header from every route
+response and sends it chunked (`FORBIDDEN_HEADERS` in `next/dist/server/send-response.js`; the
+photo route has always been served that way). A 206 still carries the total size in
+`Content-Range`. No workaround was forced; what Vercel puts on the wire was not checked.
+
+Not verified: playback and saving on real phones — in particular **iPhone with a WebM file**
+(only produced when the booth's browser cannot record MP4), and saving a recorded MP4 to the
+iPhone Photos app from the share sheet. Real booth cameras at 1 Mbit/s (picture quality, actual
+file sizes). The migration on a real Supabase project.

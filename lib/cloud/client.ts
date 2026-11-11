@@ -1,4 +1,5 @@
 import type { PhotoMime } from "@/lib/storage/types";
+import type { VideoMime } from "@/lib/video/format";
 
 /** A guest link issued by the cloud copy. Passed straight to the kiosk; the hub never stores it. */
 export interface CloudLink {
@@ -25,6 +26,15 @@ export interface CloudClient {
   }): Promise<CloudResult<CloudLink>>;
   reissue(sessionId: string): Promise<CloudResult<CloudLink>>;
   remove(sessionId: string): Promise<CloudResult<null>>;
+  /**
+   * The session video for a copy that is already in the cloud (D72). Issues no token: the guest
+   * link from `put` stays as it is.
+   */
+  putVideo(video: {
+    sessionId: string;
+    mime: VideoMime;
+    data: Uint8Array;
+  }): Promise<CloudResult<null>>;
 }
 
 /** A QR for the cloud's phone page, issued to the hub (D66). */
@@ -180,6 +190,17 @@ export class HttpCloudClient implements CloudClient, CloudInboxClient {
         },
       },
       toLink,
+    );
+  }
+
+  putVideo(video: { sessionId: string; mime: VideoMime; data: Uint8Array }) {
+    return this.call(
+      "/api/hub/photos/video",
+      {
+        body: video.data as unknown as BodyInit,
+        headers: { "content-type": video.mime, "x-session-id": video.sessionId },
+      },
+      () => null,
     );
   }
 

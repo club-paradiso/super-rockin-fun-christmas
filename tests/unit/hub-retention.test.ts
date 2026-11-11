@@ -28,6 +28,9 @@ function setup(policy: Partial<HubRetentionPolicy> = {}, retentionDays = 30) {
     ),
     reissue: vi.fn<CloudClient["reissue"]>(async () => down()),
     remove: vi.fn<CloudClient["remove"]>(async () => (online ? { ok: true, value: null } : down())),
+    putVideo: vi.fn<CloudClient["putVideo"]>(async () =>
+      online ? { ok: true, value: null } : down(),
+    ),
   };
   const sync = new CloudSync(backend, client, () => now, [1000]);
   const full: HubRetentionPolicy = { unpostedHours: 24, wallUntil: null, ...policy };

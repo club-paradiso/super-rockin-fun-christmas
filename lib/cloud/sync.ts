@@ -1,4 +1,5 @@
 import type { CloudCopy, PhotoRow, StorageBackend } from "@/lib/storage/types";
+import { videoPath } from "@/lib/storage/photo-service";
 import type { CloudClient, CloudLink } from "./client";
 
 /**
@@ -13,8 +14,15 @@ import type { CloudClient, CloudLink } from "./client";
  *
  * One operation per photo at a time: a second upload of the same session would make the cloud
  * reissue the token and kill the QR the guest may already have scanned.
+ *
+ * Session video (D72): `cloud.video` PENDING → SYNCED, sent with `putVideo` only once the photo
+ * copy is SYNCED, under the same per-photo lock. It never calls `put` or `reissue`, so it can
+ * never change the guest token; the QR never waits for it. Best-effort: after
+ * VIDEO_MAX_ATTEMPTS, or when the cloud refuses it for good, it is DROPPED and the guest page
+ * simply has no video.
  */
 export const CLOUD_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 120_000, 300_000];
+export const VIDEO_MAX_ATTEMPTS = 8;
 
 /** What a QR request gets: a link, "not yet" (cloud unreachable), or "never" (copy deleted). */
 export type CloudLinkOutcome =
@@ -59,6 +67,7 @@ export class CloudSync {
       nextAttemptAt: this.now().toISOString(),
       lastError: null,
       syncedAt: prev?.syncedAt ?? null,
+      ...(prev?.video ? { video: prev.video } : {}),
       ...cloud,
     };
   }
@@ -137,9 +146,55 @@ export class CloudSync {
     }
     await this.backend.photos.setCloud(
       row.id,
-      this.state({ state: "SYNCED", syncedAt: this.now().toISOString() }),
+      this.state({
+        state: "SYNCED",
+        syncedAt: this.now().toISOString(),
+        // A video stored before the copy existed follows now (worker or trackVideo).
+        ...(row.videoMime ? { video: "PENDING" as const } : {}),
+      }),
     );
     return { ok: true, link: result.value };
+  }
+
+  /**
+   * The photo got its session video on the hub: send it after the photo copy. Safe to call at
+   * any time and more than once; it waits its turn behind the photo's own upload.
+   */
+  async trackVideo(photoId: string) {
+    await this.exclusive(photoId, async () => {
+      const row = await this.backend.photos.getById(photoId);
+      if (!row?.cloud || !row.videoMime || row.cloud.video) return;
+      // Not SYNCED yet: upload() marks the video when the photo copy lands.
+      if (row.cloud.state !== "SYNCED") return;
+      await this.backend.photos.setCloud(
+        photoId,
+        this.state({ state: "SYNCED", video: "PENDING" }, row.cloud),
+      );
+    });
+    await this.processOne(photoId);
+  }
+
+  private async uploadVideo(row: PhotoRow) {
+    const cloud = row.cloud!;
+    const settle = (video: "SYNCED" | "DROPPED", lastError: string | null) =>
+      this.backend.photos.setCloud(
+        row.id,
+        this.state({ state: "SYNCED", video, lastError }, cloud),
+      );
+    const data = row.videoMime
+      ? await this.backend.objects.get(videoPath(row.objectPath, row.videoMime))
+      : null;
+    if (!row.videoMime || !data) return settle("DROPPED", "video missing on the hub");
+    const result = await this.client.putVideo({
+      sessionId: row.sessionId,
+      mime: row.videoMime,
+      data,
+    });
+    if (result.ok) return settle("SYNCED", null);
+    if (result.gone) return void (await this.gone(row));
+    if (!result.retry || cloud.attempts + 1 >= VIDEO_MAX_ATTEMPTS)
+      return settle("DROPPED", `video: ${result.message}`);
+    await this.failed(row, "SYNCED", `video: ${result.message}`);
   }
 
   /** Staff deleted the photo on the hub: the cloud copy and its guest link must go too, now. */
@@ -176,6 +231,13 @@ export class CloudSync {
           return;
         }
         await this.upload(row);
+        // The photo copy just landed and a video was waiting for it: send it in the same turn.
+        const synced = await this.backend.photos.getById(photoId);
+        if (synced?.cloud?.state === "SYNCED" && synced.cloud.video === "PENDING")
+          await this.uploadVideo(synced);
+      } else if (row.cloud.state === "SYNCED" && row.cloud.video === "PENDING") {
+        if (row.deletedAt || row.moderationStatus === "DELETED") return;
+        await this.uploadVideo(row);
       } else if (row.cloud.state === "DELETE_PENDING") {
         const result = await this.client.remove(row.sessionId);
         if (result.ok || !result.retry)

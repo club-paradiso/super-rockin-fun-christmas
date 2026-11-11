@@ -4,7 +4,9 @@ import { isWallEligible } from "@/lib/ops/moderation";
 import { DuplicateSessionError, PhotoService } from "@/lib/storage/photo-service";
 import { hashToken, newToken } from "@/lib/storage/token";
 import type { StorageBackend } from "@/lib/storage/types";
-import { JPEG, uuid } from "./images";
+import { KIOSK_CONFIG } from "@/config/kiosk";
+import { videoPath } from "@/lib/storage/photo-service";
+import { JPEG, MP4, WEBM, uuid } from "./images";
 
 /**
  * PhotoService behaviour every backend must satisfy. Unit tests run it on memory + local files;
@@ -69,7 +71,9 @@ export function photoServiceContract(
         "id",
         "mime",
         "tokenExpiresAt",
+        "video",
       ]);
+      expect(photo.video).toBeNull();
     });
 
     it("is idempotent per session: a retry keeps one row and one object, with a fresh token", async () => {
@@ -397,6 +401,155 @@ export function photoServiceContract(
         limit: 1,
       });
       expect(event).toMatchObject({ action: "hub_import", actorType: "system" });
+    });
+
+    // ── session video (D72) ────────────────────────────────────────────────────────────────
+    const attach = (over: Partial<Parameters<PhotoService["attachVideo"]>[0]> = {}) =>
+      svc.attachVideo({
+        sessionId: SESSION,
+        kioskId: KIOSK,
+        mime: "video/webm",
+        data: WEBM,
+        ...over,
+      });
+    const videoObject = async () => {
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      return {
+        row,
+        webm: await backend.objects.get(videoPath(row.objectPath, "video/webm")),
+        mp4: await backend.objects.get(videoPath(row.objectPath, "video/mp4")),
+      };
+    };
+
+    it("video: attached to the session's photo and read back through the same guest token", async () => {
+      const { token } = await put();
+      expect(await svc.readVideo(token)).toEqual({ ok: false, reason: "unknown" });
+      expect(await attach()).toMatchObject({ ok: true, duplicate: false });
+      const read = await svc.readVideo(token);
+      if (!("data" in read)) throw new Error("no video");
+      expect(read.mime).toBe("video/webm");
+      expect(Array.from(read.data)).toEqual(Array.from(WEBM));
+      const { row } = await videoObject();
+      expect(row).toMatchObject({ videoMime: "video/webm", videoBytes: WEBM.byteLength });
+      // The photo, its link and its state are exactly as they were.
+      expect(row.tokenHash).toBe(hashToken(token));
+      expect(row).toMatchObject({ moderationStatus: "NONE", wallConsent: false });
+      const photo = await svc.read(token);
+      expect("data" in photo && Array.from(photo.data)).toEqual(Array.from(JPEG));
+      expect("data" in photo && photo.photo.video).toEqual({
+        mime: "video/webm",
+        bytes: WEBM.byteLength,
+      });
+    });
+
+    it("video: one per session — a retry keeps the first and never touches the token", async () => {
+      const { token } = await put();
+      await attach({ mime: "video/mp4", data: MP4 });
+      expect(await attach()).toMatchObject({ ok: true, duplicate: true });
+      const { row, webm, mp4 } = await videoObject();
+      expect(row.videoMime).toBe("video/mp4");
+      expect(webm).toBeNull();
+      expect(Array.from(mp4!)).toEqual(Array.from(MP4));
+      expect((await svc.resolve(token)).ok).toBe(true);
+    });
+
+    it("video: only after the photo exists, only from the kiosk that took it", async () => {
+      expect(await attach()).toEqual({ ok: false, reason: "not_found" });
+      await put();
+      if (KIOSK !== null)
+        expect(await attach({ kioskId: null })).toEqual({ ok: false, reason: "not_found" });
+      if (OTHER !== null)
+        expect(await attach({ kioskId: OTHER })).toEqual({ ok: false, reason: "not_found" });
+      expect((await videoObject()).row.videoMime).toBeNull();
+    });
+
+    it("video: refuses other types, wrong magic bytes and anything over the size cap", async () => {
+      await put();
+      expect(await attach({ mime: "video/quicktime" })).toEqual({ ok: false, reason: "invalid" });
+      expect(await attach({ mime: "video/mp4", data: WEBM })).toEqual({
+        ok: false,
+        reason: "invalid",
+      });
+      expect(await attach({ data: JPEG })).toEqual({ ok: false, reason: "invalid" });
+      const big = new Uint8Array(KIOSK_CONFIG.videoMaxBytes + 1);
+      big.set(WEBM);
+      expect(await attach({ data: big })).toEqual({ ok: false, reason: "too_large" });
+      const { row, webm, mp4 } = await videoObject();
+      expect([row.videoMime, webm, mp4]).toEqual([null, null, null]);
+    });
+
+    it("video: a phone photo never has one", async () => {
+      await putMobile();
+      expect(await attach()).toEqual({ ok: false, reason: "closed" });
+      expect((await videoObject()).row.videoMime).toBeNull();
+    });
+
+    it("video: never part of what the wall receives", async () => {
+      const { photo } = await put();
+      await attach();
+      const staff = uuid();
+      await svc.setWallConsentForSession(SESSION, true, KIOSK);
+      expect((await svc.moderate(photo.id, "approve", staff)).ok).toBe(true);
+      const onWall = (await svc.wallPhotos(500)).find((p) => p.id === photo.id)!;
+      expect(Object.keys(onWall).sort()).toEqual(["createdAt", "frameId", "id"]);
+      const eligible = (await backend.photos.listWallEligible(500)).find((p) => p.id === photo.id)!;
+      expect(JSON.stringify(eligible)).not.toMatch(/video/i);
+    });
+
+    it("video: staff delete removes it with the image; the link is the same dead end", async () => {
+      const { token, photo } = await put();
+      await attach();
+      expect((await svc.moderate(photo.id, "delete", uuid())).ok).toBe(true);
+      const { row, webm } = await videoObject();
+      expect(row.objectDeletedAt).not.toBeNull();
+      expect(await backend.objects.get(row.objectPath)).toBeNull();
+      expect(webm).toBeNull();
+      expect(await svc.readVideo(token)).toEqual({ ok: false, reason: "deleted" });
+      expect(await attach()).toEqual({ ok: false, reason: "closed" });
+      expect((await videoObject()).webm).toBeNull();
+    });
+
+    it("video: retention removes it with the image", async () => {
+      const { token } = await put();
+      await attach({ mime: "video/mp4", data: MP4 });
+      now = new Date("2027-01-23T10:00:01Z");
+      expect((await svc.purgeRetention(1000)).failed).toBe(0);
+      const { row, mp4 } = await videoObject();
+      expect(row.moderationStatus).toBe("DELETED");
+      expect(mp4).toBeNull();
+      expect("data" in (await svc.readVideo(token))).toBe(false);
+    });
+
+    it("video: hub retention by state removes it with the image", async () => {
+      await put();
+      await attach();
+      now = new Date("2026-12-25T11:00:00Z");
+      const r = await svc.purgeCapturedBefore(["NONE"], "2026-12-24T11:00:00.000Z", "unposted");
+      expect(r.failed).toBe(0);
+      const { row, webm } = await videoObject();
+      expect(row.moderationStatus).toBe("DELETED");
+      expect(webm).toBeNull();
+    });
+
+    it("video: an expired link serves neither photo nor video", async () => {
+      const { token } = await put();
+      await attach();
+      now = new Date("2026-12-27T10:00:00Z");
+      expect(await svc.readVideo(token)).toEqual({ ok: false, reason: "expired" });
+    });
+
+    it("video on a hub copy: attached without a new token; deleteForHub removes it; then final", async () => {
+      const { token } = await put({ kioskId: null });
+      expect(await attach({ kioskId: null })).toMatchObject({ ok: true, duplicate: false });
+      // The QR the guest already scanned still works, and now also serves the video.
+      expect((await svc.resolve(token)).ok).toBe(true);
+      expect("data" in (await svc.readVideo(token))).toBe(true);
+      expect(await svc.deleteForHub(SESSION)).toBe("deleted");
+      const { webm, row } = await videoObject();
+      expect(webm).toBeNull();
+      expect(await backend.objects.get(row.objectPath)).toBeNull();
+      expect(await attach({ kioskId: null })).toEqual({ ok: false, reason: "closed" });
+      expect((await videoObject()).webm).toBeNull();
     });
   });
 }

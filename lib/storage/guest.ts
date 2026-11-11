@@ -1,5 +1,7 @@
 import "server-only";
 import { logEvent } from "@/lib/server/log";
+import type { VideoMime } from "@/lib/video/format";
+import { toGuestPhoto } from "./photo-service";
 import { getPhotoService } from "./server";
 import type { GuestPhoto } from "./types";
 
@@ -9,15 +11,7 @@ import type { GuestPhoto } from "./types";
  */
 export async function findGuestPhoto(token: string): Promise<GuestPhoto | null> {
   const result = await getPhotoService().resolve(token);
-  if (result.ok) {
-    return {
-      id: result.row.id,
-      mime: result.row.mime,
-      bytes: result.row.bytes,
-      createdAt: result.row.createdAt,
-      tokenExpiresAt: result.row.tokenExpiresAt,
-    };
-  }
+  if (result.ok) return toGuestPhoto(result.row);
   if (result.reason === "expired" || result.reason === "deleted") {
     logEvent("guest_link_unavailable", { reason: result.reason });
   }
@@ -31,6 +25,21 @@ export async function readGuestImage(
   if ("data" in result) return result;
   if (!result.ok && (result.reason === "expired" || result.reason === "deleted")) {
     logEvent("guest_image_unavailable", { reason: result.reason });
+  }
+  return null;
+}
+
+/**
+ * The session video behind a guest link (D72). Null for every unavailable case, including a photo
+ * that simply has no video: the route answers all of them with the same 404.
+ */
+export async function readGuestVideo(
+  token: string,
+): Promise<{ mime: VideoMime; createdAt: string; data: Uint8Array } | null> {
+  const result = await getPhotoService().readVideo(token);
+  if ("data" in result) return result;
+  if (!result.ok && (result.reason === "expired" || result.reason === "deleted")) {
+    logEvent("guest_video_unavailable", { reason: result.reason });
   }
   return null;
 }

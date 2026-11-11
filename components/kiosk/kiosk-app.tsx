@@ -37,7 +37,13 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
-import { requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import { deliverVideo, requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import {
+  SessionRecorder,
+  browserRecorderEnv,
+  pickVideoMime,
+  type RecordedVideo,
+} from "@/lib/kiosk/recorder";
 import { ConsentQueue } from "@/lib/offline/consent-queue";
 import { openQueueStore } from "@/lib/offline/queue-store";
 import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
@@ -67,6 +73,7 @@ type State = KioskState<Shot>;
 type Action = KioskAction<Shot>;
 
 const DEVICE_KEY = "ftl.cameraDeviceId";
+const noSubscribe = () => () => {};
 
 function readStoredDevice(): string | undefined {
   try {
@@ -133,7 +140,61 @@ export function KioskApp({
     };
   }, [cameraMode]);
 
+  // ── Session video (D72): a silent highlight reel, strictly best-effort ───────────────────
+  // Recorded only during the last seconds of each countdown and the capture moment. Nothing in
+  // the photo flow waits for it or reads its result; without MediaRecorder there is no video.
+  const recorderRef = useRef<SessionRecorder | null>(null);
+  const canRecordVideo = useSyncExternalStore(
+    noSubscribe,
+    () => {
+      const env = browserRecorderEnv();
+      return !!env && pickVideoMime(env.isTypeSupported) !== null;
+    },
+    () => false,
+  );
+  // Finished videos by session, kept in memory until their photo is on the server.
+  const videosRef = useRef(new Map<string, Promise<RecordedVideo | null>>());
+  useEffect(() => {
+    recorderRef.current = new SessionRecorder(browserRecorderEnv(), {
+      maxSeconds: KIOSK_CONFIG.videoMaxSeconds,
+      maxBytes: KIOSK_CONFIG.videoMaxBytes,
+      bitsPerSecond: KIOSK_CONFIG.videoBitsPerSecond,
+      // The last seconds of the countdown plus the capture itself.
+      segmentSeconds: KIOSK_CONFIG.videoSecondsPerShot + 1,
+    });
+    return () => recorderRef.current?.discard();
+  }, []);
+  const filming =
+    state.phase === "capturing" ||
+    (state.phase === "countdown" && state.remaining <= KIOSK_CONFIG.videoSecondsPerShot);
+  useEffect(() => {
+    if (filming) recorderRef.current?.record(stream);
+    else recorderRef.current?.pause();
+  }, [filming, stream]);
+  // Shooting is over once the guest confirms the shots (no retake after that). Declared before
+  // the camera-off effect so the file is closed while the stream is still live.
+  const shotsConfirmed = state.phase === "frame";
+  useEffect(() => {
+    if (!shotsConfirmed || !recorderRef.current) return;
+    const videos = videosRef.current;
+    if (videos.has(state.sessionId)) return;
+    videos.set(state.sessionId, recorderRef.current.finish());
+    // Photos that never reach the server (abandoned sessions) must not pile up videos.
+    while (videos.size > 3) videos.delete(videos.keys().next().value!);
+  }, [shotsConfirmed, state.sessionId]);
+  /** The photo of this session is on the server: its video may follow. Never awaited. */
+  const sendVideo = useCallback((sessionId: string) => {
+    const pending = videosRef.current.get(sessionId);
+    if (!pending) return;
+    videosRef.current.delete(sessionId);
+    void pending
+      .then((video) => (video ? deliverVideo(sessionId, video) : false))
+      .catch(() => false);
+  }, []);
+
   const reset = useCallback(() => {
+    // A session left before the shots were confirmed has no photo, so no video either.
+    recorderRef.current?.discard();
     cameraRef.current?.stop();
     setStream(null);
     releaseUrls(urlsRef.current);
@@ -352,6 +413,7 @@ export function KioskApp({
           setQueueStatus({ depth: event.depth, authBlocked: event.authBlocked, durable });
         } else if (event.type === "uploaded") {
           void showQr(event.sessionId, event.result);
+          sendVideo(event.sessionId);
           // A wall answer given while this photo was still queued can go now.
           void consents.then((c) => c.processDue(true));
         }
@@ -376,7 +438,7 @@ export function KioskApp({
       unsubscribe();
       window.removeEventListener("online", onOnline);
     };
-  }, [showQr]);
+  }, [showQr, sendVideo]);
 
   // Hub + cloud: the photo is on the hub, its QR copy is on the way. Ask every few seconds while
   // this guest is still on the delivery screen; a later guest never sees an earlier QR.
@@ -678,6 +740,7 @@ export function KioskApp({
           onToggleMode={chrome.toggleMode}
           onOpenHelp={chrome.openHelp}
           wallSubmissionsOpen={wallSubmissions === "open"}
+          videoNotice={canRecordVideo}
         />
         {idle.warning && (
           <div
@@ -770,6 +833,8 @@ interface ScreenProps {
   onOpenHelp: () => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
+  /** This booth's browser can record the session video (D72): tell the guest before shooting. */
+  videoNotice: boolean;
 }
 
 const CAMERA_ERROR_COPY: Record<CameraErrorKind, { title: string; lead: string }> = {
@@ -988,6 +1053,9 @@ function Screen(p: ScreenProps) {
     case "capturing": {
       const shooting = state.phase !== "ready";
       const pose = currentPose(state);
+      // Easy mode's large type and the two start buttons need the room: before shooting, the
+      // wordmark and the empty shot strip step aside (they are back during the countdown).
+      const compactReady = !shooting && state.mode === "easy";
       return (
         <BoothScreen
           testId={shooting ? "screen-shooting" : "screen-ready"}
@@ -1020,18 +1088,20 @@ function Screen(p: ScreenProps) {
             </CameraPreview>
           </div>
           <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG from Figma */}
-            <img
-              src="/kiosk/lights-camera-action.svg"
-              alt="LIGHTS, CAMERA, ACTION!"
-              className="h-[max(56px,8.4vh)] w-auto portrait:h-[max(44px,5vh)]"
-            />
+            {!compactReady && (
+              // eslint-disable-next-line @next/next/no-img-element -- static SVG from Figma
+              <img
+                src="/kiosk/lights-camera-action.svg"
+                alt="LIGHTS, CAMERA, ACTION!"
+                className="h-[max(56px,8.4vh)] w-auto portrait:h-[max(44px,5vh)]"
+              />
+            )}
             <p className="booth-title" data-testid="shot-label">
               {state.retakeIndex !== null
                 ? `${state.shotIndex + 1}번째 사진 다시 찍기`
                 : `${state.shotIndex + 1}번째 사진`}
             </p>
-            <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
+            {!compactReady && <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />}
             <p className="booth-lead">
               카메라를 보고 웃어주세요.
               <br />
@@ -1061,6 +1131,11 @@ function Screen(p: ScreenProps) {
                 <p className="booth-caption" data-testid="shoot-plan">
                   {state.countdownSeconds}초마다 한 컷씩, 모두 {total}컷을 찍어요
                 </p>
+                {p.videoNotice && (
+                  <p className="booth-caption" data-testid="video-notice">
+                    촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지 않아요.
+                  </p>
+                )}
                 {p.guestCameraChoice && p.devices.length > 1 && (
                   <label className="flex items-center gap-3 text-base text-ink-400">
                     카메라
