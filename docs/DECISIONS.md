@@ -852,3 +852,12 @@ User decision (2026-11-11): replace what still spoke the star-night theme, wordi
 - Frame picker labels drop "별빛": "포스트카드 · 2컷", "다섯 장 · 5컷". Frame ids are unchanged.
 - The two welcome choices use line icons (`LineIcon` in `components/kiosk/ui.tsx`, the same
   drawings as the Figma icons) instead of emoji; they take the button's text colour.
+
+## D76 · The user's own wording replaces D75's two lines
+
+User decision (2026-11-11). D75's wording was ours; the user set the final strings:
+
+- Welcome title: "크리스마스의 추억을 함께 남겨요".
+- Cream frame caption: "Matthew 5:9".
+
+Do not reword guest-facing copy without the user's own text.

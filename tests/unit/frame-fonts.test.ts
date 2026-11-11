@@ -10,7 +10,7 @@ describe("frame fonts", () => {
     expect(new Set(specs).size).toBe(specs.length);
     // The four approved frames use 400/20; optional 2–6-slot frames add a 500/16 date caption.
     expect(specs).toEqual(['400 20px "Noto Sans KR Variable"', '500 16px "Noto Sans KR Variable"']);
-    expect(requests[0]!.text).toContain("PEACEMAKERS · MT 5:9");
+    expect(requests[0]!.text).toContain("Matthew 5:9");
     expect(requests[1]!.text).toContain("Christmas Village 2026");
   });
 
