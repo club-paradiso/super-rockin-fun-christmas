@@ -1,4 +1,4 @@
-# CLAUDE.md — FOLLOW THE LIGHTS
+# CLAUDE.md — STUDIO SHALOM
 
 Web four-cut photo booth + participatory media wall for Christmas Village 2026.
 Next.js 16 (App Router) · TypeScript strict · Tailwind 4 · Vitest · Playwright.
@@ -22,8 +22,17 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
-  keeps the legible wordmark rule in `tests/unit/frames.test.ts`; mirror frame changes in Figma
+  keeps the legible lockup rule in `tests/unit/frames.test.ts`; mirror frame changes in Figma
   (`design/README.md`).
+- **The brand is STUDIO SHALOM** (D73; lockup `STUDIO` / `SHALOM` / divider / `평화의 벽`, event
+  "Christmas Village 2026", verse reference "MT 5:9" with no verse text). Colours are the tokens in
+  `app/globals.css` (`backdrop`, `ink`, `button`, `button-text`/`paper`, `accent`, plus the staff
+  status colours): no other brand colours, no gradients or glow, one filled button per view,
+  `accent` as text only at ≥ 24 px, never `button-text` on `backdrop`. The on-screen lockup is real
+  text (`components/brand.tsx`); frames use outlined SVG paths. The media wall keeps its night
+  scene with its own `--wall-*` palette (`.wall-stage`). Internal identifiers keep the old name
+  (`FTL_*`, `ftl_*`, IndexedDB `follow-the-lights`, wall browser profile folders, package name):
+  renaming them breaks deployed hubs or loses queued uploads.
 - **No secrets in the browser.** Never add `NEXT_PUBLIC_` to a secret. Kiosk auth is the
   HttpOnly cookie from `/kiosk/enroll`; the browser never talks to Supabase.
 - **Private photos.** Bucket stays private; guests only ever see `/p/[token]`,
@@ -116,6 +125,7 @@ lib/ops                moderation rules, enrollment codes, kiosk health, staff r
 lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
+components/brand.tsx   the STUDIO SHALOM lockup and one-line wordmark as text (styles in app/globals.css)
 lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client,

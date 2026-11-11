@@ -1,6 +1,7 @@
-# FOLLOW THE LIGHTS
+# STUDIO SHALOM
 
-FOLLOW THE LIGHTS is a web-based four-cut photo booth and participatory media-wall experience for Christmas Village 2026.
+STUDIO SHALOM (평화의 벽; until 2026-11-11 the project was called FOLLOW THE LIGHTS, and internal
+identifiers such as `FTL_ROLE` and the package name still are, see D73) is a web-based four-cut photo booth and participatory media-wall experience for Christmas Village 2026.
 
 > 한 사람의 순간이 모여, 공동체의 크리스마스 풍경이 됩니다.
 

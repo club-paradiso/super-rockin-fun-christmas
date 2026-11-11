@@ -1,39 +1,76 @@
 # 디자인 원본 (Figma) 과 코드의 연결
 
-편집 가능한 원본은 Figma 파일 하나다.
+편집 가능한 원본은 Figma 파일 하나다. 2026-11-11부터 브랜드는 **STUDIO SHALOM** 이다(D73).
 
-- 파일: https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU (2026-10-14부터. D65)
-- 이전 원본 https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB 은 기록으로만 둔다(D63).
-- 이 폴더의 `previews/*.jpg` 는 이전 원본 기준(2026-10-13) 화면이다. 새 화면은 `docs/screenshots/` 에
-  E2E가 찍는다.
+- 파일: https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB (file key `S5hz7sZaXXB2kNc9YrB3cB`)
+- 지금 쓰는 페이지: `STUDIO SHALOM · Kiosk`, `STUDIO SHALOM · Frame, Phone & Wall`
+- 이전 디자인(FOLLOW THE LIGHTS)은 같은 파일의 `ARCHIVE · Follow the Lights` 페이지에 있다. 기록으로만 둔다.
+- 네컷 틀 A~D의 배치와 미디어월 장면은 이전 원본 https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU
+  (D65)에서 옮긴 값 그대로다. 리브랜딩에서 바꾼 것은 틀 안의 로고 락업과 미디어월 그림 속 워드마크뿐이다.
+- 이 폴더의 `previews/*.jpg` 는 이전 브랜드(2026-10-13) 화면이다. 새 화면은 `docs/screenshots/` 에
+  E2E가 찍는다(`SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts`).
 
 Figma와 코드는 **자동으로 동기화되지 않는다.** Figma에서 바꾼 것은 아래 표의 코드 위치에 같은 값을
 옮겨야 실제 부스·미디어월에 반영된다. 반대로 코드를 바꾸면 Figma도 고쳐 둔다.
 
+### Figma에는 있지만 코드에는 아직 없는 것
+
+Figma `STUDIO SHALOM · Kiosk` 흐름에는 코드에 없는 화면이 있다. 리브랜딩(D73)은 이름·색·글꼴·로고만
+바꿨고, 아래 셋은 **만들지 않았다.** 결정이 나기 전에는 코드를 Figma에 맞추지 않는다.
+
+- **이름 입력 화면.** 코드는 이름을 받지 않는다(개인 정보를 모으지 않는다는 규칙, `CLAUDE.md`).
+- **체크박스 동의 화면.** 코드는 "네, 띄워주세요 / 아니요, 저만 볼게요" 두 버튼을 같은 크기로 보여 준다.
+- **격자(grid) 미디어월.** 코드의 미디어월은 빨랫줄 밤 장면 그대로다. 워드마크 글자만 바뀌었다.
+
+## 브랜드 토큰 (D73)
+
+값은 `app/globals.css` 의 `@theme` 에 있다. 다른 브랜드 색을 만들지 않는다.
+
+| 토큰          | 값        | 쓰는 곳                                                         |
+| ------------- | --------- | --------------------------------------------------------------- |
+| `backdrop`    | `#DDBDA1` | 화면 바탕(무늬·그라데이션·빛 번짐 없음)                         |
+| `ink`         | `#2B1A10` | 제목·본문(바탕 위 9.43:1). 흐린 글자는 `ink/75`(5.26:1)         |
+| `button`      | `#412D1B` | 채운 버튼. 한 화면에 하나                                       |
+| `button-text` | `#F6EEE4` | 버튼 위 글자(11.31:1). 바탕 위 글자로는 쓰지 않는다(1.54:1)     |
+| `paper`       | `#F6EEE4` | 카드·입력 칸·시트의 밝은 면 (`button-text` 와 같은 값)          |
+| `accent`      | `#7A440E` | 구분선·아이콘·가는 선. 글자로는 24px 이상에서만(바탕 위 4.46:1) |
+| `approve`     | `#1B5233` | 관리자 상태 색(승인·온라인). 브랜드 색이 아니다                 |
+| `danger`      | `#8F1D14` | 관리자 상태 색(삭제·오류·긴급)                                  |
+| `alert`       | `#7C3500` | 관리자 상태 색(검수 대기·응답 지연)                             |
+
+모서리: 버튼은 알약 모양, 카드 24px, 작은 조작 요소 8px. 보조 버튼은 테두리 또는 글자만(ink).
+
+로고 락업은 네 줄을 가운데로 쌓는다: `STUDIO`(Cormorant Garamond 600, 대문자, 자간 0.4em) /
+`SHALOM`(Cormorant Garamond 500, 자간 0.04em) / 짧고 가는 구분선 / `평화의 벽`(나눔명조, 자간 0.3em,
+띄어쓰기는 보통 한 칸). 화면에서는 진짜 글자다(`components/brand.tsx`, `.brand-lockup`). 화면 글자는
+Noto Sans KR 그대로이고, 카운트다운 숫자도 Noto Sans KR 이다(Cormorant의 숫자 10은 IO처럼 보인다).
+주제 성구 표기는 `MT 5:9` 이다. 성구 본문은 아직 정하지 않았으므로 어디에도 적지 않는다.
+
+미디어월은 밤 장면을 그대로 두므로 자기 색을 따로 가진다: `app/globals.css` 의 `.wall-stage`
+(`--wall-*`). 다른 화면에서 쓰지 않는다.
+
 ## 페이지
 
-| 페이지                      | 내용                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| 00 Foundations              | 색 변수, 글자 스타일, 로고 락업, 반짝이·집게·버튼 컴포넌트                              |
-| 01 Platform — Booth & Admin | 부스 화면 01~07(시작 → 틀 → 촬영 → 확인 → 틀 다시 → 미디어월 → 사진 받기), 관리자 A0~A8 |
-| 01b Platform — iPad 세로    | 같은 부스 화면의 세로(820×1180) 배치. 코드는 화면 방향에 따라 `portrait:` 로 바꾼다     |
-| 02 네컷 Templates           | 네컷 틀 A~D(남색·창틀·빨랫줄·크림, 600×1800). E~J는 "보관 · 사용 안 함"이라 코드에 없다 |
-| 03 Media Wall               | 미디어월 배경 v3(3840×1080)과 사진 5장을 건 합성 미리보기                               |
+| 페이지                              | 내용                                            |
+| ----------------------------------- | ----------------------------------------------- |
+| STUDIO SHALOM · Kiosk               | 부스 화면 흐름. 위 "코드에는 아직 없는 것" 참고 |
+| STUDIO SHALOM · Frame, Phone & Wall | 네컷 틀, 휴대폰 화면, 미디어월                  |
+| ARCHIVE · Follow the Lights         | 이전 브랜드의 디자인. 기록                      |
 
 ## 무엇을 바꾸면 어디를 고치나
 
-| Figma에서 바꾼 것                      | 코드에서 고칠 곳                                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 색 변수 `ink`~`pine`                   | `app/globals.css` 의 `@theme` (`--color-*`). 변수 설명에 같은 hex가 적혀 있다                             |
-| 색 변수 `frame/*`                      | 해당 프레임 파일 `config/frames/*.ts`                                                                     |
-| 미디어월 배경 (`Wall/Background — v3`) | 3840×1080으로 내보내 `public/wall/background-v3.jpg` 를 바꾼다. 빨랫줄·워드마크가 그림 안에 있다          |
-| 글꼴                                   | 앱은 `@fontsource-variable/noto-sans-kr` 를 함께 배포한다(`app/layout.tsx`, `lib/canvas.ts` `BRAND_FONT`) |
-| 네컷 틀 (`Template/A`~`D`)             | `config/frames/<id>.ts` 와 `public/frames/*.svg`. 아래 "프레임 옮기는 법"                                 |
-| 미디어월 사진 자리·기울기·줄 높이      | `config/wall.ts` 의 `scene` (`slots`, `strip`, `line`). Figma `Composite preview v3` 의 값을 옮긴다       |
-| 미디어월 문구 (닫힘·잠시 멈춤·빈 줄)   | `components/wall/wall-app.tsx`                                                                            |
-| 부스 문구·버튼                         | `components/kiosk/kiosk-app.tsx`, 버튼·배경·글자 크기는 `app/globals.css` 의 `.booth-*`                   |
-| 관리자 문구·상태 색                    | `components/admin/*`, 상태 이름과 색은 `components/admin/labels.ts`                                       |
-| 사인물                                 | 코드 없음. Figma에서 PDF(벡터)로 내보내 인쇄한다                                                          |
+| Figma에서 바꾼 것                      | 코드에서 고칠 곳                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 색 변수 (위 "브랜드 토큰")             | `app/globals.css` 의 `@theme` (`--color-*`)                                                                   |
+| 색 변수 `frame/*`                      | 해당 프레임 파일 `config/frames/*.ts`                                                                         |
+| 미디어월 배경 (`Wall/Background — v3`) | 3840×1080으로 내보내 `public/wall/background-v3.jpg` 를 바꾼다. 빨랫줄·워드마크가 그림 안에 있다(아래 주)     |
+| 글꼴                                   | 앱은 글꼴을 함께 배포한다(`app/layout.tsx`): Noto Sans KR, Cormorant Garamond, 나눔명조. 아래 "글꼴 라이선스" |
+| 네컷 틀 (`Template/A`~`D`)             | `config/frames/<id>.ts` 와 `public/frames/*.svg`. 아래 "프레임 옮기는 법"                                     |
+| 미디어월 사진 자리·기울기·줄 높이      | `config/wall.ts` 의 `scene` (`slots`, `strip`, `line`). Figma `Composite preview v3` 의 값을 옮긴다           |
+| 미디어월 문구 (닫힘·잠시 멈춤·빈 줄)   | `components/wall/wall-app.tsx`                                                                                |
+| 부스 문구·버튼                         | `components/kiosk/kiosk-app.tsx`, 버튼·배경·글자 크기는 `app/globals.css` 의 `.booth-*`                       |
+| 관리자 문구·상태 색                    | `components/admin/*`, 상태 이름과 색은 `components/admin/labels.ts`                                           |
+| 사인물                                 | 코드 없음. Figma에서 PDF(벡터)로 내보내 인쇄한다                                                              |
 
 ### 프레임 옮기는 법
 
@@ -67,20 +104,36 @@ SVG로 옮기는 법: Figma MCP `download_assets` 로 해당 노드를 SVG로 �
 
 `tests/unit/frames.test.ts` 가 모든 프레임에 대해 확인한다. 하나라도 어기면 `npm run check` 가 실패한다.
 
-- 프레임마다 `brand` 표시가 된 워드마크 그림이 하나 있다.
-- 출력 폭의 55% 이상.
+- 프레임마다 `brand` 표시가 된 락업 그림이 하나 있다.
+- 출력 폭의 38% 이상, 높이 80px 이상(600×1800 기준). 예전 한 줄 워드마크는 폭 55%였다. 네 줄로 쌓은
+  락업은 같은 글자 높이에 폭이 덜 필요하다(높이 80px이면 SHALOM 대문자가 약 32px, 예전 글자는 약 30px).
+- SVG의 비율(422×156.13) 그대로, 틀의 가운데에 그린다(`config/frames/shared.ts` 의 `lockupBox`).
+- 글자는 윤곽선(path)이다. `<text>` 나 글꼴 이름이 있으면 실패한다(캔버스에는 웹 글꼴이 없다).
 - 사진 칸보다 아래에 있다(얼굴을 가리지 않게).
 - 바탕색과 대비 4.5:1 이상.
 
+### 락업 SVG 만드는 법
+
+`public/frames/{navy,wood,cream}-lockup.svg` 는 Figma에서 내보낸 것이 아니라, 함께 배포하는 글꼴 파일
+(`node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-{500,600}-normal.woff`,
+`node_modules/@fontsource/nanum-myeongjo/files/nanum-myeongjo-korean-400-normal.woff`)에서 opentype.js로
+글자 윤곽선을 뽑아 만들었다(2026-11-11, 일회용 스크립트, 저장소에 없음). SHALOM 글자 크기를 100으로 두면
+STUDIO 30(자간 0.4em), 구분선 44×1.6, 평화의 벽 24(자간 0.3em), 줄 사이 13·17·17 이다. 색은 틀마다 예전
+락업의 색을 그대로 쓴다: navy·wood 는 글자 `#F2C14E` + 구분선 `#FFE3A3`, cream 은 `#0B1026` + `#E8A33D`.
+미디어월 그림(`public/wall/background-v3.jpg`) 아래쪽의 워드마크도 같은 락업(금색, 높이 약 103px)으로
+바꿔 그렸다. 나머지 그림은 그대로다.
+
 ## 새 프레임을 추가하려면
 
-1. Figma `02 네컷 Templates` 에서 기존 틀 컴포넌트를 복제해 고친다.
+1. Figma `STUDIO SHALOM · Frame, Phone & Wall` 에서 기존 틀을 복제해 고친다.
 2. `config/frames/` 에 새 파일을 만들고 위 표대로 값을 옮긴다. `config/frames/index.ts` 의 `FRAMES` 에 넣는다.
 3. `npm run check` (프레임 규칙과 로고 규칙), `npm run test:e2e` 를 돌린다.
 4. 부스에서 `/kiosk?camera=mock` 으로 촬영해 결과를 눈으로 확인한다.
 
 ## 글꼴 라이선스
 
-Noto Sans KR 은 SIL Open Font License 1.1 이다. 인쇄물·앱·이미지에 자유롭게 쓸 수 있고, 글꼴 파일을
-함께 배포해도 된다(`node_modules/@fontsource-variable/noto-sans-kr/LICENSE`). 틀의 영문 로고·제목에 쓴
-Fraunces와 Caveat도 OFL 1.1이다. 글꼴 파일이 아니라 윤곽선으로 바꾼 SVG만 배포한다.
+Noto Sans KR, Cormorant Garamond, 나눔명조는 모두 SIL Open Font License 1.1 이다. 인쇄물·앱·이미지에
+자유롭게 쓸 수 있고, 글꼴 파일을 함께 배포해도 된다(`node_modules/@fontsource-variable/noto-sans-kr/LICENSE`,
+`node_modules/@fontsource/cormorant-garamond/LICENSE`, `node_modules/@fontsource/nanum-myeongjo/LICENSE`).
+틀의 "Christmas Village 2026"·"Jeju, 11 pm" 제목에 쓴 Fraunces와 Caveat도 OFL 1.1이고, 윤곽선으로 바꾼 SVG만
+배포한다.

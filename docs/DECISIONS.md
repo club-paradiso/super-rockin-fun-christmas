@@ -752,3 +752,72 @@ Not verified: playback and saving on real phones — in particular **iPhone with
 (only produced when the booth's browser cannot record MP4), and saving a recorded MP4 to the
 iPhone Photos app from the share sheet. Real booth cameras at 1 Mbit/s (picture quality, actual
 file sizes). The migration on a real Supabase project.
+
+## D73 · The brand is STUDIO SHALOM; the flow, the rules and the wall scene do not change
+
+User decision (2026-11-11): the service is renamed from FOLLOW THE LIGHTS to **STUDIO SHALOM**
+(평화의 벽). The event is still "Christmas Village 2026". The theme verse reference is "MT 5:9";
+the verse text is not decided, so it is written nowhere.
+
+What changed:
+
+1. **Name and lockup** wherever a person sees them: booth, `/p/[token]`, `/m/[token]`, admin
+   header and login, kiosk enrollment, page titles, download file names
+   (`studio-shalom-DATE.jpg|mp4|webm`), the staff login email, the hub console and the `ops/`
+   wrappers, the USB backup README. The lockup is four stacked, centred parts: `STUDIO` /
+   `SHALOM` / a short thin divider / `평화의 벽`. On screen it is real text
+   (`components/brand.tsx`); screen headers too small for it use the name on one line
+   (`BrandWordmark`).
+2. **Tokens** (`app/globals.css`): `backdrop #DDBDA1`, `ink #2B1A10`, `button #412D1B`,
+   `button-text` = `paper #F6EEE4`, `accent #7A440E`. The night tokens (`ink` as a background,
+   `night`, `dusk`, `amber`, `ember`, `cream`, `mist`, `navy`, `gold`, `warm`, `glow`, `ink-400`)
+   are gone, not aliased. Flat paper: no star field, no gradients, no glow shadows. One filled
+   button per view, pill buttons, 24 px cards, 8 px small controls. Muted text is `ink/75`
+   (5.26:1 on backdrop). `accent` is 4.46:1 on backdrop, so it is used for text only at ≥ 24 px.
+3. **Staff status colours** are functional, not brand: `approve #1B5233`, `danger #8F1D14`,
+   `alert #7C3500`. Each is ≥ 4.5:1 as text on backdrop and on paper, and under `button-text`.
+4. **Fonts**, all OFL and bundled so the hub works offline: Cormorant Garamond 500/600 (`STUDIO`,
+   `SHALOM`) and Nanum Myeongjo 400 (`평화의 벽`), only in the lockup. UI text stays Noto Sans KR
+   (Pretendard is undecided). Countdown numerals stay in the sans: Cormorant's old-style "10" reads
+   as "IO".
+5. **Frames.** Layout, slots, ids and the other art are unchanged. Only the lockup art changed:
+   `public/frames/{navy,wood,cream}-lockup.svg` are now STUDIO SHALOM lockups whose glyphs are
+   outlined paths taken from the bundled font files (a canvas has no web fonts), in each frame's
+   earlier lockup colours. The lockup box in each frame is `lockupBox(y, height)`
+   (`config/frames/shared.ts`).
+6. **The legible-wordmark rule changed numbers.** It was "at least 55 % of the output width" for a
+   one-line wordmark (418 × 69, letters about 30 px tall). The stacked lockup is 422 × 156.13: at
+   55 % width it would be 122 px tall, and three frames (wood, clothesline, cream) have about
+   90–100 px between the art above and below it. The rule is now width ≥ 38 % **and** height ≥ 80 px
+   (SHALOM capitals about 32 px, so the main word is not smaller than before), the SVG's own
+   proportions, centred, outlined paths only, below every photo, contrast ≥ 4.5:1. `평화의 벽` is
+   about 13 px tall at 1× (26 px in the saved 2× file) in the three tight frames.
+7. **The "LIGHTS, CAMERA, ACTION!" title art** on the ready screen was removed (an old-brand pun);
+   nothing replaces it.
+8. **The media wall keeps its clothesline night scene**: layout, rotation and animations are
+   untouched. Its colours moved to a palette scoped to the wall (`.wall-stage`, `--wall-*`, the old
+   values). Only the wordmark changed: the text in the holding screen and on the phone-photo card,
+   and the wordmark painted into `public/wall/background-v3.jpg` (the old one was filled in from
+   the plain strip either side of it and the lockup drawn in the same gold).
+
+What did not change, on purpose:
+
+- **Internal identifiers** keep the old name: `FTL_ROLE` and the other `FTL_*` variables, SQL
+  `ftl_*` functions, the `ftl_staff` cookie, migration files, IndexedDB `follow-the-lights` (queued
+  uploads live there), the wall browser profile folders in `ops/start-wall.*`, `x-client-info`,
+  the Supabase `project_id`, the package name, the repository and the
+  `follow-the-lights-wall.vercel.app` hostname. Renaming any of them breaks deployed hubs or loses
+  queued uploads.
+- **Flow and rules.** The Figma kiosk flow for STUDIO SHALOM has a name input, a checkbox consent
+  and a grid wall. None of them was built: no personal data is collected, the wall question keeps
+  two equal answers, and the wall is the clothesline scene (`design/README.md`).
+- **Copy.** Korean UI strings were kept unless they contained the brand name. The welcome title
+  "별빛을 따라 오셨나요?" and the cream frame's "별빛을 따라 오신 걸 환영해요" still speak the old
+  theme; replacing them needs new copy from the user.
+- Historical records (earlier STATUS sections, decisions, reports, `design/previews/`) keep the
+  old name.
+
+Not verified: any real device (booth touch screen, phones, the LED wall); colour and legibility in
+the venue's light; the lockup's relative sizes against the Figma file (the spec gave the fonts and
+letter-spacing, the size ratios were chosen here); the staff login email on a real Supabase
+project.
