@@ -1,17 +1,21 @@
 import type { Metadata, Viewport } from "next";
-// Bundled brand font (OFL): the booth renders frame text identically on any laptop, offline.
+// Bundled fonts (all OFL), so the hub works offline. Noto Sans KR: UI and frame text. Cormorant
+// Garamond (STUDIO, SHALOM) and Nanum Myeongjo (평화의 벽): the on-screen lockup only.
 import "@fontsource-variable/noto-sans-kr";
+import "@fontsource/cormorant-garamond/latin-500.css";
+import "@fontsource/cormorant-garamond/latin-600.css";
+import "@fontsource/nanum-myeongjo/400.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FOLLOW THE LIGHTS",
+  title: "STUDIO SHALOM",
   description: "Christmas Village 2026 — 네컷 포토부스 × 참여형 미디어월",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b1122",
+  themeColor: "#ddbda1",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

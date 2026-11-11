@@ -1,5 +1,5 @@
 import type { FrameDecoration, FrameDefinition } from "@/lib/compositor/types";
-import { sparkles, stripSlots, STRIP } from "./shared";
+import { lockupBox, sparkles, stripSlots, STRIP } from "./shared";
 
 // Template B · Wood Window — 제주 한림의 밤 11시 창문. 나무 창틀 + 크림색 액자.
 const mats: FrameDecoration[] = [0, 1, 2, 3].map((i) => ({
@@ -72,10 +72,7 @@ export const woodWindow: FrameDefinition = {
     {
       type: "image",
       src: "/frames/wood-lockup.svg",
-      x: 90.5,
-      y: 1630,
-      width: 418,
-      height: 69,
+      ...lockupBox(1620.5, 86),
       brand: { color: "#f2c14e", on: "#33417f" },
     },
     {

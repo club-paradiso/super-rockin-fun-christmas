@@ -11,11 +11,11 @@ export function StaffNotice({
   return (
     <main
       data-testid={testId}
-      className="night-sky flex min-h-dvh flex-col items-center justify-center gap-6 px-8 text-center"
+      className="flex min-h-dvh flex-col items-center justify-center gap-6 px-8 text-center"
     >
-      <p className="text-lg tracking-[0.3em] text-amber">STAFF</p>
-      <h1 className="text-4xl font-bold text-cream">{title}</h1>
-      <div className="max-w-2xl text-xl leading-relaxed text-mist">{children}</div>
+      <p className="text-lg font-semibold tracking-[0.3em] text-ink/75">STAFF</p>
+      <h1 className="text-4xl font-bold text-ink">{title}</h1>
+      <div className="max-w-2xl text-xl leading-relaxed text-ink/75">{children}</div>
     </main>
   );
 }

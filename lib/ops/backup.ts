@@ -37,7 +37,7 @@ export interface BackupMarker extends BackupResult {
   version: 1;
 }
 
-const README = `FOLLOW THE LIGHTS hub backup.
+const README = `STUDIO SHALOM hub backup.
 This folder holds guest photos. Keep the stick with the event lead and delete this folder when
 the church's retention period ends (docs/RUNBOOK.md section 8).
 Restore: scripts/hub-restore.mjs (desktop icon "백업에서 복구").

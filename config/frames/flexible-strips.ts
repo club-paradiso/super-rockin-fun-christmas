@@ -1,4 +1,5 @@
 import type { FrameDefinition, FrameSlot } from "@/lib/compositor/types";
+import { lockupBox } from "./shared";
 
 /** Additional 2/3/5/6-slot designs, kept at the current 600×1800 Figma canvas size. */
 function flexibleStrip(id: string, label: string, count: number, paper: boolean): FrameDefinition {
@@ -29,10 +30,7 @@ function flexibleStrip(id: string, label: string, count: number, paper: boolean)
       {
         type: "image",
         src: paper ? "/frames/cream-lockup.svg" : "/frames/navy-lockup.svg",
-        x: 90,
-        y: 1600,
-        width: 420,
-        height: 69,
+        ...lockupBox(1572, 122),
         brand: { color: ink, on },
       },
       {

@@ -744,7 +744,7 @@ export function KioskApp({
         />
         {idle.warning && (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-center gap-6 bg-navy/95 px-6 py-5 text-center"
+            className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-center gap-6 border-t border-ink/20 bg-paper px-6 py-5 text-center"
             role="status"
             aria-live="polite"
             data-testid="idle-warning"
@@ -789,7 +789,7 @@ export function KioskApp({
         {flash > 0 && state.phase === "capturing" && (
           <div
             key={flash}
-            className="capture-flash pointer-events-none fixed inset-0 bg-cream"
+            className="capture-flash pointer-events-none fixed inset-0 bg-paper"
             aria-hidden
           />
         )}
@@ -868,10 +868,10 @@ function Screen(p: ScreenProps) {
       return (
         <section
           data-testid="screen-welcome"
-          className="booth-sky flex min-h-dvh w-full flex-col justify-center gap-[max(20px,4vh)] px-[max(24px,6.25vw)] py-[max(24px,5vh)]"
+          className="flex min-h-dvh w-full flex-col justify-center gap-[max(20px,4vh)] px-[max(24px,6.25vw)] py-[max(24px,5vh)]"
         >
           <div className="flex flex-col items-start gap-[max(12px,2vh)]">
-            <BrandLockup className="h-[clamp(80px,13vh,150px)] w-auto" />
+            <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
             <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
             {!easy && (
               <p className="booth-lead">
@@ -918,7 +918,7 @@ function Screen(p: ScreenProps) {
             <div
               role="radiogroup"
               aria-label="화면 크기"
-              className="flex rounded-full border-2 border-gold/60 p-1"
+              className="flex rounded-full border-2 border-ink/60 p-1"
             >
               {(["standard", "easy"] as const).map((m) => (
                 <button
@@ -929,7 +929,7 @@ function Screen(p: ScreenProps) {
                   data-testid={`mode-${m}`}
                   onClick={() => state.mode !== m && p.onToggleMode()}
                   className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
-                    state.mode === m ? "bg-gold text-[#0b1026]" : "text-glow"
+                    state.mode === m ? "bg-ink text-button-text" : "text-ink"
                   }`}
                 >
                   {m === "standard" ? "기본 화면" : "가+ 쉬운 화면"}
@@ -975,8 +975,8 @@ function Screen(p: ScreenProps) {
                   data-testid={`frame-option-${frame.id}`}
                   aria-pressed={selected}
                   onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
-                  className={`flex flex-col items-center gap-4 rounded-[20px] p-[14px] transition portrait:p-[10px] ${
-                    selected ? "border-[5px] border-warm bg-navy" : "border-2 border-white"
+                  className={`flex flex-col items-center gap-4 rounded-3xl p-[14px] transition portrait:p-[10px] ${
+                    selected ? "border-[5px] border-ink bg-paper" : "border-2 border-ink/30"
                   }`}
                 >
                   <div className="flex h-[min(29vh,330px)] items-center justify-center portrait:h-[min(24vh,50vw)]">
@@ -984,17 +984,13 @@ function Screen(p: ScreenProps) {
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
                       <img src={p.thumbs[frame.id]} alt="" className="max-h-full w-auto" />
                     ) : (
-                      <div className="aspect-[1/3] h-full animate-pulse bg-navy-700" />
+                      <div className="aspect-[1/3] h-full animate-pulse bg-ink/10" />
                     )}
                   </div>
-                  <span
-                    className={`text-[clamp(26px,3.33vh,36px)] font-bold ${
-                      selected ? "text-warm" : "text-glow"
-                    }`}
-                  >
+                  <span className="text-[clamp(26px,3.33vh,36px)] font-bold text-ink">
                     {frame.label}
                   </span>
-                  <span className="text-lg text-mist">{frame.slots.length}컷 템플릿</span>
+                  <span className="text-lg text-ink/75">{frame.slots.length}컷 템플릿</span>
                 </button>
               );
             })}
@@ -1054,7 +1050,7 @@ function Screen(p: ScreenProps) {
       const shooting = state.phase !== "ready";
       const pose = currentPose(state);
       // Easy mode's large type and the two start buttons need the room: before shooting, the
-      // wordmark and the empty shot strip step aside (they are back during the countdown).
+      // empty shot strip steps aside (it is back during the countdown).
       const compactReady = !shooting && state.mode === "easy";
       return (
         <BoothScreen
@@ -1069,7 +1065,7 @@ function Screen(p: ScreenProps) {
                   <span
                     key={`${state.shotIndex}-${state.remaining}`}
                     data-testid="countdown-number"
-                    className="countdown-pop text-[clamp(120px,30vh,320px)] font-bold leading-none text-gold drop-shadow-[0_0_30px_rgba(0,0,0,0.6)]"
+                    className="countdown-number countdown-pop text-[clamp(120px,30vh,320px)] font-bold leading-none text-button-text"
                   >
                     {state.remaining}
                   </span>
@@ -1077,25 +1073,17 @@ function Screen(p: ScreenProps) {
               </div>
               {pose && (
                 <div
-                  className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-navy/80 px-4 py-[max(12px,2vh)] text-center"
+                  className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-paper px-4 py-[max(12px,2vh)] text-center"
                   data-testid="pose-guide"
                   data-pose={pose.id}
                 >
-                  <span className="booth-caption text-warm">추천 포즈</span>
+                  <span className="booth-caption text-ink">추천 포즈</span>
                   <span className="booth-title">{pose.label}</span>
                 </div>
               )}
             </CameraPreview>
           </div>
           <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
-            {!compactReady && (
-              // eslint-disable-next-line @next/next/no-img-element -- static SVG from Figma
-              <img
-                src="/kiosk/lights-camera-action.svg"
-                alt="LIGHTS, CAMERA, ACTION!"
-                className="h-[max(56px,8.4vh)] w-auto portrait:h-[max(44px,5vh)]"
-              />
-            )}
             <p className="booth-title" data-testid="shot-label">
               {state.retakeIndex !== null
                 ? `${state.shotIndex + 1}번째 사진 다시 찍기`
@@ -1137,10 +1125,10 @@ function Screen(p: ScreenProps) {
                   </p>
                 )}
                 {p.guestCameraChoice && p.devices.length > 1 && (
-                  <label className="flex items-center gap-3 text-base text-ink-400">
+                  <label className="flex items-center gap-3 text-base text-ink/75">
                     카메라
                     <select
-                      className="rounded-lg bg-navy px-3 py-2 text-glow"
+                      className="rounded-lg border border-ink/50 bg-paper px-3 py-2 text-ink"
                       value={p.deviceId ?? ""}
                       onChange={(e) => p.onSelectDevice(e.target.value)}
                     >
@@ -1168,7 +1156,7 @@ function Screen(p: ScreenProps) {
             {state.shots.map((shot, i) => (
               <div key={i} className="flex flex-col gap-[1.6vh]">
                 <div
-                  className="overflow-hidden rounded-xl bg-navy-700"
+                  className="overflow-hidden rounded-lg bg-ink/10"
                   style={{ aspectRatio: String(aspect) }}
                   data-testid={`review-shot-${i}`}
                 >
@@ -1184,7 +1172,7 @@ function Screen(p: ScreenProps) {
                 <button
                   type="button"
                   onClick={() => dispatch({ type: "RETAKE", index: i })}
-                  className="min-h-[max(56px,7.6vh)] rounded-full bg-navy text-[clamp(20px,2.6vh,28px)] font-bold text-warm active:scale-[0.98]"
+                  className="min-h-[max(56px,7.6vh)] rounded-full border-2 border-ink text-[clamp(20px,2.6vh,28px)] font-bold text-ink active:scale-[0.98] active:bg-ink/10"
                   aria-label={`${i + 1}번째 사진 다시 찍기`}
                 >
                   다시 찍기
@@ -1226,7 +1214,7 @@ function Screen(p: ScreenProps) {
                   aria-label={`${index + 1}번째 사진 ${order >= 0 ? "선택 해제" : "선택"}`}
                   aria-pressed={order >= 0}
                   onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
-                  className={`relative rounded-xl border-4 p-1 transition ${order >= 0 ? "border-warm" : "border-white/30"}`}
+                  className={`relative rounded-lg border-4 p-1 transition ${order >= 0 ? "border-ink" : "border-ink/20"}`}
                 >
                   {shot && (
                     // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
@@ -1237,7 +1225,7 @@ function Screen(p: ScreenProps) {
                       style={{ aspectRatio: String(aspect) }}
                     />
                   )}
-                  <span className="absolute left-2 top-2 rounded-full bg-navy px-3 py-1 text-xl font-bold text-warm">
+                  <span className="absolute left-2 top-2 rounded-full bg-button px-3 py-1 text-xl font-bold text-button-text">
                     {order >= 0 ? order + 1 : index + 1}
                   </span>
                 </button>
@@ -1350,21 +1338,21 @@ function Screen(p: ScreenProps) {
               </button>
               <p className="booth-caption portrait:order-5">잠시 뒤 처음 화면으로 돌아가요</p>
             </div>
-            <div className="flex flex-col items-center gap-5 rounded-[28px] bg-glow p-[max(24px,3.7vh)] portrait:order-3">
+            <div className="flex flex-col items-center gap-5 rounded-3xl bg-paper p-[max(24px,3.7vh)] portrait:order-3">
               <div
                 data-testid="qr-code"
                 data-url={d.url}
-                className="w-[clamp(220px,30vh,320px)] rounded-xl bg-white p-3"
+                className="w-[clamp(220px,30vh,320px)] rounded-lg bg-white p-3"
                 // QR markup comes from the qrcode library, generated locally from our own URL.
                 dangerouslySetInnerHTML={{ __html: p.qrSvg }}
               />
-              <p className="text-center text-[clamp(20px,2.6vh,28px)] font-bold leading-[1.35] text-[#0b1026]">
+              <p className="text-center text-[clamp(20px,2.6vh,28px)] font-bold leading-[1.35] text-ink">
                 휴대폰으로 찍으면
                 <br />
                 사진 파일을 받을 수 있어요
               </p>
               {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
-              <p className="font-mono text-lg text-[#4b5068]" data-testid="session-code">
+              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
                 세션 {sessionCode}
               </p>
             </div>
@@ -1390,7 +1378,7 @@ function Screen(p: ScreenProps) {
               >
                 QR 없이 처음으로
               </button>
-              <p className="font-mono text-lg text-ink-400" data-testid="session-code">
+              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
                 세션 {sessionCode}
               </p>
             </div>
@@ -1424,7 +1412,7 @@ function Screen(p: ScreenProps) {
                   QR 없이 처음으로
                 </button>
               </div>
-              <p className="font-mono text-lg text-ink-400" data-testid="session-code">
+              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
                 세션 {sessionCode}
               </p>
             </div>
@@ -1466,7 +1454,7 @@ function MobileScreen({
     return (
       <BoothScreen testId="screen-mobile" className="gap-6 text-center">
         <div data-testid="mobile-received" className="flex flex-col items-center gap-6">
-          <p className="text-[clamp(64px,12vh,120px)] leading-none text-gold" aria-hidden>
+          <p className="text-[clamp(64px,12vh,120px)] leading-none text-accent" aria-hidden>
             ✓
           </p>
           <h1 className="booth-title">사진이 도착했어요</h1>
@@ -1536,7 +1524,7 @@ function MobileScreen({
             "안내를 읽고 ‘미디어월로 보내기’를 눌러요",
           ].map((text, i) => (
             <li key={text} className="booth-lead flex items-center gap-4 text-left">
-              <span className="flex h-[max(40px,5vh)] w-[max(40px,5vh)] shrink-0 items-center justify-center rounded-full bg-gold font-bold text-[#0b1026]">
+              <span className="flex h-[max(40px,5vh)] w-[max(40px,5vh)] shrink-0 items-center justify-center rounded-full bg-button font-bold text-button-text">
                 {i + 1}
               </span>
               {text}
@@ -1549,29 +1537,29 @@ function MobileScreen({
           </p>
         )}
         {m.status === "ready" && m.via === "lan" && (
-          <p className="booth-caption text-warm" data-testid="mobile-lan-note">
+          <p className="booth-caption text-ink" data-testid="mobile-lan-note">
             휴대폰이 행사장 와이파이에 연결되어 있어야 열려요.
           </p>
         )}
       </div>
-      <div className="flex flex-col items-center gap-4 rounded-[28px] bg-glow p-[max(24px,3.7vh)]">
+      <div className="flex flex-col items-center gap-4 rounded-3xl bg-paper p-[max(24px,3.7vh)]">
         {ready ? (
           <div
             data-testid="mobile-qr"
             data-url={m.status === "ready" ? m.url : undefined}
-            className="w-[clamp(220px,32vh,340px)] rounded-xl bg-white p-3"
+            className="w-[clamp(220px,32vh,340px)] rounded-lg bg-white p-3"
             // QR markup comes from the qrcode library, generated locally from our own URL.
             dangerouslySetInnerHTML={{ __html: qrSvg }}
           />
         ) : (
           <div
-            className="flex aspect-square w-[clamp(220px,32vh,340px)] items-center justify-center rounded-xl bg-white text-xl text-[#4b5068]"
+            className="flex aspect-square w-[clamp(220px,32vh,340px)] items-center justify-center rounded-lg bg-white text-xl text-ink/75"
             role="status"
           >
             QR을 만들고 있어요…
           </div>
         )}
-        <p className="text-center text-[clamp(18px,2.4vh,26px)] font-bold leading-[1.35] text-[#0b1026]">
+        <p className="text-center text-[clamp(18px,2.4vh,26px)] font-bold leading-[1.35] text-ink">
           사진이 도착하면
           <br />이 화면이 바뀌어요
         </p>
@@ -1592,11 +1580,11 @@ function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; 
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
-          className="max-h-full w-auto shadow-[0_0_60px_rgba(255,227,163,0.18)]"
+          className="max-h-full w-auto"
         />
       ) : (
         <div
-          className="aspect-[1/3] h-full animate-pulse bg-navy-700"
+          className="aspect-[1/3] h-full animate-pulse bg-ink/10"
           aria-label="사진을 만들고 있어요"
         />
       )}
@@ -1604,7 +1592,7 @@ function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; 
   );
 }
 
-/** Six small boxes beside the camera: ✓ done, gold outline = this shot. */
+/** Six small boxes beside the camera: filled ✓ = done, ink outline on paper = this shot. */
 function ShotStrip({ state, current }: { state: State; current: number }) {
   return (
     <div
@@ -1616,10 +1604,10 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
           key={i}
           className={`flex aspect-[4/3] w-[max(56px,5.6vh)] items-center justify-center rounded-md font-mono text-sm ${
             i === current
-              ? "border-2 border-warm bg-navy-700 text-warm"
+              ? "border-2 border-ink bg-paper text-ink"
               : shot
-                ? "bg-navy-700 text-warm"
-                : "bg-navy text-ink-400"
+                ? "bg-button text-button-text"
+                : "border border-ink/40 text-ink/75"
           }`}
         >
           {shot && i !== current ? "✓" : i + 1}
@@ -1633,7 +1621,7 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
 }
 
 /**
- * Sample photos for the frame picker before shooting (Figma Photo/Slot: a navy gradient). The
+ * Sample photos for the frame picker before shooting (a plain warm-grey gradient). The
  * same compositor draws them, so the thumbnail is the frame the guest will get.
  */
 function placeholderPhotos(): ComposeImage[] {
@@ -1641,11 +1629,11 @@ function placeholderPhotos(): ComposeImage[] {
     const canvas = createDomCanvas(400, 300) as HTMLCanvasElement;
     const ctx = canvas.getContext("2d")!;
     const gradient = ctx.createLinearGradient(0, 0, 400, 300);
-    gradient.addColorStop(0, "#3a4370");
-    gradient.addColorStop(0.71, "#232a52");
+    gradient.addColorStop(0, "#8a7565");
+    gradient.addColorStop(0.71, "#6b574a");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 400, 300);
-    ctx.fillStyle = "#8a8fa6";
+    ctx.fillStyle = "#f6eee4";
     ctx.font = "18px ui-monospace, monospace";
     ctx.textAlign = "center";
     ctx.fillText(`PHOTO ${n}`, 200, 156);
@@ -1667,7 +1655,7 @@ function StatusBadges({
       {cameraMode === "mock" && (
         <span
           data-testid="mock-badge"
-          className="rounded-full bg-ember/90 px-3 py-1 font-semibold text-ink"
+          className="rounded-full bg-alert px-3 py-1 font-semibold text-button-text"
         >
           MOCK CAMERA
         </span>
@@ -1675,7 +1663,7 @@ function StatusBadges({
       {!online && (
         <span
           data-testid="offline-badge"
-          className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink"
+          className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text"
         >
           오프라인
         </span>
@@ -1684,7 +1672,7 @@ function StatusBadges({
       {queue.depth > 0 && (
         <span
           data-testid="queue-badge"
-          className="rounded-full bg-cream/90 px-3 py-1 font-semibold text-ink"
+          className="rounded-full bg-ink px-3 py-1 font-semibold text-button-text"
         >
           전송 대기 {queue.depth}건
         </span>
@@ -1692,13 +1680,13 @@ function StatusBadges({
       {queue.authBlocked && (
         <span
           data-testid="auth-badge"
-          className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink"
+          className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text"
         >
           기기 등록 필요
         </span>
       )}
       {!queue.durable && (
-        <span className="rounded-full bg-alert/90 px-3 py-1 font-semibold text-ink">
+        <span className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text">
           임시 저장소
         </span>
       )}

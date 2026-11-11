@@ -24,8 +24,8 @@ export function AdminNav() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`flex min-h-12 shrink-0 items-center rounded-xl px-4 text-lg font-semibold ${
-              active ? "bg-amber text-ink" : "text-cream hover:bg-cream/10"
+            className={`flex min-h-12 shrink-0 items-center rounded-full px-4 text-lg font-semibold ${
+              active ? "bg-button text-button-text" : "text-ink hover:bg-ink/15"
             }`}
           >
             {label}

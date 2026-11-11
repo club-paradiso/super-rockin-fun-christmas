@@ -10,7 +10,9 @@ import { HEALTH_LABEL, HEALTH_TONE, ago, formatTime } from "./labels";
 export function KioskManager({ kiosks }: { kiosks: StaffKioskView[] }) {
   if (!kiosks.length)
     return (
-      <p className="text-lg text-mist">등록된 키오스크가 없어요. 아래에서 등록 코드를 만드세요.</p>
+      <p className="text-lg text-ink/75">
+        등록된 키오스크가 없어요. 아래에서 등록 코드를 만드세요.
+      </p>
     );
   return (
     <ul className="grid gap-3 md:grid-cols-2">
@@ -51,13 +53,13 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
           {HEALTH_LABEL[kiosk.health]}
         </span>
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-mist">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-ink/75">
         <dt>마지막 신호</dt>
-        <dd className="text-cream">{ago(kiosk.heartbeatAt)}</dd>
+        <dd className="text-ink">{ago(kiosk.heartbeatAt)}</dd>
         <dt>전송 대기</dt>
-        <dd className="text-cream">{kiosk.queueDepth === null ? "—" : `${kiosk.queueDepth}건`}</dd>
+        <dd className="text-ink">{kiosk.queueDepth === null ? "—" : `${kiosk.queueDepth}건`}</dd>
         <dt>카메라</dt>
-        <dd className="text-cream">
+        <dd className="text-ink">
           {kiosk.cameraState === "ok"
             ? "정상"
             : kiosk.cameraState === "error"
@@ -67,24 +69,24 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
         {(kiosk.frameRate !== null || kiosk.memoryMb !== null) && (
           <>
             <dt>화면</dt>
-            <dd className="text-cream" data-testid="kiosk-display-metrics">
+            <dd className="text-ink" data-testid="kiosk-display-metrics">
               {kiosk.frameRate !== null ? `${kiosk.frameRate}fps` : "—"}
               {kiosk.memoryMb !== null && ` · 메모리 ${kiosk.memoryMb}MB`}
               {kiosk.frameRate !== null && kiosk.frameRate < 20 && (
-                <span className="text-alert"> · 느려요 (저사양 모드 권장)</span>
+                <span className="text-danger"> · 느려요 (저사양 모드 권장)</span>
               )}
             </dd>
           </>
         )}
         <dt>등록</dt>
-        <dd className="text-cream">
+        <dd className="text-ink">
           {formatTime(kiosk.createdAt)} ·{" "}
           {kiosk.enrolledVia === "code" ? "일회용 코드" : "공유 비밀번호(구버전)"}
         </dd>
         {kiosk.revokedAt && (
           <>
             <dt>해제</dt>
-            <dd className="text-cream">{formatTime(kiosk.revokedAt)}</dd>
+            <dd className="text-ink">{formatTime(kiosk.revokedAt)}</dd>
           </>
         )}
       </dl>
@@ -116,7 +118,7 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
           </button>
         </div>
       )}
-      {error && <p className="text-alert">{error}</p>}
+      {error && <p className="text-danger">{error}</p>}
       <ConfirmDialog
         open={confirmRevoke}
         title={`"${kiosk.label}" 등록을 해제할까요?`}
@@ -183,20 +185,25 @@ export function EnrollmentCodeCreator() {
           일회용 등록 코드 만들기
         </button>
       </form>
-      {error && <p className="text-alert">{error}</p>}
+      {error && <p className="text-danger">{error}</p>}
       {result && (
-        <div className="rounded-xl bg-ink p-4 text-center" data-testid="enrollment-code-result">
-          <p className="text-base text-mist">
+        <div
+          className="rounded-lg bg-backdrop p-4 text-center"
+          data-testid="enrollment-code-result"
+        >
+          <p className="text-base text-ink/75">
             &ldquo;{result.label}&rdquo; 키오스크에서 /kiosk/enroll 을 열고 입력하세요
           </p>
-          <p className="text-sm text-mist">미디어월 화면은 /kiosk/enroll?next=wall 에서 입력해요</p>
+          <p className="text-sm text-ink/75">
+            미디어월 화면은 /kiosk/enroll?next=wall 에서 입력해요
+          </p>
           <p
-            className="my-3 font-mono text-5xl font-bold tracking-[0.2em] text-amber"
+            className="my-3 font-mono text-5xl font-bold tracking-[0.2em] text-accent"
             data-testid="enrollment-code"
           >
             {result.code}
           </p>
-          <p className="text-base text-mist">
+          <p className="text-base text-ink/75">
             한 번만 쓸 수 있고 {formatTime(result.expiresAt)}에 만료돼요. 이 화면을 닫으면 다시 볼
             수 없어요.
           </p>

@@ -183,7 +183,7 @@ async function main() {
       failures = 0;
       const lan = lanAddresses();
       say([
-        "FOLLOW THE LIGHTS 허브가 켜졌어요. 이 창은 닫지 마세요 (최소화는 괜찮아요).",
+        "STUDIO SHALOM 허브가 켜졌어요. 이 창은 닫지 마세요 (최소화는 괜찮아요).",
         "",
         "스태프 휴대폰 (관리자):",
         ...(lan.length

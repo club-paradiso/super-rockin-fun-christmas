@@ -11,7 +11,7 @@ import { parseCanvas } from "@/lib/wall/layout";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "FOLLOW THE LIGHTS · Media Wall",
+  title: "STUDIO SHALOM · Media Wall",
   robots: { index: false, follow: false },
 };
 

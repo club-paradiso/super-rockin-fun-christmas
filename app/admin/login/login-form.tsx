@@ -50,7 +50,7 @@ export function LoginForm() {
 
   return step === "email" ? (
     <form onSubmit={sendCode} className="mt-6 flex flex-col gap-4" data-testid="login-email-form">
-      <label className="flex flex-col gap-2 text-lg text-cream">
+      <label className="flex flex-col gap-2 text-lg text-ink">
         스태프 이메일
         <input
           type="email"
@@ -61,17 +61,17 @@ export function LoginForm() {
           className="admin-input"
         />
       </label>
-      {message && <p className="text-lg text-alert">{message}</p>}
+      {message && <p className="text-lg text-danger">{message}</p>}
       <button type="submit" disabled={busy} className="admin-btn admin-btn-primary">
         {busy ? "보내는 중…" : "로그인 코드 받기"}
       </button>
     </form>
   ) : (
     <form onSubmit={verify} className="mt-6 flex flex-col gap-4" data-testid="login-code-form">
-      <p className="text-lg text-mist">
-        등록된 스태프라면 <strong className="text-cream">{email}</strong>로 6자리 코드를 보냈어요.
+      <p className="text-lg text-ink/75">
+        등록된 스태프라면 <strong className="text-ink">{email}</strong>로 6자리 코드를 보냈어요.
       </p>
-      <label className="flex flex-col gap-2 text-lg text-cream">
+      <label className="flex flex-col gap-2 text-lg text-ink">
         로그인 코드
         <input
           inputMode="numeric"
@@ -83,7 +83,7 @@ export function LoginForm() {
           className="admin-input text-center text-3xl tracking-[0.4em]"
         />
       </label>
-      {message && <p className="text-lg text-alert">{message}</p>}
+      {message && <p className="text-lg text-danger">{message}</p>}
       <button type="submit" disabled={busy} className="admin-btn admin-btn-primary">
         {busy ? "확인 중…" : "로그인"}
       </button>

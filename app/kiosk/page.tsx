@@ -12,7 +12,7 @@ import { getBackend } from "@/lib/storage/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "FOLLOW THE LIGHTS · Photo Booth",
+  title: "STUDIO SHALOM · Photo Booth",
   robots: { index: false, follow: false },
 };
 

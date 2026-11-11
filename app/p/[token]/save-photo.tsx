@@ -28,7 +28,7 @@ export function SavePhoto({ imageUrl, mime }: { imageUrl: string; mime: string }
     fetch(imageUrl)
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
       .then((blob) => {
-        const f = new File([blob], `follow-the-lights.${mime === "image/png" ? "png" : "jpg"}`, {
+        const f = new File([blob], `studio-shalom.${mime === "image/png" ? "png" : "jpg"}`, {
           type: blob.type || mime,
         });
         if (!cancelled && navigator.canShare({ files: [f] })) setFile(f);
@@ -65,15 +65,15 @@ export function SavePhoto({ imageUrl, mime }: { imageUrl: string; mime: string }
         사진 저장하기
       </a>
       {file && (
-        <p className="text-center text-sm text-mist" data-testid="share-hint">
+        <p className="text-center text-sm text-ink/75" data-testid="share-hint">
           아이폰은 공유 메뉴에서 ‘이미지 저장’을 누르세요.
         </p>
       )}
-      {notice && <p className="text-center text-sm text-amber">{notice}</p>}
+      {notice && <p className="text-center text-sm text-ink">{notice}</p>}
       <a href={downloadHref} download className="btn-quiet" data-testid="file-download">
         파일로 받기
       </a>
-      <p className="text-center text-sm text-mist">
+      <p className="text-center text-sm text-ink/75">
         사진을 길게 눌러 ‘사진 앱에 저장’도 할 수 있어요.
       </p>
     </div>

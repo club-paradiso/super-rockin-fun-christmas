@@ -20,7 +20,7 @@ export default async function KiosksPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold">키오스크</h1>
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         온라인: {ONLINE_WITHIN_MS / 60_000}분 안에 신호 · 응답 지연: {STALE_WITHIN_MS / 60_000}분 안
         · 그 이상은 오프라인
       </p>
@@ -33,7 +33,7 @@ export default async function KiosksPage() {
             {codes.map((c) => (
               <li key={c.id} className="flex flex-wrap justify-between gap-2">
                 <span>{c.label}</span>
-                <span className="text-mist">
+                <span className="text-ink/75">
                   {c.usedAt
                     ? `사용됨 ${formatTime(c.usedAt)}`
                     : new Date(c.expiresAt) < new Date()

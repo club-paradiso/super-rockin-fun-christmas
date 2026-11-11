@@ -30,7 +30,7 @@ export default async function SessionsPage({
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-bold">최근 세션</h1>
-      <p className="text-lg text-mist">
+      <p className="text-lg text-ink/75">
         QR이 안 나왔거나 잃어버린 방문객을 도울 때 쓰세요. 최근 세션만 보여요.
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -58,7 +58,7 @@ export default async function SessionsPage({
         </form>
       </div>
       {photos.length === 0 ? (
-        <p className="admin-card p-8 text-center text-xl text-mist">이 기간에 세션이 없어요.</p>
+        <p className="admin-card p-8 text-center text-xl text-ink/75">이 기간에 세션이 없어요.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="session-list">
           {photos.map((p) => (

@@ -36,7 +36,7 @@ export async function ensureSetupCode(): Promise<string | null> {
       [
         "",
         "==================================================",
-        "  FOLLOW THE LIGHTS 허브: 첫 스태프 설정 코드",
+        "  STUDIO SHALOM 허브: 첫 스태프 설정 코드",
         `      ${shown}`,
         "  스태프 휴대폰에서 /admin/login 을 열고 이 코드를 입력하세요.",
         "  첫 스태프를 만들면 이 코드는 더 이상 쓸 수 없어요.",

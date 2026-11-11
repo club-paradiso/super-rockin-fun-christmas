@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { readUploadToken } from "@/lib/mobile/server";
 import { getPhotoService } from "@/lib/storage/server";
+import { BrandLockup } from "@/components/brand";
 import { MobileUpload } from "./mobile-upload";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "내 사진으로 참여하기 · FOLLOW THE LIGHTS",
+  title: "내 사진으로 참여하기 · STUDIO SHALOM",
   robots: { index: false, follow: false },
   // The QR token is in this address; never send it to another site.
   referrer: "no-referrer",
@@ -45,11 +46,11 @@ function safeDecode(raw: string): string {
 
 function Closed({ testId }: { testId: string }) {
   return (
-    <main className="night-sky flex min-h-dvh items-center px-5 py-10" data-testid={testId}>
+    <main className="flex min-h-dvh items-center px-5 py-10" data-testid={testId}>
       <div className="mx-auto flex max-w-md flex-col items-center gap-5 text-center">
-        <p className="text-sm tracking-[0.3em] text-amber">FOLLOW THE LIGHTS</p>
-        <h1 className="text-2xl font-bold text-cream">이 QR은 더 이상 쓸 수 없어요</h1>
-        <p className="text-lg leading-relaxed text-mist">
+        <BrandLockup className="text-[52px]" />
+        <h1 className="text-2xl font-bold text-ink">이 QR은 더 이상 쓸 수 없어요</h1>
+        <p className="text-lg leading-relaxed text-ink/75">
           시간이 지났거나 이미 쓴 QR이에요.
           <br />
           포토부스 화면에서 &lsquo;내 사진으로 참여하기&rsquo;를 다시 눌러 새 QR을 받아 주세요.

@@ -26,7 +26,7 @@ async function serve(
 
   const size = found.data.byteLength;
   const download = new URL(request.url).searchParams.has("download");
-  const filename = `follow-the-lights-${found.createdAt.slice(0, 10)}.${videoExt(found.mime)}`;
+  const filename = `studio-shalom-${found.createdAt.slice(0, 10)}.${videoExt(found.mime)}`;
   const headers: Record<string, string> = {
     "content-type": found.mime,
     "accept-ranges": "bytes",

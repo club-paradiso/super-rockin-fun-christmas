@@ -1,80 +1,77 @@
 @import "tailwindcss";
 
-/* Quiet Christmas night: deep ink sky, warm window-light amber, cream text. */
+/* STUDIO SHALOM (D73): flat warm paper, dark brown ink, one filled button per view. These are the
+   brand tokens; do not add other brand colours. Contrast (WCAG): ink on backdrop 9.43:1, ink on
+   paper 14.52:1, button-text on button 11.31:1, accent on backdrop 4.46:1 (so accent is for
+   dividers, icons and hairlines, and for text only at 24 px or larger). button-text/paper on
+   backdrop is 1.54:1: never use it for text there. Muted text is ink at 75 % (5.26:1 on backdrop,
+   6.82:1 on paper); do not go below ink/70 for body-size text. */
 @theme {
-  --color-ink: #0b1122;
-  --color-night: #121a30;
-  --color-dusk: #1c2642;
-  --color-amber: #ffcf8a;
-  --color-ember: #f3a65a;
-  --color-cream: #f7efe0;
-  --color-mist: #aeb5c7;
-  --color-alert: #ff8f7a;
-  --color-pine: #3f7d5c;
-  /* Booth (Figma ZbeBrS0o5012SNFrGZNyIU, 00 Foundations): night/800, night/700, light/*, ink/400. */
-  --color-navy: #121a3d;
-  --color-navy-700: #1c2756;
-  --color-gold: #f2c14e;
-  --color-warm: #ffe3a3;
-  --color-glow: #fff7e6;
-  --color-ink-400: #8a8fa6;
+  --color-backdrop: #ddbda1;
+  --color-ink: #2b1a10;
+  --color-button: #412d1b;
+  --color-button-text: #f6eee4;
+  /* The one light surface (cards, inputs, sheets). Same value as button-text. */
+  --color-paper: #f6eee4;
+  --color-accent: #7a440e;
+  /* Staff status colours. Functional, not brand. Each is ≥ 4.5:1 as text on backdrop and on
+     paper, and under button-text: approve 5.16 / 7.94, danger 5.04 / 7.76, alert 5.02 / 7.72. */
+  --color-approve: #1b5233;
+  --color-danger: #8f1d14;
+  --color-alert: #7c3500;
   --font-sans:
     "Noto Sans KR Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui,
     sans-serif;
+  /* Wordmark only. Countdown numerals stay in the sans: Cormorant's old-style "10" reads as "IO". */
+  --font-display: "Cormorant Garamond", "Times New Roman", serif;
+  --font-myeongjo: "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
 }
 
 html,
 body {
-  background: var(--color-ink);
-  color: var(--color-cream);
+  background: var(--color-backdrop);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* A sparse star field — a few points of light, not a gradient poster. */
-.night-sky {
-  background-color: var(--color-ink);
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 18%, rgba(247, 239, 224, 0.7), transparent 60%),
-    radial-gradient(1px 1px at 28% 72%, rgba(247, 239, 224, 0.5), transparent 60%),
-    radial-gradient(1.5px 1.5px at 47% 9%, rgba(247, 239, 224, 0.6), transparent 60%),
-    radial-gradient(1px 1px at 66% 38%, rgba(247, 239, 224, 0.45), transparent 60%),
-    radial-gradient(2px 2px at 83% 15%, rgba(255, 207, 138, 0.7), transparent 60%),
-    radial-gradient(1px 1px at 91% 64%, rgba(247, 239, 224, 0.5), transparent 60%),
-    radial-gradient(1.5px 1.5px at 7% 88%, rgba(247, 239, 224, 0.4), transparent 60%);
-}
-
-/* Booth screens (Figma 01 Platform, landscape 1920 × 1080; 01b, iPad portrait 820 × 1180): a soft
-   navy glow above centre, fading to the night edge. Sizes follow the design and shrink with the
-   screen's height or width, whichever is tighter. */
-.booth-sky {
-  background-color: #070a1c;
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 18%, rgba(255, 227, 163, 0.6), transparent 60%),
-    radial-gradient(1px 1px at 28% 72%, rgba(255, 227, 163, 0.45), transparent 60%),
-    radial-gradient(1.5px 1.5px at 74% 15%, rgba(255, 227, 163, 0.6), transparent 60%),
-    radial-gradient(1px 1px at 88% 66%, rgba(255, 227, 163, 0.45), transparent 60%),
-    radial-gradient(50% 36% at 50% 43%, #1c2756 0%, #121939 50%, #070a1c 100%);
-}
+/* Booth screens: sizes shrink with the screen's height or width, whichever is tighter. */
 .booth-title {
   font-size: clamp(28px, min(5.2vh, 4.9vw), 56px);
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
-  color: var(--color-glow);
+  color: var(--color-ink);
+  word-break: keep-all;
 }
 .booth-lead {
   font-size: clamp(18px, min(2.6vh, 2.6vw), 28px);
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: -0.01em;
-  color: var(--color-warm);
-  opacity: 0.9;
+  color: var(--color-ink);
+  word-break: keep-all;
 }
 .booth-caption {
   font-size: clamp(15px, min(1.85vh, 2vw), 20px);
   line-height: 1.5;
-  color: var(--color-ink-400);
+  color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  word-break: keep-all;
+}
+
+/* The media wall keeps its own night scene (D73): these are the old global night values, scoped
+   to the wall so the scene looks as it did. Nothing else may use them. */
+.wall-stage {
+  --wall-night: #0b1122;
+  --wall-floor: #0b0806;
+  --wall-amber: #ffcf8a;
+  --wall-cream: #f7efe0;
+  --wall-mist: #aeb5c7;
+  --wall-card: #f7efe0;
+  --wall-card-ink: #121a3d;
+  --wall-card-mat: #1c2756;
+  background: var(--wall-floor);
+  color: var(--wall-cream);
 }
 
 /* Media wall (clothesline scene): a photo is clipped on and swings to rest, then drops away.
@@ -150,35 +147,91 @@ body {
 }
 
 @layer components {
+  /* The brand lockup as real text: STUDIO / SHALOM / a short thin divider / 평화의 벽, stacked and
+     centred. 1em is the SHALOM size; set font-size on .brand-lockup. Letter-spacing adds space after
+     the last letter too, so each line gives it back with a negative margin to stay centred. In this layer so a
+     text-[…] utility on the element can set the size. */
+  .brand-lockup {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--color-ink);
+    line-height: 1;
+    font-size: 56px;
+  }
+  .brand-lockup-studio {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: max(0.3em, 13px);
+    letter-spacing: 0.4em;
+    margin-right: -0.4em;
+    text-transform: uppercase;
+  }
+  .brand-lockup-shalom {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1em;
+    letter-spacing: 0.04em;
+    margin-right: -0.04em;
+    margin-top: 0.06em;
+    text-transform: uppercase;
+  }
+  .brand-lockup-rule {
+    width: 0.44em;
+    height: max(1px, 0.016em);
+    margin: 0.13em 0 0.17em;
+    background: var(--color-accent);
+  }
+  .brand-lockup-sub {
+    font-family: var(--font-myeongjo);
+    font-weight: 400;
+    font-size: max(0.24em, 13px);
+    letter-spacing: 0.3em;
+    margin-right: -0.3em;
+    word-break: keep-all;
+    white-space: nowrap;
+  }
+  /* One line, for screen headers where the stacked lockup would be too small to read. */
+  .brand-wordmark {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--color-ink);
+    line-height: 1;
+  }
+  /* Buttons are pills; cards are 24 px; small controls 8 px. One filled (primary) button per view:
+     the others are outlined or plain text in ink. */
   .btn-primary {
-    @apply inline-flex min-h-20 items-center justify-center rounded-2xl bg-amber px-10 text-2xl font-bold text-ink shadow-[0_0_40px_rgba(255,207,138,0.25)] transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex min-h-20 items-center justify-center rounded-full bg-button px-10 text-2xl font-bold text-button-text transition active:scale-[0.98] disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex min-h-20 items-center justify-center rounded-2xl border-2 border-cream/40 px-10 text-2xl font-semibold text-cream transition active:scale-[0.98] active:bg-cream/10 disabled:opacity-50;
+    @apply inline-flex min-h-20 items-center justify-center rounded-full border-2 border-ink px-10 text-2xl font-semibold text-ink transition active:scale-[0.98] active:bg-ink/10 disabled:opacity-50;
   }
   /* Staff control panel: big, obvious, touch-friendly (desktop, tablet, phone). */
   .admin-btn {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-xl px-5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-full px-5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-50;
   }
   .admin-btn-primary {
-    @apply bg-amber text-ink;
+    @apply bg-button text-button-text;
   }
   .admin-btn-approve {
-    @apply bg-pine text-cream;
+    @apply bg-approve text-button-text;
   }
   .admin-btn-danger {
-    @apply bg-alert text-ink;
+    @apply bg-danger text-button-text;
   }
   .admin-btn-quiet {
-    @apply border border-cream/30 text-cream active:bg-cream/10;
+    @apply border border-ink/60 text-ink active:bg-ink/10;
   }
   .admin-card {
-    @apply rounded-2xl border border-cream/10 bg-night;
+    @apply rounded-3xl border border-ink/15 bg-paper;
   }
   .admin-input {
-    @apply min-h-14 rounded-xl border border-cream/20 bg-ink px-4 text-lg text-cream placeholder:text-mist/60;
+    @apply min-h-14 rounded-lg border border-ink/50 bg-paper px-4 text-lg text-ink placeholder:text-ink/70;
   }
-  /* Booth buttons (Figma Button, about 108 px tall at 1080 p: elders and children reach them). */
+  /* Booth buttons (about 108 px tall at 1080 p: elders and children reach them). */
   .booth-btn-primary,
   .booth-btn-secondary {
     @apply inline-flex items-center justify-center rounded-full font-bold whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50;
@@ -188,31 +241,32 @@ body {
     letter-spacing: -0.01em;
   }
   .booth-btn-primary {
-    @apply bg-gold text-[#0b1026];
+    @apply bg-button text-button-text;
   }
   .booth-btn-secondary {
-    @apply border-[3px] border-gold bg-navy-700 text-glow;
+    @apply border-[3px] border-ink text-ink active:bg-ink/10;
   }
   /* Booth screen chrome (2.0): way home, help, screen mode. ≥ 56 px (WCAG 2.2 target size). */
   .booth-chrome-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-warm/40 bg-navy/70 font-semibold text-glow transition active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-ink/60 font-semibold text-ink transition active:scale-[0.98] active:bg-ink/10;
     min-height: max(56px, 6.4vh);
     padding: 0 max(20px, 2vw);
     font-size: clamp(18px, 2.3vh, 26px);
   }
   .booth-chrome-btn-easy {
-    @apply border-[3px] border-glow bg-navy-700 font-bold;
+    @apply border-[3px] border-ink font-bold;
     min-height: max(76px, 9vh);
     font-size: clamp(24px, 3.2vh, 36px);
   }
-  /* Welcome: the two big choices. Equal size; the camera one is the gold primary. */
+  /* Welcome: the two big choices. Equal size; the camera one is the filled primary. */
   .welcome-choice {
-    @apply flex flex-col items-start justify-center gap-[max(8px,1.2vh)] rounded-[32px] border-[3px] border-gold bg-navy-700 text-left text-glow transition active:scale-[0.99] disabled:border-ink-400 disabled:opacity-60;
+    @apply flex flex-col items-start justify-center gap-[max(8px,1.2vh)] rounded-3xl border-[3px] border-ink bg-paper text-left text-ink transition active:scale-[0.99] disabled:border-ink/40 disabled:opacity-60;
     min-height: max(180px, 30vh);
     padding: max(24px, 3.4vh) max(24px, 2.6vw);
+    word-break: keep-all;
   }
   .welcome-choice-primary {
-    @apply bg-gold text-[#0b1026];
+    @apply border-button bg-button text-button-text;
   }
   .welcome-choice-icon {
     font-size: clamp(40px, 7vh, 80px);
@@ -228,28 +282,25 @@ body {
     font-size: clamp(18px, min(2.5vh, 2.4vw), 28px);
     font-weight: 500;
     line-height: 1.4;
-    opacity: 0.92;
   }
   .btn-quiet {
-    @apply inline-flex min-h-14 items-center justify-center rounded-xl px-6 text-lg text-mist underline-offset-4 active:underline;
+    @apply inline-flex min-h-14 items-center justify-center rounded-full px-6 text-lg text-ink/75 underline-offset-4 active:underline;
   }
 }
 
-/* Easy mode (D67): larger type, brighter text, bigger targets, same layout and the same flow
-   rules. Contrast: glow (#fff7e6) and warm (#ffe3a3) on the night background are above 12:1;
-   captions move from ink-400 to a light grey (about 10:1). */
+/* Easy mode (D67): larger type, bigger targets, same layout and the same flow rules. Contrast:
+   titles and leads are ink on backdrop (9.43:1) in both modes; easy mode also sets captions in
+   full ink (9.43:1) instead of ink at 75 % (5.26:1). */
 .kiosk-easy .booth-title {
   font-size: clamp(34px, min(6.6vh, 6vw), 76px);
   line-height: 1.25;
 }
 .kiosk-easy .booth-lead {
   font-size: clamp(22px, min(3.4vh, 3.4vw), 38px);
-  color: var(--color-glow);
-  opacity: 1;
 }
 .kiosk-easy .booth-caption {
   font-size: clamp(19px, min(2.6vh, 2.6vw), 28px);
-  color: #d5d8e6;
+  color: var(--color-ink);
 }
 .kiosk-easy .booth-btn-primary,
 .kiosk-easy .booth-btn-secondary {
@@ -257,7 +308,7 @@ body {
   font-size: clamp(26px, min(4vh, 4vw), 44px);
 }
 .kiosk-easy .booth-btn-secondary {
-  border-color: var(--color-glow);
+  border-width: 4px;
 }
 .kiosk-easy .welcome-choice {
   min-height: max(220px, 36vh);
@@ -273,7 +324,7 @@ main button:focus-visible,
 main a:focus-visible,
 main input:focus-visible,
 .kiosk-dialog button:focus-visible {
-  outline: 4px solid var(--color-gold);
+  outline: 4px solid var(--color-ink);
   outline-offset: 3px;
 }
 
@@ -301,6 +352,11 @@ main input:focus-visible,
 }
 .countdown-pop {
   animation: pop 300ms ease-out;
+}
+/* The countdown sits on the live camera picture, whose colours we do not control: light digits
+   with a tight dark edge stay readable on any of it. Not decoration. */
+.countdown-number {
+  text-shadow: 0 2px 10px rgb(43 26 16 / 0.65);
 }
 
 @media (prefers-reduced-motion: reduce) {

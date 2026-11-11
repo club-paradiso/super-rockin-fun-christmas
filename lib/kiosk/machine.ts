@@ -15,7 +15,7 @@ import type { KioskMode } from "@/lib/storage/types";
  * question; delivery events are accepted in both the consent and delivery phases. The wall
  * question is skipped while staff pause submissions (CONFIRM_FRAME askConsent: false).
  *
- * FOLLOW THE LIGHTS 2.0:
+ * Release 2.0:
  *  - welcome → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
  *    waits for the photo; no camera, no upload from the booth itself.
  *  - Easy mode (D67) is the same machine with fewer choices: START skips the frame pick before

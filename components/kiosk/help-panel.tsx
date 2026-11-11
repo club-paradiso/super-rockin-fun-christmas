@@ -126,11 +126,11 @@ export function HelpPanel(p: {
           aria-modal="true"
           aria-label="스태프 도움"
           data-testid="help-panel"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6"
         >
           <div className="flex max-h-full w-full max-w-2xl flex-col gap-6 overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold text-cream">
+              <h2 className="text-3xl font-bold text-ink">
                 스태프 도움{state.step === "menu" ? ` · ${state.displayName}` : ""}
               </h2>
               <button
@@ -145,9 +145,11 @@ export function HelpPanel(p: {
 
             {state.step === "pick" && (
               <div className="flex flex-col gap-3">
-                <p className="text-xl text-mist">이름을 고르세요.</p>
-                {state.failed && <p className="text-xl text-alert">{DENIAL_COPY.offline}</p>}
-                {!state.staff && !state.failed && <p className="text-xl text-mist">불러오는 중…</p>}
+                <p className="text-xl text-ink/75">이름을 고르세요.</p>
+                {state.failed && <p className="text-xl text-danger">{DENIAL_COPY.offline}</p>}
+                {!state.staff && !state.failed && (
+                  <p className="text-xl text-ink/75">불러오는 중…</p>
+                )}
                 {state.staff?.map((s) => (
                   <button
                     key={s.userId}
@@ -163,7 +165,7 @@ export function HelpPanel(p: {
 
             {state.step === "pin" && (
               <div className="flex flex-col gap-4">
-                <p className="text-xl text-mist">{state.who.displayName} 님의 PIN 6자리</p>
+                <p className="text-xl text-ink/75">{state.who.displayName} 님의 PIN 6자리</p>
                 <div
                   className="flex justify-center gap-3"
                   aria-label={`PIN ${state.pin.length}/${HELP_PIN_LENGTH}자리 입력됨`}
@@ -171,12 +173,12 @@ export function HelpPanel(p: {
                   {Array.from({ length: HELP_PIN_LENGTH }, (_, i) => (
                     <span
                       key={i}
-                      className={`h-6 w-6 rounded-full border-2 border-cream/60 ${i < state.pin.length ? "bg-amber" : ""}`}
+                      className={`h-6 w-6 rounded-full border-2 border-ink/70 ${i < state.pin.length ? "bg-button" : ""}`}
                     />
                   ))}
                 </div>
                 {state.denied && (
-                  <p className="text-center text-xl text-alert" data-testid="help-denied">
+                  <p className="text-center text-xl text-danger" data-testid="help-denied">
                     {DENIAL_COPY[state.denied]}
                   </p>
                 )}
@@ -190,7 +192,7 @@ export function HelpPanel(p: {
                         type="button"
                         aria-label={k === "⌫" ? "지우기" : k}
                         disabled={state.checking}
-                        className="min-h-20 rounded-2xl bg-dusk text-3xl font-bold text-cream"
+                        className="min-h-20 rounded-lg border border-ink/30 bg-paper text-3xl font-bold text-ink active:bg-ink/10"
                         onClick={() =>
                           dispatch({
                             type: "PIN",
@@ -245,16 +247,16 @@ function HelpMenu(p: {
   }, [listDevices, loadQueue]);
 
   return (
-    <div className="flex flex-col gap-6 text-cream" data-testid="help-menu">
+    <div className="flex flex-col gap-6 text-ink" data-testid="help-menu">
       <section className="flex flex-col gap-2">
         <h3 className="text-2xl font-bold">카메라</h3>
         {devices === null ? (
-          <p className="text-lg text-mist">찾는 중…</p>
+          <p className="text-lg text-ink/75">찾는 중…</p>
         ) : (
           <select
             aria-label="카메라 선택"
             data-testid="help-camera"
-            className="min-h-16 rounded-2xl bg-night px-4 text-xl text-cream"
+            className="min-h-16 rounded-lg border border-ink/50 bg-paper px-4 text-xl text-ink"
             value={p.deviceId ?? ""}
             onChange={(e) => p.onSelectDevice(e.target.value)}
           >
@@ -271,9 +273,9 @@ function HelpMenu(p: {
       <section className="flex flex-col gap-2" data-testid="help-queue">
         <h3 className="text-2xl font-bold">보내지 못한 것</h3>
         {queue === null ? (
-          <p className="text-lg text-mist">확인 중…</p>
+          <p className="text-lg text-ink/75">확인 중…</p>
         ) : queue.uploads.length === 0 && queue.consents === 0 ? (
-          <p className="text-lg text-mist">없어요. 모두 허브에 도착했어요.</p>
+          <p className="text-lg text-ink/75">없어요. 모두 허브에 도착했어요.</p>
         ) : (
           <>
             <ul className="flex flex-col gap-1 text-lg">
@@ -324,7 +326,7 @@ function HelpMenu(p: {
           화면 새로고침
         </button>
       </div>
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         처음으로: 지금 찍던 사진은 지워져요. 보내는 중이던 사진은 그대로 보내요.
       </p>
     </div>

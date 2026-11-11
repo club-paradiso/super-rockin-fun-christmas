@@ -1,4 +1,4 @@
-# FOLLOW THE LIGHTS - media wall screen (Windows). Started by start-wall.bat, which prints the
+# STUDIO SHALOM - media wall screen (Windows). Started by start-wall.bat, which prints the
 # Korean messages (this file stays ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM).
 # Needs only Chrome or Edge. The hub address is the first line of wall-hub.txt next to this file
 # (shown in the hub window). If the browser closes or crashes it is opened again. If it closes

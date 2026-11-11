@@ -21,7 +21,7 @@ export const GET = route(
 
     const ext = found.photo.mime === "image/png" ? "png" : "jpg";
     const download = new URL(request.url).searchParams.has("download");
-    const filename = `follow-the-lights-${found.photo.createdAt.slice(0, 10)}.${ext}`;
+    const filename = `studio-shalom-${found.photo.createdAt.slice(0, 10)}.${ext}`;
     return new Response(found.data as BodyInit, {
       headers: {
         "content-type": found.photo.mime,

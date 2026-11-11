@@ -91,7 +91,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
 
   const download = phone.waitForEvent("download");
   await phone.getByTestId("video-download-button").click();
-  expect((await download).suggestedFilename()).toMatch(/^follow-the-lights-.+\.(mp4|webm)$/);
+  expect((await download).suggestedFilename()).toMatch(/^studio-shalom-.+\.(mp4|webm)$/);
   await phoneContext.close();
 });
 

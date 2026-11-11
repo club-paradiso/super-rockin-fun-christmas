@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useId, useRef } from "react";
 import type { KioskMode } from "@/lib/storage/types";
 
 /**
- * What every booth screen shares (FOLLOW THE LIGHTS 2.0): the guest's screen mode, the way home,
+ * What every booth screen shares (release 2.0): the guest's screen mode, the way home,
  * and help. Provided once by KioskApp so screens do not pass it around.
  */
 export interface KioskChrome {
@@ -104,7 +104,7 @@ export function KioskDialog({
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#03050f]/80 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6"
       onClick={onClose}
     >
       <div
@@ -113,7 +113,7 @@ export function KioskDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         data-testid={testId}
-        className="kiosk-dialog flex max-h-[90dvh] w-full max-w-3xl flex-col gap-6 overflow-y-auto rounded-[28px] border-2 border-gold/60 bg-navy p-[max(24px,4vh)] text-left"
+        className="kiosk-dialog flex max-h-[90dvh] w-full max-w-3xl flex-col gap-6 overflow-y-auto rounded-3xl bg-paper p-[max(24px,4vh)] text-left"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="booth-title">
@@ -175,7 +175,7 @@ function HelpItem({
         {icon}
       </span>
       <div>
-        <dt className="text-[clamp(22px,3vh,32px)] font-bold text-glow">{title}</dt>
+        <dt className="text-[clamp(22px,3vh,32px)] font-bold text-ink">{title}</dt>
         <dd className="booth-lead mt-1">{children}</dd>
       </div>
     </div>

@@ -46,7 +46,7 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
               type="time"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className="rounded-lg bg-ink px-3 py-2 text-cream"
+              className="rounded-lg bg-backdrop px-3 py-2 text-ink"
               data-testid="wall-hours-start"
             />
           </label>
@@ -56,13 +56,13 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
               type="time"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className="rounded-lg bg-ink px-3 py-2 text-cream"
+              className="rounded-lg bg-backdrop px-3 py-2 text-ink"
               data-testid="wall-hours-end"
             />
           </label>
         </div>
       )}
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         시간대: {timeZone}. 끝이 시작보다 이르면 자정을 넘겨요(예: 18:00~01:00). 관리자 첫 화면의
         &ldquo;계속 켜기&rdquo;/&ldquo;끄기&rdquo;가 이 시간보다 먼저예요.
       </p>

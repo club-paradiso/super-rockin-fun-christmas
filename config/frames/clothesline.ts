@@ -1,5 +1,5 @@
 import type { FrameDecoration, FrameDefinition, FrameSlot } from "@/lib/compositor/types";
-import { STRIP } from "./shared";
+import { lockupBox, STRIP } from "./shared";
 
 // Template C · Clothesline — 크라프트 종이 + 폴라로이드 + 집게. 미디어월 빨랫줄과 같은 언어.
 
@@ -59,10 +59,7 @@ export const clothesline: FrameDefinition = {
     {
       type: "image",
       src: "/frames/cream-lockup.svg",
-      x: 91,
-      y: 1572,
-      width: 418,
-      height: 69,
+      ...lockupBox(1563, 86),
       brand: { color: "#0b1026", on: "#f7f1e3" },
     },
     {

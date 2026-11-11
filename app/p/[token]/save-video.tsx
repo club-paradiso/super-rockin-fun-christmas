@@ -26,7 +26,7 @@ export function SaveVideo({ videoUrl, mime }: { videoUrl: string; mime: string }
     fetch(videoUrl)
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
       .then((blob) => {
-        const f = new File([blob], `follow-the-lights.${mime === "video/mp4" ? "mp4" : "webm"}`, {
+        const f = new File([blob], `studio-shalom.${mime === "video/mp4" ? "mp4" : "webm"}`, {
           type: mime,
         });
         if (!cancelled && navigator.canShare({ files: [f] })) setFile(f);
@@ -63,10 +63,10 @@ export function SaveVideo({ videoUrl, mime }: { videoUrl: string; mime: string }
       >
         영상 저장
       </a>
-      <p className="text-center text-sm text-mist">
+      <p className="text-center text-sm text-ink/75">
         촬영하는 모습을 담은 짧은 영상이에요. 소리는 없어요.
       </p>
-      {notice && <p className="text-center text-sm text-amber">{notice}</p>}
+      {notice && <p className="text-center text-sm text-ink">{notice}</p>}
     </div>
   );
 }

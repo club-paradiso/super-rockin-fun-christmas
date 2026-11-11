@@ -1,5 +1,5 @@
 import type { FrameDefinition } from "@/lib/compositor/types";
-import { sparkles, stripSlots, STRIP } from "./shared";
+import { lockupBox, sparkles, stripSlots, STRIP } from "./shared";
 
 // Template A · Navy Strip — 짙은 남색 밤하늘 + 금색 반짝이. 기본 추천안. A cream 18 px margin
 // around a navy panel.
@@ -64,10 +64,7 @@ export const navyStrip: FrameDefinition = {
     {
       type: "image",
       src: "/frames/navy-lockup.svg",
-      x: 91,
-      y: 1580,
-      width: 418,
-      height: 69,
+      ...lockupBox(1562, 132),
       brand: { color: "#f2c14e", on: "#070a1c" },
     },
     {
