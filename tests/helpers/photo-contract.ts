@@ -510,10 +510,12 @@ export function photoServiceContract(
     });
 
     it("video: retention removes it with the image", async () => {
-      const { token } = await put();
+      const { token, photo } = await put();
       await attach({ mime: "video/mp4", data: MP4 });
       now = new Date("2027-01-23T10:00:01Z");
-      expect((await svc.purgeRetention(1000)).failed).toBe(0);
+      // The sweep also meets other tests' rows on a shared database (Supabase): assert on this
+      // photo only, never on the totals.
+      expect((await svc.purgeRetention(1000)).deletedIds).toContain(photo.id);
       const { row, mp4 } = await videoObject();
       expect(row.moderationStatus).toBe("DELETED");
       expect(mp4).toBeNull();
@@ -521,11 +523,11 @@ export function photoServiceContract(
     });
 
     it("video: hub retention by state removes it with the image", async () => {
-      await put();
+      const { photo } = await put();
       await attach();
       now = new Date("2026-12-25T11:00:00Z");
       const r = await svc.purgeCapturedBefore(["NONE"], "2026-12-24T11:00:00.000Z", "unposted");
-      expect(r.failed).toBe(0);
+      expect(r.deletedIds).toContain(photo.id);
       const { row, webm } = await videoObject();
       expect(row.moderationStatus).toBe("DELETED");
       expect(webm).toBeNull();
