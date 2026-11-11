@@ -45,7 +45,7 @@ function flexibleStrip(id: string, label: string, count: number, paper: boolean)
     ],
   };
 }
-export const twoStars = flexibleStrip("two-stars", "별빛 포스트카드 · 2컷", 2, true);
+export const twoStars = flexibleStrip("two-stars", "포스트카드 · 2컷", 2, true);
 export const threeMoments = flexibleStrip("three-moments", "세 장의 이야기 · 3컷", 3, true);
-export const fiveLights = flexibleStrip("five-lights", "별빛 다섯 장 · 5컷", 5, false);
+export const fiveLights = flexibleStrip("five-lights", "다섯 장 · 5컷", 5, false);
 export const sixLights = flexibleStrip("six-lights", "여섯 장의 밤 · 6컷", 6, false);

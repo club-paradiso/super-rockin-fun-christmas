@@ -53,7 +53,7 @@ import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import type { KioskMode } from "@/lib/storage/types";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import { BoothScreen, BrandLockup, CameraPreview } from "./ui";
+import { BoothScreen, BrandLockup, CameraPreview, LineIcon } from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -866,7 +866,7 @@ function Screen(p: ScreenProps) {
         >
           <div className="flex flex-col items-start gap-[max(12px,2vh)]">
             <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
-            <h1 className="booth-title">별빛을 따라 오셨나요?</h1>
+            <h1 className="booth-title">사진관에 오신 걸 환영해요</h1>
             {!easy && (
               <p className="booth-lead">
                 사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.
@@ -880,8 +880,8 @@ function Screen(p: ScreenProps) {
               data-testid="start-camera"
               onClick={p.onStart}
             >
-              <span className="welcome-choice-icon" aria-hidden>
-                📸
+              <span className="welcome-choice-icon">
+                <LineIcon name="camera" />
               </span>
               <span className="welcome-choice-title">여기서 사진 찍기</span>
               <span className="welcome-choice-lead">
@@ -895,8 +895,8 @@ function Screen(p: ScreenProps) {
               disabled={!p.wallSubmissionsOpen}
               onClick={p.onStartMobile}
             >
-              <span className="welcome-choice-icon" aria-hidden>
-                📱
+              <span className="welcome-choice-icon">
+                <LineIcon name="phone" />
               </span>
               <span className="welcome-choice-title">내 사진으로 참여하기</span>
               <span className="welcome-choice-lead">

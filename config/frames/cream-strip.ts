@@ -25,7 +25,7 @@ export const creamStrip: FrameDefinition = {
     },
     {
       type: "text",
-      text: "별빛을 따라 오신 걸 환영해요",
+      text: "PEACEMAKERS · MT 5:9",
       x: 300,
       y: 1696,
       size: 20,

@@ -839,3 +839,16 @@ is removed.
   explain them.
 
 Not verified: whether guests get stuck on site without the on-screen tips.
+
+## D75 · Old-theme copy and emoji icons go
+
+User decision (2026-11-11): replace what still spoke the star-night theme, wording left to us.
+
+- Welcome title "별빛을 따라 오셨나요?" → "사진관에 오신 걸 환영해요" (the brand is an analogue photo
+  studio; the line under it already says what the booth does).
+- Cream frame caption "별빛을 따라 오신 걸 환영해요" → "PEACEMAKERS · MT 5:9", the line the user
+  specified for the bottom of the STUDIO SHALOM frame. The verse text itself is still undecided
+  and is written nowhere.
+- Frame picker labels drop "별빛": "포스트카드 · 2컷", "다섯 장 · 5컷". Frame ids are unchanged.
+- The two welcome choices use line icons (`LineIcon` in `components/kiosk/ui.tsx`, the same
+  drawings as the Figma icons) instead of emoji; they take the button's text colour.

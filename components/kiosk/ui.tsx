@@ -26,6 +26,44 @@ export function Stage({
 
 export { BrandLockup, BrandWordmark };
 
+/**
+ * Line icons for the booth (same drawings as the Figma Icon components). They take the text
+ * colour and the font size of where they sit; decorative, so hidden from assistive tech.
+ */
+const LINE_ICONS = {
+  camera: (
+    <>
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.3l1.4-2h7.6l1.4 2h2.3A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-9Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  phone: (
+    <>
+      <rect x="7" y="3" width="10" height="18" rx="2" />
+      <path d="M11 17.5h2" />
+    </>
+  ),
+} as const;
+
+export function LineIcon({ name }: { name: keyof typeof LINE_ICONS }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      focusable="false"
+    >
+      {LINE_ICONS[name]}
+    </svg>
+  );
+}
+
 /** "3 / 6 ●●●○○○". Done steps are accent, the current one is the dark button colour. */
 export function Stepper({ step, total }: { step: number; total: number }) {
   return (
