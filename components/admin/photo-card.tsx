@@ -89,9 +89,9 @@ export function PhotoCard({
       data-status={photo.status}
       data-source={photo.source}
     >
-      <div className="flex h-72 items-center justify-center bg-ink">
+      <div className="flex h-72 items-center justify-center bg-backdrop">
         {photo.deleted ? (
-          <p className="text-lg text-mist">이미지 삭제됨</p>
+          <p className="text-lg text-ink/75">이미지 삭제됨</p>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- private staff-only proxy, no caching
           <img
@@ -112,30 +112,30 @@ export function PhotoCard({
           </span>
           <span
             className={`rounded-full px-3 py-1 text-sm font-bold ${
-              photo.source === "mobile" ? "bg-ember text-ink" : "bg-cream/10"
+              photo.source === "mobile" ? "bg-alert text-button-text" : "bg-ink/15"
             }`}
             data-testid="photo-source"
           >
             {photo.source === "mobile" ? "휴대폰 사진" : "현장 촬영"}
           </span>
           {photo.wallConsent && (
-            <span className="rounded-full bg-cream/10 px-3 py-1 text-sm">미디어월 동의</span>
+            <span className="rounded-full bg-ink/15 px-3 py-1 text-sm">미디어월 동의</span>
           )}
           {photo.wallEligible && (
-            <span className="rounded-full bg-pine/40 px-3 py-1 text-sm">월 게시 가능</span>
+            <span className="rounded-full bg-approve/15 px-3 py-1 text-sm">월 게시 가능</span>
           )}
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-mist">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-ink/75">
           <dt>{photo.source === "mobile" ? "접수" : "촬영"}</dt>
-          <dd className="text-cream">{formatTime(photo.createdAt)}</dd>
+          <dd className="text-ink">{formatTime(photo.createdAt)}</dd>
           <dt>프레임</dt>
-          <dd className="text-cream">{photo.frameLabel}</dd>
+          <dd className="text-ink">{photo.frameLabel}</dd>
           <dt>키오스크</dt>
-          <dd className="text-cream">{photo.kioskLabel ?? "—"}</dd>
+          <dd className="text-ink">{photo.kioskLabel ?? "—"}</dd>
           <dt>세션</dt>
-          <dd className="font-mono text-cream">{photo.sessionShort}</dd>
+          <dd className="font-mono text-ink">{photo.sessionShort}</dd>
           <dt>링크</dt>
-          <dd className="text-cream">
+          <dd className="text-ink">
             {photo.source === "mobile"
               ? "없음 (방문객 휴대폰 사진)"
               : photo.linkActive
@@ -144,7 +144,7 @@ export function PhotoCard({
           </dd>
         </dl>
         {error && (
-          <p role="alert" className="text-base text-alert">
+          <p role="alert" className="text-base text-danger">
             {error}
           </p>
         )}
@@ -176,7 +176,7 @@ export function PhotoCard({
         {undoHide && (
           <div
             role="status"
-            className="flex items-center justify-between gap-3 rounded-xl bg-ink p-3"
+            className="flex items-center justify-between gap-3 rounded-lg bg-backdrop p-3"
             data-testid="undo-hide"
           >
             <span className="text-base">{photo.sessionShort} 사진을 숨겼어요.</span>

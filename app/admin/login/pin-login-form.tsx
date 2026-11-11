@@ -19,7 +19,7 @@ function PinPad({ value, onChange }: { value: string; onChange: (v: string) => v
         {Array.from({ length: PIN_LENGTH }, (_, i) => (
           <span
             key={i}
-            className={`h-5 w-5 rounded-full border-2 border-cream/60 ${i < value.length ? "bg-amber" : ""}`}
+            className={`h-5 w-5 rounded-full border-2 border-ink/70 ${i < value.length ? "bg-button" : ""}`}
           />
         ))}
       </div>
@@ -32,7 +32,7 @@ function PinPad({ value, onChange }: { value: string; onChange: (v: string) => v
               key={i}
               type="button"
               aria-label={k === "⌫" ? "지우기" : k}
-              className="admin-btn min-h-16 bg-dusk text-2xl font-bold"
+              className="min-h-16 rounded-lg border border-ink/30 bg-paper text-2xl font-bold text-ink transition active:scale-[0.98] active:bg-ink/10 disabled:opacity-50"
               onClick={() =>
                 onChange(k === "⌫" ? value.slice(0, -1) : (value + k).slice(0, PIN_LENGTH))
               }
@@ -75,19 +75,21 @@ export function PinLoginForm({ staff }: { staff: { userId: string; displayName: 
   }
 
   if (staff.length === 0)
-    return <p className="mt-6 text-lg text-mist">등록된 스태프가 없어요. 책임자에게 문의하세요.</p>;
+    return (
+      <p className="mt-6 text-lg text-ink/75">등록된 스태프가 없어요. 책임자에게 문의하세요.</p>
+    );
 
   return (
     <form onSubmit={submit} className="mt-6 flex flex-col gap-5" data-testid="pin-login-form">
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-lg text-cream">이름을 고르세요</legend>
+        <legend className="mb-2 text-lg text-ink">이름을 고르세요</legend>
         <div className="flex flex-wrap gap-2">
           {staff.map((s) => (
             <button
               key={s.userId}
               type="button"
               aria-pressed={userId === s.userId}
-              className={`admin-btn ${userId === s.userId ? "admin-btn-primary" : "bg-dusk"}`}
+              className={`admin-btn ${userId === s.userId ? "bg-ink text-button-text" : "admin-btn-quiet"}`}
               onClick={() => {
                 setUserId(s.userId);
                 setMessage(null);
@@ -100,12 +102,12 @@ export function PinLoginForm({ staff }: { staff: { userId: string; displayName: 
       </fieldset>
       {userId && (
         <>
-          <p className="text-lg text-cream">PIN {PIN_LENGTH}자리</p>
+          <p className="text-lg text-ink">PIN {PIN_LENGTH}자리</p>
           <PinPad value={pin} onChange={setPin} />
         </>
       )}
       {message && (
-        <p role="alert" className="text-lg text-alert">
+        <p role="alert" className="text-lg text-danger">
           {message}
         </p>
       )}
@@ -155,11 +157,11 @@ export function HubSetupForm() {
 
   return (
     <form onSubmit={submit} className="mt-6 flex flex-col gap-4" data-testid="hub-setup-form">
-      <p className="text-lg text-mist">
+      <p className="text-lg text-ink/75">
         처음 쓰는 허브예요. 허브 노트북의 검은 창에 나온{" "}
-        <strong className="text-cream">설정 코드</strong>로 첫 스태프를 만드세요.
+        <strong className="text-ink">설정 코드</strong>로 첫 스태프를 만드세요.
       </p>
-      <label className="flex flex-col gap-2 text-lg text-cream">
+      <label className="flex flex-col gap-2 text-lg text-ink">
         설정 코드
         <input
           required
@@ -170,7 +172,7 @@ export function HubSetupForm() {
           className="admin-input text-center text-2xl tracking-[0.3em]"
         />
       </label>
-      <label className="flex flex-col gap-2 text-lg text-cream">
+      <label className="flex flex-col gap-2 text-lg text-ink">
         이름
         <input
           required
@@ -180,10 +182,10 @@ export function HubSetupForm() {
           className="admin-input"
         />
       </label>
-      <p className="text-lg text-cream">새 PIN {PIN_LENGTH}자리</p>
+      <p className="text-lg text-ink">새 PIN {PIN_LENGTH}자리</p>
       <PinPad value={pin} onChange={setPin} />
       {message && (
-        <p role="alert" className="text-lg text-alert">
+        <p role="alert" className="text-lg text-danger">
           {message}
         </p>
       )}

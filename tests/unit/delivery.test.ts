@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import {
+  deliverVideo,
+  requestQr,
+  sendWallConsent,
+  uploadOnce,
+  uploadVideoOnce,
+} from "@/lib/kiosk/delivery";
 import { makeQrSvg } from "@/lib/qr";
 import { JPEG, SESSION } from "../helpers/images";
 
@@ -97,5 +103,73 @@ describe("requestQr", () => {
     const fetchImpl = respond(202, { qr: "pending" });
     await requestQr("s-1", fetchImpl);
     expect(JSON.parse(fetchImpl.mock.calls[0]![1].body)).toEqual({ sessionId: "s-1" });
+  });
+});
+
+describe("session video delivery (D72): best-effort, never queued", () => {
+  const video = { mime: "video/mp4", blob: new Blob([new Uint8Array(8)], { type: "video/mp4" }) };
+
+  it("sends the bytes with the session id and the kiosk cookie only", async () => {
+    const fetchImpl = respond(201, { ok: true });
+    expect(await uploadVideoOnce(SESSION, video, fetchImpl)).toBe("done");
+    const [url, init] = fetchImpl.mock.calls[0]! as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ];
+    expect(url).toBe("/api/photos/video");
+    expect(init.headers).toEqual({ "content-type": "video/mp4", "x-session-id": SESSION });
+    expect(init.credentials).toBe("same-origin");
+    expect(init.body).toBe(video.blob);
+  });
+
+  it.each([
+    [200, "done"],
+    [404, "retry"], // the photo may not have landed yet
+    [429, "retry"],
+    [502, "retry"],
+    [400, "dropped"],
+    [401, "dropped"],
+    [409, "dropped"],
+    [413, "dropped"],
+    [415, "dropped"],
+  ])("HTTP %i → %s", async (status, outcome) => {
+    expect(await uploadVideoOnce(SESSION, video, respond(status))).toBe(outcome);
+  });
+
+  it("a network error is worth another try", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    expect(await uploadVideoOnce(SESSION, video, fetchImpl)).toBe("retry");
+  });
+
+  it("retries a few times, then gives up quietly with one console line", async () => {
+    const send = vi.fn().mockResolvedValue("retry");
+    const warn = vi.fn();
+    const slept: number[] = [];
+    const ok = await deliverVideo(SESSION, video, {
+      send,
+      warn,
+      delaysMs: [10, 20],
+      sleep: async (ms) => void slept.push(ms),
+    });
+    expect(ok).toBe(false);
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(slept).toEqual([10, 20]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).not.toContain(SESSION);
+  });
+
+  it("stops at once when the server will never take it, and when it succeeds", async () => {
+    const warn = vi.fn();
+    const dropped = vi.fn().mockResolvedValue("dropped");
+    expect(await deliverVideo(SESSION, video, { send: dropped, warn, sleep: async () => {} })).toBe(
+      false,
+    );
+    expect(dropped).toHaveBeenCalledTimes(1);
+    const later = vi.fn().mockResolvedValueOnce("retry").mockResolvedValueOnce("done");
+    expect(await deliverVideo(SESSION, video, { send: later, warn, sleep: async () => {} })).toBe(
+      true,
+    );
+    expect(later).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

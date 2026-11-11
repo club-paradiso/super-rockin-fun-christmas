@@ -104,3 +104,68 @@ export async function requestQr(
     return null;
   }
 }
+
+/**
+ * One attempt to send the session video (D72) for a photo the server already has.
+ * "done": stored (or was already). "retry": worth one more try (offline, 5xx, 429, and 404 —
+ * the photo may not have landed yet). "dropped": the server will never take it.
+ * The caller gives up quietly either way: the guest's photo and QR never depend on this.
+ */
+export type VideoOutcome = "done" | "retry" | "dropped";
+
+export async function uploadVideoOnce(
+  sessionId: string,
+  video: { mime: string; blob: Blob },
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = 30_000,
+): Promise<VideoOutcome> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl("/api/photos/video", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": video.mime, "x-session-id": sessionId },
+      body: video.blob,
+      signal: controller.signal,
+    });
+    if (response.ok) return "done";
+    const status = response.status;
+    return status === 404 || status === 429 || status >= 500 ? "retry" : "dropped";
+  } catch {
+    return "retry";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Send a session video with a few spaced tries, then give up. Not queued offline on purpose
+ * (D72): a video is up to 3.5 MB and only nice to have, and the durable queue is reserved for
+ * the photo and the wall answer. Returns whether the server has it.
+ */
+export async function deliverVideo(
+  sessionId: string,
+  video: { mime: string; blob: Blob },
+  opts: {
+    send?: (sessionId: string, video: { mime: string; blob: Blob }) => Promise<VideoOutcome>;
+    delaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
+    warn?: (message: string) => void;
+  } = {},
+): Promise<boolean> {
+  const send = opts.send ?? ((id, v) => uploadVideoOnce(id, v));
+  const delays = opts.delaysMs ?? [3_000, 10_000];
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const warn = opts.warn ?? ((message: string) => console.warn(message));
+  for (let attempt = 0; ; attempt++) {
+    const outcome = await send(sessionId, video);
+    if (outcome === "done") return true;
+    if (outcome === "dropped" || attempt >= delays.length) {
+      // For staff looking at the booth's console; the guest sees nothing about it.
+      warn(`session video not sent (${outcome}, ${attempt + 1} tries)`);
+      return false;
+    }
+    await sleep(delays[attempt]!);
+  }
+}

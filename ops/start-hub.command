@@ -1,5 +1,5 @@
 #!/bin/bash
-# FOLLOW THE LIGHTS - hub + booth screen (macOS). Double-click in Finder.
+# STUDIO SHALOM - hub + booth screen (macOS). Double-click in Finder.
 # Keep this window open while the event runs. Closing it stops the hub.
 cd "$(dirname "$0")/.." || exit 1
 if ! command -v node >/dev/null 2>&1; then

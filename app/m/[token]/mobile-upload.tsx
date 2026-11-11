@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BrandLockup } from "@/components/brand";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
 import {
@@ -203,11 +204,11 @@ export function MobileUpload({
   const choose = () => inputRef.current?.click();
 
   return (
-    <main className="night-sky min-h-dvh px-5 pb-12 pt-8" data-testid="mobile-upload">
+    <main className="min-h-dvh px-5 pb-12 pt-8" data-testid="mobile-upload">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <header className="text-center">
-          <p className="text-sm tracking-[0.3em] text-amber">FOLLOW THE LIGHTS</p>
-          <h1 className="mt-2 text-2xl font-bold text-cream">내 사진으로 참여하기</h1>
+          <BrandLockup className="text-[52px]" />
+          <h1 className="mt-5 text-2xl font-bold text-ink">내 사진으로 참여하기</h1>
           <Steps phase={phase.name} />
         </header>
 
@@ -227,7 +228,7 @@ export function MobileUpload({
 
         {phase.name === "pick" && (
           <section className="flex flex-col gap-4 text-center">
-            <p className="text-lg leading-relaxed text-mist">
+            <p className="text-lg leading-relaxed text-ink/75">
               휴대폰에 있는 사진 한 장을 골라 보내면,
               <br />
               운영팀이 확인한 뒤 미디어월에 걸어 드려요.
@@ -239,14 +240,14 @@ export function MobileUpload({
         )}
 
         {phase.name === "preparing" && (
-          <p className="text-center text-lg text-mist" role="status">
+          <p className="text-center text-lg text-ink/75" role="status">
             사진을 준비하고 있어요…
           </p>
         )}
 
         {(phase.name === "preview" || phase.name === "uploading") && preview && (
           <section className="flex flex-col gap-5">
-            <figure className="flex justify-center rounded-2xl bg-ink/60 p-3">
+            <figure className="flex justify-center rounded-3xl bg-paper p-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- local object URL */}
               <img
                 src={preview.url}
@@ -270,8 +271,8 @@ export function MobileUpload({
                       onClick={() => setAspect(c.aspect)}
                       className={`min-h-12 rounded-full px-4 text-base font-semibold ${
                         aspect === c.aspect
-                          ? "bg-amber text-ink"
-                          : "border border-cream/30 text-cream"
+                          ? "bg-ink text-button-text"
+                          : "border border-ink/50 text-ink"
                       }`}
                     >
                       {c.label}
@@ -280,7 +281,7 @@ export function MobileUpload({
                   <button
                     type="button"
                     onClick={() => setRotation(nextRotation)}
-                    className="min-h-12 rounded-full border border-cream/30 px-4 text-base font-semibold text-cream"
+                    className="min-h-12 rounded-full border border-ink/50 px-4 text-base font-semibold text-ink"
                     data-testid="mobile-rotate"
                   >
                     ↻ 돌리기
@@ -303,11 +304,11 @@ export function MobileUpload({
             )}
             {phase.name === "uploading" && (
               <div role="status" className="flex flex-col gap-3 text-center">
-                <p className="text-lg text-cream" data-testid="mobile-uploading">
+                <p className="text-lg text-ink" data-testid="mobile-uploading">
                   {phase.attempt > 0 ? "다시 보내고 있어요…" : "보내고 있어요…"}
                 </p>
                 <div
-                  className="h-3 overflow-hidden rounded-full bg-ink"
+                  className="h-3 overflow-hidden rounded-full bg-ink/20"
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -315,7 +316,7 @@ export function MobileUpload({
                   aria-label="보내는 중"
                 >
                   <div
-                    className="h-full bg-amber transition-[width]"
+                    className="h-full bg-button transition-[width]"
                     style={{ width: `${Math.round(phase.progress * 100)}%` }}
                   />
                 </div>
@@ -329,13 +330,13 @@ export function MobileUpload({
             <p className="text-5xl" aria-hidden>
               ✓
             </p>
-            <h2 className="text-2xl font-bold text-cream">사진을 받았어요</h2>
-            <p className="text-lg leading-relaxed text-mist">
+            <h2 className="text-2xl font-bold text-ink">사진을 받았어요</h2>
+            <p className="text-lg leading-relaxed text-ink/75">
               운영팀이 확인하고 있어요. 확인이 끝나면 미디어월에 걸려요.
               <br />
-              <strong className="text-amber">아직 미디어월에 나온 것은 아니에요.</strong>
+              <strong className="text-ink">아직 미디어월에 나온 것은 아니에요.</strong>
             </p>
-            <p className="text-base text-mist">
+            <p className="text-base text-ink/75">
               내리고 싶으면 현장 안내 봉사자에게 말씀해 주세요. 이 창은 닫아도 돼요.
             </p>
           </section>
@@ -347,8 +348,8 @@ export function MobileUpload({
             role="alert"
             data-testid="mobile-error"
           >
-            <h2 className="text-xl font-bold text-cream">보내지 못했어요</h2>
-            <p className="text-lg leading-relaxed text-mist">{phase.message}</p>
+            <h2 className="text-xl font-bold text-ink">보내지 못했어요</h2>
+            <p className="text-lg leading-relaxed text-ink/75">{phase.message}</p>
             {phase.retry && preview ? (
               <button type="button" className="btn-primary w-full" onClick={() => void submit()}>
                 다시 보내기
@@ -363,8 +364,8 @@ export function MobileUpload({
 
         {phase.name === "expired" && (
           <section className="flex flex-col gap-4 text-center" data-testid="mobile-expired">
-            <h2 className="text-xl font-bold text-cream">이 QR은 시간이 지났어요</h2>
-            <p className="text-lg leading-relaxed text-mist">
+            <h2 className="text-xl font-bold text-ink">이 QR은 시간이 지났어요</h2>
+            <p className="text-lg leading-relaxed text-ink/75">
               포토부스에서 &lsquo;내 사진으로 참여하기&rsquo;를 다시 눌러 새 QR을 받아 주세요.
             </p>
           </section>
@@ -391,7 +392,9 @@ function Steps({ phase }: { phase: Phase["name"] }) {
           key={s}
           aria-current={i + 1 === current ? "step" : undefined}
           className={`rounded-full px-3 py-1 ${
-            i + 1 === current ? "bg-amber font-bold text-ink" : "bg-ink/60 text-mist"
+            i + 1 === current
+              ? "bg-ink font-bold text-button-text"
+              : "border border-ink/40 text-ink/75"
           }`}
         >
           {i + 1}. {s}
@@ -408,20 +411,20 @@ function Steps({ phase }: { phase: Phase["name"] }) {
  */
 function Consent({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="rounded-2xl border border-cream/15 bg-ink/60 p-4">
-      <h2 className="text-lg font-bold text-cream">보내기 전에 꼭 읽어 주세요</h2>
-      <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed text-mist">
+    <div className="rounded-3xl border border-ink/15 bg-paper p-5">
+      <h2 className="text-lg font-bold text-ink">보내기 전에 꼭 읽어 주세요</h2>
+      <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed text-ink/75">
         <li>이 사진은 크리스마스 마을의 공개된 미디어월에 다른 분들 사진과 함께 보일 수 있어요.</li>
         <li>운영팀이 직접 확인하고 승인한 사진만 걸려요. 승인되지 않을 수도 있어요.</li>
-        <li>FOLLOW THE LIGHTS 미디어월에만 쓰고, 정해진 보관 기간이 지나면 지워져요.</li>
+        <li>STUDIO SHALOM 미디어월에만 쓰고, 정해진 보관 기간이 지나면 지워져요.</li>
         <li>다른 사람이 함께 나온 사진은 그분께 먼저 허락을 받아 주세요.</li>
         <li>어린이가 나온 사진은 보호자가 함께 확인한 뒤 보내 주세요.</li>
         <li>사진 속 위치 정보 같은 기록은 지우고 사진만 저장해요.</li>
       </ul>
-      <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 text-base font-semibold text-cream">
+      <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 text-base font-semibold text-ink">
         <input
           type="checkbox"
-          className="h-6 w-6 shrink-0 accent-amber"
+          className="h-6 w-6 shrink-0 accent-button"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           data-testid="mobile-consent"

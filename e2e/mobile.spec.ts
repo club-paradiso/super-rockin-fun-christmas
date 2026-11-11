@@ -164,17 +164,12 @@ test("easy mode: large screen, no frame pick, steps in words, home asks first, h
   // No frame pick before shooting in easy mode.
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
   await expect(kiosk.getByTestId("easy-step")).toContainText("촬영 준비");
-  const start = kiosk.getByRole("button", { name: "촬영 시작" });
+  const start = kiosk.getByRole("button", { name: "자유 포즈로 찍기" });
   expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(60);
-  for (const id of ["go-home", "open-help", "toggle-mode"])
+  for (const id of ["go-home", "toggle-mode"])
     expect((await kiosk.getByTestId(id).boundingBox())!.height).toBeGreaterThanOrEqual(60);
-
-  // Help is a real dialog: opens, takes focus, closes with Escape.
-  await kiosk.getByTestId("open-help").click();
-  await expect(kiosk.getByTestId("guest-help")).toBeVisible();
-  await expect(kiosk.getByTestId("guest-help")).toHaveAttribute("aria-modal", "true");
-  await kiosk.keyboard.press("Escape");
-  await expect(kiosk.getByTestId("guest-help")).toHaveCount(0);
+  // No guest help on the booth (D74): staff are on site.
+  await expect(kiosk.getByTestId("open-help")).toHaveCount(0);
 
   await start.click();
   await expect(kiosk.getByTestId("countdown-number")).toHaveText("5");

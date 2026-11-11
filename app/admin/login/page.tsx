@@ -4,13 +4,14 @@ import { getServerConfig } from "@/lib/server/env";
 import { currentStaff } from "@/lib/staff-auth/page";
 import { ensureSetupCode } from "@/lib/staff-auth/setup";
 import { getBackend } from "@/lib/storage/server";
+import { BrandLockup } from "@/components/brand";
 import { LoginForm } from "./login-form";
 import { HubSetupForm, PinLoginForm } from "./pin-login-form";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "스태프 로그인 · FOLLOW THE LIGHTS",
+  title: "스태프 로그인 · STUDIO SHALOM",
   robots: { index: false, follow: false },
 };
 
@@ -37,14 +38,16 @@ export default async function LoginPage({
         : null;
 
   return (
-    <main className="night-sky flex min-h-dvh items-center justify-center px-5 py-10">
+    <main className="flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-md">
-        <p className="text-sm tracking-[0.3em] text-amber">FOLLOW THE LIGHTS · STAFF</p>
-        <h1 className="mt-2 text-3xl font-bold text-cream">스태프 로그인</h1>
+        <div className="flex justify-center">
+          <BrandLockup className="text-[56px]" />
+        </div>
+        <h1 className="mt-8 text-3xl font-bold text-ink">스태프 로그인</h1>
         {notice && (
           <p
             role="status"
-            className="mt-4 rounded-xl bg-alert/20 p-4 text-lg text-cream"
+            className="mt-4 rounded-lg border border-danger/50 bg-paper p-4 text-lg text-ink"
             data-testid="login-denied"
           >
             {notice}
@@ -55,7 +58,7 @@ export default async function LoginPage({
         ) : staffAuth ? (
           <LoginForm />
         ) : (
-          <p className="mt-6 text-lg text-mist">{DENIED.not_configured}</p>
+          <p className="mt-6 text-lg text-ink/75">{DENIED.not_configured}</p>
         )}
       </div>
     </main>

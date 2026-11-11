@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { authenticateKiosk } from "@/lib/kiosk-auth/server";
 import { KIOSK_COOKIE } from "@/lib/kiosk-auth/session";
+import { BrandWordmark } from "@/components/brand";
 import { getServerConfig } from "@/lib/server/env";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "키오스크 등록 · FOLLOW THE LIGHTS",
+  title: "키오스크 등록 · STUDIO SHALOM",
   robots: { index: false, follow: false },
 };
 
@@ -31,14 +32,17 @@ export default async function EnrollPage({
   const auth = await authenticateKiosk((await cookies()).get(KIOSK_COOKIE)?.value ?? null);
 
   return (
-    <main className="min-h-dvh bg-ink px-8 py-12 text-cream">
+    <main className="min-h-dvh bg-backdrop px-8 py-12 text-ink">
       <div className="mx-auto flex max-w-xl flex-col gap-8">
         <header>
-          <p className="text-sm tracking-[0.3em] text-amber">STAFF · FOLLOW THE LIGHTS</p>
-          <h1 className="mt-2 text-3xl font-bold">
+          <p>
+            <BrandWordmark className="text-[22px]" />
+            <span className="ml-3 text-base font-semibold text-ink/75">STAFF</span>
+          </p>
+          <h1 className="mt-4 text-3xl font-bold">
             {toWall ? "미디어월 화면 등록" : "키오스크 기기 등록"}
           </h1>
-          <p className="mt-3 text-mist">
+          <p className="mt-3 text-ink/75">
             {toWall
               ? "이 브라우저를 미디어월 화면으로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."
               : "이 브라우저를 촬영 키오스크로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."}
@@ -46,7 +50,10 @@ export default async function EnrollPage({
         </header>
 
         {auth.ok ? (
-          <section data-testid="enroll-status" className="rounded-2xl border border-amber/40 p-6">
+          <section
+            data-testid="enroll-status"
+            className="rounded-3xl border border-ink/15 bg-paper p-6"
+          >
             <p className="text-xl">
               등록됨: <strong>{auth.label}</strong>
             </p>
@@ -64,15 +71,18 @@ export default async function EnrollPage({
         ) : (
           <div className="flex flex-col gap-8">
             {typeof error === "string" && (
-              <p role="alert" className="rounded-xl border border-alert/40 p-4 text-lg text-alert">
+              <p
+                role="alert"
+                className="rounded-lg border border-danger/50 bg-paper p-4 text-lg text-danger"
+              >
                 {ERRORS[error] ?? "등록하지 못했어요."}
               </p>
             )}
 
             {sharedPasswordEnabled && (
-              <section className="rounded-2xl border border-amber/40 p-6">
+              <section className="rounded-3xl border border-ink/15 bg-paper p-6">
                 <h2 className="text-xl font-semibold">운영자 비밀번호로 등록</h2>
-                <p className="mt-2 text-base text-mist">
+                <p className="mt-2 text-base text-ink/75">
                   운영자가 정한 등록 비밀번호를 입력하면 바로 사용할 수 있어요. 기기마다 처음 한
                   번만 등록하면 돼요.
                 </p>
@@ -90,7 +100,7 @@ export default async function EnrollPage({
                       required
                       maxLength={40}
                       placeholder={toWall ? "예: 로비 미디어월" : "예: 본당 입구 아이패드"}
-                      className="rounded-xl bg-night px-4 py-4 text-xl text-cream"
+                      className="rounded-lg border border-ink/50 bg-paper px-4 py-4 text-xl text-ink placeholder:text-ink/70"
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-lg">
@@ -100,7 +110,7 @@ export default async function EnrollPage({
                       type="password"
                       required
                       autoComplete="off"
-                      className="rounded-xl bg-night px-4 py-4 text-xl text-cream"
+                      className="rounded-lg border border-ink/50 bg-paper px-4 py-4 text-xl text-ink placeholder:text-ink/70"
                     />
                   </label>
                   <button type="submit" className="btn-primary">
@@ -110,7 +120,7 @@ export default async function EnrollPage({
               </section>
             )}
 
-            <section className="rounded-2xl border border-cream/15 p-6">
+            <section className="rounded-3xl border border-ink/15 bg-paper p-6">
               <h2 className="text-xl font-semibold">
                 {sharedPasswordEnabled ? "일회용 코드로 등록 (예비)" : "일회용 코드로 등록"}
               </h2>
@@ -129,10 +139,10 @@ export default async function EnrollPage({
                     autoComplete="off"
                     autoCapitalize="characters"
                     placeholder="예: K7QM-3XRP"
-                    className="rounded-xl bg-night px-4 py-4 text-center font-mono text-3xl tracking-[0.2em] text-cream"
+                    className="rounded-lg border border-ink/50 bg-paper px-4 py-4 text-center font-mono text-3xl tracking-[0.2em] text-ink placeholder:text-ink/70"
                   />
                 </label>
-                <p className="text-base text-mist">
+                <p className="text-base text-ink/75">
                   운영 화면(/admin → 키오스크)에서 만든 코드예요. 15분 동안 한 번만 쓸 수 있어요.
                 </p>
                 <button

@@ -17,12 +17,12 @@ export function stateLabel(state: string): string {
 }
 
 export const STATUS_TONE: Record<ModerationStatus, string> = {
-  NONE: "bg-dusk text-mist",
-  PENDING: "bg-amber text-ink",
-  APPROVED: "bg-pine text-cream",
-  REJECTED: "bg-dusk text-cream",
-  HIDDEN: "bg-dusk text-amber",
-  DELETED: "bg-alert/80 text-ink",
+  NONE: "bg-ink/10 text-ink/75",
+  PENDING: "bg-alert text-button-text",
+  APPROVED: "bg-approve text-button-text",
+  REJECTED: "bg-ink/10 text-ink",
+  HIDDEN: "bg-ink/10 text-alert",
+  DELETED: "bg-danger text-button-text",
 };
 
 export const ACTION_LABEL: Record<ModerationAction, string> = {
@@ -42,10 +42,10 @@ export const HEALTH_LABEL: Record<KioskHealth, string> = {
 };
 
 export const HEALTH_TONE: Record<KioskHealth, string> = {
-  online: "bg-pine text-cream",
-  stale: "bg-amber text-ink",
-  offline: "bg-alert/80 text-ink",
-  revoked: "bg-dusk text-mist",
+  online: "bg-approve text-button-text",
+  stale: "bg-alert text-button-text",
+  offline: "bg-danger text-button-text",
+  revoked: "bg-ink/10 text-ink/75",
 };
 
 const timeFmt = new Intl.DateTimeFormat("ko-KR", {

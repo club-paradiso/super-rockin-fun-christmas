@@ -101,7 +101,7 @@ async function shootAndAnswer(answer: "yes" | "no") {
   await kiosk.goto("/kiosk?camera=mock");
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
-  await kiosk.getByRole("button", { name: "촬영 시작" }).click();
+  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
@@ -132,6 +132,35 @@ test("online: the QR is the cloud's link, the phone downloads from the cloud, co
   const copy = (await cloudRow(hub.sessionId))!;
   expect(copy.tokenHash).toBe(sha256(tokenFromUrl(url)));
   expect(copy.wallConsent).toBe(false);
+});
+
+test("online: the session video follows the photo to the cloud; the scanned QR keeps working", async ({
+  browser,
+}) => {
+  const recordable = await kiosk.evaluate(
+    () =>
+      typeof MediaRecorder !== "undefined" &&
+      ["video/mp4", "video/webm"].some((m) => MediaRecorder.isTypeSupported(m)),
+  );
+  test.skip(!recordable, "this browser cannot record video");
+  const { url, session } = await kioskPhotoToQr(kiosk, "no");
+  expect(url.startsWith(`${CLOUD}/p/`)).toBe(true);
+  const phone = await newPage(browser);
+  // The photo is there at once; the video arrives a moment later, under the same link.
+  expect((await phone.request.get(`${url}/image`)).status()).toBe(200);
+  await expect
+    .poll(async () => (await phone.request.get(`${url}/video`)).status(), { timeout: 30_000 })
+    .toBe(200);
+  await phone.goto(url);
+  await expect(phone.getByTestId("video-download-button")).toBeVisible();
+  expect((await phone.request.get(`${url}/image`)).status()).toBe(200);
+  await phone.context().close();
+
+  const hub = (await hubRow(session))! as Row & { cloud?: { state: string; video?: string } };
+  expect(hub.cloud).toMatchObject({ state: "SYNCED", video: "SYNCED" });
+  // Still the token of the QR on screen: the video call did not issue another one.
+  expect((await cloudRow(hub.sessionId))!.tokenHash).toBe(sha256(tokenFromUrl(url)));
+  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
 });
 
 test("cloud down: 'QR 준비 중', never a fake QR; the QR appears by itself when the cloud is back", async ({

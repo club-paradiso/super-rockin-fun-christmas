@@ -11,6 +11,7 @@ import type {
   KioskRepository,
   KioskRow,
   ModerationStatus,
+  ObjectMime,
   ObjectStorage,
   PhotoListFilter,
   PhotoMime,
@@ -30,6 +31,7 @@ import type {
   WallRepository,
 } from "./types";
 import { MODERATION_STATES } from "./types";
+import type { VideoMime } from "@/lib/video/format";
 
 /**
  * Supabase Postgres + private Storage bucket, accessed only from the Next.js server with the
@@ -56,6 +58,8 @@ const toPhoto = (r: Row): PhotoRow => ({
   moderationStatus: r.moderation_status as ModerationStatus,
   deletedAt: iso(r.deleted_at),
   objectDeletedAt: iso(r.object_deleted_at),
+  videoMime: (r.video_mime as VideoMime | null) ?? null,
+  videoBytes: (r.video_bytes as number | null) ?? null,
   createdAt: iso(r.created_at)!,
   updatedAt: iso(r.updated_at)!,
 });
@@ -240,6 +244,14 @@ class SupabasePhotoRepository implements PhotoRepository {
     if (error) throw new SupabaseError("set thumb", error);
   }
 
+  async setVideo(id: string, video: { mime: VideoMime; bytes: number }) {
+    const { error } = await this.db
+      .from("photos")
+      .update({ video_mime: video.mime, video_bytes: video.bytes })
+      .eq("id", id);
+    if (error) throw new SupabaseError("set video", error);
+  }
+
   async markObjectsDeleted(id: string, atIso: string) {
     const { error } = await this.db
       .from("photos")
@@ -332,7 +344,7 @@ class SupabaseObjectStorage implements ObjectStorage {
     private readonly bucket: string,
   ) {}
 
-  async put(path: string, data: Uint8Array, mime: PhotoMime) {
+  async put(path: string, data: Uint8Array, mime: ObjectMime) {
     const { error } = await this.db.storage
       .from(this.bucket)
       .upload(path, data, { contentType: mime, upsert: false, cacheControl: "0" });

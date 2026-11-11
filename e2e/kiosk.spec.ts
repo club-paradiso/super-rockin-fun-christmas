@@ -1,10 +1,12 @@
 import { selectDefaultPhotos } from "./helpers";
 import { expect, test } from "@playwright/test";
 import {
+  SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
   photoForToken,
   shootFourWithMock,
+  startSession,
   toConsent,
   tokenFromUrl,
 } from "./helpers";
@@ -141,4 +143,41 @@ test("unknown photo link: friendly page with a 404 status", async ({ page }) => 
   const res = await page.goto(`/p/${"A".repeat(32)}`);
   expect(res!.status()).toBe(404);
   await expect(page.getByText("사진을 찾을 수 없어요")).toBeVisible();
+});
+
+test("pose guide (D71): one primary and one secondary start; poses only when asked for", async ({
+  page,
+}) => {
+  await page.goto("/kiosk?camera=mock");
+  await startSession(page);
+  // Exactly one filled button; both are large touch targets.
+  const free = page.getByTestId("shoot-free");
+  const guide = page.getByTestId("shoot-guide");
+  await expect(free).toHaveText("자유 포즈로 찍기");
+  await expect(guide).toHaveText("포즈 추천받고 찍기");
+  await expect(page.locator('[data-testid="screen-ready"] .booth-btn-primary')).toHaveCount(1);
+  for (const button of [free, guide])
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(64);
+  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 6컷을 찍어요");
+
+  await guide.click();
+  const pose = page.getByTestId("pose-guide");
+  await expect(pose).toContainText("추천 포즈");
+  await expect(pose).toContainText("서로 마주 보기");
+  await expect(pose).toHaveAttribute("data-pose", "arms-on-shoulders", { timeout: 15_000 });
+  await expect(pose).toContainText("어깨동무");
+  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(pose).toHaveCount(0);
+
+  await page.getByRole("button", { name: "1번째 사진 다시 찍기" }).click();
+  await expect(page.getByTestId("countdown-number")).toBeVisible();
+  await expect(pose).toContainText("서로 마주 보기"); // a retake keeps this guest's choice
+  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  // Free poses: nothing extra during the countdown.
+  await page.getByTestId("go-home").click();
+  await page.getByTestId("confirm-home-yes").click();
+  await startSession(page);
+  await free.click();
+  await expect(page.getByTestId("countdown-number")).toBeVisible();
+  await expect(pose).toHaveCount(0);
 });

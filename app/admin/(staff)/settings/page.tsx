@@ -36,7 +36,7 @@ export default async function SettingsPage() {
       />
       <WallHoursForm hours={settings.wallHours} timeZone={WALL_CONFIG.timeZone} />
       <KioskModeForm mode={settings.kioskDefaultMode} />
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         마지막 변경: {formatTime(settings.updatedAt)}
         {updater ? ` · ${updater.displayName}` : ""}
       </p>

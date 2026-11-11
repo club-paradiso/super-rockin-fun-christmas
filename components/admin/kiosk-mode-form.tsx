@@ -32,7 +32,7 @@ export function KioskModeForm({ mode }: { mode: KioskMode }) {
   return (
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="kiosk-mode">
       <h2 className="text-2xl font-bold">부스 시작 화면</h2>
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         방문객은 어느 화면에서든 직접 바꿀 수 있어요. 여기서는 처음 보이는 화면만 정해요.
       </p>
       <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="부스 시작 화면">
@@ -55,7 +55,7 @@ export function KioskModeForm({ mode }: { mode: KioskMode }) {
         ))}
       </div>
       {message && (
-        <p role="status" className="text-base text-mist">
+        <p role="status" className="text-base text-ink/75">
           {message}
         </p>
       )}

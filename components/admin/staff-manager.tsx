@@ -42,14 +42,16 @@ export function StaffManager({
         {staff.map((m) => (
           <li
             key={m.userId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink p-3"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-backdrop p-3"
             data-testid="staff-item"
           >
             <span>
               <strong className="text-lg">{m.displayName}</strong>{" "}
-              {m.email && <span className="text-mist">{m.email}</span>}{" "}
+              {m.email && <span className="text-ink/75">{m.email}</span>}{" "}
               {!m.active && (
-                <span className="rounded-full bg-dusk px-2 py-0.5 text-sm text-mist">비활성</span>
+                <span className="rounded-full bg-ink/10 px-2 py-0.5 text-sm text-ink/75">
+                  비활성
+                </span>
               )}
             </span>
             {mode === "pin" && (
@@ -128,12 +130,12 @@ export function StaffManager({
           스태프 추가
         </button>
       </form>
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         {mode === "pin"
           ? "추가된 사람은 로그인 화면에서 이름을 고르고 PIN을 입력해요. PIN은 본인에게 직접 알려 주세요. PIN을 바꾸면 그 사람의 기존 로그인은 바로 끊겨요."
           : "추가된 사람은 이메일로 받은 6자리 코드로 로그인해요. 비밀번호는 없어요."}
       </p>
-      {error && <p className="text-alert">{error}</p>}
+      {error && <p className="text-danger">{error}</p>}
     </section>
   );
 }

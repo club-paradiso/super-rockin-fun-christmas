@@ -70,6 +70,9 @@ class FileDb {
         ...p,
         thumbPath: p.thumbPath ?? null,
         objectDeletedAt: p.objectDeletedAt ?? null,
+        // Files written before D72 have no session video.
+        videoMime: p.videoMime ?? null,
+        videoBytes: p.videoBytes ?? null,
       });
     }
     for (const k of db.kiosks ?? []) {
@@ -237,6 +240,7 @@ export function createLocalBackend(rootDir: string): StorageBackend {
       "transition",
       "rotateToken",
       "setThumbPath",
+      "setVideo",
       "markObjectsDeleted",
       "setCloud",
     ]),

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { closeEvent, eventCloseAllowed } from "@/lib/ops/event-close";
-import { JPEG, uuid } from "../helpers/images";
+import { JPEG, WEBM, uuid } from "../helpers/images";
 
 /** "행사 종료 처리" (Phase 5, docs/RUNBOOK.md 8) through the real hub route. */
 const ORIGIN = "http://192.168.0.10:3000";
@@ -55,13 +55,16 @@ async function photosInEveryState() {
   const { getPhotoService } = await import("@/lib/storage/server");
   const svc = getPhotoService();
   const make = async (consent: boolean | null, ...actions: string[]) => {
+    const sessionId = uuid();
     const put = await svc.put({
-      sessionId: uuid(),
+      sessionId,
       kioskId: null,
       frameId: "starlight-strip",
       mime: "image/jpeg",
       data: JPEG,
     });
+    // Every session also has its video (D72): it must go with the photo.
+    await svc.attachVideo({ sessionId, kioskId: null, mime: "video/webm", data: WEBM });
     if (consent !== null) await svc.setWallConsent(put.token, consent, null);
     for (const a of actions)
       await svc.moderate(put.photo.id, a as "approve" | "reject" | "hide" | "delete", staffId);
@@ -95,9 +98,14 @@ describe("event close", () => {
   it("deletes every photo, stops the wall, audits each delete as the staff member", async () => {
     const made = await photosInEveryState();
     const { getBackend, getPhotoService } = await import("@/lib/storage/server");
+    const stored = async () =>
+      (await readdir(path.join(dir, "objects"), { recursive: true }).catch(() => [])).map(String);
+    // Six live photos with their videos; the staff delete already took the seventh's.
+    expect((await stored()).filter((f) => f.endsWith(".video.webm"))).toHaveLength(6);
     const res = await close({ confirm: "행사 종료" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deleted: 6, failed: 0, cloudQueued: 0, incomplete: false });
+    expect((await stored()).filter((f) => /\.(webm|mp4)$/.test(f))).toEqual([]);
 
     const backend = getBackend();
     for (const p of made) {

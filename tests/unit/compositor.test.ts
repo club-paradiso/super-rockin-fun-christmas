@@ -127,7 +127,11 @@ describe("composeFrame", () => {
     expect(render()).toHaveLength(4);
     const draws = render(new Map([["/frames/navy-lockup.svg", lockup]]));
     const logo = draws.find((d) => (d.args[0] as { id?: string }).id === "lockup");
-    expect(logo?.args.slice(1)).toEqual([91, 1580, 418, 69]);
+    // The box is data (config/frames/navy-strip.ts): the lockup, 132 px tall, centred on 600.
+    const [x, y, w, h] = logo!.args.slice(1) as number[];
+    expect([y, h]).toEqual([1562, 132]);
+    expect(w).toBeCloseTo(132 * (422 / 156.13), 6);
+    expect(x).toBeCloseTo((600 - w!) / 2, 6);
   });
 
   it("refuses a frame that places a slot twice", () => {

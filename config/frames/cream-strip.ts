@@ -1,5 +1,5 @@
 import type { FrameDefinition } from "@/lib/compositor/types";
-import { stripSlots, STRIP } from "./shared";
+import { lockupBox, stripSlots, STRIP } from "./shared";
 
 // Template D · Cream Strip — 마태복음 2:9-10, 별을 따라가는 빛의 길. 가장 밝고 단정한 안.
 export const creamStrip: FrameDefinition = {
@@ -20,15 +20,12 @@ export const creamStrip: FrameDefinition = {
     {
       type: "image",
       src: "/frames/cream-lockup.svg",
-      x: 91,
-      y: 1588,
-      width: 418,
-      height: 69,
+      ...lockupBox(1583, 86),
       brand: { color: "#0b1026", on: "#fff7e6" },
     },
     {
       type: "text",
-      text: "별빛을 따라 오신 걸 환영해요",
+      text: "PEACEMAKERS · MT 5:9",
       x: 300,
       y: 1696,
       size: 20,

@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { CloudClient, CloudLink, CloudResult } from "@/lib/cloud/client";
 import { CloudSync } from "@/lib/cloud/sync";
-import { JPEG, uuid } from "../helpers/images";
+import { JPEG, WEBM, uuid } from "../helpers/images";
 
 /**
  * The hub's routes with a cloud configured (FTL_ROLE=hub + CLOUD_BASE_URL). The HTTP client is
@@ -18,6 +18,7 @@ let online = true;
 const live = new Map<string, string>();
 let n = 0;
 const removed: string[] = [];
+const videos = new Map<string, string>(); // sessionId → mime of the video the cloud holds
 const expired = new Set<string>(); // the cloud's retention deleted these copies
 const down = <T>(): CloudResult<T> => ({ ok: false, retry: true, message: "cloud unreachable" });
 const gone = <T>(): CloudResult<T> => ({ ok: false, retry: false, gone: true, message: "410" });
@@ -41,6 +42,12 @@ const client: CloudClient = {
     if (!online) return down();
     live.delete(s);
     removed.push(s);
+    return { ok: true, value: null };
+  },
+  putVideo: async (v) => {
+    if (!online) return down();
+    if (!live.has(v.sessionId)) return { ok: false, retry: false, message: "404" };
+    videos.set(v.sessionId, v.mime);
     return { ok: true, value: null };
   },
 };
@@ -155,6 +162,47 @@ describe("hub upload with a cloud", () => {
     expect((await askQr(other, sessionId)).status).toBe(404);
     expect((await askQr("", sessionId)).status).toBe(401);
     expect((await askQr(kiosk, uuid())).status).toBe(404);
+  });
+});
+
+describe("session video on a hub with a cloud (D72)", () => {
+  async function sendVideo(cookie: string, sessionId: string) {
+    const { POST } = await import("@/app/api/photos/video/route");
+    return POST(
+      new Request(`${ORIGIN}/api/photos/video`, {
+        method: "POST",
+        body: WEBM,
+        headers: {
+          "content-type": "video/webm",
+          "x-session-id": sessionId,
+          origin: ORIGIN,
+          cookie,
+        },
+      }),
+    );
+  }
+
+  it("the video follows the photo copy to the cloud; the QR's token is not replaced", async () => {
+    online = true;
+    const { sessionId, body } = await upload(kiosk);
+    const token = live.get(sessionId);
+    expect(body.url).toBe(`https://cloud.example.org/p/${token}`);
+    expect((await sendVideo(kiosk, sessionId)).status).toBe(201);
+    await vi.waitFor(() => expect(videos.get(sessionId)).toBe("video/webm"));
+    expect(live.get(sessionId)).toBe(token);
+    expect((await rowFor(sessionId)).cloud).toMatchObject({ state: "SYNCED", video: "SYNCED" });
+  });
+
+  it("cloud down: the kiosk still gets 201 at once, and the video goes when the cloud is back", async () => {
+    online = true;
+    const { sessionId } = await upload(kiosk);
+    online = false;
+    expect((await sendVideo(kiosk, sessionId)).status).toBe(201);
+    await vi.waitFor(async () =>
+      expect((await rowFor(sessionId)).cloud).toMatchObject({ video: "PENDING", attempts: 1 }),
+    );
+    expect(videos.has(sessionId)).toBe(false);
+    online = true;
   });
 });
 

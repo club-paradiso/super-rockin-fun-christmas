@@ -40,7 +40,7 @@ export default async function PhotosPage({
     <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-bold">사진</h1>
       <form className="admin-card flex flex-wrap items-end gap-3 p-4" action="/admin/photos">
-        <label className="flex flex-col gap-1 text-base text-mist">
+        <label className="flex flex-col gap-1 text-base text-ink/75">
           상태
           <select name="status" defaultValue={status} className="admin-input">
             <option value="">전체</option>
@@ -51,7 +51,7 @@ export default async function PhotosPage({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-base text-mist">
+        <label className="flex flex-col gap-1 text-base text-ink/75">
           기간
           <select name="window" defaultValue={window} className="admin-input">
             {(Object.keys(PHOTO_WINDOWS) as PhotoWindow[]).map((w) => (
@@ -61,7 +61,7 @@ export default async function PhotosPage({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-base text-mist">
+        <label className="flex flex-col gap-1 text-base text-ink/75">
           키오스크
           <select name="kiosk" defaultValue={kiosk} className="admin-input">
             <option value="">전체</option>
@@ -72,7 +72,7 @@ export default async function PhotosPage({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-base text-mist">
+        <label className="flex flex-col gap-1 text-base text-ink/75">
           세션 코드
           <input name="session" defaultValue={session} className="admin-input w-44 font-mono" />
         </label>
@@ -80,7 +80,7 @@ export default async function PhotosPage({
           적용
         </button>
       </form>
-      <p className="text-base text-mist">{photos.length}장 (최대 120장)</p>
+      <p className="text-base text-ink/75">{photos.length}장 (최대 120장)</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="photo-library">
         {photos.map((p) => (
           <PhotoCard key={p.id} photo={p} />

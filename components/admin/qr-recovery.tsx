@@ -44,21 +44,21 @@ export function QrRecovery({ photoId }: { photoId: string }) {
       >
         QR 다시 보여주기
       </button>
-      {error && <p className="text-base text-alert">{error}</p>}
+      {error && <p className="text-base text-danger">{error}</p>}
       {result && (
         <div
-          className="flex flex-col items-center gap-3 rounded-xl bg-cream/5 p-4"
+          className="flex flex-col items-center gap-3 rounded-lg bg-ink/10 p-4"
           data-testid="qr-again-result"
           data-url={result.url}
         >
           <div
-            className="w-64 rounded-xl bg-white p-3"
+            className="w-64 rounded-lg bg-white p-3"
             dangerouslySetInnerHTML={{ __html: result.svg }}
           />
-          <p className="text-center text-base text-mist">
+          <p className="text-center text-base text-ink/75">
             방문객 휴대폰 카메라로 비춰 주세요. {formatTime(result.expiresAt)}까지 유효.
           </p>
-          <p className="break-all text-center font-mono text-sm text-mist">{result.url}</p>
+          <p className="break-all text-center font-mono text-sm text-ink/75">{result.url}</p>
         </div>
       )}
       <ConfirmDialog
@@ -69,7 +69,7 @@ export function QrRecovery({ photoId }: { photoId: string }) {
         onConfirm={rotate}
         onCancel={() => setConfirming(false)}
       >
-        이전 QR과 링크는 <strong className="text-cream">더 이상 작동하지 않아요.</strong> 사진은
+        이전 QR과 링크는 <strong className="text-ink">더 이상 작동하지 않아요.</strong> 사진은
         그대로예요.
       </ConfirmDialog>
     </div>

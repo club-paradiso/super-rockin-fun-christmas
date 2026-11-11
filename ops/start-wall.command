@@ -1,5 +1,5 @@
 #!/bin/bash
-# FOLLOW THE LIGHTS - media wall screen (macOS). Double-click in Finder.
+# STUDIO SHALOM - media wall screen (macOS). Double-click in Finder.
 # Needs only Chrome or Edge. The hub address is the first line of wall-hub.txt next to this file
 # (shown in the hub window). If the browser closes or crashes it is opened again.
 DIR="$(cd "$(dirname "$0")" && pwd)"

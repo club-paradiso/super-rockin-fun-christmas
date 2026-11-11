@@ -1,7 +1,17 @@
+function positiveInt(value: string | undefined, fallback: number): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
   shotsPerSession: 6,
-  countdownSeconds: 3,
+  /**
+   * Seconds counted before every shot (D71). Easy mode is never shorter (lib/kiosk/machine.ts).
+   * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
+   * the E2E run does not wait 6 × 10 s per session. Do not set it on a real booth.
+   */
+  countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 10),
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview
    * box uses the same ratio with object-fit: cover, so what the guest sees is what is saved.
@@ -20,6 +30,19 @@ export const KIOSK_CONFIG = {
    * ("잠시 뒤 처음 화면으로 돌아가요"); every touch starts it again.
    */
   idleResetSeconds: Number(process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS ?? 90),
+  /**
+   * Session video (D72): a silent highlight reel, one file per session. For each shot only the
+   * last `videoSecondsPerShot` seconds of the countdown plus the capture moment are recorded.
+   */
+  videoSecondsPerShot: 3,
+  /** Retakes keep appending only while the reel is shorter than this. */
+  videoMaxSeconds: 30,
+  videoBitsPerSecond: 1_000_000,
+  /**
+   * Hard cap, enforced on the booth and on every server route (413). The cloud runs on Vercel,
+   * where request bodies above about 4.5 MB fail. A video over the cap is dropped, never trimmed.
+   */
+  videoMaxBytes: 3_500_000,
   /** Hub + cloud: how often the kiosk asks whether a pending QR copy has reached the cloud. */
   qrPollSeconds: 3,
   /** Staff help mode (hub): hold the top-left corner this long to open it. */

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { KIOSK_CONFIG } from "@/config/kiosk";
 import { isMobilePhoto, MOBILE_FRAME_ID } from "@/config/mobile";
+import { VIDEO_MIMES, hasVideoSignature, videoExt, type VideoMime } from "@/lib/video/format";
 import { isWallEligible, planModeration, type ModerationAction } from "@/lib/ops/moderation";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
@@ -29,6 +31,29 @@ export interface PhotoServiceOptions {
 /** Derived objects that live next to a photo and must go when it goes. */
 const derivedPath = (objectPath: string, kind: "thumb" | "wall") =>
   `${objectPath.replace(/\.[a-z]+$/, "")}.${kind}.jpg`;
+
+/**
+ * Where a photo's session video lives (D72): next to the photo, by name. Derived, not stored, so
+ * deleting a photo always reaches its video, even one whose row was never updated.
+ */
+export const videoPath = (objectPath: string, mime: VideoMime) =>
+  `${objectPath.replace(/\.[a-z]+$/, "")}.video.${videoExt(mime)}`;
+
+export interface AttachVideoInput {
+  sessionId: string;
+  /** The kiosk that took the photo; null for a hub copy on the cloud. */
+  kioskId: string | null;
+  mime: string;
+  data: Uint8Array;
+}
+
+export type AttachVideoResult =
+  | { ok: true; photoId: string; duplicate: boolean }
+  /**
+   * not_found: no photo for this session and kiosk (yet). closed: the photo is deleted, or is a
+   * phone photo. too_large / invalid: the bytes will never be accepted.
+   */
+  | { ok: false; reason: "not_found" | "closed" | "too_large" | "invalid" };
 
 export interface PutPhotoInput {
   sessionId: string;
@@ -106,6 +131,7 @@ export function toGuestPhoto(row: PhotoRow): GuestPhoto {
     bytes: row.bytes,
     createdAt: row.createdAt,
     tokenExpiresAt: row.tokenExpiresAt,
+    video: row.videoMime && row.videoBytes ? { mime: row.videoMime, bytes: row.videoBytes } : null,
   };
 }
 
@@ -194,6 +220,8 @@ export class PhotoService {
       moderationStatus: "NONE",
       deletedAt: null,
       objectDeletedAt: null,
+      videoMime: null,
+      videoBytes: null,
       createdAt: created.toISOString(),
       updatedAt: created.toISOString(),
     };
@@ -269,6 +297,8 @@ export class PhotoService {
       moderationStatus: "NONE",
       deletedAt: null,
       objectDeletedAt: null,
+      videoMime: null,
+      videoBytes: null,
       createdAt: created.toISOString(),
       updatedAt: created.toISOString(),
     };
@@ -348,6 +378,63 @@ export class PhotoService {
     const row = await this.backend.photos.findBySessionId(sessionId);
     if (!row || !isMobilePhoto(row) || row.kioskId !== null || isGone(row)) return null;
     return this.backend.objects.get(row.objectPath);
+  }
+
+  // ── session video (D72) ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Attach the booth's silent session video to the photo of the same session. Best-effort by
+   * design: nothing about the photo, its guest link, wall consent or moderation depends on it or
+   * is changed by it (no token is touched, so a scanned QR keeps working). One video per photo:
+   * a retry is a no-op. Phone photos (D66) never have one. Only the kiosk that took the photo
+   * may attach (kioskId null = the hub, for its own copies on the cloud).
+   */
+  async attachVideo(input: AttachVideoInput): Promise<AttachVideoResult> {
+    const mime = (VIDEO_MIMES as readonly string[]).includes(input.mime)
+      ? (input.mime as VideoMime)
+      : null;
+    if (!mime) return { ok: false, reason: "invalid" };
+    if (input.data.byteLength > KIOSK_CONFIG.videoMaxBytes)
+      return { ok: false, reason: "too_large" };
+    if (!hasVideoSignature(input.data, mime)) return { ok: false, reason: "invalid" };
+
+    const row = await this.backend.photos.findBySessionId(input.sessionId);
+    if (!row || row.kioskId !== input.kioskId) return { ok: false, reason: "not_found" };
+    if (isGone(row) || isMobilePhoto(row)) return { ok: false, reason: "closed" };
+    if (row.videoMime) return { ok: true, photoId: row.id, duplicate: true };
+
+    const path = videoPath(row.objectPath, mime);
+    try {
+      await this.backend.objects.put(path, input.data, mime);
+    } catch {
+      // Left over from an attempt that stored the bytes but never recorded them: replace it.
+      await this.backend.objects.remove(path);
+      await this.backend.objects.put(path, input.data, mime);
+    }
+    await this.backend.photos.setVideo(row.id, { mime, bytes: input.data.byteLength });
+    // Deleted while the bytes were being stored: do not leave the video behind.
+    const after = await this.backend.photos.getById(row.id);
+    if (!after || isGone(after)) {
+      await this.backend.objects.remove(path).catch(() => undefined);
+      return { ok: false, reason: "closed" };
+    }
+    return { ok: true, photoId: row.id, duplicate: false };
+  }
+
+  /** Guest video by token. Same lookup as the photo; "unknown" also when there is no video. */
+  async readVideo(
+    token: string,
+  ): Promise<{ mime: VideoMime; createdAt: string; data: Uint8Array } | ResolveResult> {
+    const found = await this.resolve(token);
+    if (!found.ok) return found;
+    const video = await this.videoOf(found.row);
+    return video ? { ...video, createdAt: found.row.createdAt } : { ok: false, reason: "unknown" };
+  }
+
+  private async videoOf(row: PhotoRow): Promise<{ mime: VideoMime; data: Uint8Array } | null> {
+    if (!row.videoMime || isMobilePhoto(row)) return null;
+    const data = await this.backend.objects.get(videoPath(row.objectPath, row.videoMime));
+    return data ? { mime: row.videoMime, data } : null;
   }
 
   // ── guest delivery ───────────────────────────────────────────────────────────────────────
@@ -675,6 +762,9 @@ export class PhotoService {
     // Lazily generated copies use these derived paths even if the row never recorded them.
     await this.backend.objects.remove(derivedPath(row.objectPath, "thumb"));
     await this.backend.objects.remove(derivedPath(row.objectPath, "wall"));
+    // The session video goes wherever the photo goes (D72): both names, recorded or not.
+    for (const mime of VIDEO_MIMES)
+      await this.backend.objects.remove(videoPath(row.objectPath, mime));
   }
 
   private async removeObjectsAndMark(row: PhotoRow): Promise<boolean> {

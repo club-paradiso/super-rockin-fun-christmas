@@ -81,19 +81,31 @@ describe("frame definitions", () => {
       );
     });
 
-    // The wordmark is small on a phone screen and on the wall's 1400 px copy: keep it big enough
-    // to read, below every photo and with enough contrast (docs/DECISIONS.md D63, D65).
-    it("draws a legible FOLLOW THE LIGHTS wordmark", () => {
+    // The lockup is small on a phone screen and on the wall's 1400 px copy: keep it big enough
+    // to read, below every photo and with enough contrast (docs/DECISIONS.md D63, D65, D73).
+    // The old one-line wordmark had to be 55 % of the width to get letters about 30 px tall. The
+    // STUDIO SHALOM lockup is four stacked lines (422 × 156.13), so the same letter height needs
+    // less width: at 80 px tall, SHALOM's capitals are about 32 px. Both sizes are checked.
+    it("draws a legible STUDIO SHALOM lockup", () => {
       const brands = frame.decorations.filter((d) => d.type === "image" && d.brand);
       expect(brands).toHaveLength(1);
       const logo = brands[0]!;
       if (logo.type !== "image" || !logo.brand) return;
-      expect(logo.width / frame.outputWidth).toBeGreaterThanOrEqual(0.55);
+      expect(logo.width / frame.outputWidth).toBeGreaterThanOrEqual(0.38);
+      expect(logo.height).toBeGreaterThanOrEqual(80);
+      // Drawn at the SVG's own proportions (never stretched) and centred on the strip.
+      const svg = readFileSync(join("public", logo.src), "utf8");
+      const [, w, h] = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg)!;
+      expect(logo.width / logo.height).toBeCloseTo(Number(w) / Number(h), 3);
+      expect(logo.x + logo.width / 2).toBeCloseTo(frame.outputWidth / 2, 3);
+      // Outlined paths only: a canvas has no web fonts, so live text would change the wordmark.
+      expect(svg).not.toMatch(/<text|font-family/);
       expect(logo.x).toBeGreaterThanOrEqual(0);
       expect(logo.x + logo.width).toBeLessThanOrEqual(frame.outputWidth);
       // Below every photo, never on top of a face.
       const lowest = Math.max(...frame.slots.map((s) => s.y + s.height));
       expect(logo.y).toBeGreaterThanOrEqual(lowest);
+      expect(logo.y + logo.height).toBeLessThanOrEqual(frame.outputHeight);
       expect(contrast(logo.brand.color, logo.brand.on)).toBeGreaterThanOrEqual(4.5);
     });
 

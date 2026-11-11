@@ -37,12 +37,12 @@ export function ConfirmDialog({
         e.preventDefault();
         onCancel();
       }}
-      className="m-auto w-[min(92vw,30rem)] rounded-2xl border border-cream/20 bg-night p-0 text-cream backdrop:bg-ink/80"
+      className="m-auto w-[min(92vw,30rem)] rounded-3xl border border-ink/15 bg-paper p-0 text-ink backdrop:bg-ink/70"
       data-testid="confirm-dialog"
     >
       <div className="flex flex-col gap-5 p-6">
         <h2 className="text-2xl font-bold">{title}</h2>
-        <div className="text-lg leading-relaxed text-mist">{children}</div>
+        <div className="text-lg leading-relaxed text-ink/75">{children}</div>
         <div className="flex flex-wrap justify-end gap-3">
           <button
             type="button"

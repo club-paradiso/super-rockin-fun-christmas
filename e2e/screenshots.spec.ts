@@ -25,7 +25,7 @@ async function shootToReview(page: Page) {
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
   await startSession(page);
-  await page.getByRole("button", { name: "촬영 시작" }).click();
+  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
@@ -50,7 +50,7 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   await page.waitForTimeout(800); // mock camera's first frames
   await shot(page, "booth-1280x800-03-ready");
-  await page.getByRole("button", { name: "촬영 시작" }).click();
+  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
   await shot(page, "booth-1280x800-04-countdown");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
@@ -86,7 +86,7 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
   await shot(page, "booth-1920x1080-01-welcome");
   await startSession(page);
-  await page.getByRole("button", { name: "촬영 시작" }).click();
+  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();

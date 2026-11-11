@@ -642,3 +642,213 @@ reproduced by tests that fail on the old code:
   the cloud delete its copy: the photo stayed `NONE` without consent, invisible to review. The hub
   now finishes an existing row (`PhotoService.completeMobile`) before acknowledging; a photo
   deleted on the hub stays deleted.
+
+## D71 · Optional pose guide; every shot counts 10 seconds
+
+Product decision (user, 2026-11-11): "포즈 가이드를 선택하면 추천 포즈를 안내하고, 그렇지 않으면 자유
+포즈로 10초 카운트다운 해서 한 컷씩 총 6컷 촬영".
+
+- **Countdown is 10 s per shot** (`KIOSK_CONFIG.countdownSeconds`), six shots, one at a time. Easy
+  mode keeps its rule "never shorter than standard" (`EASY_MIN_COUNTDOWN` floor of 5 s), so on a
+  real booth both modes count 10 s. `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is a test-only override
+  (set to 3 in `e2e/env.ts`, inlined at build) so the E2E suite does not wait a minute per session;
+  it is not in `.env.example` and must not be set on a booth.
+- **The pose guide is a choice on the ready screen, not a second flow.** One filled button
+  "자유 포즈로 찍기" (default) and one outlined "포즈 추천받고 찍기". `BEGIN_SHOOTING` carries
+  `guide`; the state keeps `poseGuide` (false by default, cleared by RESET). The pure selector
+  `currentPose` returns the pose for the shot being counted down or captured: null in free mode,
+  pose i for a retake of shot i. Nothing else in the machine reads it, so shooting, selection,
+  consent and upload are identical with or without the guide, in both screen modes (D67).
+- **Poses are data** in `config/poses.ts` (`{ id, label }`, one per shot): 서로 마주 보기, 어깨동무,
+  악수하기, twice. `tests/unit/poses.test.ts` requires the length to equal `shotsPerSession`. Text
+  only: there are no pose illustrations and none were invented.
+- After a camera reconnect the guest is back on the ready screen and chooses again; the shots
+  already taken are kept as before.
+- In easy mode the ready screen leaves out the "LIGHTS, CAMERA, ACTION!" wordmark and the empty
+  shot strip (both return during the countdown): with two start buttons and the notices, the large
+  type did not fit 1280 × 800 otherwise (checked with screenshots at 1280 × 800 and 1080 × 1920).
+- **Not verified:** how 10 s feels at a real booth with a queue (six shots now take about 70 s),
+  and whether the pose band over the preview is readable from where guests stand.
+
+## D72 · Session video: a silent highlight reel behind the same QR (user confirmation pending)
+
+User request (2026-11-11): "QR 코드로 사진 다운받을 때, 촬영 영상도 같이 다운받을 수 있도록". The
+choices below were made to implement it and are **waiting for the user's confirmation**.
+
+What was decided:
+
+1. **Silent video only.** The booth never asks for a microphone (`getUserMedia({ audio: false })`,
+   unchanged) and the recorder is given the camera stream as it is.
+2. **A highlight reel, one file per session.** For each shot only the last
+   `KIOSK_CONFIG.videoSecondsPerShot` (3) seconds of the countdown plus the capture moment are
+   recorded, with one MediaRecorder that is paused between shots (`lib/kiosk/recorder.ts`). Retakes
+   append while the reel is under `videoMaxSeconds` (30) and one more segment still fits under the
+   size cap. Target bitrate `videoBitsPerSecond` (1 Mbit/s).
+3. **Size cap `videoMaxBytes` = 3 500 000, hard.** The cloud runs on Vercel, where request bodies
+   above about 4.5 MB fail. Enforced on the booth (a video over the cap is dropped whole, never
+   trimmed), in `PhotoService.attachVideo`, in both upload routes (413), and by a column check.
+4. **MP4 when the booth's browser can record it, else WebM.** Servers accept only those two and
+   check the container's magic bytes (`lib/video/format.ts`).
+5. **Strictly best-effort.** Nothing in photography, the photo upload, wall consent or QR delivery
+   waits for the video or reads its result. Unsupported, failed or oversized means the session has
+   no video. The guest page shows "영상 저장" only when the server really has one.
+6. **Guests are told** on the ready screen: "촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지
+   않아요." The line is shown only when this booth's browser can record.
+7. **Phone uploads (D66) never have a video; the media wall never receives one**, nor a URL or a
+   flag about it (`WallPhoto` and `wall_eligible_photos` are unchanged; tested).
+
+How it is built:
+
+- **Storage.** The video is an object next to the photo at a derived path
+  (`<photo>.video.mp4|webm`, `videoPath` in `photo-service.ts`); the row records only
+  `videoMime` / `videoBytes` (migration `20261111090000_session_video.sql`, which also lets the
+  private bucket hold the two video types). Because the path is derived, every place that removes
+  a photo's image removes the video too — staff delete, DELETED moderation, retention, hub
+  retention, event close, `deleteForHub` — even a video whose row was never updated. `setVideo` is
+  unaudited bookkeeping like the thumbnail path: it is not a decision about the photo.
+- **Kiosk → server.** `POST /api/photos/video` (kiosk cookie only): raw bytes, `x-session-id`,
+  after the photo exists (404 before). Idempotent per session: the first video stays. It touches
+  no token, state or consent.
+- **Not queued offline.** The durable IndexedDB queue stays reserved for the photo and the wall
+  answer. The finished video is kept in memory (at most three sessions), sent when the photo's
+  upload succeeds, tried three times (3 s and 10 s apart), then dropped: the guest sees nothing,
+  the booth console gets one line, and the server logs every refusal it sees
+  (`upload_video_refused`, `upload_video_too_large`, `upload_video_storage_failed`). A reload or a
+  long outage loses the video, never the photo.
+- **Hub + cloud.** `CloudCopy.video` (PENDING → SYNCED | DROPPED). `CloudSync.trackVideo` sends it
+  with `putVideo` → `POST /api/hub/photos/video` (Bearer `HUB_SYNC_SECRET`, hub copies only, 410
+  once the copy is deleted) under the same per-photo lock, only after the photo copy is SYNCED. It
+  never calls `put` or `reissue`, so the guest token is never reissued and a scanned QR keeps
+  working. The QR never waits for it. Retries use the same backoff; after 8 tries or a final
+  refusal the video is DROPPED.
+- **Guest.** `GET`/`HEAD /p/[token]/video`: same uniform 404 as the image for unknown, expired
+  and deleted links and for photos without a video; `Content-Type`, `Content-Length`,
+  `Accept-Ranges`, single byte ranges (206/416), and the image route's `private, no-store`.
+  The page adds a secondary "영상 저장" (`save-video.tsx`, same share-or-download approach as the
+  photo); the photo stays the one primary action.
+- **USB backup includes videos.** The backup mirrors the hub's `objects/` folder, so videos are
+  copied with the photos and removed from the stick when the hub deletes them. Up to 3.5 MB more
+  per session on the laptop and the stick.
+
+Choices the request left open (also for the user to confirm):
+
+- The video is the raw camera picture: **not mirrored** (the photo is) and not cropped to 4:3.
+  Mirroring would need a second canvas pipeline running during the shoot.
+- Recording ends when the guest confirms the shots ("이대로 좋아요"); a session abandoned before
+  that has no video. A camera reconnect mid-session starts the reel over.
+- Staff pages do not show or play the video; moderation is about the photo. Deleting the photo
+  deletes the video.
+- The guest page is rendered once: if the phone opens the link before the video has arrived
+  (normally a second or two after the photo), the button appears on a reload.
+- Storage statistics (`storedBytes`) still count photos only.
+
+Known limit: the video route sets `Content-Length` (unit-tested at the handler), but Next.js
+16.4.5's own Node server (`next start`, i.e. the hub) removes that header from every route
+response and sends it chunked (`FORBIDDEN_HEADERS` in `next/dist/server/send-response.js`; the
+photo route has always been served that way). A 206 still carries the total size in
+`Content-Range`. No workaround was forced; what Vercel puts on the wire was not checked.
+
+Not verified: playback and saving on real phones — in particular **iPhone with a WebM file**
+(only produced when the booth's browser cannot record MP4), and saving a recorded MP4 to the
+iPhone Photos app from the share sheet. Real booth cameras at 1 Mbit/s (picture quality, actual
+file sizes). The migration on a real Supabase project.
+
+## D73 · The brand is STUDIO SHALOM; the flow, the rules and the wall scene do not change
+
+User decision (2026-11-11): the service is renamed from FOLLOW THE LIGHTS to **STUDIO SHALOM**
+(평화의 벽). The event is still "Christmas Village 2026". The theme verse reference is "MT 5:9";
+the verse text is not decided, so it is written nowhere.
+
+What changed:
+
+1. **Name and lockup** wherever a person sees them: booth, `/p/[token]`, `/m/[token]`, admin
+   header and login, kiosk enrollment, page titles, download file names
+   (`studio-shalom-DATE.jpg|mp4|webm`), the staff login email, the hub console and the `ops/`
+   wrappers, the USB backup README. The lockup is four stacked, centred parts: `STUDIO` /
+   `SHALOM` / a short thin divider / `평화의 벽`. On screen it is real text
+   (`components/brand.tsx`); screen headers too small for it use the name on one line
+   (`BrandWordmark`).
+2. **Tokens** (`app/globals.css`): `backdrop #DDBDA1`, `ink #2B1A10`, `button #412D1B`,
+   `button-text` = `paper #F6EEE4`, `accent #7A440E`. The night tokens (`ink` as a background,
+   `night`, `dusk`, `amber`, `ember`, `cream`, `mist`, `navy`, `gold`, `warm`, `glow`, `ink-400`)
+   are gone, not aliased. Flat paper: no star field, no gradients, no glow shadows. One filled
+   button per view, pill buttons, 24 px cards, 8 px small controls. Muted text is `ink/75`
+   (5.26:1 on backdrop). `accent` is 4.46:1 on backdrop, so it is used for text only at ≥ 24 px.
+3. **Staff status colours** are functional, not brand: `approve #1B5233`, `danger #8F1D14`,
+   `alert #7C3500`. Each is ≥ 4.5:1 as text on backdrop and on paper, and under `button-text`.
+4. **Fonts**, all OFL and bundled so the hub works offline: Cormorant Garamond 500/600 (`STUDIO`,
+   `SHALOM`) and Nanum Myeongjo 400 (`평화의 벽`), only in the lockup. UI text stays Noto Sans KR
+   (Pretendard is undecided). Countdown numerals stay in the sans: Cormorant's old-style "10" reads
+   as "IO".
+5. **Frames.** Layout, slots, ids and the other art are unchanged. Only the lockup art changed:
+   `public/frames/{navy,wood,cream}-lockup.svg` are now STUDIO SHALOM lockups whose glyphs are
+   outlined paths taken from the bundled font files (a canvas has no web fonts), in each frame's
+   earlier lockup colours. The lockup box in each frame is `lockupBox(y, height)`
+   (`config/frames/shared.ts`).
+6. **The legible-wordmark rule changed numbers.** It was "at least 55 % of the output width" for a
+   one-line wordmark (418 × 69, letters about 30 px tall). The stacked lockup is 422 × 156.13: at
+   55 % width it would be 122 px tall, and three frames (wood, clothesline, cream) have about
+   90–100 px between the art above and below it. The rule is now width ≥ 38 % **and** height ≥ 80 px
+   (SHALOM capitals about 32 px, so the main word is not smaller than before), the SVG's own
+   proportions, centred, outlined paths only, below every photo, contrast ≥ 4.5:1. `평화의 벽` is
+   about 13 px tall at 1× (26 px in the saved 2× file) in the three tight frames.
+7. **The "LIGHTS, CAMERA, ACTION!" title art** on the ready screen was removed (an old-brand pun);
+   nothing replaces it.
+8. **The media wall keeps its clothesline night scene**: layout, rotation and animations are
+   untouched. Its colours moved to a palette scoped to the wall (`.wall-stage`, `--wall-*`, the old
+   values). Only the wordmark changed: the text in the holding screen and on the phone-photo card,
+   and the wordmark painted into `public/wall/background-v3.jpg` (the old one was filled in from
+   the plain strip either side of it and the lockup drawn in the same gold).
+
+What did not change, on purpose:
+
+- **Internal identifiers** keep the old name: `FTL_ROLE` and the other `FTL_*` variables, SQL
+  `ftl_*` functions, the `ftl_staff` cookie, migration files, IndexedDB `follow-the-lights` (queued
+  uploads live there), the wall browser profile folders in `ops/start-wall.*`, `x-client-info`,
+  the Supabase `project_id`, the package name, the repository and the
+  `follow-the-lights-wall.vercel.app` hostname. Renaming any of them breaks deployed hubs or loses
+  queued uploads.
+- **Flow and rules.** The Figma kiosk flow for STUDIO SHALOM has a name input, a checkbox consent
+  and a grid wall. None of them was built: no personal data is collected, the wall question keeps
+  two equal answers, and the wall is the clothesline scene (`design/README.md`).
+- **Copy.** Korean UI strings were kept unless they contained the brand name. The welcome title
+  "별빛을 따라 오셨나요?" and the cream frame's "별빛을 따라 오신 걸 환영해요" still speak the old
+  theme; replacing them needs new copy from the user.
+- Historical records (earlier STATUS sections, decisions, reports, `design/previews/`) keep the
+  old name.
+
+Not verified: any real device (booth touch screen, phones, the LED wall); colour and legibility in
+the venue's light; the lockup's relative sizes against the Figma file (the spec gave the fonts and
+letter-spacing, the size ratios were chosen here); the staff login email on a real Supabase
+project.
+
+## D74 · No guest help on the booth; the wall take-down line moves to the phone page
+
+User decision (2026-11-11): staff are at the booth for the whole event, so the booth's guest help
+is removed.
+
+- Removed: the "도움말" button on the welcome screen and in the footer ("도움이 필요해요" in easy
+  mode), the help dialog (`GuestHelp`), its state and its E2E check.
+- Kept: staff help mode (D59: corner hold + name + PIN). The name is similar but it is the staff
+  recovery tool. "처음으로" and "쉬운 화면" stay.
+- The dialog told guests how to have a photo taken off the wall. That is the way to withdraw
+  consent, so it must stay somewhere: `/p/[token]` now ends with "미디어월에 걸린 사진을 내리고
+  싶으면 부스 직원에게 말씀해 주세요." The cloud copy has no wall consent (D40), so the line shows
+  for every guest, whatever they answered.
+- The "how to scan the QR" and "how to save the photo" tips are gone from the screen; staff
+  explain them.
+
+Not verified: whether guests get stuck on site without the on-screen tips.
+
+## D75 · Old-theme copy and emoji icons go
+
+User decision (2026-11-11): replace what still spoke the star-night theme, wording left to us.
+
+- Welcome title "별빛을 따라 오셨나요?" → "사진관에 오신 걸 환영해요" (the brand is an analogue photo
+  studio; the line under it already says what the booth does).
+- Cream frame caption "별빛을 따라 오신 걸 환영해요" → "PEACEMAKERS · MT 5:9", the line the user
+  specified for the bottom of the STUDIO SHALOM frame. The verse text itself is still undecided
+  and is written nowhere.
+- Frame picker labels drop "별빛": "포스트카드 · 2컷", "다섯 장 · 5컷". Frame ids are unchanged.
+- The two welcome choices use line icons (`LineIcon` in `components/kiosk/ui.tsx`, the same
+  drawings as the Figma icons) instead of emoji; they take the button's text colour.

@@ -92,19 +92,19 @@ export function EmergencyPanel({
               disabled={busy !== null}
               onClick={() => toggle(s.key)}
               data-testid={`switch-${s.key}`}
-              className={`flex min-h-28 flex-col items-start gap-1 rounded-2xl border-2 p-4 text-left transition ${
-                on ? "border-alert bg-alert/20" : "border-cream/15 bg-ink"
+              className={`flex min-h-28 flex-col items-start gap-1 rounded-3xl border-2 p-4 text-left transition ${
+                on ? "border-danger bg-danger/10" : "border-ink/20 bg-backdrop"
               }`}
             >
               <span className="flex w-full items-center justify-between text-xl font-bold">
                 {s.title}
                 <span
-                  className={`rounded-full px-3 py-1 text-sm ${on ? "bg-alert text-ink" : "bg-dusk text-mist"}`}
+                  className={`rounded-full px-3 py-1 text-sm ${on ? "bg-danger text-button-text" : "bg-ink/10 text-ink/75"}`}
                 >
                   {busy === s.key ? "…" : on ? "켜짐" : "꺼짐"}
                 </span>
               </span>
-              <span className="text-base text-mist">{s.help}</span>
+              <span className="text-base text-ink/75">{s.help}</span>
             </button>
           );
         })}
@@ -113,7 +113,7 @@ export function EmergencyPanel({
         <p className="text-xl font-bold">
           미디어월 켜기/끄기{" "}
           <span
-            className={`ml-2 rounded-full px-3 py-1 text-sm ${wallStatus.open ? "bg-pine text-cream" : "bg-alert text-ink"}`}
+            className={`ml-2 rounded-full px-3 py-1 text-sm ${wallStatus.open ? "bg-approve text-button-text" : "bg-danger text-button-text"}`}
             data-testid="wall-open-status"
           >
             지금 {OPEN_TEXT[wallStatus.reason]}
@@ -129,22 +129,22 @@ export function EmergencyPanel({
               disabled={busy !== null}
               onClick={() => setForce(o.value)}
               data-testid={`wall-force-${o.value}`}
-              className={`min-h-14 rounded-2xl border-2 px-4 text-lg font-bold ${
+              className={`min-h-14 rounded-full border-2 px-4 text-lg font-bold ${
                 settings.wallForce === o.value
-                  ? "border-amber bg-amber/20"
-                  : "border-cream/15 bg-ink"
+                  ? "border-accent bg-accent/15"
+                  : "border-ink/20 bg-backdrop"
               }`}
             >
               {o.label}
             </button>
           ))}
         </div>
-        <p className="text-base text-mist">
+        <p className="text-base text-ink/75">
           자동이면 설정의 운영 시간에만 사진이 나와요. 시간 밖에는 &ldquo;오늘의 미디어월은
           여기까지예요&rdquo; 화면이 떠요.
         </p>
       </div>
-      {error && <p className="mt-3 text-alert">{error}</p>}
+      {error && <p className="mt-3 text-danger">{error}</p>}
     </section>
   );
 }

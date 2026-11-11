@@ -247,7 +247,7 @@ otp_expiry = 600
 # Uncomment to customize email template
 # Staff OTP login email. Shows the 6-digit code ({{ .Token }}); staff type it on /admin/login.
 [auth.email.template.magic_link]
-subject = "FOLLOW THE LIGHTS 스태프 로그인 코드"
+subject = "STUDIO SHALOM 스태프 로그인 코드"
 content_path = "./supabase/templates/staff-login.html"
 
 # [auth.email.template.invite]

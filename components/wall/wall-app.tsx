@@ -343,7 +343,7 @@ export function WallApp({
       data-testid="wall"
       data-wall-state={screen}
       data-wall-mode={revoked ? "revoked" : (feed?.mode ?? "boot")}
-      className="relative h-dvh w-full cursor-none overflow-hidden bg-[#0b0806]"
+      className="wall-stage relative h-dvh w-full cursor-none overflow-hidden"
     >
       {viewport && (
         <div
@@ -364,27 +364,30 @@ export function WallApp({
               feed?.mode === "holding" && !revoked ? (
                 <div
                   data-testid="wall-holding"
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-ink/85 text-center"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/85 text-center"
                   style={{ gap: unit * 30 }}
                 >
-                  <p className="text-amber" style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}>
-                    FOLLOW THE LIGHTS
+                  <p
+                    className="text-(--wall-amber)"
+                    style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}
+                  >
+                    STUDIO SHALOM
                   </p>
-                  <p className="font-bold text-cream" style={{ fontSize: unit * 64 }}>
+                  <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
                     잠시 후 다시 불을 밝힐게요
                   </p>
                 </div>
               ) : feed?.mode === "closed" && !revoked ? (
                 <div
                   data-testid="wall-closed"
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-ink/70 text-center"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/70 text-center"
                   style={{ gap: unit * 30 }}
                 >
-                  <p className="font-bold text-cream" style={{ fontSize: unit * 60 }}>
+                  <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 60 }}>
                     오늘의 미디어월은 여기까지예요
                   </p>
                   {feed.opensAt && (
-                    <p className="text-amber" style={{ fontSize: unit * 40 }}>
+                    <p className="text-(--wall-amber)" style={{ fontSize: unit * 40 }}>
                       {feed.opensAt}에 다시 불을 밝힐게요
                     </p>
                   )}
@@ -392,7 +395,7 @@ export function WallApp({
               ) : screen === "EMPTY" ? (
                 <p
                   data-testid="wall-empty"
-                  className="absolute w-full text-center text-cream/80"
+                  className="absolute w-full text-center text-(--wall-cream)/80"
                   style={{
                     top: WALL_CONFIG.scene.line.y0 + unit * 260,
                     fontSize: unit * 40,
@@ -432,7 +435,7 @@ export function WallApp({
                     >
                       <Clip dropToStrip={card.y - place.y} />
                       <div
-                        className="absolute inset-x-0 bottom-0 flex flex-col bg-[#f7efe0]"
+                        className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
                         style={{
                           top: card.y - place.y,
                           padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
@@ -444,14 +447,14 @@ export function WallApp({
                           src={url}
                           alt=""
                           data-testid="wall-photo-image"
-                          className="w-full bg-[#1c2756] object-contain"
+                          className="w-full bg-(--wall-card-mat) object-contain"
                           style={{ height: PHONE_CARD.photoHeight }}
                         />
                         <p
-                          className="flex flex-1 items-center justify-center font-bold text-[#121a3d]"
+                          className="flex flex-1 items-center justify-center font-bold text-(--wall-card-ink)"
                           style={{ fontSize: 17, letterSpacing: "0.24em" }}
                         >
-                          FOLLOW THE LIGHTS
+                          STUDIO SHALOM
                         </p>
                       </div>
                     </div>
@@ -501,7 +504,7 @@ export function WallApp({
       {revoked && (
         <p
           data-testid="wall-revoked"
-          className="absolute top-[3vh] right-[3vw] text-[1vw] text-mist"
+          className="absolute top-[3vh] right-[3vw] text-[1vw] text-(--wall-mist)"
         >
           STAFF · 이 화면의 등록이 해제됐어요
         </p>
@@ -509,7 +512,7 @@ export function WallApp({
       {!online && !revoked && (
         <p
           data-testid="wall-offline"
-          className="absolute top-[3vh] right-[3vw] text-[1vw] text-mist"
+          className="absolute top-[3vh] right-[3vw] text-[1vw] text-(--wall-mist)"
         >
           STAFF · 연결 확인 중
         </p>

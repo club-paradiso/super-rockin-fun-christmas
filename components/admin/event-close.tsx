@@ -30,13 +30,12 @@ export function EventClose({
   return (
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="event-close">
       <h2 className="text-xl font-bold">행사 종료 처리</h2>
-      <p className="text-base text-mist">
-        행사가 끝난 뒤 한 번만 누릅니다. 이 노트북의 사진{" "}
-        <b className="text-cream">{photosLeft}장</b>을 모두 지우고, 미디어월 참여와 미디어월을
-        멈추고, QR 서버(클라우드)의 사본도 지우라고 보냅니다. 되돌릴 수 없습니다. 감사 기록에는 누가
-        지웠는지 남습니다.
+      <p className="text-base text-ink/75">
+        행사가 끝난 뒤 한 번만 누릅니다. 이 노트북의 사진 <b className="text-ink">{photosLeft}장</b>
+        을 모두 지우고, 미디어월 참여와 미디어월을 멈추고, QR 서버(클라우드)의 사본도 지우라고
+        보냅니다. 되돌릴 수 없습니다. 감사 기록에는 누가 지웠는지 남습니다.
       </p>
-      <p className="text-base text-mist">
+      <p className="text-base text-ink/75">
         {eventEnd
           ? `행사 종료 시각: ${eventEnd}. 그 전에는 누를 수 없어요. 누르지 않아도 종료 24시간 뒤 저절로 지워져요.`
           : "행사 종료 시각(EVENT_END_AT)이 설정되지 않았어요. 기술 담당에게 확인한 뒤 누르세요."}

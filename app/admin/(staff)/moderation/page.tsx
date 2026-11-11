@@ -30,7 +30,7 @@ export default async function ModerationPage({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-3xl font-bold">검수 대기 {queue.length}건</h1>
-        <p className="text-base text-mist">미디어월 동의 + 검수 대기 · 오래된 순</p>
+        <p className="text-base text-ink/75">미디어월 동의 + 검수 대기 · 오래된 순</p>
       </div>
       <nav className="flex flex-wrap gap-2" aria-label="사진 출처">
         {FILTERS.map((f) => {
@@ -49,7 +49,7 @@ export default async function ModerationPage({
         })}
       </nav>
       {queue.length === 0 ? (
-        <p className="admin-card p-8 text-center text-xl text-mist" data-testid="queue-empty">
+        <p className="admin-card p-8 text-center text-xl text-ink/75" data-testid="queue-empty">
           검수할 사진이 없어요.
         </p>
       ) : (

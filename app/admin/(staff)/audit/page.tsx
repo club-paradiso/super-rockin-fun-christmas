@@ -36,7 +36,7 @@ export default async function AuditPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-bold">기록</h1>
-      <p className="text-base text-mist">최근 200건 · 수정·삭제할 수 없는 기록이에요.</p>
+      <p className="text-base text-ink/75">최근 200건 · 수정·삭제할 수 없는 기록이에요.</p>
       <ol className="flex flex-col gap-2" data-testid="audit-list">
         {events.map((e) => (
           <li
@@ -45,18 +45,18 @@ export default async function AuditPage() {
             data-testid="audit-item"
             data-action={e.action}
           >
-            <span className="font-mono text-mist">{formatTime(e.occurredAt)}</span>
+            <span className="font-mono text-ink/75">{formatTime(e.occurredAt)}</span>
             <strong className="text-lg">{ACTION[e.action] ?? e.action}</strong>
-            <span className="text-mist">{e.actorLabel}</span>
+            <span className="text-ink/75">{e.actorLabel}</span>
             {e.fromState && e.toState && e.subjectType === "photo" && (
               <span>
                 {stateLabel(e.fromState)} → {stateLabel(e.toState)}
               </span>
             )}
-            <span className="font-mono text-sm text-mist">
+            <span className="font-mono text-sm text-ink/75">
               {e.subjectType}:{e.subjectId.slice(0, 8)}
             </span>
-            {e.note && <span className="w-full text-mist">메모: {e.note}</span>}
+            {e.note && <span className="w-full text-ink/75">메모: {e.note}</span>}
           </li>
         ))}
       </ol>
