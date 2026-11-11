@@ -52,10 +52,18 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      # Keep the Chromium download separate from apt. GitHub-hosted runners
+      # sometimes cannot resolve the Ubuntu mirror even with a browser cache hit.
+      # E2E remains the hard gate: missing shared libraries will fail browser launch.
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Install Chromium OS dependencies
+        id: pw-deps
+        continue-on-error: true
+        run: timeout 120s npx playwright install-deps chromium
+      - name: Report OS dependency mirror failure
+        if: steps.pw-deps.outcome == 'failure'
+        run: echo "::warning::Playwright OS dependency installation failed; E2E must verify Chromium runs successfully."
       - name: E2E — local file store (staff specs skip)
         run: npm run test:e2e
         env:

@@ -866,7 +866,7 @@ function Screen(p: ScreenProps) {
         >
           <div className="flex flex-col items-start gap-[max(12px,2vh)]">
             <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
-            <h1 className="booth-title">사진관에 오신 걸 환영해요</h1>
+            <h1 className="booth-title">크리스마스의 추억을 함께 남겨요</h1>
             {!easy && (
               <p className="booth-lead">
                 사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.

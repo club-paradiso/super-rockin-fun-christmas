@@ -25,7 +25,7 @@ export const creamStrip: FrameDefinition = {
     },
     {
       type: "text",
-      text: "PEACEMAKERS · MT 5:9",
+      text: "Matthew 5:9",
       x: 300,
       y: 1696,
       size: 20,
