@@ -1,5 +1,6 @@
 import type { CameraErrorKind } from "@/lib/camera/types";
 import { getFrame } from "@/config/frames";
+import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskMode } from "@/lib/storage/types";
 
 /**
@@ -19,7 +20,10 @@ import type { KioskMode } from "@/lib/storage/types";
  *    waits for the photo; no camera, no upload from the booth itself.
  *  - Easy mode (D67) is the same machine with fewer choices: START skips the frame pick before
  *    shooting (the frame is chosen afterwards, with the guest's own photos), and every countdown
- *    is longer. The mode is per guest: RESET returns to the staff default.
+ *    is at least EASY_MIN_COUNTDOWN. The mode is per guest: RESET returns to the staff default.
+ *  - Pose guide (D71): on the ready screen the guest chooses free poses or recommended ones
+ *    (BEGIN_SHOOTING guide). It only changes what is shown during the countdown (currentPose);
+ *    the shots, countdown and every later step are the same, in both screen modes.
  */
 
 export type KioskPhase =
@@ -58,8 +62,11 @@ export type MobileState =
   /** offline: no internet for the cloud QR; paused: staff paused submissions. */
   | { status: "failed"; reason: "offline" | "paused" | "error" };
 
-/** Seconds counted before each shot, by mode. Easy mode leaves more time to get ready. */
-export const COUNTDOWN_BY_MODE: Record<KioskMode, number> = { standard: 3, easy: 5 };
+/**
+ * Easy mode never counts fewer seconds than this, and never fewer than the standard countdown
+ * (D71: the standard countdown is 10 s, so in production both modes count the same).
+ */
+export const EASY_MIN_COUNTDOWN = 5;
 
 export interface KioskState<Shot> {
   phase: KioskPhase;
@@ -74,6 +81,8 @@ export interface KioskState<Shot> {
   shotIndex: number;
   /** When retaking a single shot from review, its index; null during the first pass. */
   retakeIndex: number | null;
+  /** The guest asked for recommended poses (D71). False = free poses. Per guest. */
+  poseGuide: boolean;
   remaining: number;
   frameId: string;
   selectedShotIndices: number[];
@@ -98,7 +107,8 @@ export type KioskAction<Shot> =
   | { type: "CAMERA_RETRY" }
   /** Switch device / reconnect from the live preview. */
   | { type: "CAMERA_RESTART" }
-  | { type: "BEGIN_SHOOTING" }
+  /** guide: show a recommended pose during each countdown (D71). */
+  | { type: "BEGIN_SHOOTING"; guide: boolean }
   | { type: "TICK" }
   | { type: "SHOT_CAPTURED"; shot: Shot }
   | { type: "CAPTURE_FAILED" }
@@ -139,7 +149,7 @@ export type KioskAction<Shot> =
 
 export interface KioskInit {
   shotCount: number;
-  /** Standard-mode countdown. Easy mode uses COUNTDOWN_BY_MODE.easy (never shorter). */
+  /** Standard-mode countdown. Easy mode is never shorter (and at least EASY_MIN_COUNTDOWN). */
   countdownSeconds: number;
   frameId: string;
   /** Staff default start mode; "standard" when omitted. */
@@ -147,7 +157,7 @@ export interface KioskInit {
 }
 
 function countdownFor(mode: KioskMode, standard: number): number {
-  return mode === "easy" ? Math.max(standard, COUNTDOWN_BY_MODE.easy) : standard;
+  return mode === "easy" ? Math.max(standard, EASY_MIN_COUNTDOWN) : standard;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
@@ -165,6 +175,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
     retakeIndex: null,
+    poseGuide: false,
     remaining: init.countdownSeconds,
     frameId: init.frameId,
     selectedShotIndices: [],
@@ -294,6 +305,7 @@ export function kioskReducer<Shot>(
         return {
           ...state,
           phase: "countdown",
+          poseGuide: action.guide,
           shotIndex: firstEmpty,
           remaining: state.countdownSeconds,
           captureFailures: 0,
@@ -499,6 +511,18 @@ export function easyStep(
     case "delivery":
       return { step: total, total, label: "휴대폰으로 받기" };
   }
+}
+
+/**
+ * The recommended pose for the shot being counted down or captured (D71). Null in free mode and
+ * outside shooting. A retake of shot i shows pose i again.
+ */
+export function currentPose<Shot>(
+  state: KioskState<Shot>,
+  sequence: readonly Pose[] = POSE_SEQUENCE,
+): Pose | null {
+  if (!state.poseGuide || !isShooting(state.phase) || sequence.length === 0) return null;
+  return sequence[state.shotIndex % sequence.length] ?? null;
 }
 
 /** Phases where the camera must be running. */

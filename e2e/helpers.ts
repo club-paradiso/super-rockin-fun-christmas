@@ -39,7 +39,7 @@ export async function shootSixWithMock(page: Page, frame?: string) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await startSession(page, frame);
-  await page.getByRole("button", { name: "촬영 시작" }).click();
+  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toHaveText("3");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }

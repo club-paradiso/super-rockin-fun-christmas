@@ -642,3 +642,27 @@ reproduced by tests that fail on the old code:
   the cloud delete its copy: the photo stayed `NONE` without consent, invisible to review. The hub
   now finishes an existing row (`PhotoService.completeMobile`) before acknowledging; a photo
   deleted on the hub stays deleted.
+
+## D71 · Optional pose guide; every shot counts 10 seconds
+
+Product decision (user, 2026-11-11): "포즈 가이드를 선택하면 추천 포즈를 안내하고, 그렇지 않으면 자유
+포즈로 10초 카운트다운 해서 한 컷씩 총 6컷 촬영".
+
+- **Countdown is 10 s per shot** (`KIOSK_CONFIG.countdownSeconds`), six shots, one at a time. Easy
+  mode keeps its rule "never shorter than standard" (`EASY_MIN_COUNTDOWN` floor of 5 s), so on a
+  real booth both modes count 10 s. `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is a test-only override
+  (set to 3 in `e2e/env.ts`, inlined at build) so the E2E suite does not wait a minute per session;
+  it is not in `.env.example` and must not be set on a booth.
+- **The pose guide is a choice on the ready screen, not a second flow.** One filled button
+  "자유 포즈로 찍기" (default) and one outlined "포즈 추천받고 찍기". `BEGIN_SHOOTING` carries
+  `guide`; the state keeps `poseGuide` (false by default, cleared by RESET). The pure selector
+  `currentPose` returns the pose for the shot being counted down or captured: null in free mode,
+  pose i for a retake of shot i. Nothing else in the machine reads it, so shooting, selection,
+  consent and upload are identical with or without the guide, in both screen modes (D67).
+- **Poses are data** in `config/poses.ts` (`{ id, label }`, one per shot): 서로 마주 보기, 어깨동무,
+  악수하기, twice. `tests/unit/poses.test.ts` requires the length to equal `shotsPerSession`. Text
+  only: there are no pose illustrations and none were invented.
+- After a camera reconnect the guest is back on the ready screen and chooses again; the shots
+  already taken are kept as before.
+- **Not verified:** how 10 s feels at a real booth with a queue (six shots now take about 70 s),
+  and whether the pose band over the preview is readable from where guests stand.

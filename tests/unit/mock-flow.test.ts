@@ -31,7 +31,7 @@ describe("mock camera flow", () => {
     dispatch({ type: "CONFIRM_PICK" });
     await camera.start();
     dispatch({ type: "CAMERA_READY" });
-    dispatch({ type: "BEGIN_SHOOTING" });
+    dispatch({ type: "BEGIN_SHOOTING", guide: false });
 
     let guard = 0;
     while (state.phase === "countdown" || state.phase === "capturing") {

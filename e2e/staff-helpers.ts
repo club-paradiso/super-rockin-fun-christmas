@@ -85,7 +85,7 @@ export async function kioskPhotoToQr(kiosk: Page, answer: "yes" | "no" = "no") {
   await kiosk.goto("/kiosk?camera=mock");
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
-  await kiosk.getByRole("button", { name: "촬영 시작" }).click();
+  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();

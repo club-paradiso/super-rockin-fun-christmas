@@ -66,6 +66,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `lib/wall/host.ts` in `next.config.ts`. No second database, no wall-only backend.
 - **Easy mode is a view, not a fork** (D67): `mode` lives in `lib/kiosk/machine.ts`; never duplicate
   the shooting, selection, consent or upload rules for it.
+- **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
+  decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, text only; no
+  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (10 s); easy mode is never
+  shorter. `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
@@ -115,7 +119,7 @@ scripts                hub-start.mjs (launcher), hub-restore.mjs, event-check.mj
                        check), staff-add.mjs (plain Node, unit tested)
 ops                    desktop-icon wrappers: start-hub / restore-backup / event-check (.bat/.command),
                        start-wall
-config/                kiosk knobs and frame definitions
+config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71)
 design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
 tests/integration      real Supabase (npm run test:supabase)

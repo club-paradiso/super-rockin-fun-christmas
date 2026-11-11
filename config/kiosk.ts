@@ -1,7 +1,17 @@
+function positiveInt(value: string | undefined, fallback: number): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
   shotsPerSession: 6,
-  countdownSeconds: 3,
+  /**
+   * Seconds counted before every shot (D71). Easy mode is never shorter (lib/kiosk/machine.ts).
+   * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
+   * the E2E run does not wait 6 × 10 s per session. Do not set it on a real booth.
+   */
+  countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 10),
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview
    * box uses the same ratio with object-fit: cover, so what the guest sees is what is saved.

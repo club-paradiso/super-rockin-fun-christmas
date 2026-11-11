@@ -27,6 +27,7 @@ import { loadFrameFonts } from "@/lib/compositor/fonts";
 import {
   capturedCount,
   createInitialState,
+  currentPose,
   easyStep,
   isShooting,
   kioskReducer,
@@ -986,6 +987,7 @@ function Screen(p: ScreenProps) {
     case "countdown":
     case "capturing": {
       const shooting = state.phase !== "ready";
+      const pose = currentPose(state);
       return (
         <BoothScreen
           testId={shooting ? "screen-shooting" : "screen-ready"}
@@ -1005,6 +1007,16 @@ function Screen(p: ScreenProps) {
                   </span>
                 ) : null}
               </div>
+              {pose && (
+                <div
+                  className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-navy/80 px-4 py-[max(12px,2vh)] text-center"
+                  data-testid="pose-guide"
+                  data-pose={pose.id}
+                >
+                  <span className="booth-caption text-warm">추천 포즈</span>
+                  <span className="booth-title">{pose.label}</span>
+                </div>
+              )}
             </CameraPreview>
           </div>
           <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
@@ -1027,15 +1039,27 @@ function Screen(p: ScreenProps) {
             </p>
             {!shooting && (
               <>
-                <button
-                  type="button"
-                  className="booth-btn-primary"
-                  onClick={() => dispatch({ type: "BEGIN_SHOOTING" })}
-                >
-                  촬영 시작
-                </button>
-                <p className="booth-caption">
-                  {total}번 찍어요. 매번 {state.countdownSeconds}초를 셀게요.
+                {/* One filled button only: free poses is the default, the guide is the option. */}
+                <div className="flex flex-wrap gap-[max(12px,1.6vh)] portrait:justify-center">
+                  <button
+                    type="button"
+                    className="booth-btn-primary"
+                    data-testid="shoot-free"
+                    onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: false })}
+                  >
+                    자유 포즈로 찍기
+                  </button>
+                  <button
+                    type="button"
+                    className="booth-btn-secondary"
+                    data-testid="shoot-guide"
+                    onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: true })}
+                  >
+                    포즈 추천받고 찍기
+                  </button>
+                </div>
+                <p className="booth-caption" data-testid="shoot-plan">
+                  {state.countdownSeconds}초마다 한 컷씩, 모두 {total}컷을 찍어요
                 </p>
                 {p.guestCameraChoice && p.devices.length > 1 && (
                   <label className="flex items-center gap-3 text-base text-ink-400">
