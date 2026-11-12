@@ -533,7 +533,9 @@ export function KioskApp({
   // Easy mode leaves twice as long before giving up on an unattended screen.
   const idleSeconds = KIOSK_CONFIG.idleResetSeconds * (state.mode === "easy" ? 2 : 1);
   const idle = useIdleReset(
-    state.phase !== "welcome" && !isShooting(state.phase),
+    // The welcome choices go back to the attract screen too, so a half-chosen language or
+    // screen mode never waits for the next guest (D80).
+    state.phase !== "attract" && !isShooting(state.phase),
     idleSeconds,
     reset,
   );
@@ -648,7 +650,7 @@ export function KioskApp({
     state.phase === "delivery" ||
     (state.phase === "mobile" &&
       (state.mobile.status === "received" || state.mobile.status === "failed"));
-  const midSession = state.phase !== "welcome" && !ownHomeButton;
+  const midSession = state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
   const requestHome = useCallback(() => {
     // Nothing to lose on these screens: go straight home. Elsewhere, ask first.
     if (state.phase === "mobile") reset();
@@ -739,6 +741,7 @@ export function KioskApp({
           onRetryDelivery={deliver}
           onConsent={chooseConsent}
           onReset={reset}
+          onOpen={() => dispatch({ type: "OPEN" })}
           onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
           onStartMobile={() => dispatch({ type: "START_MOBILE" })}
           mobileQrSvg={
@@ -834,6 +837,7 @@ interface ScreenProps {
   onRetryDelivery: () => void;
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
+  onOpen: () => void;
   onStart: () => void;
   onStartMobile: () => void;
   mobileQrSvg: string | null;
@@ -869,6 +873,41 @@ function Screen(p: ScreenProps) {
   const t = KIOSK_COPY[state.lang];
 
   switch (state.phase) {
+    case "attract":
+      // "화면을 눌러 시작" (D80): the whole screen is the start button, and the seal is the
+      // letter's closure the guest opens. Both languages, because nobody has chosen one yet.
+      return (
+        <section
+          data-testid="screen-attract"
+          className="flex min-h-dvh w-full cursor-pointer flex-col px-[max(24px,4.2vw)] py-[max(16px,2vh)]"
+          onClick={p.onOpen}
+        >
+          <LetterSheet
+            seal
+            className="flex flex-1 flex-col items-center justify-center gap-[max(24px,5vh)] text-center"
+          >
+            <BrandLockup className="text-[clamp(64px,min(13vh,12vw),150px)]" />
+            <p className="booth-lead">{KIOSK_COPY.ko.attract.event}</p>
+            <div className="flex flex-col items-center gap-[max(10px,1.6vh)]">
+              <button
+                type="button"
+                className="booth-btn-primary"
+                data-testid="attract-start"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  p.onOpen();
+                }}
+              >
+                {KIOSK_COPY.ko.attract.start}
+              </button>
+              <p lang="en" className="booth-caption">
+                {KIOSK_COPY.en.attract.start}
+              </p>
+            </div>
+          </LetterSheet>
+        </section>
+      );
+
     case "welcome": {
       // Two clear choices (2.0): take photos here, or send a photo from your own phone. The
       // screen mode is chosen here too, and can be changed on every screen.
@@ -878,10 +917,7 @@ function Screen(p: ScreenProps) {
           data-testid="screen-welcome"
           className="flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] py-[max(16px,2vh)]"
         >
-          <LetterSheet
-            seal
-            className="flex flex-1 flex-col justify-center gap-[max(20px,4vh)] !px-[max(24px,4.2vw)]"
-          >
+          <LetterSheet className="flex flex-1 flex-col justify-center gap-[max(20px,4vh)] !px-[max(24px,4.2vw)]">
             <div className="flex flex-col items-start gap-[max(12px,2vh)]">
               <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
               <h1 className="booth-title">{t.welcome.title}</h1>

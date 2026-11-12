@@ -17,6 +17,11 @@ export type EasyStepKey =
 const ko = {
   langName: "한국어",
   langGroup: "언어 · Language",
+  /** The attract screen (D80). The guest has not chosen a language yet: it shows both. */
+  attract: {
+    start: "화면을 눌러 시작",
+    event: "Christmas Village 2026",
+  },
   welcome: {
     title: "크리스마스의 추억을 함께 남겨요",
     lead: "사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.",
@@ -190,6 +195,10 @@ export type KioskCopy = typeof ko;
 const en: KioskCopy = {
   langName: "English",
   langGroup: "언어 · Language",
+  attract: {
+    start: "Tap the screen to start",
+    event: "Christmas Village 2026",
+  },
   welcome: {
     title: "Make a Christmas memory together",
     lead: "Take photos and get them on your phone, or send your own photo to hang on the big screen.",

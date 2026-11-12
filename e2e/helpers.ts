@@ -27,7 +27,20 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
 }
 
 /** Attract → pick a frame (or keep the preselected one) → camera ready. */
+/**
+ * The attract screen ("화면을 눌러 시작", D80) → the welcome choices. Also fine when the welcome
+ * screen is already open (after "이전").
+ */
+export async function openWelcome(page: Page) {
+  const attract = page.getByTestId("screen-attract");
+  const welcome = page.getByTestId("screen-welcome");
+  await expect(attract.or(welcome)).toBeVisible();
+  if (await attract.isVisible()) await page.getByTestId("attract-start").click();
+  await expect(welcome).toBeVisible();
+}
+
 export async function startSession(page: Page, frame?: string) {
+  await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   if (frame) await page.getByTestId(`frame-option-${frame}`).click();

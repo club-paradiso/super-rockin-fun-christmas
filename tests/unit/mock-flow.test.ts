@@ -27,6 +27,7 @@ describe("mock camera flow", () => {
     });
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
+    dispatch({ type: "OPEN" });
     dispatch({ type: "START", sessionId: crypto.randomUUID() });
     dispatch({ type: "CONFIRM_PICK" });
     await camera.start();
@@ -80,7 +81,7 @@ describe("mock camera flow", () => {
 
     dispatch({ type: "RESET" });
     camera.stop();
-    expect(state.phase).toBe("welcome");
+    expect(state.phase).toBe("attract");
     expect(state.shots.every((s) => s === null)).toBe(true);
     expect(camera.isActive()).toBe(false);
   });

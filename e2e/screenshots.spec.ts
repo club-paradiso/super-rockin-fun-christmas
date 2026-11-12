@@ -1,4 +1,4 @@
-import { selectDefaultPhotos } from "./helpers";
+import { selectDefaultPhotos, openWelcome } from "./helpers";
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
@@ -40,7 +40,9 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
+  await shot(page, "booth-1280x800-00-attract");
+  await openWelcome(page);
   await shot(page, "booth-1280x800-01-welcome");
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
@@ -83,7 +85,9 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
+  await shot(page, "booth-1920x1080-00-attract");
+  await openWelcome(page);
   await shot(page, "booth-1920x1080-01-welcome");
   await startSession(page);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();

@@ -6,11 +6,12 @@ import {
   shootSixWithMock,
   startSession,
   toFrame,
+  openWelcome,
 } from "./helpers";
 
 /**
- * STUDIO SHALOM booth (D77, D78, D79): the star in the O, "이전", the English screens, the 2×2
- * frame and the letter sheet with its seal. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
+ * STUDIO SHALOM booth (D77, D78, D79, D80): the star in the O, "이전", the English screens, the 2×2
+ * frame, the attract screen and the letter sheet with its seal. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -39,6 +40,7 @@ test("이전: frame pick → welcome, camera → frame pick, never during or aft
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   await page.getByTestId("go-back").click();
@@ -57,6 +59,7 @@ test("이전: frame pick → welcome, camera → frame pick, never during or aft
 
 test("English: the whole booth in English, the next guest back in Korean", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
   await page.getByTestId("lang-en").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(
@@ -85,8 +88,9 @@ test("English: the whole booth in English, the next guest back in Korean", async
   expect(text).not.toMatch(/[가-힣]/);
 
   await page.getByRole("button", { name: "All done" }).click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ko");
+  await openWelcome(page);
   await expect(
     page.getByRole("heading", { name: "크리스마스의 추억을 함께 남겨요" }),
   ).toBeVisible();
@@ -120,13 +124,16 @@ test("the STUDIO SHALOM 2×2: first in the picker, four photos, 1200 × 1500, de
   expect(url).toMatch(/\/p\/[A-Za-z0-9_-]{32}$/);
 });
 
-test("the letter sheet: every booth screen sits on paper, the seal only on welcome and the QR", async ({
+test("the letter sheet: every booth screen sits on paper, the seal only on the attract screen and the QR", async ({
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
-  const welcome = page.getByTestId("screen-welcome");
-  await expect(welcome.getByTestId("letter-sheet")).toBeVisible();
-  const seal = welcome.getByTestId("wax-seal");
+  // 화면을 눌러 시작 (D80): the sealed letter the guest opens.
+  const attract = page.getByTestId("screen-attract");
+  await expect(attract.getByTestId("letter-sheet")).toBeVisible();
+  await expect(attract.getByRole("button", { name: "화면을 눌러 시작" })).toBeVisible();
+  await expect(attract.getByText("Tap the screen to start")).toBeVisible();
+  const seal = attract.getByTestId("wax-seal");
   await expect(seal).toBeVisible();
   await expect(seal).toHaveAttribute("alt", "");
   await expect(seal).toHaveCSS("pointer-events", "none");
@@ -135,7 +142,13 @@ test("the letter sheet: every booth screen sits on paper, the seal only on welco
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+  // A touch anywhere opens the letter, not only the button.
+  await page.mouse.click(200, 700);
+  const welcome = page.getByTestId("screen-welcome");
+  await expect(welcome.getByTestId("letter-sheet")).toBeVisible();
+  await expect(page.getByTestId("wax-seal")).toHaveCount(0);
 
+  await openWelcome(page);
   await page.getByTestId("start-camera").click();
   await expect(page.getByTestId("screen-pick").getByTestId("letter-sheet")).toBeVisible();
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
