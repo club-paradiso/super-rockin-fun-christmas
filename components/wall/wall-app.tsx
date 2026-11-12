@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { MOBILE_FRAME_ID } from "@/config/mobile";
-import { PHONE_CARD, phoneCardBox, wallLayout } from "@/lib/wall/layout";
+import { getFrame } from "@/config/frames";
+import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
@@ -133,6 +134,11 @@ export function WallApp({
           ? feed.photos.filter((p) => p.frameId === MOBILE_FRAME_ID).map((p) => p.id)
           : [],
       ),
+    [feed],
+  );
+  // Booth photos by frame: a frame that is not a 1:3 strip hangs wider (D77).
+  const photoFrames = useMemo(
+    () => new Map(feed?.mode === "live" ? feed.photos.map((p) => [p.id, p.frameId]) : []),
     [feed],
   );
   const showNow = useMemo(
@@ -461,6 +467,10 @@ export function WallApp({
                   </figure>
                 );
               }
+              const frame = getFrame(photoFrames.get(slot.photoId));
+              const box =
+                framedPhotoBox(place, { width: frame.outputWidth, height: frame.outputHeight }) ??
+                place.box;
               return (
                 <figure
                   key={`${i}-${slot.photoId}`}
@@ -469,10 +479,10 @@ export function WallApp({
                   data-phase={slot.phase}
                   className="absolute"
                   style={{
-                    left: place.box.x,
+                    left: box.x,
                     top: place.y,
-                    width: place.box.width,
-                    height: place.box.height + (place.box.y - place.y),
+                    width: box.width,
+                    height: box.height + (box.y - place.y),
                     transform: `rotate(${place.tilt}deg)`,
                     transformOrigin: "50% 0",
                   }}
@@ -480,7 +490,7 @@ export function WallApp({
                   <div
                     className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                   >
-                    <Clip dropToStrip={place.box.y - place.y} />
+                    <Clip dropToStrip={box.y - place.y} />
                     {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -489,7 +499,7 @@ export function WallApp({
                       data-testid="wall-photo-image"
                       className="h-full w-full object-contain object-top"
                       style={{
-                        paddingTop: place.box.y - place.y,
+                        paddingTop: box.y - place.y,
                         filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.55))",
                       }}
                     />

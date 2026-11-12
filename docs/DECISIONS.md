@@ -861,3 +861,57 @@ User decision (2026-11-11). D75's wording was ours; the user set the final strin
 - Cream frame caption: "Matthew 5:9".
 
 Do not reword guest-facing copy without the user's own text.
+
+## D77 · A star in the O of SHALOM; a STUDIO SHALOM 2×2 frame
+
+User decisions (2026-11-12): the O of SHALOM holds a four-pointed star, as the O of FOLLOW THE
+LIGHTS once did; and a STUDIO SHALOM 2×2 frame is added next to the existing frames (all kept).
+
+- **Star.** The same star (a concave four-pointed sparkle, 0.63 : 1) in every lockup, in the
+  letters' own colour. Frames: an extra `<path id="o-star">` in `public/frames/*-lockup.svg`,
+  centred in the O's counter (found from the outlined glyph: 297.6, 65.5 in the 422 × 156.13
+  lockup) and 36 tall (60 % of the counter). Screen: `components/brand.tsx` draws it over the real
+  letter (`.brand-o`, `.brand-o-star` in `app/globals.css`), so the text is still "SHALOM" for
+  copy, search and assistive tech. `tests/unit/frames.test.ts` checks every frame lockup has the
+  star in the letters' colour; `e2e/shalom-booth.spec.ts` checks the star sits inside the O.
+  Not changed: the wordmark painted into the media wall picture (`public/wall/background-v3.jpg`).
+- **2×2 frame** (`config/frames/shalom-grid.ts`, id `shalom-grid`): 600 × 750 (4:5, saved
+  1200 × 1500), backdrop `#DDBDA1`, four 4:3 photos (252 × 189) on 6 px paper mats, the ink lockup
+  (`public/frames/shalom-lockup.svg`, 104 tall) below the photos, then "Christmas Village 2026 ·
+  {date}" and "MT 5:9" in ink. It meets every frame rule; the size rule now reads "strips 600 ×
+  1800, the 2×2 600 × 750". First in the picker; the preselected frame stays the navy strip
+  (`DEFAULT_FRAME_ID`), so nothing else changes for a guest who does not pick it.
+- The Figma "10 네컷 프레임" (1200 × 1800, lockup at the top, near-square photos) was not copied:
+  the photos must be 4:3 (preview = result) and the lockup must sit below the photos (never over a
+  face). The 2×2 keeps the Figma idea (four photos in a grid, paper mats, backdrop colour, lockup,
+  MT 5:9) within those rules.
+- **Wall.** A frame that is not a 1:3 strip hangs as a box at the phone card's width (340 px),
+  centred on the same clip and never taller than a strip (`framedPhotoBox`, `lib/wall/layout.ts`),
+  instead of shrinking inside the strip box. Strips are unchanged.
+
+## D78 · Korean / English booth, and a "이전" (back) step
+
+User decisions (2026-11-12): the SS 01 kiosk flow in Figma goes into the code **without removing
+any existing feature** (phone participation, easy mode, staff help, single-shot retake, frame
+pick); **no name input** (no personal data, unchanged); the booth gets **Korean and English**.
+
+Most of the Figma SS 01 UX was already in the code (progress, "처음으로" with a confirmation, two
+equal wall answers, the selection count, the reset notice on the QR screen). What was missing:
+
+- **Language** is a view, like the screen mode (D67): `lang` in `lib/kiosk/machine.ts`
+  (`SET_LANG`, any time; `RESET` returns to Korean, so every guest starts in Korean). The welcome
+  screen has a `한국어 · English` switch next to the screen-mode switch. Every guest-facing string
+  is in `lib/kiosk/copy.ts`, Korean exactly as before (D76: the user's wording) and English
+  written for it; frame and pose names carry `labelEn`. `<html lang>` follows the choice. Staff
+  text (help mode, status badges, admin) stays Korean. A unit test checks the English copy has
+  every key the Korean has and no Hangul (two deliberate exceptions: the picker's own label and the
+  phone page's Korean button name, quoted with its meaning).
+- **Back** ("이전", top left of the screen header) is offered only where nothing the guest made is
+  lost (`canGoBack`): frame pick → welcome; the camera before the first shot → frame pick (easy
+  mode: welcome, it skipped the pick); photo selection → frame. Not during shooting, not after a
+  shot exists (a reconnect keeps shots), not from the frame screen after shooting (the session
+  video is already closed), never once the frame is final (the upload has started).
+
+Not done: the phone pages (`/p/[token]`, `/m/[token]`) stay Korean only; an English guest scanning
+the QR sees Korean there. The English copy was written here, not by the user: it needs the user's
+check, like any guest copy.

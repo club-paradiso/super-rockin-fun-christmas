@@ -78,6 +78,21 @@ export function parseCanvas(raw: string | null | undefined) {
  */
 export const PHONE_CARD = { width: 340, photoHeight: 380, margin: 16, caption: 46 } as const;
 
+/**
+ * A booth photo whose frame is not a 1:3 strip (the STUDIO SHALOM 2×2, 4:5, D77) hangs at the
+ * phone card's width, centred on the same clip, never taller than a strip. Inside a strip box it
+ * would shrink to a stamp. Null for strips: they keep the strip box.
+ */
+export function framedPhotoBox(
+  place: SlotPlace,
+  frame: { width: number; height: number },
+): Rect | null {
+  const aspect = frame.width / frame.height;
+  if (Math.abs(aspect - place.box.width / place.box.height) < 0.05) return null;
+  const width = Math.min(PHONE_CARD.width, place.box.height * aspect);
+  return { x: place.x - width / 2, y: place.box.y, width, height: width / aspect };
+}
+
 export function phoneCardBox(place: SlotPlace): Rect {
   const height = PHONE_CARD.margin + PHONE_CARD.photoHeight + PHONE_CARD.caption;
   return { x: place.x - PHONE_CARD.width / 2, y: place.box.y, width: PHONE_CARD.width, height };

@@ -14,9 +14,9 @@ export const STRIP = { width: 600, height: 1800 } as const;
  * own proportions so the art is never stretched.
  */
 export const LOCKUP_ASPECT = 422 / 156.13;
-export function lockupBox(y: number, height: number) {
+export function lockupBox(y: number, height: number, canvasWidth: number = STRIP.width) {
   const width = height * LOCKUP_ASPECT;
-  return { x: (STRIP.width - width) / 2, y, width, height };
+  return { x: (canvasWidth - width) / 2, y, width, height };
 }
 
 /** The four photo slots shared by A, B and D (466.667 × 350, 4:3), 370 px apart. */

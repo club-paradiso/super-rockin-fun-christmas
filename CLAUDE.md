@@ -88,6 +88,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, text only; no
   invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (10 s); easy mode is never
   shorter. `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
+- **The booth language is a view too** (D78): `lang` in `lib/kiosk/machine.ts` (every guest
+  starts in Korean). Every guest string lives in `lib/kiosk/copy.ts` in both languages; never
+  hard-code booth copy in a component. Korean copy is the user's wording (D76). "이전" exists only
+  where `canGoBack` allows it: never once a shot exists or the frame is final.
+- **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
+  lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
@@ -129,6 +135,7 @@ components/brand.tsx   the STUDIO SHALOM lockup and one-line wordmark as text (s
 lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client,
+                       booth copy in Korean and English (copy.ts, D78),
                        session video recorder (injected MediaRecorder, D72)
 lib/video              video types, magic-byte check, byte ranges (shared by booth and server)
 lib/offline            IndexedDB stores + UploadQueue and ConsentQueue (retry, dedupe, reload-safe)

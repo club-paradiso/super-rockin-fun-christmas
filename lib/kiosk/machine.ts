@@ -2,6 +2,7 @@ import type { CameraErrorKind } from "@/lib/camera/types";
 import { getFrame } from "@/config/frames";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskMode } from "@/lib/storage/types";
+import type { EasyStepKey, KioskLang } from "@/lib/kiosk/copy";
 
 /**
  * Pure kiosk session state machine. No timers, no camera, no DOM: the KioskApp component runs
@@ -24,6 +25,13 @@ import type { KioskMode } from "@/lib/storage/types";
  *  - Pose guide (D71): on the ready screen the guest chooses free poses or recommended ones
  *    (BEGIN_SHOOTING guide). It only changes what is shown during the countdown (currentPose);
  *    the shots, countdown and every later step are the same, in both screen modes.
+ *
+ * STUDIO SHALOM booth flow (D78):
+ *  - Language: the guest picks Korean or English on the welcome screen (SET_LANG). A view, like
+ *    the screen mode: no rule changes with it. Every new guest starts in Korean (RESET).
+ *  - Back: one step back where nothing is lost (canGoBack): frame pick → welcome, the camera
+ *    before the first shot → frame pick (easy mode: welcome), photo selection → frame. Never once
+ *    the frame is final: the upload has already started then.
  */
 
 export type KioskPhase =
@@ -95,6 +103,8 @@ export interface KioskState<Shot> {
   /** Staff default (settings); every new guest starts in it. */
   defaultMode: KioskMode;
   mobile: MobileState;
+  /** Language of this guest's screens (D78). Per guest: RESET returns to Korean. */
+  lang: KioskLang;
 }
 
 export type KioskAction<Shot> =
@@ -145,6 +155,10 @@ export type KioskAction<Shot> =
   | { type: "MOBILE_RECEIVED"; sessionId: string }
   /** QR expired or the guest asked for a new one. */
   | { type: "MOBILE_RETRY" }
+  /** The guest chose the language of the booth screens (D78). Allowed at any time. */
+  | { type: "SET_LANG"; lang: KioskLang }
+  /** "이전": one step back, only where canGoBack allows it (D78). */
+  | { type: "BACK" }
   | { type: "RESET" };
 
 export interface KioskInit {
@@ -186,6 +200,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     mode,
     defaultMode: mode,
     mobile: { status: "idle" },
+    lang: "ko",
   };
 }
 
@@ -207,6 +222,25 @@ export function kioskReducer<Shot>(
         // The next guest starts in the staff default, whatever this guest chose.
         mode: state.defaultMode,
       });
+
+    case "SET_LANG":
+      return state.lang === action.lang ? state : { ...state, lang: action.lang };
+
+    case "BACK":
+      if (!canGoBack(state)) return state;
+      switch (state.phase) {
+        case "pick":
+          return { ...state, phase: "welcome", sessionId: "" };
+        case "ready":
+          // Easy mode skipped the frame pick on the way here (START), so back is the welcome.
+          return state.mode === "easy"
+            ? { ...state, phase: "welcome", sessionId: "", poseGuide: false }
+            : { ...state, phase: "pick", poseGuide: false };
+        case "select":
+          return { ...state, phase: "frame", selectedShotIndices: [] };
+        default:
+          return state;
+      }
 
     case "SET_MODE":
       if (state.mode === action.mode) return state;
@@ -444,6 +478,25 @@ export function kioskReducer<Shot>(
   }
 }
 
+/**
+ * Where "이전" is offered (D78): only a step back that loses nothing the guest made. The camera
+ * screen before the first shot goes back to the frame pick; after a shot it does not (a reconnect
+ * keeps earlier shots, and going back would drop them). From the frame screen after shooting
+ * there is no way back to the shots (the session video is already closed), and nothing once the
+ * frame is final (the upload has started).
+ */
+export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
+  switch (state.phase) {
+    case "pick":
+    case "select":
+      return true;
+    case "ready":
+      return capturedCount(state) === 0;
+    default:
+      return false;
+  }
+}
+
 /** The photo is final and on its way: the consent and delivery screens. */
 function uploading<Shot>(state: KioskState<Shot>): boolean {
   return state.phase === "consent" || state.phase === "delivery";
@@ -486,7 +539,7 @@ export function progressStep(
 export function easyStep(
   phase: KioskPhase,
   askConsent: boolean,
-): { step: number; total: number; label: string } | null {
+): { step: number; total: number; label: string; key: EasyStepKey } | null {
   const total = askConsent ? 6 : 5;
   switch (phase) {
     case "welcome":
@@ -496,20 +549,20 @@ export function easyStep(
     case "camera":
     case "camera-error":
     case "ready":
-      return { step: 1, total, label: "촬영 준비" };
+      return { step: 1, total, label: "촬영 준비", key: "ready" };
     case "countdown":
     case "capturing":
-      return { step: 1, total, label: "사진 찍기" };
+      return { step: 1, total, label: "사진 찍기", key: "shoot" };
     case "review":
-      return { step: 2, total, label: "사진 확인" };
+      return { step: 2, total, label: "사진 확인", key: "review" };
     case "frame":
-      return { step: 3, total, label: "사진 꾸미기" };
+      return { step: 3, total, label: "사진 꾸미기", key: "frame" };
     case "select":
-      return { step: 4, total, label: "사진 고르기" };
+      return { step: 4, total, label: "사진 고르기", key: "select" };
     case "consent":
-      return { step: 5, total, label: "미디어월 참여" };
+      return { step: 5, total, label: "미디어월 참여", key: "consent" };
     case "delivery":
-      return { step: total, total, label: "휴대폰으로 받기" };
+      return { step: total, total, label: "휴대폰으로 받기", key: "delivery" };
   }
 }
 

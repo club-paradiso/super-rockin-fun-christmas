@@ -102,6 +102,8 @@ export interface FrameDefinition {
   name: string;
   /** Short Korean label shown on the kiosk frame picker. */
   label: string;
+  /** The same label for the English booth screens. */
+  labelEn: string;
   outputWidth: number;
   outputHeight: number;
   background: FrameBackground;

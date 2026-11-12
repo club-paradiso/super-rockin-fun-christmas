@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { POSE_SEQUENCE } from "@/config/poses";
+import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
+  canGoBack,
   capturedCount,
   createInitialState,
   currentPose,
@@ -505,5 +507,116 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     const s = begin(true);
     expect(currentPose(s, [{ id: "x", label: "엑스" }])).toEqual({ id: "x", label: "엑스" });
     expect(currentPose(s, [])).toBeNull();
+  });
+});
+
+describe("language (D78): a view, per guest", () => {
+  it("starts in Korean, switches at any time, and the next guest starts in Korean again", () => {
+    let s = init();
+    expect(s.lang).toBe("ko");
+    s = run(s, { type: "SET_LANG", lang: "en" });
+    expect(s.lang).toBe("en");
+    s = run(s, { type: "START", sessionId: SESSION }, { type: "SET_LANG", lang: "ko" });
+    expect([s.phase, s.lang]).toEqual(["pick", "ko"]);
+    s = run(s, { type: "SET_LANG", lang: "en" }, { type: "RESET" });
+    expect(s.lang).toBe("ko");
+  });
+
+  it("changes nothing else: the same shots, frames and steps in both languages", () => {
+    const ko = toReview();
+    const en = run(init(), { type: "SET_LANG", lang: "en" });
+    let s = run(
+      en,
+      { type: "START", sessionId: SESSION },
+      { type: "CONFIRM_PICK" },
+      { type: "CAMERA_READY" },
+    );
+    s = run(s, { type: "BEGIN_SHOOTING", guide: false });
+    for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
+    expect({ ...s, lang: "ko" }).toEqual(ko);
+  });
+
+  it("every English string exists for every Korean one", () => {
+    const shape = (o: unknown): unknown =>
+      typeof o === "function"
+        ? `fn${(o as (...a: unknown[]) => unknown).length}`
+        : Array.isArray(o)
+          ? o.map(shape)
+          : o && typeof o === "object"
+            ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shape(v)]))
+            : typeof o;
+    expect(shape(KIOSK_COPY.en)).toEqual(shape(KIOSK_COPY.ko));
+    const hangul = /[\uac00-\ud7a3]/;
+    const strings = (o: unknown, path = ""): [string, string][] =>
+      typeof o === "string"
+        ? [[path, o]]
+        : typeof o === "function"
+          ? [[path, String((o as (...a: number[]) => string)(1, 2))]]
+          : o && typeof o === "object"
+            ? Object.entries(o).flatMap(([k, v]) => strings(v, `${path}.${k}`))
+            : [];
+    // Korean only where it names something Korean on purpose: the language picker's own label
+    // and the phone page's button, quoted with its English meaning.
+    const allowed = new Set([".langGroup", ".mobile.steps.2"]);
+    for (const [path, text] of strings(KIOSK_COPY.en))
+      if (!allowed.has(path)) expect(hangul.test(text), `${path}: ${text}`).toBe(false);
+  });
+});
+
+describe("back (D78): one step, never losing what the guest made", () => {
+  it("frame pick → welcome, and the session is gone", () => {
+    const s = run(init(), { type: "START", sessionId: SESSION });
+    expect(canGoBack(s)).toBe(true);
+    const back = run(s, { type: "BACK" });
+    expect([back.phase, back.sessionId]).toEqual(["welcome", ""]);
+  });
+
+  it("camera before the first shot → frame pick (easy mode: welcome)", () => {
+    const s = toReady();
+    expect(canGoBack(s)).toBe(true);
+    expect(run(s, { type: "BACK" }).phase).toBe("pick");
+    const easy = run(
+      init(),
+      { type: "SET_MODE", mode: "easy" },
+      { type: "START", sessionId: SESSION },
+      { type: "CAMERA_READY" },
+    );
+    expect(easy.phase).toBe("ready");
+    expect(run(easy, { type: "BACK" }).phase).toBe("welcome");
+  });
+
+  it("not once a shot exists, not while shooting, not after the frame is final", () => {
+    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    expect(canGoBack(s)).toBe(false);
+    expect(run(s, { type: "BACK" })).toBe(s);
+    s = shoot(s, "shot-0");
+    // A reconnect brings the guest back to the camera with one shot kept.
+    const reconnected = run(
+      s,
+      { type: "CAMERA_FAILED", kind: "missing" },
+      { type: "CAMERA_RETRY" },
+      { type: "CAMERA_READY" },
+    );
+    expect([reconnected.phase, canGoBack(reconnected)]).toEqual(["ready", false]);
+    const review = toReview();
+    expect(canGoBack(review)).toBe(false);
+    const frame = run(review, { type: "CONFIRM_SHOTS" });
+    expect(canGoBack(frame)).toBe(false);
+    const consent = selectFour(frame, true);
+    expect(consent.phase).toBe("consent");
+    expect(canGoBack(consent)).toBe(false);
+    expect(run(consent, { type: "BACK" })).toBe(consent);
+  });
+
+  it("photo selection → frame, with the selection cleared", () => {
+    const select = run(
+      toReview(),
+      { type: "CONFIRM_SHOTS" },
+      { type: "CONFIRM_FRAME", askConsent: true },
+      { type: "TOGGLE_SHOT_SELECTION", index: 2 },
+    );
+    expect(canGoBack(select)).toBe(true);
+    const back = run(select, { type: "BACK" });
+    expect([back.phase, back.selectedShotIndices, capturedCount(back)]).toEqual(["frame", [], 6]);
   });
 });

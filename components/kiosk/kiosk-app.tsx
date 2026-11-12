@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -25,6 +26,7 @@ import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/composit
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
 import {
+  canGoBack,
   capturedCount,
   createInitialState,
   currentPose,
@@ -37,6 +39,7 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
+import { KIOSK_COPY, KIOSK_LANGS, lines, type KioskCopy } from "@/lib/kiosk/copy";
 import { deliverVideo, requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import {
   SessionRecorder,
@@ -651,17 +654,27 @@ export function KioskApp({
     if (state.phase === "mobile") reset();
     else setConfirmHome(true);
   }, [state.phase, reset]);
+  const t = KIOSK_COPY[state.lang];
+  const backAllowed = canGoBack(state);
   const chrome: KioskChrome = useMemo(
     () => ({
       mode: state.mode,
+      lang: state.lang,
+      t,
       easyStep: easyStep(state.phase, wallSubmissions === "open"),
+      goBack: backAllowed ? () => dispatch({ type: "BACK" }) : null,
       toggleMode: () =>
         dispatch({ type: "SET_MODE", mode: state.mode === "easy" ? "standard" : "easy" }),
       goHome: midSession ? requestHome : null,
       quiet: isShooting(state.phase),
     }),
-    [state.mode, state.phase, wallSubmissions, midSession, requestHome],
+    [state.mode, state.lang, t, backAllowed, state.phase, wallSubmissions, midSession, requestHome],
   );
+
+  // The page language follows the guest's choice (screen readers, hyphenation).
+  useEffect(() => {
+    document.documentElement.lang = state.lang;
+  }, [state.lang]);
 
   // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
@@ -709,6 +722,7 @@ export function KioskApp({
         className={`relative min-h-dvh select-none overflow-hidden ${state.mode === "easy" ? "kiosk-easy" : ""}`}
         data-phase={state.phase}
         data-mode={state.mode}
+        data-lang={state.lang}
         data-wall-submissions={wallSubmissions}
       >
         <Screen
@@ -735,6 +749,7 @@ export function KioskApp({
               : null
           }
           onToggleMode={chrome.toggleMode}
+          onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
           wallSubmissionsOpen={wallSubmissions === "open"}
           videoNotice={canRecordVideo}
         />
@@ -745,17 +760,15 @@ export function KioskApp({
             aria-live="polite"
             data-testid="idle-warning"
           >
-            <p className="booth-lead">
-              {idle.secondsLeft}초 뒤 처음 화면으로 돌아가요. 계속하려면 화면을 눌러 주세요.
-            </p>
+            <p className="booth-lead">{t.idle.warning(idle.secondsLeft)}</p>
             <button type="button" className="booth-btn-secondary" onClick={idle.bump}>
-              계속할게요
+              {t.idle.stay}
             </button>
           </div>
         )}
         {confirmHome && (
           <KioskDialog
-            title="처음 화면으로 갈까요?"
+            title={t.home.title}
             onClose={() => setConfirmHome(false)}
             testId="confirm-home"
             actions={
@@ -765,7 +778,7 @@ export function KioskApp({
                   className="booth-btn-secondary"
                   onClick={() => setConfirmHome(false)}
                 >
-                  계속 찍을게요
+                  {t.home.stay}
                 </button>
                 <button
                   type="button"
@@ -773,12 +786,12 @@ export function KioskApp({
                   data-testid="confirm-home-yes"
                   onClick={reset}
                 >
-                  처음으로 갈게요
+                  {t.home.leave}
                 </button>
               </>
             }
           >
-            <p className="booth-lead">지금까지 찍은 사진은 지워지고 저장되지 않아요.</p>
+            <p className="booth-lead">{t.home.lead}</p>
           </KioskDialog>
         )}
         {flash > 0 && state.phase === "capturing" && (
@@ -825,27 +838,27 @@ interface ScreenProps {
   onStartMobile: () => void;
   mobileQrSvg: string | null;
   onToggleMode: () => void;
+  /** The guest's language choice on the welcome screen (D78). */
+  onSetLang: (lang: KioskState<Shot>["lang"]) => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
   videoNotice: boolean;
 }
 
-const CAMERA_ERROR_COPY: Record<CameraErrorKind, { title: string; lead: string }> = {
-  denied: {
-    title: "카메라 사용이 허용되지 않았어요",
-    lead: "도우미에게 알려 주세요. 브라우저 설정에서 카메라를 허용해야 해요.",
-  },
-  missing: {
-    title: "카메라를 찾을 수 없어요",
-    lead: "카메라 연결을 확인한 뒤 다시 시도해 주세요.",
-  },
-  unsupported: {
-    title: "이 화면에서는 카메라를 쓸 수 없어요",
-    lead: "HTTPS 주소 또는 지원되는 브라우저에서 열어야 해요. 도우미에게 알려 주세요.",
-  },
-  failed: { title: "카메라가 잠시 멈췄어요", lead: "다시 시도를 눌러 주세요." },
-};
+/** Text with "\n" line breaks from the copy (lib/kiosk/copy.ts). */
+function Lines({ text }: { text: string }) {
+  return (
+    <>
+      {lines(text).map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 function Screen(p: ScreenProps) {
   const { state, dispatch } = p;
@@ -853,6 +866,7 @@ function Screen(p: ScreenProps) {
   const aspect = KIOSK_CONFIG.captureAspect;
   const progress = progressStep(state.phase, p.wallSubmissionsOpen);
   const sessionCode = state.sessionId.slice(0, 8);
+  const t = KIOSK_COPY[state.lang];
 
   switch (state.phase) {
     case "welcome": {
@@ -866,12 +880,8 @@ function Screen(p: ScreenProps) {
         >
           <div className="flex flex-col items-start gap-[max(12px,2vh)]">
             <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
-            <h1 className="booth-title">크리스마스의 추억을 함께 남겨요</h1>
-            {!easy && (
-              <p className="booth-lead">
-                사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.
-              </p>
-            )}
+            <h1 className="booth-title">{t.welcome.title}</h1>
+            {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
           </div>
           <div className="grid w-full grid-cols-2 gap-[max(16px,2vw)] portrait:grid-cols-1">
             <button
@@ -883,9 +893,9 @@ function Screen(p: ScreenProps) {
               <span className="welcome-choice-icon">
                 <LineIcon name="camera" />
               </span>
-              <span className="welcome-choice-title">여기서 사진 찍기</span>
+              <span className="welcome-choice-title">{t.welcome.camera}</span>
               <span className="welcome-choice-lead">
-                {easy ? "부스 카메라로 찍어요" : "여섯 장 찍고 골라서 휴대폰으로 받아요"}
+                {easy ? t.welcome.cameraLeadEasy : t.welcome.cameraLead}
               </span>
             </button>
             <button
@@ -898,20 +908,20 @@ function Screen(p: ScreenProps) {
               <span className="welcome-choice-icon">
                 <LineIcon name="phone" />
               </span>
-              <span className="welcome-choice-title">내 사진으로 참여하기</span>
+              <span className="welcome-choice-title">{t.welcome.mobile}</span>
               <span className="welcome-choice-lead">
                 {p.wallSubmissionsOpen
                   ? easy
-                    ? "휴대폰 사진을 보내요"
-                    : "휴대폰에 있는 사진을 미디어월로 보내요"
-                  : "지금은 사진 접수를 잠시 멈췄어요"}
+                    ? t.welcome.mobileLeadEasy
+                    : t.welcome.mobileLead
+                  : t.welcome.paused}
               </span>
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <div
               role="radiogroup"
-              aria-label="화면 크기"
+              aria-label={t.welcome.modeGroup}
               className="flex rounded-full border-2 border-ink/60 p-1"
             >
               {(["standard", "easy"] as const).map((m) => (
@@ -926,7 +936,30 @@ function Screen(p: ScreenProps) {
                     state.mode === m ? "bg-ink text-button-text" : "text-ink"
                   }`}
                 >
-                  {m === "standard" ? "기본 화면" : "가+ 쉬운 화면"}
+                  {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
+                </button>
+              ))}
+            </div>
+            {/* 한국어 · English (D78): each name in its own language, the same in both. */}
+            <div
+              role="radiogroup"
+              aria-label={t.langGroup}
+              className="flex rounded-full border-2 border-ink/60 p-1"
+            >
+              {KIOSK_LANGS.map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  role="radio"
+                  lang={lang}
+                  aria-checked={state.lang === lang}
+                  data-testid={`lang-${lang}`}
+                  onClick={() => p.onSetLang(lang)}
+                  className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
+                    state.lang === lang ? "bg-ink text-button-text" : "text-ink"
+                  }`}
+                >
+                  {KIOSK_COPY[lang].langName}
                 </button>
               ))}
             </div>
@@ -946,11 +979,9 @@ function Screen(p: ScreenProps) {
       return (
         <BoothScreen testId={pick ? "screen-pick" : "screen-frame"} progress={progress}>
           <h1 className="booth-title text-center">
-            {pick ? "마음에 드는 틀을 골라주세요" : "사진을 넣어 봤어요"}
+            {pick ? t.frame.pickTitle : t.frame.againTitle}
           </h1>
-          {!pick && (
-            <p className="booth-lead mt-3 text-center">다른 틀이 더 잘 어울리면 바꿔도 돼요.</p>
-          )}
+          {!pick && <p className="booth-lead mt-3 text-center">{t.frame.againLead}</p>}
           <div className="mt-[3vh] grid max-h-[66dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
@@ -974,9 +1005,9 @@ function Screen(p: ScreenProps) {
                     )}
                   </div>
                   <span className="text-[clamp(26px,3.33vh,36px)] font-bold text-ink">
-                    {frame.label}
+                    {state.lang === "en" ? frame.labelEn : frame.label}
                   </span>
-                  <span className="text-lg text-ink/75">{frame.slots.length}컷 템플릿</span>
+                  <span className="text-lg text-ink/75">{t.frame.slots(frame.slots.length)}</span>
                 </button>
               );
             })}
@@ -993,7 +1024,7 @@ function Screen(p: ScreenProps) {
                 )
               }
             >
-              {pick ? "이 틀로 찍기" : "이 틀로 할게요"}
+              {pick ? t.frame.pickConfirm : t.frame.againConfirm}
             </button>
           </div>
         </BoothScreen>
@@ -1003,13 +1034,13 @@ function Screen(p: ScreenProps) {
     case "camera":
       return (
         <BoothScreen testId="screen-camera" progress={progress} className="gap-6 text-center">
-          <h1 className="booth-title">카메라를 켜고 있어요</h1>
-          <p className="booth-lead">허용을 묻는 창이 뜨면 &lsquo;허용&rsquo;을 눌러 주세요.</p>
+          <h1 className="booth-title">{t.camera.startingTitle}</h1>
+          <p className="booth-lead">{t.camera.startingLead}</p>
         </BoothScreen>
       );
 
     case "camera-error": {
-      const copy = CAMERA_ERROR_COPY[state.cameraError ?? "failed"];
+      const copy = t.camera.errors[state.cameraError ?? "failed"];
       return (
         <BoothScreen testId="screen-camera-error" progress={progress} className="gap-6 text-center">
           <h1 className="booth-title">{copy.title}</h1>
@@ -1020,10 +1051,10 @@ function Screen(p: ScreenProps) {
               className="booth-btn-primary"
               onClick={() => dispatch({ type: "CAMERA_RETRY" })}
             >
-              다시 시도
+              {t.camera.retry}
             </button>
             <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
-              처음으로
+              {t.camera.home}
             </button>
           </div>
         </BoothScreen>
@@ -1063,8 +1094,10 @@ function Screen(p: ScreenProps) {
                   data-testid="pose-guide"
                   data-pose={pose.id}
                 >
-                  <span className="booth-caption text-ink">추천 포즈</span>
-                  <span className="booth-title">{pose.label}</span>
+                  <span className="booth-caption text-ink">{t.shoot.pose}</span>
+                  <span className="booth-title">
+                    {state.lang === "en" ? (pose.labelEn ?? pose.label) : pose.label}
+                  </span>
                 </div>
               )}
             </CameraPreview>
@@ -1072,14 +1105,12 @@ function Screen(p: ScreenProps) {
           <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
             <p className="booth-title" data-testid="shot-label">
               {state.retakeIndex !== null
-                ? `${state.shotIndex + 1}번째 사진 다시 찍기`
-                : `${state.shotIndex + 1}번째 사진`}
+                ? t.shoot.retakeShot(state.shotIndex + 1)
+                : t.shoot.shot(state.shotIndex + 1)}
             </p>
             {!compactReady && <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />}
             <p className="booth-lead">
-              카메라를 보고 웃어주세요.
-              <br />
-              숫자가 0이 되면 찍혀요.
+              <Lines text={t.shoot.lead} />
             </p>
             {!shooting && (
               <>
@@ -1091,7 +1122,7 @@ function Screen(p: ScreenProps) {
                     data-testid="shoot-free"
                     onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: false })}
                   >
-                    자유 포즈로 찍기
+                    {t.shoot.free}
                   </button>
                   <button
                     type="button"
@@ -1099,26 +1130,26 @@ function Screen(p: ScreenProps) {
                     data-testid="shoot-guide"
                     onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: true })}
                   >
-                    포즈 추천받고 찍기
+                    {t.shoot.guide}
                   </button>
                 </div>
                 <p className="booth-caption" data-testid="shoot-plan">
-                  {state.countdownSeconds}초마다 한 컷씩, 모두 {total}컷을 찍어요
+                  {t.shoot.plan(state.countdownSeconds, total)}
                 </p>
                 {p.videoNotice && (
                   <p className="booth-caption" data-testid="video-notice">
-                    촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지 않아요.
+                    {t.shoot.video}
                   </p>
                 )}
                 {p.guestCameraChoice && p.devices.length > 1 && (
                   <label className="flex items-center gap-3 text-base text-ink/75">
-                    카메라
+                    {t.camera.choose}
                     <select
                       className="rounded-lg border border-ink/50 bg-paper px-3 py-2 text-ink"
                       value={p.deviceId ?? ""}
                       onChange={(e) => p.onSelectDevice(e.target.value)}
                     >
-                      <option value="">기본 카메라</option>
+                      <option value="">{t.camera.defaultDevice}</option>
                       {p.devices.map((d) => (
                         <option key={d.deviceId} value={d.deviceId}>
                           {d.label}
@@ -1137,7 +1168,7 @@ function Screen(p: ScreenProps) {
     case "review":
       return (
         <BoothScreen testId="screen-review" progress={progress}>
-          <h1 className="booth-title">잘 나왔나요?</h1>
+          <h1 className="booth-title">{t.review.title}</h1>
           <div className="mt-[3vh] grid w-full grid-cols-4 gap-[max(12px,1.1vw)] portrait:grid-cols-2">
             {state.shots.map((shot, i) => (
               <div key={i} className="flex flex-col gap-[1.6vh]">
@@ -1150,7 +1181,7 @@ function Screen(p: ScreenProps) {
                     // eslint-disable-next-line @next/next/no-img-element -- local object URL
                     <img
                       src={shot.url}
-                      alt={`${i + 1}번째 사진`}
+                      alt={t.shoot.shot(i + 1)}
                       className="h-full w-full object-cover"
                     />
                   )}
@@ -1159,9 +1190,9 @@ function Screen(p: ScreenProps) {
                   type="button"
                   onClick={() => dispatch({ type: "RETAKE", index: i })}
                   className="min-h-[max(56px,7.6vh)] rounded-full border-2 border-ink text-[clamp(20px,2.6vh,28px)] font-bold text-ink active:scale-[0.98] active:bg-ink/10"
-                  aria-label={`${i + 1}번째 사진 다시 찍기`}
+                  aria-label={t.shoot.retakeShot(i + 1)}
                 >
-                  다시 찍기
+                  {t.review.retake}
                 </button>
               </div>
             ))}
@@ -1171,7 +1202,7 @@ function Screen(p: ScreenProps) {
             className="booth-btn-primary mt-[4vh] portrait:mt-auto portrait:w-full"
             onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
           >
-            이대로 좋아요
+            {t.review.confirm}
           </button>
         </BoothScreen>
       );
@@ -1181,13 +1212,13 @@ function Screen(p: ScreenProps) {
       const selected = state.selectedShotIndices;
       return (
         <BoothScreen testId="screen-select" progress={progress}>
-          <h1 className="booth-title text-center">6장 중 {required}장을 골라주세요</h1>
+          <h1 className="booth-title text-center">{t.select.title(required, total)}</h1>
           <p
             className="booth-lead mt-3 text-center"
             data-testid="select-required"
             data-required={required}
           >
-            선택한 순서대로 프레임에 들어가요. {selected.length} / {required}장 선택했어요.
+            {t.select.lead(selected.length, required)}
           </p>
           <div className="mt-[3vh] grid w-full max-w-5xl grid-cols-3 gap-3 overflow-y-auto portrait:grid-cols-2">
             {state.shots.map((shot, index) => {
@@ -1197,7 +1228,9 @@ function Screen(p: ScreenProps) {
                   key={index}
                   type="button"
                   data-testid={`select-shot-${index}`}
-                  aria-label={`${index + 1}번째 사진 ${order >= 0 ? "선택 해제" : "선택"}`}
+                  aria-label={
+                    order >= 0 ? t.select.unchoose(index + 1) : t.select.choose(index + 1)
+                  }
                   aria-pressed={order >= 0}
                   onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
                   className={`relative rounded-lg border-4 p-1 transition ${order >= 0 ? "border-ink" : "border-ink/20"}`}
@@ -1224,7 +1257,7 @@ function Screen(p: ScreenProps) {
               className="booth-btn-secondary"
               onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
             >
-              프레임 바꾸기
+              {t.select.changeFrame}
             </button>
             <button
               type="button"
@@ -1235,7 +1268,7 @@ function Screen(p: ScreenProps) {
                 dispatch({ type: "CONFIRM_SELECTION", askConsent: p.wallSubmissionsOpen })
               }
             >
-              이 사진으로 완성하기
+              {t.select.confirm}
             </button>
           </div>
         </BoothScreen>
@@ -1249,17 +1282,13 @@ function Screen(p: ScreenProps) {
           progress={progress}
           className="flex-row items-center justify-center gap-[max(32px,4vw)] portrait:flex-col portrait:gap-[3vh]"
         >
-          <FinalPreview finalImage={p.finalImage} frameId={state.frameId} />
+          <FinalPreview finalImage={p.finalImage} frameId={state.frameId} t={t} />
           <div className="flex max-w-[44rem] flex-col items-start gap-[max(14px,2.2vh)] portrait:w-full portrait:max-w-none portrait:items-center portrait:text-center">
             <h1 className="booth-title">
-              이 사진을 미디어월에
-              <br />
-              띄워도 될까요?
+              <Lines text={t.consent.title} />
             </h1>
             <p className="booth-lead">
-              미디어월에 다른 분들 사진과 함께 돌아가며 보여요.
-              <br />
-              아니요를 눌러도 사진은 받을 수 있어요.
+              <Lines text={t.consent.lead} />
             </p>
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}
             <div className="flex w-full max-w-[30rem] flex-col gap-[max(14px,2.6vh)] portrait:max-w-none">
@@ -1269,7 +1298,7 @@ function Screen(p: ScreenProps) {
                 data-testid="consent-yes"
                 onClick={() => p.onConsent("yes")}
               >
-                네, 띄워주세요
+                {t.consent.yes}
               </button>
               <button
                 type="button"
@@ -1277,15 +1306,13 @@ function Screen(p: ScreenProps) {
                 data-testid="consent-no"
                 onClick={() => p.onConsent("no")}
               >
-                아니요, 저만 볼게요
+                {t.consent.no}
               </button>
             </div>
             <p className="booth-caption text-[clamp(18px,2.2vh,24px)]">
               {/* Figma: "행사가 끝나면 지워져요". Not what retention does yet (hub 24 h / event end,
                   cloud PHOTO_RETENTION_DAYS); the church decides the period (docs/STATUS.md). */}
-              사진은 정해진 기간이 지나면 지워져요.
-              <br />
-              띄운 뒤에도 안내 봉사자에게 말하면 바로 내려드려요.
+              <Lines text={t.consent.note} />
             </p>
           </div>
         </BoothScreen>
@@ -1305,13 +1332,13 @@ function Screen(p: ScreenProps) {
               className="flex flex-col items-start gap-[max(16px,2.6vh)] portrait:contents"
               data-testid="delivery-ready"
             >
-              <h1 className="booth-title portrait:order-1">휴대폰으로 사진을 받아 가세요</h1>
+              <h1 className="booth-title portrait:order-1">{t.delivery.title}</h1>
               <p className="booth-lead portrait:order-2">
-                휴대폰 카메라로 QR을 비춰 주세요.
+                {t.delivery.lead}
                 {state.consent === "yes" && (
                   <>
                     <br />
-                    잠시 뒤 큰 화면에서 내 사진을 찾아보세요.
+                    {t.delivery.onWall}
                   </>
                 )}
               </p>
@@ -1320,9 +1347,9 @@ function Screen(p: ScreenProps) {
                 className="booth-btn-secondary portrait:order-4 portrait:w-full"
                 onClick={p.onReset}
               >
-                다 받았어요
+                {t.delivery.done}
               </button>
-              <p className="booth-caption portrait:order-5">잠시 뒤 처음 화면으로 돌아가요</p>
+              <p className="booth-caption portrait:order-5">{t.delivery.resetSoon}</p>
             </div>
             <div className="flex flex-col items-center gap-5 rounded-3xl bg-paper p-[max(24px,3.7vh)] portrait:order-3">
               <div
@@ -1333,13 +1360,11 @@ function Screen(p: ScreenProps) {
                 dangerouslySetInnerHTML={{ __html: p.qrSvg }}
               />
               <p className="text-center text-[clamp(20px,2.6vh,28px)] font-bold leading-[1.35] text-ink">
-                휴대폰으로 찍으면
-                <br />
-                사진 파일을 받을 수 있어요
+                <Lines text={t.delivery.qrNote} />
               </p>
               {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
               <p className="font-mono text-lg text-ink/75" data-testid="session-code">
-                세션 {sessionCode}
+                {t.delivery.session(sessionCode)}
               </p>
             </div>
           </BoothScreen>
@@ -1349,11 +1374,9 @@ function Screen(p: ScreenProps) {
         <BoothScreen testId="screen-delivery" progress={progress} className="gap-6 text-center">
           {d.status === "qr-pending" ? (
             <div data-testid="delivery-qr-pending" className="flex flex-col items-center gap-6">
-              <h1 className="booth-title">QR을 준비하고 있어요</h1>
+              <h1 className="booth-title">{t.delivery.pendingTitle}</h1>
               <p className="booth-lead">
-                사진은 안전하게 저장했어요. 인터넷이 조금 느려서 QR이 늦어지고 있어요.
-                <br />
-                잠시만 기다리면 이 화면에 QR이 나와요.
+                <Lines text={t.delivery.pendingLead} />
               </p>
               {/* Without a QR this is how staff find the photo later (최근 세션 → QR 다시 보여주기). */}
               <button
@@ -1362,31 +1385,23 @@ function Screen(p: ScreenProps) {
                 data-testid="qr-pending-continue"
                 onClick={p.onReset}
               >
-                QR 없이 처음으로
+                {t.delivery.withoutQr}
               </button>
               <p className="font-mono text-lg text-ink/75" data-testid="session-code">
-                세션 {sessionCode}
+                {t.delivery.session(sessionCode)}
               </p>
             </div>
           ) : d.status === "queued" ? (
             <div data-testid="delivery-queued" className="flex flex-col items-center gap-6">
               <h1 className="booth-title">
-                {d.reason === "auth" ? "도우미를 불러 주세요" : "사진을 보내고 있어요"}
+                {d.reason === "auth" ? t.delivery.authTitle : t.delivery.queuedTitle}
               </h1>
               <p className="booth-lead">
-                {d.reason === "auth" ? (
-                  "이 기기 등록이 필요해요. 사진은 이 기기에 안전하게 보관 중이에요."
-                ) : (
-                  <>
-                    사진은 이 기기에 안전하게 저장했어요.
-                    <br />
-                    연결되면 자동으로 보내고 QR을 보여 드릴게요.
-                  </>
-                )}
+                {d.reason === "auth" ? t.delivery.authLead : <Lines text={t.delivery.queuedLead} />}
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
-                  다시 시도
+                  {t.delivery.retry}
                 </button>
                 {/* The photo and the wall answer are safe on this device and go out later. */}
                 <button
@@ -1395,25 +1410,25 @@ function Screen(p: ScreenProps) {
                   data-testid="queued-continue"
                   onClick={p.onReset}
                 >
-                  QR 없이 처음으로
+                  {t.delivery.withoutQr}
                 </button>
               </div>
               <p className="font-mono text-lg text-ink/75" data-testid="session-code">
-                세션 {sessionCode}
+                {t.delivery.session(sessionCode)}
               </p>
             </div>
           ) : d.status === "failed" ? (
             <>
-              <h1 className="booth-title">사진을 보내지 못했어요</h1>
-              <p className="booth-lead">도우미에게 알려 주세요.</p>
+              <h1 className="booth-title">{t.delivery.failedTitle}</h1>
+              <p className="booth-lead">{t.delivery.failedLead}</p>
               <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
-                처음으로
+                {t.delivery.home}
               </button>
             </>
           ) : (
             <>
-              <h1 className="booth-title">사진을 보내고 있어요</h1>
-              <p className="booth-lead">잠시만 기다려 주세요.</p>
+              <h1 className="booth-title">{t.delivery.sendingTitle}</h1>
+              <p className="booth-lead">{t.delivery.sendingLead}</p>
             </>
           )}
         </BoothScreen>
@@ -1436,6 +1451,7 @@ function MobileScreen({
 }) {
   const m = state.mobile;
   const easy = state.mode === "easy";
+  const t = KIOSK_COPY[state.lang].mobile;
   if (m.status === "received") {
     return (
       <BoothScreen testId="screen-mobile" className="gap-6 text-center">
@@ -1443,31 +1459,19 @@ function MobileScreen({
           <p className="text-[clamp(64px,12vh,120px)] leading-none text-accent" aria-hidden>
             ✓
           </p>
-          <h1 className="booth-title">사진이 도착했어요</h1>
+          <h1 className="booth-title">{t.receivedTitle}</h1>
           <p className="booth-lead">
-            운영팀이 확인한 뒤 미디어월에 걸어 드려요.
-            <br />
-            확인에는 시간이 조금 걸릴 수 있어요.
+            <Lines text={t.receivedLead} />
           </p>
           <button type="button" className="booth-btn-primary" onClick={onReset}>
-            처음으로
+            {t.home}
           </button>
         </div>
       </BoothScreen>
     );
   }
   if (m.status === "failed") {
-    const copy = {
-      offline: {
-        title: "지금은 인터넷이 연결되지 않았어요",
-        lead: "내 사진 보내기는 인터넷이 필요해요. 사진 찍기는 지금도 할 수 있어요.",
-      },
-      paused: {
-        title: "지금은 사진 접수를 잠시 멈췄어요",
-        lead: "잠시 뒤 다시 시도해 주세요. 사진 찍기는 지금도 할 수 있어요.",
-      },
-      error: { title: "QR을 만들지 못했어요", lead: "다시 시도를 눌러 주세요." },
-    }[m.reason];
+    const copy = t.failed[m.reason];
     return (
       <BoothScreen testId="screen-mobile" className="gap-6 text-center">
         <div
@@ -1484,11 +1488,11 @@ function MobileScreen({
                 className="booth-btn-primary"
                 onClick={() => dispatch({ type: "MOBILE_RETRY" })}
               >
-                다시 시도
+                {t.retry}
               </button>
             )}
             <button type="button" className="booth-btn-secondary" onClick={onReset}>
-              처음으로
+              {t.home}
             </button>
           </div>
         </div>
@@ -1502,13 +1506,9 @@ function MobileScreen({
       className="flex-row items-center justify-center gap-[max(40px,6vw)] portrait:flex-col portrait:gap-[3vh]"
     >
       <div className="flex max-w-[48rem] flex-col items-start gap-[max(14px,2.4vh)] portrait:items-center portrait:text-center">
-        <h1 className="booth-title">휴대폰으로 QR을 찍어 주세요</h1>
-        <ol className="flex flex-col gap-[max(10px,1.6vh)]" aria-label="순서">
-          {[
-            "휴대폰 카메라로 QR을 찍어요",
-            "열린 화면에서 사진 한 장을 골라요",
-            "안내를 읽고 ‘미디어월로 보내기’를 눌러요",
-          ].map((text, i) => (
+        <h1 className="booth-title">{t.title}</h1>
+        <ol className="flex flex-col gap-[max(10px,1.6vh)]" aria-label={t.stepsLabel}>
+          {t.steps.map((text, i) => (
             <li key={text} className="booth-lead flex items-center gap-4 text-left">
               <span className="flex h-[max(40px,5vh)] w-[max(40px,5vh)] shrink-0 items-center justify-center rounded-full bg-button font-bold text-button-text">
                 {i + 1}
@@ -1517,14 +1517,10 @@ function MobileScreen({
             </li>
           ))}
         </ol>
-        {!easy && (
-          <p className="booth-caption">
-            운영팀이 확인한 사진만 미디어월에 걸려요. 회원가입이나 앱 설치는 필요 없어요.
-          </p>
-        )}
+        {!easy && <p className="booth-caption">{t.note}</p>}
         {m.status === "ready" && m.via === "lan" && (
           <p className="booth-caption text-ink" data-testid="mobile-lan-note">
-            휴대폰이 행사장 와이파이에 연결되어 있어야 열려요.
+            {t.lan}
           </p>
         )}
       </div>
@@ -1542,12 +1538,11 @@ function MobileScreen({
             className="flex aspect-square w-[clamp(220px,32vh,340px)] items-center justify-center rounded-lg bg-white text-xl text-ink/75"
             role="status"
           >
-            QR을 만들고 있어요…
+            {t.making}
           </div>
         )}
         <p className="text-center text-[clamp(18px,2.4vh,26px)] font-bold leading-[1.35] text-ink">
-          사진이 도착하면
-          <br />이 화면이 바뀌어요
+          <Lines text={t.waiting} />
         </p>
       </div>
     </BoothScreen>
@@ -1555,14 +1550,22 @@ function MobileScreen({
 }
 
 /** The finished strip, shown beside the wall question. */
-function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; frameId: string }) {
+function FinalPreview({
+  finalImage,
+  frameId,
+  t,
+}: {
+  finalImage: FinalImage | null;
+  frameId: string;
+  t: KioskCopy;
+}) {
   return (
     <div className="flex h-[min(66vh,720px)] items-center portrait:h-[36vh]">
       {finalImage?.frameId === frameId ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL
         <img
           src={finalImage.url}
-          alt="완성된 사진"
+          alt={t.consent.finished}
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
@@ -1571,7 +1574,7 @@ function FinalPreview({ finalImage, frameId }: { finalImage: FinalImage | null; 
       ) : (
         <div
           className="aspect-[1/3] h-full animate-pulse bg-ink/10"
-          aria-label="사진을 만들고 있어요"
+          aria-label={t.consent.making}
         />
       )}
     </div>
@@ -1583,7 +1586,7 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
   return (
     <div
       className="flex gap-3"
-      aria-label={`${state.shotCount}장 중 ${capturedCount(state)}장 촬영`}
+      aria-label={KIOSK_COPY[state.lang].shoot.progress(capturedCount(state), state.shotCount)}
     >
       {state.shots.map((shot, i) => (
         <span

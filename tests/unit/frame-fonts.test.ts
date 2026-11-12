@@ -8,10 +8,16 @@ describe("frame fonts", () => {
     const requests = frameFontRequests(FRAMES);
     const specs = requests.map((r) => r.spec);
     expect(new Set(specs).size).toBe(specs.length);
-    // The four approved frames use 400/20; optional 2–6-slot frames add a 500/16 date caption.
-    expect(specs).toEqual(['400 20px "Noto Sans KR Variable"', '500 16px "Noto Sans KR Variable"']);
-    expect(requests[0]!.text).toContain("Matthew 5:9");
-    expect(requests[1]!.text).toContain("Christmas Village 2026");
+    // The four approved frames use 400/20; the 2–6-slot frames and the STUDIO SHALOM 2×2 add a
+    // 500/16 date caption (the 2×2 draws "MT 5:9" at 400/20).
+    expect([...specs].sort()).toEqual([
+      '400 20px "Noto Sans KR Variable"',
+      '500 16px "Noto Sans KR Variable"',
+    ]);
+    const text = (spec: string) => requests.find((r) => r.spec.startsWith(spec))!.text;
+    expect(text("400 20px")).toContain("Matthew 5:9");
+    expect(text("400 20px")).toContain("MT 5:9");
+    expect(text("500 16px")).toContain("Christmas Village 2026");
   });
 
   it("fills the date token with the digits it will draw", () => {
