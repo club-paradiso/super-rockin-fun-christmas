@@ -280,6 +280,20 @@ body {
     font-size: clamp(24px, 3.2vh, 36px);
   }
   /* Welcome: the two big choices. Equal size; the camera one is the filled primary. */
+  /* D79: one sheet of letter paper on the backdrop; the seal is pressed on its corner. */
+  .letter-sheet {
+    @apply relative rounded-lg border border-ink/10 bg-paper;
+    margin-block: max(8px, 1vh) max(12px, 1.4vh);
+    padding: max(20px, 2.6vh) max(16px, 2.4vw);
+  }
+  .wax-seal {
+    @apply pointer-events-none absolute select-none;
+    width: clamp(104px, min(13vw, 14vh), 168px);
+    height: auto;
+    right: -12px;
+    bottom: -12px;
+    transform: rotate(-8deg);
+  }
   .welcome-choice {
     @apply flex flex-col items-start justify-center gap-[max(8px,1.2vh)] rounded-3xl border-[3px] border-ink bg-paper text-left text-ink transition active:scale-[0.99] disabled:border-ink/40 disabled:opacity-60;
     min-height: max(180px, 30vh);
@@ -339,6 +353,19 @@ body {
 }
 .kiosk-easy .welcome-choice-lead {
   font-size: clamp(22px, min(3.2vh, 3vw), 34px);
+}
+/* Portrait (iPad): the two choices stack, so each is shorter and the welcome sheet fits (D79). */
+@media (orientation: portrait) {
+  .welcome-choice {
+    min-height: max(150px, 15vh);
+    padding-block: max(20px, 2.4vh);
+  }
+  .welcome-choice-icon {
+    font-size: clamp(40px, min(7vh, 7vw), 80px);
+  }
+  .kiosk-easy .welcome-choice {
+    min-height: max(170px, 18vh);
+  }
 }
 /* Keyboard focus is always visible (WCAG 2.4.7 / 2.4.13). */
 main button:focus-visible,

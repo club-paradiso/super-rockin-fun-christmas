@@ -92,6 +92,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   starts in Korean). Every guest string lives in `lib/kiosk/copy.ts` in both languages; never
   hard-code booth copy in a component. Korean copy is the user's wording (D76). "이전" exists only
   where `canGoBack` allows it: never once a shot exists or the frame is final.
+- **The booth is a letter** (D79): booth content sits on one `LetterSheet` (paper on the backdrop).
+  The wax seal (`public/brand/wax-seal.webp`) is decoration only (`alt=""`, no pointer events,
+  never over a button, never causing scroll) and is pressed on two screens only: welcome and the
+  QR once it is real.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the

@@ -9,8 +9,8 @@ import {
 } from "./helpers";
 
 /**
- * STUDIO SHALOM booth (D77, D78): the star in the O, "이전", the English screens and the 2×2
- * frame. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
+ * STUDIO SHALOM booth (D77, D78, D79): the star in the O, "이전", the English screens, the 2×2
+ * frame and the letter sheet with its seal. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -118,4 +118,34 @@ test("the STUDIO SHALOM 2×2: first in the picker, four photos, 1200 × 1500, de
   expect(loaded).toBe(true);
   const url = await answerForQr(page, "yes");
   expect(url).toMatch(/\/p\/[A-Za-z0-9_-]{32}$/);
+});
+
+test("the letter sheet: every booth screen sits on paper, the seal only on welcome and the QR", async ({
+  page,
+}) => {
+  await page.goto("/kiosk?camera=mock");
+  const welcome = page.getByTestId("screen-welcome");
+  await expect(welcome.getByTestId("letter-sheet")).toBeVisible();
+  const seal = welcome.getByTestId("wax-seal");
+  await expect(seal).toBeVisible();
+  await expect(seal).toHaveAttribute("alt", "");
+  await expect(seal).toHaveCSS("pointer-events", "none");
+  // Decoration never makes the booth scroll sideways.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  await page.getByTestId("start-camera").click();
+  await expect(page.getByTestId("screen-pick").getByTestId("letter-sheet")).toBeVisible();
+  await expect(page.getByTestId("wax-seal")).toHaveCount(0);
+
+  await shootSixWithMock(page);
+  await toFrame(page);
+  await expect(page.getByTestId("wax-seal")).toHaveCount(0);
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await selectDefaultPhotos(page);
+  await answerForQr(page, "no");
+  await expect(page.getByTestId("delivery-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-delivery").getByTestId("wax-seal")).toBeVisible();
 });
