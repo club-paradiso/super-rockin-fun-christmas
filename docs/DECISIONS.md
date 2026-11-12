@@ -915,3 +915,31 @@ equal wall answers, the selection count, the reset notice on the QR screen). Wha
 Not done: the phone pages (`/p/[token]`, `/m/[token]`) stay Korean only; an English guest scanning
 the QR sees Korean there. The English copy was written here, not by the user: it needs the user's
 check, like any guest copy.
+
+## D79 · The letter sheet and the wax seal on the booth
+
+User decisions (2026-11-12): the wax seal (a red wax disc with the four-point star, the image the
+user made) replaces the old "MT" stamp idea, toned to a matte red so it is not brown and does not
+look pasted on; the booth screens look like **letter paper** so the seal belongs to them ("A로
+가자": option A of the Figma comparison).
+
+- Every booth screen puts its content on **one sheet of paper** on the backdrop:
+  `LetterSheet` in `components/kiosk/ui.tsx` (`.letter-sheet`: `paper`, radius 8, a 1 px `ink`/10
+  edge). `BoothScreen` uses it, and so does the welcome screen. The header (back, wordmark,
+  progress) and the footer buttons stay on the backdrop, outside the sheet. Paper boxes on the
+  sheet (the QR boxes) get a 1 px `ink`/15 edge so paper on paper still reads.
+- The **seal is pressed only twice**: on the welcome sheet and on the QR screen once the QR is real
+  (`delivery-ready`). A seal on every screen stops meaning anything; first and last screen are the
+  letter's opening and its closing. Not on the "QR 준비 중" or offline screens.
+- The seal is **decoration**: `public/brand/wax-seal.webp` (480 px, 27 KB; the Figma filters
+  contrast −25, saturation −20, highlights −65, shadows +20 baked in), `alt=""`, `aria-hidden`,
+  `pointer-events: none`, at the sheet's bottom-right corner, never over a button and never
+  making the page scroll. It is an image, not a brand colour or a gradient in the UI, so the
+  token rule stays as it is. It carries no text and no verse.
+- iPad portrait (820 × 1180): the welcome cards are a little shorter and the QR box a little
+  tighter so the welcome and QR screens fit without scrolling; the "다 받았어요" button is no longer
+  full width in portrait, which keeps the sealed corner clear.
+- Figma: the KIOSK page has the same sheet on every screen, the seal on 1a, 1b, 1c and 8a.
+
+Not done: the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
+photos are tall). Frames and the media wall do not use the seal.

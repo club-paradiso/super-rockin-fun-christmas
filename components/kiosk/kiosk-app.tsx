@@ -56,7 +56,7 @@ import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import type { KioskMode } from "@/lib/storage/types";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import { BoothScreen, BrandLockup, CameraPreview, LineIcon } from "./ui";
+import { BoothScreen, BrandLockup, CameraPreview, LetterSheet, LineIcon } from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -876,94 +876,99 @@ function Screen(p: ScreenProps) {
       return (
         <section
           data-testid="screen-welcome"
-          className="flex min-h-dvh w-full flex-col justify-center gap-[max(20px,4vh)] px-[max(24px,6.25vw)] py-[max(24px,5vh)]"
+          className="flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] py-[max(16px,2vh)]"
         >
-          <div className="flex flex-col items-start gap-[max(12px,2vh)]">
-            <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
-            <h1 className="booth-title">{t.welcome.title}</h1>
-            {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
-          </div>
-          <div className="grid w-full grid-cols-2 gap-[max(16px,2vw)] portrait:grid-cols-1">
-            <button
-              type="button"
-              className="welcome-choice welcome-choice-primary"
-              data-testid="start-camera"
-              onClick={p.onStart}
-            >
-              <span className="welcome-choice-icon">
-                <LineIcon name="camera" />
-              </span>
-              <span className="welcome-choice-title">{t.welcome.camera}</span>
-              <span className="welcome-choice-lead">
-                {easy ? t.welcome.cameraLeadEasy : t.welcome.cameraLead}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="welcome-choice"
-              data-testid="start-mobile"
-              disabled={!p.wallSubmissionsOpen}
-              onClick={p.onStartMobile}
-            >
-              <span className="welcome-choice-icon">
-                <LineIcon name="phone" />
-              </span>
-              <span className="welcome-choice-title">{t.welcome.mobile}</span>
-              <span className="welcome-choice-lead">
-                {p.wallSubmissionsOpen
-                  ? easy
-                    ? t.welcome.mobileLeadEasy
-                    : t.welcome.mobileLead
-                  : t.welcome.paused}
-              </span>
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <div
-              role="radiogroup"
-              aria-label={t.welcome.modeGroup}
-              className="flex rounded-full border-2 border-ink/60 p-1"
-            >
-              {(["standard", "easy"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={state.mode === m}
-                  data-testid={`mode-${m}`}
-                  onClick={() => state.mode !== m && p.onToggleMode()}
-                  className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
-                    state.mode === m ? "bg-ink text-button-text" : "text-ink"
-                  }`}
-                >
-                  {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
-                </button>
-              ))}
+          <LetterSheet
+            seal
+            className="flex flex-1 flex-col justify-center gap-[max(20px,4vh)] !px-[max(24px,4.2vw)]"
+          >
+            <div className="flex flex-col items-start gap-[max(12px,2vh)]">
+              <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
+              <h1 className="booth-title">{t.welcome.title}</h1>
+              {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
             </div>
-            {/* 한국어 · English (D78): each name in its own language, the same in both. */}
-            <div
-              role="radiogroup"
-              aria-label={t.langGroup}
-              className="flex rounded-full border-2 border-ink/60 p-1"
-            >
-              {KIOSK_LANGS.map((lang) => (
-                <button
-                  key={lang}
-                  type="button"
-                  role="radio"
-                  lang={lang}
-                  aria-checked={state.lang === lang}
-                  data-testid={`lang-${lang}`}
-                  onClick={() => p.onSetLang(lang)}
-                  className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
-                    state.lang === lang ? "bg-ink text-button-text" : "text-ink"
-                  }`}
-                >
-                  {KIOSK_COPY[lang].langName}
-                </button>
-              ))}
+            <div className="grid w-full grid-cols-2 gap-[max(16px,2vw)] portrait:grid-cols-1">
+              <button
+                type="button"
+                className="welcome-choice welcome-choice-primary"
+                data-testid="start-camera"
+                onClick={p.onStart}
+              >
+                <span className="welcome-choice-icon">
+                  <LineIcon name="camera" />
+                </span>
+                <span className="welcome-choice-title">{t.welcome.camera}</span>
+                <span className="welcome-choice-lead">
+                  {easy ? t.welcome.cameraLeadEasy : t.welcome.cameraLead}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="welcome-choice"
+                data-testid="start-mobile"
+                disabled={!p.wallSubmissionsOpen}
+                onClick={p.onStartMobile}
+              >
+                <span className="welcome-choice-icon">
+                  <LineIcon name="phone" />
+                </span>
+                <span className="welcome-choice-title">{t.welcome.mobile}</span>
+                <span className="welcome-choice-lead">
+                  {p.wallSubmissionsOpen
+                    ? easy
+                      ? t.welcome.mobileLeadEasy
+                      : t.welcome.mobileLead
+                    : t.welcome.paused}
+                </span>
+              </button>
             </div>
-          </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div
+                role="radiogroup"
+                aria-label={t.welcome.modeGroup}
+                className="flex rounded-full border-2 border-ink/60 p-1"
+              >
+                {(["standard", "easy"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={state.mode === m}
+                    data-testid={`mode-${m}`}
+                    onClick={() => state.mode !== m && p.onToggleMode()}
+                    className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
+                      state.mode === m ? "bg-ink text-button-text" : "text-ink"
+                    }`}
+                  >
+                    {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
+                  </button>
+                ))}
+              </div>
+              {/* 한국어 · English (D78): each name in its own language, the same in both. */}
+              <div
+                role="radiogroup"
+                aria-label={t.langGroup}
+                className="flex rounded-full border-2 border-ink/60 p-1"
+              >
+                {KIOSK_LANGS.map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    role="radio"
+                    lang={lang}
+                    aria-checked={state.lang === lang}
+                    data-testid={`lang-${lang}`}
+                    onClick={() => p.onSetLang(lang)}
+                    className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
+                      state.lang === lang ? "bg-ink text-button-text" : "text-ink"
+                    }`}
+                  >
+                    {KIOSK_COPY[lang].langName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </LetterSheet>
         </section>
       );
     }
@@ -1325,6 +1330,7 @@ function Screen(p: ScreenProps) {
           <BoothScreen
             testId="screen-delivery"
             progress={progress}
+            seal
             className="flex-row items-center justify-center gap-[max(40px,6.25vw)] portrait:flex-col portrait:gap-[2.4vh] portrait:text-center"
           >
             {/* Portrait (iPad): title, lead, QR, button — the column dissolves into the screen's. */}
@@ -1344,18 +1350,18 @@ function Screen(p: ScreenProps) {
               </p>
               <button
                 type="button"
-                className="booth-btn-secondary portrait:order-4 portrait:w-full"
+                className="booth-btn-secondary portrait:order-4 portrait:w-[min(100%,28rem)]"
                 onClick={p.onReset}
               >
                 {t.delivery.done}
               </button>
               <p className="booth-caption portrait:order-5">{t.delivery.resetSoon}</p>
             </div>
-            <div className="flex flex-col items-center gap-5 rounded-3xl bg-paper p-[max(24px,3.7vh)] portrait:order-3">
+            <div className="flex flex-col items-center gap-5 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)] portrait:order-3 portrait:p-[max(20px,2.6vh)]">
               <div
                 data-testid="qr-code"
                 data-url={d.url}
-                className="w-[clamp(220px,30vh,320px)] rounded-lg bg-white p-3"
+                className="w-[clamp(220px,min(30vh,36vw),320px)] rounded-lg bg-white p-3"
                 // QR markup comes from the qrcode library, generated locally from our own URL.
                 dangerouslySetInnerHTML={{ __html: p.qrSvg }}
               />
@@ -1524,7 +1530,7 @@ function MobileScreen({
           </p>
         )}
       </div>
-      <div className="flex flex-col items-center gap-4 rounded-3xl bg-paper p-[max(24px,3.7vh)]">
+      <div className="flex flex-col items-center gap-4 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)]">
         {ready ? (
           <div
             data-testid="mobile-qr"

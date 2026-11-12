@@ -119,11 +119,14 @@ export function BoothScreen({
   testId,
   progress,
   className = "",
+  seal = false,
 }: {
   children: React.ReactNode;
   testId: string;
   progress?: { step: number; total: number } | null;
   className?: string;
+  /** Press the wax seal on this sheet's corner (D79: welcome and the QR only). */
+  seal?: boolean;
 }) {
   const chrome = useKioskChrome();
   const easy = chrome?.mode === "easy";
@@ -160,11 +163,51 @@ export function BoothScreen({
           )}
         </header>
       )}
-      <div className={`flex flex-1 flex-col items-center justify-center ${className}`}>
+      <LetterSheet
+        seal={seal}
+        className={`flex flex-1 flex-col items-center justify-center ${className}`}
+      >
         {children}
-      </div>
+      </LetterSheet>
       <BoothFooter />
     </section>
+  );
+}
+
+/**
+ * The letter sheet (D79): every booth screen's content sits on one sheet of paper on the
+ * backdrop. Layout classes go to the sheet itself, so screens keep their own arrangement.
+ */
+export function LetterSheet({
+  children,
+  className = "",
+  seal = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  seal?: boolean;
+}) {
+  return (
+    <div className={`letter-sheet ${className}`} data-testid="letter-sheet">
+      {children}
+      {seal && <WaxSeal />}
+    </div>
+  );
+}
+
+/** Decoration only: no text, not focusable, never in the way of a touch. */
+export function WaxSeal() {
+  return (
+    // A fixed 27 KB asset at one size; next/image would add nothing here.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/brand/wax-seal.webp"
+      alt=""
+      aria-hidden
+      draggable={false}
+      data-testid="wax-seal"
+      className="wax-seal"
+    />
   );
 }
 
