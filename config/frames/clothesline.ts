@@ -50,6 +50,7 @@ export const clothesline: FrameDefinition = {
   id: "clothesline",
   name: "Clothesline",
   label: "빨랫줄",
+  labelEn: "Clothesline",
   outputWidth: STRIP.width,
   outputHeight: STRIP.height,
   background: { type: "solid", color: "#f7f1e3" },

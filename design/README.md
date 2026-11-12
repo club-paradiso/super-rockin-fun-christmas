@@ -15,12 +15,16 @@ Figma와 코드는 **자동으로 동기화되지 않는다.** Figma에서 바�
 
 ### Figma에는 있지만 코드에는 아직 없는 것
 
-Figma `STUDIO SHALOM · Kiosk` 흐름에는 코드에 없는 화면이 있다. 리브랜딩(D73)은 이름·색·글꼴·로고만
-바꿨고, 아래 셋은 **만들지 않았다.** 결정이 나기 전에는 코드를 Figma에 맞추지 않는다.
+2026-11-12에 사용자가 작업 중인 Figma(https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU, 페이지 `SS 01 ·
+키오스크 새 흐름`, `SS 02 · 네컷 프레임 · 휴대폰 · 미디어월`)의 흐름을 반영했다(D77, D78): O 속 별,
+2×2 틀, 한국어/English, 이전. 아래는 **일부러 만들지 않았다.**
 
-- **이름 입력 화면.** 코드는 이름을 받지 않는다(개인 정보를 모으지 않는다는 규칙, `CLAUDE.md`).
-- **체크박스 동의 화면.** 코드는 "네, 띄워주세요 / 아니요, 저만 볼게요" 두 버튼을 같은 크기로 보여 준다.
-- **격자(grid) 미디어월.** 코드의 미디어월은 빨랫줄 밤 장면 그대로다. 워드마크 글자만 바뀌었다.
+- **이름 입력 화면.** 사용자 결정(2026-11-12): 만들지 않는다. 코드는 이름을 받지 않는다(개인 정보 규칙).
+- **두 장의 선택 카드 동의 화면.** 코드는 "네, 띄워주세요 / 아니요, 저만 볼게요" 두 버튼을 같은 크기로
+  보여 준다(같은 원칙). 문구는 사용자 문구 그대로 둔다(D76).
+- **격자(grid) 미디어월.** 코드의 미디어월은 빨랫줄 밤 장면 그대로다. 2×2 사진만 넓은 상자로 걸린다(D77).
+- **Figma 문구 변경**(예: "6장 모두 다시 찍기", 키오스크 상단 막대의 "처음으로" 위치). 손님 문구는 사용자가
+  정한 것만 바꾼다(D76). "처음으로"는 코드에서 화면 아래에 그대로 있다.
 
 ## 브랜드 토큰 (D73)
 
@@ -66,6 +70,8 @@ Noto Sans KR 그대로이고, 카운트다운 숫자도 Noto Sans KR 이다(Corm
 | 미디어월 배경 (`Wall/Background — v3`) | 3840×1080으로 내보내 `public/wall/background-v3.jpg` 를 바꾼다. 빨랫줄·워드마크가 그림 안에 있다(아래 주)     |
 | 글꼴                                   | 앱은 글꼴을 함께 배포한다(`app/layout.tsx`): Noto Sans KR, Cormorant Garamond, 나눔명조. 아래 "글꼴 라이선스" |
 | 네컷 틀 (`Template/A`~`D`)             | `config/frames/<id>.ts` 와 `public/frames/*.svg`. 아래 "프레임 옮기는 법"                                     |
+| 2×2 틀 (`10 네컷 프레임 · 2×2`)        | `config/frames/shalom-grid.ts`, `public/frames/shalom-lockup.svg` (D77)                                       |
+| 부스 문구 (한국어·영어)                | `lib/kiosk/copy.ts` (D78). 한국어는 사용자 문구 그대로                                                        |
 | 미디어월 사진 자리·기울기·줄 높이      | `config/wall.ts` 의 `scene` (`slots`, `strip`, `line`). Figma `Composite preview v3` 의 값을 옮긴다           |
 | 미디어월 문구 (닫힘·잠시 멈춤·빈 줄)   | `components/wall/wall-app.tsx`                                                                                |
 | 부스 문구·버튼                         | `components/kiosk/kiosk-app.tsx`, 버튼·배경·글자 크기는 `app/globals.css` 의 `.booth-*`                       |

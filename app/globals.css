@@ -201,6 +201,27 @@ body {
     color: var(--color-ink);
     line-height: 1;
   }
+  /* The star in the O of SHALOM (D77), the same four-pointed star as the frame lockups
+     (public/frames/*-lockup.svg: 36 / 100 of the SHALOM size tall). It sits in the O's counter:
+     centred on the glyph (the box also holds the letter-spacing after it, hence the offset) and on
+     the capitals' middle. Same colour as the letters. */
+  .brand-o {
+    position: relative;
+    display: inline-block;
+  }
+  .brand-o-star {
+    position: absolute;
+    left: calc(50% - var(--brand-o-tracking, 0.02em));
+    top: 0.5em;
+    width: 0.227em;
+    height: 0.36em;
+    transform: translate(-50%, -50%);
+    fill: currentColor;
+    pointer-events: none;
+  }
+  .brand-wordmark .brand-o {
+    --brand-o-tracking: 0.1em;
+  }
   /* Buttons are pills; cards are 24 px; small controls 8 px. One filled (primary) button per view:
      the others are outlined or plain text in ink. */
   .btn-primary {

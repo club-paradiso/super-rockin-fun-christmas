@@ -19,8 +19,14 @@ function contrast(a: string, b: string) {
 }
 
 describe("frame definitions", () => {
+  it("puts the STUDIO SHALOM 2×2 first, keeps the navy strip preselected", () => {
+    expect(FRAMES[0]!.id).toBe("shalom-grid");
+    expect(FRAMES[0]!.slots).toHaveLength(4);
+    expect(DEFAULT_FRAME_ID).toBe("navy-strip");
+  });
+
   it("preserves four Figma templates and adds four flexible templates", () => {
-    expect(FRAMES.slice(0, 4).map((f) => [f.id, f.label])).toEqual([
+    expect(FRAMES.slice(1, 5).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],
       ["wood-window", "창틀"],
       ["clothesline", "빨랫줄"],
@@ -29,7 +35,7 @@ describe("frame definitions", () => {
   });
 
   it("provides 2 through 6 output slots", () => {
-    expect(FRAMES.slice(4).map((f) => f.id)).toEqual([
+    expect(FRAMES.slice(5).map((f) => f.id)).toEqual([
       "two-stars",
       "three-moments",
       "five-lights",
@@ -123,9 +129,27 @@ describe("frame definitions", () => {
       }
     });
 
-    it("keeps the Figma strip size and square photo corners", () => {
-      expect([frame.outputWidth, frame.outputHeight]).toEqual([600, 1800]);
+    // Strips keep the Figma 600 × 1800; the STUDIO SHALOM 2×2 is 600 × 750 (4:5, D77).
+    it("keeps its Figma size and square photo corners", () => {
+      const size = frame.id === "shalom-grid" ? [600, 750] : [600, 1800];
+      expect([frame.outputWidth, frame.outputHeight]).toEqual(size);
       for (const slot of frame.slots) expect(slot.radius ?? 0).toBe(0);
+    });
+
+    it("has an English label for the English booth screens", () => {
+      expect(frame.labelEn.trim().length).toBeGreaterThan(0);
+      expect(frame.labelEn).not.toMatch(/[\uac00-\ud7a3]/);
+    });
+
+    // D77: the O of SHALOM carries the four-pointed star, in the letters' own colour.
+    it("draws the star in the O of the lockup", () => {
+      const logo = frame.decorations.find((d) => d.type === "image" && d.brand);
+      if (logo?.type !== "image") throw new Error("no lockup");
+      const svg = readFileSync(join("public", logo.src), "utf8");
+      const star = /<path id="o-star" d="[^"]+" fill="(#[0-9A-Fa-f]{6})"/.exec(svg);
+      expect(star).not.toBeNull();
+      const letters = /<path d="M8\.4[^"]*" fill="(#[0-9A-Fa-f]{6})"/.exec(svg);
+      expect(star![1]).toBe(letters![1]);
     });
   });
 });

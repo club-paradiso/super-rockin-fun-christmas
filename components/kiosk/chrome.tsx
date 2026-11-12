@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useId, useRef } from "react";
 import type { KioskMode } from "@/lib/storage/types";
+import { KIOSK_COPY, type EasyStepKey, type KioskCopy, type KioskLang } from "@/lib/kiosk/copy";
 
 /**
  * What every booth screen shares (release 2.0): the guest's screen mode and the way home.
@@ -9,17 +10,24 @@ import type { KioskMode } from "@/lib/storage/types";
  */
 export interface KioskChrome {
   mode: KioskMode;
+  /** The guest's language (D78) and its strings. */
+  lang: KioskLang;
+  t: KioskCopy;
   /** Easy mode: the current step in words ("2단계 · 사진 확인"). */
-  easyStep: { step: number; total: number; label: string } | null;
+  easyStep: { step: number; total: number; key: EasyStepKey } | null;
   toggleMode: () => void;
   /** "처음으로": asks first when a session is under way. Null where it makes no sense. */
   goHome: (() => void) | null;
+  /** "이전": one step back where nothing is lost (D78). Null where there is no way back. */
+  goBack: (() => void) | null;
   /** Hide the footer (while counting down and shooting: nothing to press, nothing to distract). */
   quiet: boolean;
 }
 
 export const KioskChromeContext = createContext<KioskChrome | null>(null);
 export const useKioskChrome = () => useContext(KioskChromeContext);
+/** The guest's booth strings; Korean outside a booth (tests, previews). */
+export const useKioskCopy = (): KioskCopy => useContext(KioskChromeContext)?.t ?? KIOSK_COPY.ko;
 
 /**
  * Footer of every booth screen. Standard: two quiet buttons. Easy: the same two, large, high
@@ -29,6 +37,7 @@ export function BoothFooter() {
   const chrome = useKioskChrome();
   if (!chrome || chrome.quiet) return null;
   const easy = chrome.mode === "easy";
+  const t = chrome.t.chrome;
   const btn = easy ? "booth-chrome-btn booth-chrome-btn-easy" : "booth-chrome-btn";
   return (
     <footer
@@ -37,7 +46,7 @@ export function BoothFooter() {
     >
       {chrome.goHome && (
         <button type="button" className={btn} onClick={chrome.goHome} data-testid="go-home">
-          <span aria-hidden>←</span> 처음으로
+          <span aria-hidden>←</span> {t.home}
         </button>
       )}
       <button
@@ -47,7 +56,8 @@ export function BoothFooter() {
         aria-pressed={easy}
         data-testid="toggle-mode"
       >
-        <span aria-hidden>{easy ? "가" : "가+"}</span> {easy ? "기본 화면으로" : "쉬운 화면"}
+        <span aria-hidden>{easy ? t.iconStandard : t.iconEasy}</span>{" "}
+        {easy ? t.toStandard : t.toEasy}
       </button>
     </footer>
   );

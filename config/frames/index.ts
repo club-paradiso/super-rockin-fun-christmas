@@ -4,9 +4,14 @@ import { creamStrip } from "./cream-strip";
 import { navyStrip } from "./navy-strip";
 import { woodWindow } from "./wood-window";
 import { twoStars, threeMoments, fiveLights, sixLights } from "./flexible-strips";
+import { shalomGrid } from "./shalom-grid";
 
-/** Picker order = Figma order (Template A–D). The first one is preselected. */
+/**
+ * Picker order: the STUDIO SHALOM 2×2 first (D77), then Figma order (Template A–D) and the flexible
+ * strips. The preselected frame stays the navy strip (DEFAULT_FRAME_ID).
+ */
 export const FRAMES: readonly FrameDefinition[] = [
+  shalomGrid,
   navyStrip,
   woodWindow,
   clothesline,
@@ -17,10 +22,10 @@ export const FRAMES: readonly FrameDefinition[] = [
   sixLights,
 ];
 
-export const DEFAULT_FRAME_ID = FRAMES[0]!.id;
+export const DEFAULT_FRAME_ID = navyStrip.id;
 
 export function getFrame(id: string | null | undefined): FrameDefinition {
-  return FRAMES.find((f) => f.id === id) ?? FRAMES[0]!;
+  return FRAMES.find((f) => f.id === id) ?? navyStrip;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WALL_CONFIG } from "@/config/wall";
-import { lineYAt, parseCanvas, wallLayout } from "@/lib/wall/layout";
+import { getFrame } from "@/config/frames";
+import { framedPhotoBox, lineYAt, parseCanvas, wallLayout } from "@/lib/wall/layout";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
 
 describe("wall layout (Figma composite v3)", () => {
@@ -26,6 +27,28 @@ describe("wall layout (Figma composite v3)", () => {
       const prev = layout.slots[i]!;
       expect(s.box.x).toBeGreaterThan(prev.box.x + prev.box.width);
     });
+  });
+
+  // D77: the STUDIO SHALOM 2×2 (4:5) hangs wider than a strip, keeps its own proportions, stays
+  // inside the picture and never reaches a neighbour, even if every slot holds one.
+  it("hangs a 2×2 photo as a wider box and keeps strips as they are", () => {
+    const size = (id: string) => {
+      const f = getFrame(id);
+      return { width: f.outputWidth, height: f.outputHeight };
+    };
+    for (const s of layout.slots) expect(framedPhotoBox(s, size("navy-strip"))).toBeNull();
+    const boxes = layout.slots.map((s) => framedPhotoBox(s, size("shalom-grid"))!);
+    for (const [i, b] of boxes.entries()) {
+      const s = layout.slots[i]!;
+      expect(b.width / b.height).toBeCloseTo(600 / 750, 3);
+      expect(b.width).toBeGreaterThan(s.box.width);
+      expect(b.height).toBeLessThanOrEqual(s.box.height);
+      expect(b.x + b.width / 2).toBeCloseTo(s.x, 6);
+      expect(b.x).toBeGreaterThan(0);
+      expect(b.x + b.width).toBeLessThan(layout.width);
+      expect(b.y + b.height).toBeLessThan(layout.height);
+    }
+    boxes.slice(1).forEach((b, i) => expect(b.x).toBeGreaterThan(boxes[i]!.x + boxes[i]!.width));
   });
 
   it("low-spec mode keeps four slots and leaves the middle empty", () => {

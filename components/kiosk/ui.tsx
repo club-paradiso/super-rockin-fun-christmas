@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { BrandLockup, BrandWordmark } from "@/components/brand";
-import { BoothFooter, useKioskChrome } from "./chrome";
+import type { EasyStepKey } from "@/lib/kiosk/copy";
+import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 
 /** Full-screen stage every kiosk screen sits on. */
 export function Stage({
@@ -66,8 +67,9 @@ export function LineIcon({ name }: { name: keyof typeof LINE_ICONS }) {
 
 /** "3 / 6 ●●●○○○". Done steps are accent, the current one is the dark button colour. */
 export function Stepper({ step, total }: { step: number; total: number }) {
+  const t = useKioskCopy();
   return (
-    <div className="flex items-center gap-[14px]" aria-label={`${total}단계 중 ${step}단계`}>
+    <div className="flex items-center gap-[14px]" aria-label={t.steps.of(step, total)}>
       <span className="font-mono text-xl tracking-[0.08em] text-ink" data-testid="step-progress">
         {step} / {total}
       </span>
@@ -85,15 +87,21 @@ export function Stepper({ step, total }: { step: number; total: number }) {
 }
 
 /** Easy mode: "2 / 6단계 · 사진 확인" in words, large, with a progress bar. */
-export function EasyStep({ step, total, label }: { step: number; total: number; label: string }) {
+export function EasyStep({
+  step,
+  total,
+  stepKey,
+}: {
+  step: number;
+  total: number;
+  stepKey: EasyStepKey;
+}) {
+  const t = useKioskCopy();
   return (
     <div className="flex flex-col items-end gap-2" data-testid="easy-step">
       <p className="text-[clamp(24px,3.4vh,38px)] font-bold text-ink">
-        <span className="text-accent">{step}단계</span> · {label}
-        <span className="sr-only">
-          {" "}
-          ({total}단계 중 {step}단계)
-        </span>
+        <span className="text-accent">{t.steps.easy(step)}</span> · {t.steps.labels[stepKey]}
+        <span className="sr-only"> ({t.steps.of(step, total)})</span>
       </p>
       <div className="h-3 w-[min(36vw,320px)] overflow-hidden rounded-full bg-ink/20" aria-hidden>
         <div className="h-full bg-button" style={{ width: `${(step / total) * 100}%` }} />
@@ -119,16 +127,34 @@ export function BoothScreen({
 }) {
   const chrome = useKioskChrome();
   const easy = chrome?.mode === "easy";
+  const back = chrome?.goBack ?? null;
   return (
     <section
       data-testid={testId}
       className="relative flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] pb-[max(20px,3vh)] pt-[max(20px,4.4vh)]"
     >
-      {(progress || (easy && chrome?.easyStep)) && (
+      {(progress || back || (easy && chrome?.easyStep)) && (
         <header className="flex min-h-[max(56px,7.4vh)] items-center justify-between gap-4">
-          <BrandWordmark className="text-[clamp(20px,2.8vh,30px)]" />
+          <div className="flex items-center gap-[max(16px,2vw)]">
+            {/* One step back, where nothing the guest made is lost (D78). */}
+            {back && (
+              <button
+                type="button"
+                className={`booth-chrome-btn ${easy ? "booth-chrome-btn-easy" : ""}`}
+                onClick={back}
+                data-testid="go-back"
+              >
+                <span aria-hidden>‹</span> {chrome!.t.chrome.back}
+              </button>
+            )}
+            <BrandWordmark className="text-[clamp(20px,2.8vh,30px)]" />
+          </div>
           {easy && chrome?.easyStep ? (
-            <EasyStep {...chrome.easyStep} />
+            <EasyStep
+              step={chrome.easyStep.step}
+              total={chrome.easyStep.total}
+              stepKey={chrome.easyStep.key}
+            />
           ) : (
             progress && <Stepper step={progress.step} total={progress.total} />
           )}
@@ -185,6 +211,7 @@ export function CameraPreview({
   children?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const t = useKioskCopy();
 
   useEffect(() => {
     const video = videoRef.current;
@@ -212,7 +239,7 @@ export function CameraPreview({
       />
       {!stream && (
         <div className="absolute inset-0 flex items-center justify-center text-xl text-ink/75">
-          미리보기를 준비하고 있어요…
+          {t.camera.preview}
         </div>
       )}
       {children}

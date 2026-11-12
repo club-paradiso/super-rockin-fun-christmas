@@ -2,7 +2,13 @@ import type { FrameDefinition, FrameSlot } from "@/lib/compositor/types";
 import { lockupBox } from "./shared";
 
 /** Additional 2/3/5/6-slot designs, kept at the current 600×1800 Figma canvas size. */
-function flexibleStrip(id: string, label: string, count: number, paper: boolean): FrameDefinition {
+function flexibleStrip(
+  id: string,
+  label: string,
+  labelEn: string,
+  count: number,
+  paper: boolean,
+): FrameDefinition {
   const gap = 13;
   const height = Math.min(340, (1440 - (count - 1) * gap) / count);
   const width = height * (4 / 3);
@@ -20,6 +26,7 @@ function flexibleStrip(id: string, label: string, count: number, paper: boolean)
     id,
     name: label,
     label,
+    labelEn,
     outputWidth: 600,
     outputHeight: 1800,
     background: { type: "solid", color: paper ? "#f7f1e3" : "#070a1c" },
@@ -45,7 +52,31 @@ function flexibleStrip(id: string, label: string, count: number, paper: boolean)
     ],
   };
 }
-export const twoStars = flexibleStrip("two-stars", "포스트카드 · 2컷", 2, true);
-export const threeMoments = flexibleStrip("three-moments", "세 장의 이야기 · 3컷", 3, true);
-export const fiveLights = flexibleStrip("five-lights", "다섯 장 · 5컷", 5, false);
-export const sixLights = flexibleStrip("six-lights", "여섯 장의 밤 · 6컷", 6, false);
+export const twoStars = flexibleStrip(
+  "two-stars",
+  "포스트카드 · 2컷",
+  "Postcard · 2 photos",
+  2,
+  true,
+);
+export const threeMoments = flexibleStrip(
+  "three-moments",
+  "세 장의 이야기 · 3컷",
+  "A Story in Three · 3 photos",
+  3,
+  true,
+);
+export const fiveLights = flexibleStrip(
+  "five-lights",
+  "다섯 장 · 5컷",
+  "Five · 5 photos",
+  5,
+  false,
+);
+export const sixLights = flexibleStrip(
+  "six-lights",
+  "여섯 장의 밤 · 6컷",
+  "A Night in Six · 6 photos",
+  6,
+  false,
+);
