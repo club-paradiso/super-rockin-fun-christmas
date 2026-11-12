@@ -1,4 +1,4 @@
-import { selectDefaultPhotos } from "./helpers";
+import { selectDefaultPhotos, openWelcome } from "./helpers";
 import { createClient } from "@supabase/supabase-js";
 import { expect, type Browser, type Page } from "@playwright/test";
 import { MAILPIT_URL } from "./env";
@@ -83,6 +83,7 @@ export async function enrollWithCode(kiosk: Page, code: string) {
  */
 export async function kioskPhotoToQr(kiosk: Page, answer: "yes" | "no" = "no") {
   await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();

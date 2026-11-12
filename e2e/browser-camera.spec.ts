@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, startSession } from "./helpers";
+import { enrollKiosk, startSession, openWelcome } from "./helpers";
 
 // Exercises the real BrowserCamera (getUserMedia) against Chromium's built-in fake webcam.
 // This proves the browser code path, not any particular physical camera.
@@ -33,11 +33,12 @@ test("camera permission denied shows a clear error and a way back", async ({ bro
       Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" }));
   });
   await page.goto("/kiosk");
+  await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await page.getByRole("button", { name: "이 틀로 찍기" }).click();
   await expect(page.getByTestId("screen-camera-error")).toBeVisible();
   await expect(page.getByText("카메라 사용이 허용되지 않았어요")).toBeVisible();
   await page.getByRole("button", { name: "처음으로" }).click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
   await context.close();
 });

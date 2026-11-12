@@ -1,4 +1,4 @@
-import { selectDefaultPhotos } from "./helpers";
+import { selectDefaultPhotos, openWelcome } from "./helpers";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
@@ -99,6 +99,7 @@ test("setup: staff and an enrolled booth on the hub", async ({ browser }) => {
 /** Booth session up to the wall question's answer (the QR screen follows). */
 async function shootAndAnswer(answer: "yes" | "no") {
   await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
@@ -122,7 +123,7 @@ test("online: the QR is the cloud's link, the phone downloads from the cloud, co
   await phone.context().close();
 
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
 
   const hub = (await hubRow(session))!;
   expect(hub.cloud?.state).toBe("SYNCED");
@@ -196,7 +197,7 @@ test("cloud down: the wall answer is kept and the guest can leave without a QR",
       .replace("세션", "")
       .trim();
     await kiosk.getByTestId("qr-pending-continue").click();
-    await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+    await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
     await expect
       .poll(async () => {
         const r = await hubRow(session);
@@ -225,6 +226,7 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
   browser,
 }) => {
   await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
   await kiosk.getByTestId("start-mobile").click();
   const qr = kiosk.getByTestId("mobile-qr");
   await expect(qr.locator("svg")).toBeVisible();
@@ -277,6 +279,7 @@ test("내 사진으로 참여하기 offline: the booth says the internet is need
   await closeProxy();
   try {
     await kiosk.goto("/kiosk?camera=mock");
+    await openWelcome(kiosk);
     await kiosk.getByTestId("start-mobile").click();
     await expect(kiosk.getByTestId("mobile-failed")).toHaveAttribute("data-reason", "offline");
     await expect(kiosk.getByTestId("mobile-qr")).toHaveCount(0);
@@ -286,7 +289,7 @@ test("내 사진으로 참여하기 offline: the booth says the internet is need
   await kiosk.getByRole("button", { name: "다시 시도" }).click();
   await expect(kiosk.getByTestId("mobile-qr").locator("svg")).toBeVisible({ timeout: 15_000 });
   await kiosk.getByTestId("go-home").click();
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
 });
 
 test("staff delete on the hub kills the cloud link too", async () => {
