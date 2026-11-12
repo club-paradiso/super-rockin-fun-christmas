@@ -9,8 +9,9 @@ import type { EasyStepKey, KioskLang } from "@/lib/kiosk/copy";
  * effects in response to phases and dispatches the results back here. That keeps every rule
  * (exactly N shots, retake, reset) unit-testable.
  *
- * welcome → pick (frame) → camera → ready → countdown ⇄ capturing → review
- *         → frame (again, with the guest's photos) → consent → delivery (QR) → (reset) welcome
+ * attract ("화면을 눌러 시작", D80) → welcome → pick (frame) → camera → ready → countdown ⇄
+ *         capturing → review → frame (again, with the guest's photos) → consent → delivery (QR)
+ *         → (reset) attract
  *
  * The upload starts as soon as the frame is final, so it runs while the guest answers the wall
  * question; delivery events are accepted in both the consent and delivery phases. The wall
@@ -35,6 +36,7 @@ import type { EasyStepKey, KioskLang } from "@/lib/kiosk/copy";
  */
 
 export type KioskPhase =
+  | "attract" // "화면을 눌러 시작": the booth waiting for the next guest (D80)
   | "welcome"
   | "pick" // choose a frame before shooting
   | "camera" // requesting permission / starting the camera
@@ -141,6 +143,8 @@ export type KioskAction<Shot> =
   | { type: "SET_MODE"; mode: KioskMode }
   /** Staff changed the default start mode (settings refresh). */
   | { type: "SET_DEFAULT_MODE"; mode: KioskMode }
+  /** A touch on the attract screen opens the welcome choices (D80). */
+  | { type: "OPEN" }
   /** "내 사진으로 참여하기" from the welcome screen. */
   | { type: "START_MOBILE" }
   | {
@@ -180,7 +184,7 @@ export const MAX_CAPTURE_FAILURES = 3;
 export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
   const mode = init.mode ?? "standard";
   return {
-    phase: "welcome",
+    phase: "attract",
     /** Empty until START; a session only exists once a guest begins. */
     sessionId: "",
     shotCount: init.shotCount,
@@ -223,6 +227,9 @@ export function kioskReducer<Shot>(
         mode: state.defaultMode,
       });
 
+    case "OPEN":
+      return state.phase === "attract" ? { ...state, phase: "welcome" } : state;
+
     case "SET_LANG":
       return state.lang === action.lang ? state : { ...state, lang: action.lang };
 
@@ -254,7 +261,7 @@ export function kioskReducer<Shot>(
     case "SET_DEFAULT_MODE":
       if (state.defaultMode === action.mode) return state;
       // Nobody is using the booth: show the new default right away.
-      return state.phase === "welcome"
+      return state.phase === "attract" || state.phase === "welcome"
         ? {
             ...state,
             defaultMode: action.mode,
@@ -512,6 +519,7 @@ export function progressStep(
 ): { step: number; total: number } | null {
   const total = askConsent ? 7 : 6;
   switch (phase) {
+    case "attract":
     case "welcome":
     case "mobile":
       return null;
@@ -542,6 +550,7 @@ export function easyStep(
 ): { step: number; total: number; label: string; key: EasyStepKey } | null {
   const total = askConsent ? 6 : 5;
   switch (phase) {
+    case "attract":
     case "welcome":
     case "mobile":
       return null;

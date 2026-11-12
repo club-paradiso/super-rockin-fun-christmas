@@ -92,7 +92,7 @@ test("happy path: frame → 6 shots → frame again → consent YES → upload �
   expect(row!.wallConsent).toBe(true);
 
   await page.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
 });
 
 test("decline path: consent NO leaves the download working and nothing queued for the wall", async ({

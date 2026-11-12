@@ -5,7 +5,7 @@ import {
   MAX_CAPTURE_FAILURES,
   canGoBack,
   capturedCount,
-  createInitialState,
+  createInitialState as attractState,
   currentPose,
   easyStep,
   kioskReducer,
@@ -15,6 +15,11 @@ import {
 } from "@/lib/kiosk/machine";
 
 type S = KioskState<string>;
+
+/** Most tests start where a guest has touched the attract screen (D80). */
+function createInitialState<Shot>(init: Parameters<typeof attractState>[0]): KioskState<Shot> {
+  return kioskReducer(attractState<Shot>(init), { type: "OPEN" });
+}
 const SESSION = "11111111-2222-4333-8444-555555555555";
 
 function init(): S {
@@ -257,7 +262,7 @@ describe("reset", () => {
       { type: "SET_CONSENT", consent: "yes" },
     );
     const s = run(done, { type: "RESET" });
-    expect(s.phase).toBe("welcome");
+    expect(s.phase).toBe("attract");
     expect(s.sessionId).toBe("");
     expect(s.shots).toEqual([null, null, null, null, null, null]);
     expect(s.delivery).toEqual({ status: "idle" });
@@ -268,7 +273,7 @@ describe("reset", () => {
 
   it("each START begins a new session id", () => {
     const a = run(init(), { type: "START", sessionId: "a" });
-    const b = run(a, { type: "RESET" }, { type: "START", sessionId: "b" });
+    const b = run(a, { type: "RESET" }, { type: "OPEN" }, { type: "START", sessionId: "b" });
     expect([a.sessionId, b.sessionId]).toEqual(["a", "b"]);
   });
 });
@@ -372,7 +377,7 @@ describe("easy mode (D67): same machine, fewer choices", () => {
     let s = run(init(), { type: "SET_MODE", mode: "easy" }, { type: "START", sessionId: SESSION });
     expect(s.phase).toBe("camera");
     s = run(s, { type: "RESET" });
-    expect([s.mode, s.countdownSeconds, s.phase]).toEqual(["standard", 3, "welcome"]);
+    expect([s.mode, s.countdownSeconds, s.phase]).toEqual(["standard", 3, "attract"]);
   });
 
   it("a new staff default applies on the welcome screen at once, otherwise to the next guest", () => {
@@ -413,7 +418,7 @@ describe("내 사진으로 참여하기 (D66) on the booth", () => {
     s = run(s, { type: "MOBILE_RECEIVED", sessionId: SESSION });
     expect(s.mobile.status).toBe("received");
     expect(run(s, { type: "RESET" })).toMatchObject({
-      phase: "welcome",
+      phase: "attract",
       mobile: { status: "idle" },
     });
   });
@@ -618,5 +623,36 @@ describe("back (D78): one step, never losing what the guest made", () => {
     expect(canGoBack(select)).toBe(true);
     const back = run(select, { type: "BACK" });
     expect([back.phase, back.selectedShotIndices, capturedCount(back)]).toEqual(["frame", [], 6]);
+  });
+});
+
+describe("attract screen (D80): 화면을 눌러 시작", () => {
+  const fresh = () =>
+    attractState<string>({ shotCount: 6, countdownSeconds: 3, frameId: "navy-strip" });
+
+  it("the booth starts on the attract screen, and only a touch opens the welcome choices", () => {
+    const s = fresh();
+    expect([s.phase, s.sessionId]).toEqual(["attract", ""]);
+    // Nothing starts from the attract screen except OPEN.
+    expect(run(s, { type: "START", sessionId: SESSION }).phase).toBe("attract");
+    expect(run(s, { type: "START_MOBILE" }).phase).toBe("attract");
+    expect(run(s, { type: "OPEN" }).phase).toBe("welcome");
+    expect(run(s, { type: "OPEN" }, { type: "OPEN" }).phase).toBe("welcome");
+  });
+
+  it("has no step, no back and no progress", () => {
+    expect(canGoBack(fresh())).toBe(false);
+    expect(progressStep("attract", true)).toBeNull();
+    expect(easyStep("attract", true)).toBeNull();
+  });
+
+  it("a new staff default applies on the attract screen at once", () => {
+    const s = run(fresh(), { type: "SET_DEFAULT_MODE", mode: "easy" });
+    expect([s.phase, s.mode, s.defaultMode]).toEqual(["attract", "easy", "easy"]);
+  });
+
+  it("the attract copy exists in both languages", () => {
+    expect(KIOSK_COPY.ko.attract.start).toBe("화면을 눌러 시작");
+    expect(KIOSK_COPY.en.attract.start).not.toMatch(/[가-힣]/);
   });
 });

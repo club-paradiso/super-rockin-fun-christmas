@@ -1,4 +1,4 @@
-import { selectDefaultPhotos } from "./helpers";
+import { selectDefaultPhotos, openWelcome } from "./helpers";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -106,6 +106,7 @@ async function approve(request: APIRequestContext, sessionId: string) {
 
 async function boothPhoto(frame: "navy-strip" | "wood-window") {
   await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await kiosk.getByTestId(`frame-option-${frame}`).click();
   await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();

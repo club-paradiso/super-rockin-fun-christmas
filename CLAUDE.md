@@ -94,8 +94,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   where `canGoBack` allows it: never once a shot exists or the frame is final.
 - **The booth is a letter** (D79): booth content sits on one `LetterSheet` (paper on the backdrop).
   The wax seal (`public/brand/wax-seal.webp`) is decoration only (`alt=""`, no pointer events,
-  never over a button, never causing scroll) and is pressed on two screens only: welcome and the
-  QR once it is real.
+  never over a button, never causing scroll) and is pressed on two screens only: the attract screen and
+  the QR once it is real.
+- **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
+  initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the

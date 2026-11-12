@@ -83,7 +83,7 @@ test("reload while queued: the photo survives in IndexedDB and uploads after res
   const [queued] = await idbQueue(page);
 
   await page.reload();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
   await expect(page.getByTestId("queue-badge")).toHaveText("전송 대기 1건");
 
   await page.unroute("**/api/photos");
@@ -125,7 +125,7 @@ test("offline: the guest still answers the wall question, and the answer lands w
   await expect(page.getByTestId("delivery-queued")).toBeVisible();
   const [queued] = await idbQueue(page);
   await page.getByTestId("queued-continue").click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
   expect(await idbConsents(page)).toEqual([
     expect.objectContaining({ sessionId: queued!.sessionId, consent: true }),
   ]);

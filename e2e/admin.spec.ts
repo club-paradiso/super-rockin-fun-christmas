@@ -55,7 +55,7 @@ test("one-time code enrolls a fresh kiosk, and cannot be reused", async ({ brows
   kiosk = await newPage(browser);
   await enrollWithCode(kiosk, usedCode);
   await expect(kiosk).toHaveURL(/\/kiosk$/);
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
 
   const other = await newPage(browser);
   await enrollWithCode(other, usedCode);
@@ -148,7 +148,7 @@ test("PAUSE SUBMISSIONS: photography and QR keep working, wall consent is skippe
   await expect(kiosk.getByTestId("step-progress")).toHaveText("6 / 6");
   expect((await kiosk.request.get(`${url}/image`)).status()).toBe(200);
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   expect((await photoForToken(tokenFromUrl(url)))?.moderationStatus).toBe("NONE");
 
   await staff.getByTestId("switch-pauseSubmissions").click();

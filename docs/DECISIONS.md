@@ -928,7 +928,7 @@ look pasted on; the booth screens look like **letter paper** so the seal belongs
   edge). `BoothScreen` uses it, and so does the welcome screen. The header (back, wordmark,
   progress) and the footer buttons stay on the backdrop, outside the sheet. Paper boxes on the
   sheet (the QR boxes) get a 1 px `ink`/15 edge so paper on paper still reads.
-- The **seal is pressed only twice**: on the welcome sheet and on the QR screen once the QR is real
+- The **seal is pressed only twice**: on the first screen (the attract screen since D80) and on the QR screen once the QR is real
   (`delivery-ready`). A seal on every screen stops meaning anything; first and last screen are the
   letter's opening and its closing. Not on the "QR 준비 중" or offline screens.
 - The seal is **decoration**: `public/brand/wax-seal.webp` (480 px, 27 KB; the Figma filters
@@ -943,3 +943,23 @@ look pasted on; the booth screens look like **letter paper** so the seal belongs
 
 Not done: the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
 photos are tall). Frames and the media wall do not use the seal.
+
+## D80 · "화면을 눌러 시작" comes back as the first screen
+
+User request (2026-11-12): the intro screen with "화면을 눌러 시작" is needed. It was the first
+screen until the 2.0 release (#29), which replaced it with the two-choice welcome.
+
+- New phase `attract` in `lib/kiosk/machine.ts`, the initial state and where `RESET` returns.
+  Only `OPEN` (a touch anywhere on the screen, or its button) leaves it, to `welcome`; `START` and
+  `START_MOBILE` still need `welcome`. A new staff default mode applies at once on `attract` and
+  `welcome`. "이전" from the frame pick still goes to `welcome`, not further.
+- The screen: one letter sheet with the lockup, "Christmas Village 2026", the one filled button
+  "화면을 눌러 시작" (the user's wording) and, small, "Tap the screen to start": nobody has chosen a
+  language yet, so it shows both. No progress, no back, no footer.
+- The seal moves from the welcome choices to this screen: the guest opens the sealed letter, and
+  the QR screen closes it (D79 keeps two seals).
+- The idle reset now also runs on the welcome choices: a guest who chose English or the easy view
+  and walked away leaves the booth on the attract screen in Korean and the staff default.
+- E2E: `openWelcome` in `e2e/helpers.ts` taps through the attract screen; after a reset the specs
+  expect `screen-attract`.
+- Figma: KIOSK `0 · 화면을 눌러 시작 (인트로 · 봉인)` in the first section, seals removed from 1a–1c.

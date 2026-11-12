@@ -125,7 +125,7 @@ export function BoothScreen({
   testId: string;
   progress?: { step: number; total: number } | null;
   className?: string;
-  /** Press the wax seal on this sheet's corner (D79: welcome and the QR only). */
+  /** Press the wax seal on this sheet's corner (D79, D80: the attract screen and the QR only). */
   seal?: boolean;
 }) {
   const chrome = useKioskChrome();

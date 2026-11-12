@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, answerForQr, toConsent } from "./helpers";
+import { SHOOT_TIMEOUT, answerForQr, toConsent, openWelcome } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
@@ -71,7 +71,7 @@ test("setup: staff session and an enrolled booth", async ({ browser }) => {
 
 test("welcome: two clear choices and a screen-size switch", async () => {
   await kiosk.goto("/kiosk?camera=mock");
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await openWelcome(kiosk);
   for (const id of ["start-camera", "start-mobile"]) {
     const box = (await kiosk.getByTestId(id).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(150);
@@ -82,6 +82,7 @@ test("welcome: two clear choices and a screen-size switch", async () => {
 test("내 사진으로 참여하기: QR → phone → booth sees it → staff approve → wall card", async ({
   browser,
 }) => {
+  await openWelcome(kiosk);
   await kiosk.getByTestId("start-mobile").click();
   const qr = kiosk.getByTestId("mobile-qr");
   await expect(qr.locator("svg")).toBeVisible();
@@ -158,6 +159,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
 
 test("easy mode: large screen, no frame pick, steps in words, home asks first, help opens", async () => {
   await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
   await kiosk.getByTestId("mode-easy").click();
   await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "easy");
   await kiosk.getByTestId("start-camera").click();
@@ -187,7 +189,7 @@ test("easy mode: large screen, no frame pick, steps in words, home asks first, h
   await answerForQr(kiosk, "no");
   await kiosk.getByRole("button", { name: "다 받았어요" }).click();
   // The next guest starts in the staff default again.
-  await expect(kiosk.getByTestId("screen-welcome")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "standard");
 });
 
