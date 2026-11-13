@@ -5,7 +5,12 @@ import { enrollKiosk, startSession, openWelcome } from "./helpers";
 // This proves the browser code path, not any particular physical camera.
 test.use({
   permissions: ["camera"],
-  launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+  launchOptions: {
+    args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+    // This spec replaces the launch options, so it has to carry the optional browser path itself
+    // (playwright.config.ts: E2E_CHROMIUM_PATH).
+    ...(process.env.E2E_CHROMIUM_PATH ? { executablePath: process.env.E2E_CHROMIUM_PATH } : {}),
+  },
 });
 
 test("getUserMedia path reaches review with six captures", async ({ page }) => {
