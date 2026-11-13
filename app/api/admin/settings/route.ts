@@ -9,7 +9,9 @@ import {
   type SettingsPatch,
   type WallForce,
 } from "@/lib/storage/types";
+import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { isValidHours } from "@/lib/wall/hours";
+import { ROTATE_MINUTES, normalizeLook, type WallLook } from "@/lib/wall/themes";
 
 const FORCES: WallForce[] = ["auto", "on", "off"];
 
@@ -23,13 +25,14 @@ export const GET = staffRoute("admin_settings", async () =>
 /**
  * POST any of {"pauseSubmissions","pauseWall","showHoldingScreen"} as booleans,
  * "wallForce": "auto" | "on" | "off", "wallHours": {"start":"HH:MM","end":"HH:MM"} | null,
- * "kioskDefaultMode": "standard" | "easy" (D67). Audited.
+ * "kioskDefaultMode": "standard" | "easy" (D67), "wallPublic": boolean (D86),
+ * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85). Audited.
  * pauseSubmissions stops NEW media-wall submissions only; photography and QR delivery continue.
  */
 export const POST = staffRoute("admin_settings_update", async (request, { staff }) => {
   const body = await readJson<Record<string, unknown>>(request);
   const patch: SettingsPatch = {};
-  for (const key of ["pauseSubmissions", "pauseWall", "showHoldingScreen"] as const) {
+  for (const key of ["pauseSubmissions", "pauseWall", "showHoldingScreen", "wallPublic"] as const) {
     if (body && key in body) {
       if (typeof body[key] !== "boolean") return jsonError(400, `${key} must be boolean`);
       patch[key] = body[key] as boolean;
@@ -56,15 +59,53 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
             end: (body.wallHours as { end: string }).end,
           };
   }
+  if (body && "wallLook" in body) {
+    const problem = wallLookProblem(body.wallLook);
+    if (problem) return jsonError(400, problem);
+    patch.wallLook = normalizeLook(body.wallLook, WALL_THEMES, DEFAULT_WALL_THEME);
+  }
   if (!Object.keys(patch).length) return jsonError(400, "nothing to change");
   const settings = await getBackend().settings.update(patch, staff.userId);
-  const { wallHours, ...flags } = patch;
+  const { wallHours, wallLook, ...flags } = patch;
   logEvent("settings_updated", {
     staffId: staff.userId,
     ...flags,
+    ...(wallLook && {
+      wallTheme: wallLook.theme,
+      wallRotate: wallLook.rotate
+        ? `${wallLook.rotateMinutes}m:${wallLook.rotation.join(",")}`
+        : "off",
+    }),
     ...(wallHours !== undefined && {
       wallHours: wallHours ? `${wallHours.start}-${wallHours.end}` : null,
     }),
   });
   return NextResponse.json({ settings }, { headers: NO_STORE });
 });
+
+/** Strict on the way in (a typo must not silently become the default theme). */
+function wallLookProblem(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return "wallLook must be an object";
+  const look = raw as Partial<Record<keyof WallLook, unknown>>;
+  const known = new Set(WALL_THEMES.map((t) => t.id));
+  if (typeof look.theme !== "string" || !known.has(look.theme))
+    return "wallLook.theme must be a known theme id";
+  if (typeof look.rotate !== "boolean") return "wallLook.rotate must be boolean";
+  if (
+    typeof look.rotateMinutes !== "number" ||
+    !Number.isInteger(look.rotateMinutes) ||
+    look.rotateMinutes < ROTATE_MINUTES.min ||
+    look.rotateMinutes > ROTATE_MINUTES.max
+  )
+    return `wallLook.rotateMinutes must be a whole number from ${ROTATE_MINUTES.min} to ${ROTATE_MINUTES.max}`;
+  if (
+    !Array.isArray(look.rotation) ||
+    look.rotation.length > WALL_THEMES.length ||
+    !look.rotation.every((id) => typeof id === "string" && known.has(id)) ||
+    new Set(look.rotation).size !== look.rotation.length
+  )
+    return "wallLook.rotation must be a list of different known theme ids";
+  if (look.rotate && look.rotation.length < 2)
+    return "wallLook.rotation needs at least two themes to rotate";
+  return null;
+}

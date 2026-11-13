@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
+import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
 import { MOBILE_FRAME_ID } from "@/config/mobile";
 import { getFrame } from "@/config/frames";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
@@ -27,17 +28,24 @@ function reloadPage() {
  * the pure scheduler decide what enters and leaves, in the hub's fair rotation order. Anything
  * the server stops listing disappears on the same render; after WALL_CONFIG.offlineGraceMs
  * without a successful poll every cached photo is dropped, because the wall can no longer learn
- * about hides or deletions. Each photo it puts up is reported back (/api/wall/shown), which is
- * the exposure log the rotation is built on.
+ * about hides or deletions.
+ *
+ * The page needs no enrollment (D86). The feed says who this screen is: an enrolled venue
+ * `display` also sends a heartbeat and reports each photo it puts up (/api/wall/shown, the
+ * exposure log the rotation is built on); the `public` audience only reads. The feed also names
+ * the background theme (D85), so staff change it for every screen at once.
  */
 export function WallApp({
   canvas = null,
   lite = false,
+  initialTheme = DEFAULT_WALL_THEME,
 }: {
   /** The LED's input size (WALL_CANVAS / ?canvas=); null = this screen. The scene is fitted into it. */
   canvas?: { width: number; height: number } | null;
-  /** Low-spec mode: fades only, no twinkling, fewer photos. */
+  /** Low-spec mode: fades only, fewer photos. */
   lite?: boolean;
+  /** The theme at page load; the feed takes over from the first poll. */
+  initialTheme?: string;
 }) {
   // Measured after mount, so the server render and the first client render agree.
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
@@ -47,18 +55,24 @@ export function WallApp({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-  // The Figma scene has a fixed size and fixed slots; low-spec mode leaves the middle one empty.
+  const [feed, setFeed] = useState<WallFeed | null>(null);
+  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them.
+  const theme = getWallTheme(feed?.theme ?? initialTheme);
   const layout = useMemo(
-    () => wallLayout(WALL_CONFIG.scene, lite ? WALL_CONFIG.liteSlots : undefined),
-    [lite],
+    () => wallLayout(theme.scene, lite ? theme.liteSlots : undefined),
+    [theme, lite],
   );
   const slotCount = layout.slots.length;
   const slotsRef = useRef(slotCount);
+  // Only an enrolled venue display reports back (heartbeat, exposure log).
+  const isDisplay = feed?.audience === "display";
+  const isDisplayRef = useRef(false);
+  useEffect(() => {
+    isDisplayRef.current = isDisplay;
+  }, [isDisplay]);
 
-  const [feed, setFeed] = useState<WallFeed | null>(null);
   const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const [online, setOnline] = useState(true);
-  const [revoked, setRevoked] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [images, setImages] = useState<ReadonlyMap<string, string>>(new Map());
   const [schedule, setSchedule] = useState<WallSchedule>(() => emptySchedule(0));
@@ -122,8 +136,8 @@ export function WallApp({
 
   const fresh = lastOkAt !== null && now - lastOkAt <= WALL_CONFIG.offlineGraceMs;
   const eligible = useMemo(
-    () => (fresh && !revoked && feed?.mode === "live" ? feed.photos.map((p) => p.id) : []),
-    [fresh, revoked, feed],
+    () => (fresh && feed?.mode === "live" ? feed.photos.map((p) => p.id) : []),
+    [fresh, feed],
   );
   const allowed = useMemo(() => new Set(eligible), [eligible]);
   // Which photos came from a guest's phone (D66): they hang as a card instead of a strip.
@@ -142,8 +156,8 @@ export function WallApp({
     [feed],
   );
   const showNow = useMemo(
-    () => new Set(fresh && !revoked && feed?.mode === "live" ? feed.showNow : []),
-    [fresh, revoked, feed],
+    () => new Set(fresh && feed?.mode === "live" ? feed.showNow : []),
+    [fresh, feed],
   );
 
   // What is on screen right now, and what went up since the last report (read by the poller).
@@ -181,19 +195,15 @@ export function WallApp({
           signal: controller.signal,
         });
         if (stopped) return;
-        if (res.status === 401) {
-          setRevoked(true);
-          setOnline(true);
-          return;
-        }
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as WallFeed;
         if (stopped) return;
         setFeed(body);
-        setRevoked(false);
         setOnline(true);
         setLastOkAt(Date.now());
-        void report();
+        // The public audience never reports: the server would refuse it anyway.
+        if (body.audience === "display") void report();
+        else unreported.current = [];
       } catch {
         if (!stopped) setOnline(false);
       } finally {
@@ -226,6 +236,7 @@ export function WallApp({
   // Heartbeat, so staff can see the display in /admin → 키오스크, with its frame rate and (in
   // Chromium) JS memory: the numbers a long run is judged by (docs/ARCHITECTURE.md 1.8).
   useEffect(() => {
+    if (!isDisplay) return;
     frames.current = { count: 0, since: Date.now() };
     const beat = () => {
       const t = Date.now();
@@ -247,7 +258,7 @@ export function WallApp({
     void beat();
     const id = setInterval(beat, WALL_CONFIG.heartbeatMs);
     return () => clearInterval(id);
-  }, []);
+  }, [isDisplay]);
 
   // Image cache: load what is newly eligible (one at a time), release what is not.
   const loading = useRef(new Set<string>());
@@ -328,9 +339,9 @@ export function WallApp({
   }, []);
 
   const screen = wallScreenState({
-    booted: feed !== null || revoked,
+    booted: feed !== null,
     online,
-    maintenance: revoked || (feed !== null && feed.mode !== "live"),
+    maintenance: feed !== null && feed.mode !== "live",
     approvedCount: eligible.length,
   });
 
@@ -348,7 +359,9 @@ export function WallApp({
     <main
       data-testid="wall"
       data-wall-state={screen}
-      data-wall-mode={revoked ? "revoked" : (feed?.mode ?? "boot")}
+      data-wall-mode={feed?.mode ?? "boot"}
+      data-wall-audience={feed?.audience ?? "unknown"}
+      style={{ background: theme.fallbackColor }}
       className="wall-stage relative h-dvh w-full cursor-none overflow-hidden"
     >
       {viewport && (
@@ -364,10 +377,11 @@ export function WallApp({
           }}
         >
           <WallScene
+            theme={theme}
             layout={layout}
             lite={lite}
             overlay={
-              feed?.mode === "holding" && !revoked ? (
+              feed?.mode === "holding" ? (
                 <div
                   data-testid="wall-holding"
                   className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/85 text-center"
@@ -383,7 +397,7 @@ export function WallApp({
                     잠시 후 다시 불을 밝힐게요
                   </p>
                 </div>
-              ) : feed?.mode === "closed" && !revoked ? (
+              ) : feed?.mode === "closed" ? (
                 <div
                   data-testid="wall-closed"
                   className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/70 text-center"
@@ -401,11 +415,8 @@ export function WallApp({
               ) : screen === "EMPTY" ? (
                 <p
                   data-testid="wall-empty"
-                  className="absolute w-full text-center text-(--wall-cream)/80"
-                  style={{
-                    top: WALL_CONFIG.scene.line.y0 + unit * 260,
-                    fontSize: unit * 40,
-                  }}
+                  className="wall-note absolute"
+                  style={{ top: theme.emptyTextY, fontSize: unit * 40 }}
                 >
                   사진을 찍고 미디어월에 함께해 주세요
                 </p>
@@ -439,13 +450,13 @@ export function WallApp({
                     <div
                       className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                     >
-                      <Clip dropToStrip={card.y - place.y} />
+                      <Clip theme={theme} dropToStrip={card.y - place.y} />
                       <div
                         className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
                         style={{
                           top: card.y - place.y,
                           padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
-                          boxShadow: "0 12px 24px rgba(0,0,0,0.55)",
+                          boxShadow: "0 12px 24px var(--wall-photo-shadow)",
                         }}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL from our server */}
@@ -469,8 +480,11 @@ export function WallApp({
               }
               const frame = getFrame(photoFrames.get(slot.photoId));
               const box =
-                framedPhotoBox(place, { width: frame.outputWidth, height: frame.outputHeight }) ??
-                place.box;
+                framedPhotoBox(
+                  place,
+                  { width: frame.outputWidth, height: frame.outputHeight },
+                  theme.wideMax,
+                ) ?? place.box;
               return (
                 <figure
                   key={`${i}-${slot.photoId}`}
@@ -490,7 +504,7 @@ export function WallApp({
                   <div
                     className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                   >
-                    <Clip dropToStrip={box.y - place.y} />
+                    <Clip theme={theme} dropToStrip={box.y - place.y} />
                     {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -500,7 +514,7 @@ export function WallApp({
                       className="h-full w-full object-contain object-top"
                       style={{
                         paddingTop: box.y - place.y,
-                        filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.55))",
+                        filter: "drop-shadow(0 12px 24px var(--wall-photo-shadow))",
                       }}
                     />
                   </div>
@@ -511,15 +525,7 @@ export function WallApp({
         </div>
       )}
 
-      {revoked && (
-        <p
-          data-testid="wall-revoked"
-          className="absolute top-[3vh] right-[3vw] text-[1vw] text-(--wall-mist)"
-        >
-          STAFF · 이 화면의 등록이 해제됐어요
-        </p>
-      )}
-      {!online && !revoked && (
+      {!online && (
         <p
           data-testid="wall-offline"
           className="absolute top-[3vh] right-[3vw] text-[1vw] text-(--wall-mist)"

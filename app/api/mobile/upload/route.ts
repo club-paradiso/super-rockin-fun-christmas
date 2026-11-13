@@ -29,7 +29,7 @@ const perQr = new RateLimiter(6, 10 * 60_000);
  * token is the only key, and it allows one photo for 15 minutes.
  *
  * Headers: x-upload-token (from the QR address), x-wall-consent: "yes" (the page cannot submit
- * without it), content-type image/jpeg | image/png. Body: the image (the page has already shrunk
+ * without it), x-wall-scope: "public" when the page showed the public-wall notice (D86), content-type image/jpeg | image/png. Body: the image (the page has already shrunk
  * it to a JPEG; the server never trusts that and re-encodes it, dropping EXIF and GPS).
  *
  * 201 new / 200 the same photo again → {status:"received", review:"pending"}. "received" is not
@@ -69,7 +69,8 @@ export const POST = route("mobile_upload", async (request: Request) => {
     throw err;
   }
 
-  const paused = (await getBackend().settings.get()).pauseSubmissions;
+  const settings = await getBackend().settings.get();
+  const paused = settings.pauseSubmissions;
   let result;
   try {
     result = await getPhotoService().putMobile({
@@ -77,6 +78,8 @@ export const POST = route("mobile_upload", async (request: Request) => {
       kioskId,
       data: normalized.data,
       submissionsPaused: paused,
+      // The phone page showed the public-wall notice, and the public wall is on right now (D86).
+      publicScope: request.headers.get("x-wall-scope") === "public" && settings.wallPublic,
     });
   } catch (err) {
     logEvent(

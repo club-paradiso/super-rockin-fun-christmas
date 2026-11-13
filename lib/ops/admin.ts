@@ -4,6 +4,7 @@ import { photoSource, type PhotoSource } from "@/config/mobile";
 import { getCloudSync, getHubInbox } from "@/lib/cloud/server";
 import type { HubInboxStatus } from "@/lib/cloud/inbox";
 import { getServerConfig } from "@/lib/server/env";
+import { SHARED_OPERATOR, isSharedOperator } from "@/lib/staff-auth/shared";
 import { opsStatus, type OpsStatus } from "./backup-server";
 import type { CloudSyncStatus } from "@/lib/cloud/sync";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
@@ -262,8 +263,10 @@ export async function listAudit(filter: {
         ? "시스템"
         : e.actorType === "kiosk"
           ? `키오스크 ${e.actorId ? (kioskNames.get(e.actorId) ?? e.actorId.slice(0, 8)) : ""}`.trim()
-          : e.actorId
-            ? (staffNames.get(e.actorId) ?? e.actorId.slice(0, 8))
-            : "스태프",
+          : isSharedOperator(e.actorId)
+            ? SHARED_OPERATOR.displayName
+            : e.actorId
+              ? (staffNames.get(e.actorId) ?? e.actorId.slice(0, 8))
+              : "스태프",
   }));
 }

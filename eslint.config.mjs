@@ -11,6 +11,8 @@ const config = [
       "playwright-report/**",
       "test-results/**",
       "next-env.d.ts",
+      // Agent worktrees are whole copies of the repository (with their own builds).
+      ".claude/**",
     ],
   },
 ];

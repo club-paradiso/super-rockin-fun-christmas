@@ -31,6 +31,8 @@ import type {
   WallRepository,
 } from "./types";
 import { MODERATION_STATES } from "./types";
+import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
+import { normalizeLook } from "@/lib/wall/themes";
 import type { VideoMime } from "@/lib/video/format";
 
 /**
@@ -55,6 +57,7 @@ const toPhoto = (r: Row): PhotoRow => ({
   tokenExpiresAt: iso(r.token_expires_at)!,
   retentionExpiresAt: iso(r.retention_expires_at)!,
   wallConsent: r.wall_consent as boolean,
+  wallPublic: (r.wall_public as boolean | null) ?? false,
   moderationStatus: r.moderation_status as ModerationStatus,
   deletedAt: iso(r.deleted_at),
   objectDeletedAt: iso(r.object_deleted_at),
@@ -109,6 +112,8 @@ const toSettings = (r: Row): EventSettings => ({
       : null,
   wallForce: (r.wall_force as EventSettings["wallForce"]) ?? "auto",
   kioskDefaultMode: (r.kiosk_default_mode as EventSettings["kioskDefaultMode"]) ?? "standard",
+  wallPublic: (r.wall_public as boolean | null) ?? false,
+  wallLook: normalizeLook(r.wall_look, WALL_THEMES, DEFAULT_WALL_THEME),
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -190,6 +195,7 @@ class SupabasePhotoRepository implements PhotoRepository {
       token_expires_at: row.tokenExpiresAt,
       retention_expires_at: row.retentionExpiresAt,
       wall_consent: row.wallConsent,
+      wall_public: row.wallConsent && row.wallPublic,
       moderation_status: row.moderationStatus,
       created_at: row.createdAt,
     });
@@ -220,6 +226,7 @@ class SupabasePhotoRepository implements PhotoRepository {
       p_from: t.from,
       p_to: t.to,
       p_wall_consent: t.wallConsent ?? null,
+      p_wall_public: t.wallPublic ?? null,
       p_deleted_at: t.deletedAt ?? null,
       p_actor_type: t.actor.type,
       p_actor_id: t.actor.id,
@@ -308,10 +315,13 @@ class SupabasePhotoRepository implements PhotoRepository {
     return [];
   }
 
-  /** Reads the `wall_eligible_photos` view, so the wall rule also lives in the database. */
-  async listWallEligible(limit: number) {
+  /**
+   * Reads the `wall_eligible_photos` view (or `wall_public_photos` for the public audience, D86),
+   * so both wall rules also live in the database.
+   */
+  async listWallEligible(limit: number, publicOnly = false) {
     const { data, error } = await this.db
-      .from("wall_eligible_photos")
+      .from(publicOnly ? "wall_public_photos" : "wall_eligible_photos")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -486,6 +496,8 @@ class SupabaseSettingsRepository implements SettingsRepository {
       p_wall_hours_start: patch.wallHours?.start ?? null,
       p_wall_hours_end: patch.wallHours?.end ?? null,
       p_kiosk_default_mode: patch.kioskDefaultMode ?? null,
+      p_wall_public: patch.wallPublic ?? null,
+      p_wall_look: patch.wallLook ?? null,
       p_actor_id: staffUserId,
     });
     return toSettings(rows[0]!);

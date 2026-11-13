@@ -33,6 +33,9 @@ test("fresh hub: first staff member with the console setup code, then /admin", a
   staff = await newPage(browser);
   await staff.goto("/admin");
   await expect(staff).toHaveURL(/\/admin\/login/);
+  // The shared password is the first way in (D84); name + PIN is one link away.
+  await expect(staff.getByTestId("login-password-form")).toBeVisible();
+  await staff.getByTestId("login-switch").click();
   await expect(staff.getByTestId("hub-setup-form")).toBeVisible();
   await staff.getByLabel("설정 코드").fill(HUB_SETUP_CODE.toLowerCase());
   await staff.getByLabel("이름").fill("현장 책임자");
@@ -55,7 +58,7 @@ test("fresh hub: first staff member with the console setup code, then /admin", a
 
 test("the setup code is single-use; a stranger only sees the PIN login", async ({ browser }) => {
   const page = await newPage(browser);
-  await page.goto("/admin/login");
+  await page.goto("/admin/login?staff=1");
   await expect(page.getByTestId("hub-setup-form")).toHaveCount(0);
   await expect(page.getByTestId("pin-login-form")).toBeVisible();
   expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
@@ -72,7 +75,7 @@ test("staff adds a helper with name + PIN; the helper signs in with the keypad",
   await expect(staff.getByTestId("staff-item").filter({ hasText: "도우미" })).toBeVisible();
 
   const helper = await newPage(browser);
-  await helper.goto("/admin/login");
+  await helper.goto("/admin/login?staff=1");
   await helper.getByRole("button", { name: "도우미" }).click();
   await typePin(helper, "000001");
   await helper.getByRole("button", { name: "로그인" }).click();

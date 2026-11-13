@@ -65,3 +65,14 @@ export function isWallEligible(
 ): boolean {
   return row.moderationStatus === "APPROVED" && row.wallConsent && row.deletedAt === null;
 }
+
+/**
+ * Photos an ANONYMOUS viewer of the wall address may be sent (D86): wall-eligible, and the
+ * guest's consent covered the public address. A photo taken before the public wall existed, or
+ * while it was switched off, never qualifies, whatever staff do to it later.
+ */
+export function isPublicWallEligible(
+  row: Pick<PhotoRow, "moderationStatus" | "wallConsent" | "wallPublic" | "deletedAt">,
+): boolean {
+  return isWallEligible(row) && row.wallPublic === true;
+}

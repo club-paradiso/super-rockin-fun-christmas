@@ -334,7 +334,11 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
         body: JSON.stringify({ queueDepth: 4, camera: "error" }),
       }),
     );
-    expect(await beat.json()).toEqual({ wallSubmissions: "open", kioskDefaultMode: "standard" });
+    expect(await beat.json()).toEqual({
+      wallSubmissions: "open",
+      kioskDefaultMode: "standard",
+      wallPublic: false,
+    });
     const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;
     expect(kiosk).toMatchObject({ queueDepth: 4, cameraState: "error", enrolledVia: "code" });
 
@@ -426,8 +430,13 @@ describe("media wall API on the local backend", () => {
     expect(enrolled.headers.get("location")).toBe("/wall");
     const display = enrolled.headers.get("set-cookie")!.split(";")[0]!;
 
-    expect((await getFeed(null)).status).toBe(401);
-    expect((await getFeed("ftl_kiosk=v1.forged")).status).toBe(401);
+    // No cookie, or a forged one: the public audience (D86). With the public wall off (the
+    // default) it is answered, but never with a photo.
+    for (const cookie of [null, "ftl_kiosk=v1.forged"]) {
+      const res = await getFeed(cookie);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ audience: "public", mode: "live", photos: [] });
+    }
 
     // Two guests say YES, one says NO; staff approves one YES.
     const kioskRes = await enrollPost(
@@ -467,8 +476,15 @@ describe("media wall API on the local backend", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
     const text = await res.text();
-    const body = JSON.parse(text) as { mode: string; photos: { id: string }[] };
+    const body = JSON.parse(text) as {
+      mode: string;
+      audience: string;
+      theme: string;
+      photos: { id: string }[];
+    };
     expect(body.mode).toBe("live");
+    expect(body.audience).toBe("display");
+    expect(body.theme).toBe("peace-wall");
     const ids = body.photos.map((p) => p.id);
     expect(ids).toContain(approved);
     expect(ids).not.toContain(pending);
@@ -482,7 +498,10 @@ describe("media wall API on the local backend", () => {
     expect((await getImage(display, pending)).status).toBe(404);
     expect((await getImage(display, declined)).status).toBe(404);
     expect((await getImage(display, "not-a-uuid")).status).toBe(404);
-    expect((await getImage(null, approved)).status).toBe(401);
+    // Consent given for the venue wall is not consent for the internet: an anonymous viewer is
+    // sent neither the id nor the image, even though the photo is approved.
+    expect((await getImage(null, approved)).status).toBe(404);
+    expect(((await (await getFeed(null)).json()) as { photos: unknown[] }).photos).toHaveLength(0);
 
     // Hidden after the last poll: refused at once, gone from the next poll.
     await svc.moderate(approved, "hide", staffId);
@@ -511,11 +530,167 @@ describe("media wall API on the local backend", () => {
     await backend.settings.update({ pauseWall: false, showHoldingScreen: false }, staffId);
     expect((await getImage(display, approved)).status).toBe(200);
 
-    // Revoking the display cuts it off on its next request.
+    // Revoking the display turns it into one more anonymous viewer on its next request.
     const displayRow = (await backend.kiosks.list()).find((k) => k.label === "미디어월")!;
     await backend.kiosks.update(displayRow.id, { revoke: true }, staffId);
-    expect((await getFeed(display)).status).toBe(401);
-    expect((await getImage(display, approved)).status).toBe(401);
+    expect(await (await getFeed(display)).json()).toMatchObject({ audience: "public", photos: [] });
+    expect((await getImage(display, approved)).status).toBe(404);
+  });
+
+  // D86. The wall address needs no enrollment, so what an anonymous viewer may see is decided
+  // per photo, by what the guest was told when they said yes.
+  it("the public audience sees only photos whose consent covered the public wall", async () => {
+    const { getBackend, getPhotoService } = await import("@/lib/storage/server");
+    const backend = getBackend();
+    const svc = getPhotoService();
+    const staffId = uuid();
+    const { POST: enrollPost } = await api.enroll();
+    const kioskRes = await enrollPost(
+      new Request("https://lights.example.org/api/kiosk/enroll", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://lights.example.org",
+          "x-forwarded-for": "10.9.1.1",
+        },
+        body: JSON.stringify({ secret: ENROLL, label: "public wall kiosk" }),
+      }),
+    );
+    const kiosk = kioskRes.headers.get("set-cookie")!.split(";")[0]!;
+    const { POST: consent } = await api.consent();
+    const answer = (token: string, yes: boolean, scope?: string) =>
+      consent(
+        new Request("https://lights.example.org/api/photos/consent", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: kiosk },
+          body: JSON.stringify({ token, consent: yes, ...(scope ? { scope } : {}) }),
+        }),
+      );
+    const shoot = async (scope?: string) => {
+      const sessionId = uuid();
+      const { token } = (await (await upload(kiosk, JPEG, {}, sessionId)).json()) as {
+        token: string;
+      };
+      await answer(token, true, scope);
+      const id = (await backend.photos.findBySessionId(sessionId))!.id;
+      expect((await svc.moderate(id, "approve", staffId)).ok).toBe(true);
+      return { id, token };
+    };
+    const publicIds = async () =>
+      ((await (await getFeed(null)).json()) as { photos: { id: string }[] }).photos.map(
+        (p) => p.id,
+      );
+
+    // Public wall off: the booth may claim "public", the server does not record it.
+    const early = await shoot("public");
+    expect((await backend.photos.getById(early.id))!.wallPublic).toBe(false);
+
+    await backend.settings.update({ wallPublic: true }, staffId);
+    const open = await shoot("public");
+    const venueOnly = await shoot();
+    expect((await backend.photos.getById(open.id))!.wallPublic).toBe(true);
+    expect((await backend.photos.getById(venueOnly.id))!.wallPublic).toBe(false);
+
+    // Anonymous: only the photo consented for the public wall. The other two are approved and on
+    // the venue wall, but were never agreed for the internet.
+    const res = await getFeed(null);
+    const text = await res.text();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(text).not.toMatch(/objectPath|object_path|tokenHash|kioskId|photos\//);
+    expect(JSON.parse(text)).toMatchObject({ audience: "public", ordering: "newest", showNow: [] });
+    expect(await publicIds()).toEqual([open.id]);
+    expect((await getImage(null, open.id)).status).toBe(200);
+    expect((await getImage(null, venueOnly.id)).status).toBe(404);
+    expect((await getImage(null, early.id)).status).toBe(404);
+
+    // An anonymous viewer cannot report exposures or a heartbeat (no kiosk session).
+    const { POST: shown } = await import("@/app/api/wall/shown/route");
+    const report = await shown(
+      new Request("https://lights.example.org/api/wall/shown", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://lights.example.org" },
+        body: JSON.stringify({ shown: [open.id], onWall: [open.id] }),
+      }),
+    );
+    expect(report.status).toBe(401);
+    const { POST: heartbeat } = await import("@/app/api/kiosk/heartbeat/route");
+    const beat = await heartbeat(
+      new Request("https://lights.example.org/api/kiosk/heartbeat", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://lights.example.org" },
+        body: JSON.stringify({ queueDepth: 0, camera: "unknown" }),
+      }),
+    );
+    expect(beat.status).toBe(401);
+
+    // Hidden, then back: gone and refused at once, like on the venue wall.
+    await svc.moderate(open.id, "hide", staffId);
+    expect(await publicIds()).toEqual([]);
+    expect((await getImage(null, open.id)).status).toBe(404);
+    await svc.moderate(open.id, "unhide", staffId);
+    expect(await publicIds()).toEqual([open.id]);
+
+    // Emergency switches apply to the public audience too.
+    await backend.settings.update({ pauseWall: true }, staffId);
+    expect(await (await getFeed(null)).json()).toMatchObject({ mode: "paused", photos: [] });
+    expect((await getImage(null, open.id)).status).toBe(404);
+    await backend.settings.update({ pauseWall: false }, staffId);
+
+    // Staff switch the public wall off: nothing is sent, but the consent record stays.
+    await backend.settings.update({ wallPublic: false }, staffId);
+    expect(await publicIds()).toEqual([]);
+    expect((await getImage(null, open.id)).status).toBe(404);
+    expect((await backend.photos.getById(open.id))!.wallPublic).toBe(true);
+    await backend.settings.update({ wallPublic: true }, staffId);
+
+    // Deleted: gone for everyone, and the image is refused.
+    await svc.moderate(open.id, "delete", staffId);
+    expect(await publicIds()).toEqual([]);
+    expect((await getImage(null, open.id)).status).toBe(404);
+    await backend.settings.update({ wallPublic: false }, staffId);
+  });
+
+  it("a guest who withdraws consent also withdraws the public scope", async () => {
+    const { getBackend } = await import("@/lib/storage/server");
+    const backend = getBackend();
+    const staffId = uuid();
+    await backend.settings.update({ wallPublic: true }, staffId);
+    const { POST: enrollPost } = await api.enroll();
+    const kioskRes = await enrollPost(
+      new Request("https://lights.example.org/api/kiosk/enroll", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://lights.example.org",
+          "x-forwarded-for": "10.9.1.2",
+        },
+        body: JSON.stringify({ secret: ENROLL, label: "scope kiosk" }),
+      }),
+    );
+    const kiosk = kioskRes.headers.get("set-cookie")!.split(";")[0]!;
+    const { POST: consent } = await api.consent();
+    const sessionId = uuid();
+    await upload(kiosk, JPEG, {}, sessionId);
+    const answer = (yes: boolean, scope?: string) =>
+      consent(
+        new Request("https://lights.example.org/api/photos/consent", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie: kiosk },
+          body: JSON.stringify({ sessionId, consent: yes, ...(scope ? { scope } : {}) }),
+        }),
+      );
+    const row = async () => (await backend.photos.findBySessionId(sessionId))!;
+    await answer(true, "public");
+    expect(await row()).toMatchObject({ wallConsent: true, wallPublic: true });
+    await answer(false);
+    expect(await row()).toMatchObject({ wallConsent: false, wallPublic: false });
+    // Yes again, this time without the notice: venue wall only.
+    await answer(true);
+    expect(await row()).toMatchObject({ wallConsent: true, wallPublic: false });
+    // An unknown scope word is not "public".
+    await answer(true, "everyone");
+    expect(await row()).toMatchObject({ wallConsent: true, wallPublic: false });
+    await backend.settings.update({ wallPublic: false }, staffId);
   });
 
   it("enrollment errors keep the wall destination; anything else never redirects off-site", async () => {

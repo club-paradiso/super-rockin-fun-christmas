@@ -138,7 +138,7 @@ test("staff on a phone (390×844): PIN login, overview, moderation", async ({ br
   const page = await (
     await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   ).newPage();
-  await page.goto("/admin/login");
+  await page.goto("/admin/login?staff=1");
   if (await page.getByTestId("hub-setup-form").isVisible()) {
     await page.getByLabel("설정 코드").fill(HUB_SETUP_CODE);
     await page.getByLabel("이름").fill("현장 책임자");

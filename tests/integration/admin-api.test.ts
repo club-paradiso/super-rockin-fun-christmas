@@ -342,7 +342,11 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         body: { queueDepth: 2, camera: "ok" },
       });
       expect(hb.status).toBe(200);
-      expect(await hb.json()).toEqual({ wallSubmissions: "open", kioskDefaultMode: "standard" });
+      expect(await hb.json()).toEqual({
+        wallSubmissions: "open",
+        kioskDefaultMode: "standard",
+        wallPublic: false,
+      });
       const { kiosks } = (await (
         await call(routes.kiosks(), "GET", "/api/admin/kiosks", { cookie: staffCookie })
       ).json()) as {
@@ -548,7 +552,11 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         cookie: kioskCookie,
         body: { queueDepth: 0 },
       });
-      expect(await hb.json()).toEqual({ wallSubmissions: "paused", kioskDefaultMode: "standard" });
+      expect(await hb.json()).toEqual({
+        wallSubmissions: "paused",
+        kioskDefaultMode: "standard",
+        wallPublic: false,
+      });
       await call(routes.settings(), "POST", "/api/admin/settings", {
         cookie: staffCookie,
         body: { pauseSubmissions: false },

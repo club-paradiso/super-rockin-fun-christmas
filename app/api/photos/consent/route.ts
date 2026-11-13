@@ -16,7 +16,10 @@ export const dynamic = "force-dynamic";
  * delivery: the guest link works the same whatever is sent here. YES → PENDING human review.
  * YES is refused (409) while staff have paused wall submissions.
  *
- * Body: {"sessionId","consent"} (the kiosk's durable consent queue) or {"token","consent"}.
+ * Body: {"sessionId","consent"} (the kiosk's durable consent queue) or {"token","consent"}, plus
+ * "scope":"public" when the booth showed the guest the public-wall notice (D86). That scope is
+ * recorded only if the public wall is switched on right now; otherwise the consent is for the
+ * venue wall alone.
  */
 export const POST = route("consent", async (request: Request) => {
   const config = getServerConfig();
@@ -35,17 +38,21 @@ export const POST = route("consent", async (request: Request) => {
   } catch {
     return jsonError(400, "invalid json");
   }
-  const { token, sessionId, consent } = (body ?? {}) as {
+  const { token, sessionId, consent, scope } = (body ?? {}) as {
     token?: unknown;
     sessionId?: unknown;
     consent?: unknown;
+    scope?: unknown;
   };
   if (typeof consent !== "boolean" || (typeof token !== "string" && !isUuid(sessionId))) {
     return jsonError(400, "consent and a sessionId or token are required");
   }
   // PAUSE SUBMISSIONS stops new wall submissions only; "NO" and the photo link keep working.
   const settings = await getBackend().settings.get();
-  const opts = { submissionsPaused: settings.pauseSubmissions };
+  const opts = {
+    submissionsPaused: settings.pauseSubmissions,
+    publicScope: scope === "public" && settings.wallPublic,
+  };
   const service = getPhotoService();
   const result = isUuid(sessionId)
     ? await service.setWallConsentForSession(sessionId, consent, auth.kioskId, opts)

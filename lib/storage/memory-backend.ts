@@ -31,7 +31,8 @@ import type {
   WallShowNow,
   WallEligibleRow,
 } from "./types";
-import { isWallEligible } from "@/lib/ops/moderation";
+import { defaultWallLook } from "@/config/wall-themes";
+import { isPublicWallEligible, isWallEligible } from "@/lib/ops/moderation";
 import { MODERATION_STATES } from "./types";
 
 /**
@@ -119,6 +120,9 @@ export class MemoryPhotoRepository implements PhotoRepository {
     const row = this.rows.get(t.photoId);
     if (!row || row.moderationStatus !== t.from) return null;
     const wallConsent = t.wallConsent ?? row.wallConsent;
+    // Public scope travels with the consent answer and never outlives it (D86).
+    const wallPublic =
+      t.wallConsent == null ? row.wallPublic : t.wallConsent && (t.wallPublic ?? false);
     // Same invariants as the database constraints and trigger.
     if (t.to === "APPROVED" && !wallConsent) throw new Error("photos_approved_needs_consent");
     if (row.moderationStatus === "DELETED" && t.to !== "DELETED")
@@ -126,6 +130,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
     const next = this.patch(t.photoId, {
       moderationStatus: t.to,
       wallConsent,
+      wallPublic,
       deletedAt: row.deletedAt ?? t.deletedAt ?? null,
     });
     this.audit.append({
@@ -137,6 +142,8 @@ export class MemoryPhotoRepository implements PhotoRepository {
       fromState: t.from,
       toState: t.to,
       note: t.note ?? null,
+      // A consent answer records the scope it was given with (D86).
+      ...(t.wallConsent == null ? {} : { details: { wall_public: wallPublic } }),
     });
     return next;
   }
@@ -210,9 +217,9 @@ export class MemoryPhotoRepository implements PhotoRepository {
       .map((r) => ({ ...r }));
   }
   /** Same rule as the `wall_eligible_photos` view in supabase/migrations. */
-  async listWallEligible(limit: number): Promise<WallEligibleRow[]> {
+  async listWallEligible(limit: number, publicOnly = false): Promise<WallEligibleRow[]> {
     return [...this.rows.values()]
-      .filter(isWallEligible)
+      .filter(publicOnly ? isPublicWallEligible : isWallEligible)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
       .slice(0, limit)
       .map(({ id, createdAt, frameId, mime, thumbPath, objectPath }) => ({
@@ -400,6 +407,8 @@ export class MemorySettingsRepository implements SettingsRepository {
     wallHours: null,
     wallForce: "auto",
     kioskDefaultMode: "standard",
+    wallPublic: false,
+    wallLook: defaultWallLook(),
     updatedAt: now(),
     updatedBy: null,
   };
@@ -418,6 +427,8 @@ export class MemorySettingsRepository implements SettingsRepository {
         wall_hours: s.wallHours ? `${s.wallHours.start}-${s.wallHours.end}` : null,
         wall_force: s.wallForce,
         kiosk_default_mode: s.kioskDefaultMode,
+        wall_public: s.wallPublic,
+        wall_look: s.wallLook,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
@@ -429,6 +440,10 @@ export class MemorySettingsRepository implements SettingsRepository {
           : patch.wallHours && { ...patch.wallHours },
       wallForce: patch.wallForce ?? before.wallForce,
       kioskDefaultMode: patch.kioskDefaultMode ?? before.kioskDefaultMode,
+      wallPublic: patch.wallPublic ?? before.wallPublic,
+      wallLook: patch.wallLook
+        ? { ...patch.wallLook, rotation: [...patch.wallLook.rotation] }
+        : before.wallLook,
       updatedAt: now(),
       updatedBy: staffUserId,
     };

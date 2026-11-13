@@ -88,8 +88,68 @@ body {
   --wall-card: #f7efe0;
   --wall-card-ink: #121a3d;
   --wall-card-mat: #1c2756;
+  --wall-photo-shadow: rgba(0, 0, 0, 0.55);
   background: var(--wall-floor);
   color: var(--wall-cream);
+}
+/* Themes (D85). A light picture gets a softer, warm photo shadow; text laid on a picture uses
+   the booth's ink or the wall's cream, whichever the theme says reads on that spot. */
+.wall-scene[data-tone="light"] {
+  --wall-photo-shadow: rgba(43, 26, 16, 0.4);
+}
+.wall-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  line-height: 1;
+  color: #2b1a10;
+}
+.wall-wordmark[data-tone="cream"] {
+  color: var(--wall-cream);
+}
+.wall-wordmark[data-tone="label"] {
+  padding: 0.3em 0.75em;
+  background: var(--wall-card);
+  box-shadow: 0 8px 18px var(--wall-photo-shadow);
+}
+.wall-wordmark-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  /* letter-spacing adds space after the last letter too: pull the rule back in. */
+  margin-right: -0.16em;
+}
+.wall-wordmark-rule {
+  width: 1px;
+  height: 0.72em;
+  background: currentColor;
+  opacity: 0.55;
+}
+.wall-wordmark-sub {
+  font-family: var(--font-myeongjo);
+  font-size: 0.52em;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+}
+/* The "empty wall" line: a paper note, readable on every theme. */
+.wall-note {
+  left: 50%;
+  transform: translateX(-50%) rotate(-0.6deg);
+  white-space: nowrap;
+  padding: 0.5em 1.1em;
+  background: var(--wall-card);
+  color: #2b1a10;
+  font-weight: 600;
+  box-shadow: 0 10px 22px var(--wall-photo-shadow);
+}
+.wall-background-in {
+  animation: wall-fade-in 1.6s ease-out both;
+}
+.wall-lite .wall-background-in {
+  animation: none;
 }
 
 /* Media wall (clothesline scene): a photo is clipped on and swings to rest, then drops away.
@@ -158,6 +218,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .wall-photo-enter {
     animation: wall-fade-in 0.01s both;
+  }
+  .wall-background-in {
+    animation: none;
   }
   .wall-photo-exit {
     animation: wall-fade-out 0.01s both;
@@ -269,6 +332,20 @@ body {
   }
   .admin-input {
     @apply min-h-14 rounded-lg border border-ink/50 bg-paper px-4 text-lg text-ink placeholder:text-ink/70;
+  }
+  /* Administrator login (D84): one centred column on phones, tablets and desktops. The page may
+     scroll when a software keyboard or a short window leaves too little room; nothing is clipped. */
+  .admin-login {
+    @apply flex min-h-dvh items-center justify-center;
+    padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+  .admin-login-card {
+    width: 100%;
+    max-width: 26rem;
+  }
+  .admin-login-lockup {
+    font-size: clamp(40px, 9vmin, 64px);
   }
   /* Booth buttons (about 108 px tall at 1080 p: elders and children reach them). */
   .booth-btn-primary,
