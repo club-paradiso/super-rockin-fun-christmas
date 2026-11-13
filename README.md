@@ -31,19 +31,23 @@ app has not been deployed or tried on real devices, and it is not production-rea
 | `/wall` media wall: approved + consented only, enrolled display, offline cache | ✅ Phase 4          |
 | 2.0: "내 사진으로 참여하기" phone upload → same review queue (D66)             | ✅ 2.0 (software)   |
 | 2.0: easy mode (large type, fewer choices) + staff default (D67)               | ✅ 2.0 (software)   |
-| 2.0: dedicated wall hostname (`WALL_HOSTS`, D68) — domain not attached yet     | ⏳ needs approval   |
+| 2.0: dedicated wall hostname (`WALL_HOSTS`, D68)                               | ✅ old name live    |
+| /admin opens with the kiosk enrollment password (D84)                          | ✅ software         |
+| Media-wall themes from Figma SS 03, chosen in /admin (D85)                     | ✅ software         |
+| Wall address without enrollment; public photos only by consent (D86)           | ✅ software         |
+| `studio-shalom*.vercel.app` addresses (D87)                                    | ⛔ not attached     |
 | Real phones, staff devices, wall screen, camera, iPad, MY4CUT                  | ❌ **not verified** |
 
 ## Surfaces
 
-| Route           | Who          | What                                                                                                                                                       |
-| --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device                                                                                                |
-| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                                                                        |
-| `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                                                                      |
-| `/m/[token]`    | Guest phones | "내 사진으로 참여하기": send one own photo for wall review (booth QR, 15 min) — [`docs/MOBILE_UPLOAD_ARCHITECTURE.md`](docs/MOBILE_UPLOAD_ARCHITECTURE.md) |
-| `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, emergency, audit — see [`docs/ADMIN.md`](docs/ADMIN.md)                                                       |
-| `/wall`         | Display      | Media wall. Requires an enrolled display (`/kiosk/enroll?next=wall`)                                                                                       |
+| Route           | Who          | What                                                                                                                                                                                  |
+| --------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/kiosk`        | Guests       | The booth (`/` redirects here). Requires an enrolled device                                                                                                                           |
+| `/kiosk/enroll` | Staff        | Enroll this browser as a kiosk with a one-time code                                                                                                                                   |
+| `/p/[token]`    | Guest phones | Download page opened from the QR code                                                                                                                                                 |
+| `/m/[token]`    | Guest phones | "내 사진으로 참여하기": send one own photo for wall review (booth QR, 15 min) — [`docs/MOBILE_UPLOAD_ARCHITECTURE.md`](docs/MOBILE_UPLOAD_ARCHITECTURE.md)                            |
+| `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, wall background, emergency, audit. Opens with the kiosk enrollment password (D84) — see [`docs/ADMIN.md`](docs/ADMIN.md)                 |
+| `/wall`         | Anyone       | Media wall. Opens without enrollment (D86): an enrolled display gets every approved photo, anyone else only photos agreed to for the public wall, and none while 공개 미디어월 is off |
 
 ## Quick start (development)
 
@@ -62,7 +66,8 @@ As the venue hub (the event setup: local files, staff log in with name + PIN, no
 ```bash
 # .env.local: FTL_ROLE=hub, PHOTO_STORE=local, KIOSK_SESSION_SECRET (≥ 32 chars)
 npm run build && npx next start -H 0.0.0.0
-# The console prints a one-time 설정 코드 → open /admin/login and create the first staff member.
+# /admin opens with KIOSK_ENROLL_SECRET (12+ characters). For a personal PIN login instead, the
+# console prints a one-time 설정 코드 → open /admin/login?staff=1 and create the first staff member.
 ```
 
 With the cloud staff admin (local Supabase in Docker: Postgres, Auth, Storage, Mailpit):

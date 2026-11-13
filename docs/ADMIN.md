@@ -5,26 +5,49 @@ action is checked on the server and recorded in **기록** (audit).
 
 ## Logging in
 
-### On the venue hub (`FTL_ROLE=hub`, the event setup)
+### The usual way: the shared password (D84)
 
-1. On a phone connected to the event router, open `http://<hub address>:3000/admin`.
+1. Open `/admin` (cloud: `https://<site>/admin`; hub: `http://<hub address>:3000/admin`).
+2. Type the **kiosk enrollment password** (`KIOSK_ENROLL_SECRET`, the one used to enroll a booth)
+   → **관리자 화면 열기**. **보기** shows what you typed.
+
+That is all: no email, no code. You are signed in as **공용 관리자** for 12 hours, on that browser
+only. **로그아웃** (top right) ends it. Eight wrong passwords lock that device's address for 15
+minutes.
+
+- Everyone who uses the password is the same 공용 관리자 in **기록**: the log shows what was done
+  and when, not which person did it.
+- A booth enrolled with the same password is **not** signed in to /admin, and signing in to /admin
+  does not enroll a booth.
+- If the password is shorter than 12 characters, or not set, this login is off and the page says
+  so. Use a personal login below.
+- If the password leaks: change `KIOSK_ENROLL_SECRET` and redeploy (hub: restart). Every
+  administrator session ends; booths that are already enrolled keep working.
+
+The personal logins below still work, from **이름과 PIN으로 로그인** / **스태프 이메일 코드로
+로그인** under the password field (`/admin/login?staff=1`). Use one when the log should show who
+did something. On the hub a personal PIN is also what opens the booth's staff menu (help mode).
+
+### Personal login on the venue hub (`FTL_ROLE=hub`)
+
+1. On a phone connected to the event router, open `http://<hub address>:3000/admin/login?staff=1`.
 2. Tap your name, type your 6-digit PIN on the keypad → **로그인**.
 
 Five wrong PINs lock that name for 15 minutes. **First time on a new hub:** the black hub window
-on the booth laptop shows a one-time **설정 코드**. Open `/admin/login`, type that code, your name
+on the booth laptop shows a one-time **설정 코드**. Open `/admin/login?staff=1`, type that code, your name
 and a new PIN → **첫 스태프 만들기**. After that the code no longer works.
 
 **Adding staff:** **설정 → 스태프** → name + PIN → **스태프 추가**. Tell the person their PIN in
 person. **PIN 바꾸기** sets a new PIN and logs that person out everywhere. **비활성화** cuts
 someone off on their very next click. No email or phone number is stored.
 
-### On the cloud deployment (email codes)
+### Personal login on the cloud deployment (email codes)
 
-1. Open `https://<site>/admin` → **스태프 로그인**.
+1. Open `https://<site>/admin/login?staff=1` → **스태프 로그인**.
 2. Enter your email → **로그인 코드 받기**.
 3. Check your email for a 6-digit code (valid 10 minutes) → enter it → **로그인**.
 
-There are no passwords and no sign-up. Only people on the staff list receive a code, and the
+There is no personal password and no sign-up. Only people on the staff list receive a code, and the
 screen looks identical for anyone else, so it doesn't reveal who is staff.
 
 **Adding staff:** **설정 → 스태프** → email + name → **스태프 추가**. That person can log in
@@ -41,7 +64,7 @@ yourself. The very first staff member is created once from a terminal:
 | **최근 세션** | Helping a guest whose QR didn't appear or got lost (last 1–24 h only)                                         |
 | **사진**      | Library with filters (status, time window, kiosk, session code) and every action                              |
 | **키오스크**  | Kiosk status, rename, **등록 해제** (revoke), one-time enrollment codes                                       |
-| **설정**      | Emergency switches and the staff list                                                                         |
+| **설정**      | Emergency switches, wall hours, **미디어월 배경**, **공개 미디어월**, booth start screen, the staff list      |
 | **기록**      | Append-only history of every change (who, what, when)                                                         |
 
 ## Moderation rules
@@ -118,6 +141,39 @@ lasts the normal link lifetime, but never past the photo's retention date.
 | **대기 화면 표시** (SHOW HOLDING SCREEN)   | The wall shows a holding message and receives no photos. Wins over PAUSE WALL                                                                   | `/wall` feed    |
 
 While any switch is on, a red banner appears on every admin page.
+
+## 미디어월 배경 (설정, D85)
+
+Nine backgrounds: eight STUDIO SHALOM scenes and the old night scene (marked 이전 디자인).
+
+- Tap a card → **배경 저장**. Every wall changes within about 5 seconds, with a soft fade. Nothing
+  else changes: photos, review and the booth carry on.
+- **배경을 자동으로 바꿔요**: tick **돌아가며 보여 주기** on two or more cards, choose the interval
+  (5–120 minutes) → **배경 저장**. All walls change at the same moment.
+- **기본 배경으로 되돌리기** goes back to 평화의 벽 with rotation off, in one tap.
+- "지금 화면" shows what is on the wall right now.
+
+## 공개 미디어월 (설정, D86)
+
+The wall address opens for anyone, with no code and no enrollment. This switch decides whether
+such a screen is sent **photos**.
+
+| Switch             | A screen that just opens the wall address             | A screen enrolled as a display (키오스크 → 등록 코드) |
+| ------------------ | ----------------------------------------------------- | ----------------------------------------------------- |
+| **꺼짐** (default) | the background only, no photos                        | every approved photo                                  |
+| **켜짐**           | approved photos whose guest agreed to the public wall | every approved photo                                  |
+
+- Turning it **on** asks for confirmation. Within a minute the booth's consent screen gains the
+  line "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요." and the phone page shows it too.
+  Only photos agreed to **after** that are public.
+- Photos agreed to before, or while it was off, were agreed to for the venue screen only. They
+  never appear on a public screen, whatever you do later; they still appear on an enrolled
+  display. The card shows both counts.
+- Turning it **off** stops photos on public screens within about 5 seconds.
+- **To show every approved photo at the venue**, enroll that screen once
+  (`/kiosk/enroll?next=wall` with a 등록 코드): it then gets the full feed and appears under
+  **키오스크**. Or keep the public wall on from before the first guest, so every photo is public.
+- The emergency switches and the wall hours apply to every screen, public or enrolled.
 
 ## Privacy
 

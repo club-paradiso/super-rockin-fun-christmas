@@ -58,6 +58,8 @@ type SendOutcome = "ok" | "expired" | keyof typeof ERRORS;
 function send(
   token: string,
   blob: Blob,
+  /** The consent text on screen included the public-wall line (D86). */
+  publicWall: boolean,
   onProgress: (fraction: number) => void,
 ): Promise<SendOutcome> {
   return new Promise((resolve) => {
@@ -66,6 +68,7 @@ function send(
     xhr.setRequestHeader("content-type", "image/jpeg");
     xhr.setRequestHeader("x-upload-token", token);
     xhr.setRequestHeader("x-wall-consent", "yes");
+    if (publicWall) xhr.setRequestHeader("x-wall-scope", "public");
     xhr.timeout = 60_000;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
@@ -95,10 +98,13 @@ function send(
 
 export function MobileUpload({
   token,
+  publicWall,
   expiresAt,
   alreadySent,
 }: {
   token: string;
+  /** Staff have the public wall on: say so in the consent text and send that scope. */
+  publicWall: boolean;
   expiresAt: string;
   alreadySent: boolean;
 }) {
@@ -184,7 +190,7 @@ export function MobileUpload({
     try {
       for (let attempt = 0; ; attempt++) {
         setPhase({ name: "uploading", progress: 0, attempt });
-        const outcome = await send(token, preview.blob, (progress) =>
+        const outcome = await send(token, preview.blob, publicWall, (progress) =>
           setPhase({ name: "uploading", progress, attempt }),
         );
         if (outcome === "ok") return setPhase({ name: "done" });
@@ -199,7 +205,7 @@ export function MobileUpload({
     } finally {
       sending.current = false;
     }
-  }, [preview, consent, token]);
+  }, [preview, consent, token, publicWall]);
 
   const choose = () => inputRef.current?.click();
 
@@ -287,7 +293,7 @@ export function MobileUpload({
                     ↻ 돌리기
                   </button>
                 </div>
-                <Consent checked={consent} onChange={setConsent} />
+                <Consent checked={consent} onChange={setConsent} publicWall={publicWall} />
                 <button
                   type="button"
                   className="btn-primary w-full"
@@ -409,12 +415,26 @@ function Steps({ phase }: { phase: Phase["name"] }) {
  * age rule are the church's decision (docs/STATUS.md "14세 미만 기준, 보관 기간 확정") and are
  * deliberately not promised here.
  */
-function Consent({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Consent({
+  checked,
+  onChange,
+  publicWall,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  publicWall: boolean;
+}) {
   return (
     <div className="rounded-3xl border border-ink/15 bg-paper p-5">
       <h2 className="text-lg font-bold text-ink">보내기 전에 꼭 읽어 주세요</h2>
       <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed text-ink/75">
         <li>이 사진은 크리스마스 마을의 공개된 미디어월에 다른 분들 사진과 함께 보일 수 있어요.</li>
+        {/* D86. Written by Claude (2026-11-13), pending the user's wording. */}
+        {publicWall && (
+          <li data-testid="mobile-public-note">
+            미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.
+          </li>
+        )}
         <li>운영팀이 직접 확인하고 승인한 사진만 걸려요. 승인되지 않을 수도 있어요.</li>
         <li>STUDIO SHALOM 미디어월에만 쓰고, 정해진 보관 기간이 지나면 지워져요.</li>
         <li>다른 사람이 함께 나온 사진은 그분께 먼저 허락을 받아 주세요.</li>

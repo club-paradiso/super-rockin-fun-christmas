@@ -42,14 +42,23 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   return the same 404.
 - **No fake QR.** A QR is shown only after the server returned a real token.
 - **Schema changes are migrations** in `supabase/migrations/`, never console clicks.
-- **Staff = a session + an active staff row**, checked server-side on every page
-  (`requireStaff`) and API (`staffRoute`), through `authorizeStaffRequest` / `getStaffForPage`.
+- **/admin opens with the kiosk enrollment password** (D84, a user decision: never add a separate
+  administrator password). `POST /api/admin/auth/password` → HttpOnly `ftl_admin`
+  (`lib/staff-auth/shared.ts`): its own cookie and its own MAC key, bound to both
+  `KIOSK_SESSION_SECRET` and `KIOSK_ENROLL_SECRET`, acting as the fixed `SHARED_OPERATOR` (never a
+  staff row, never a real person's id). Refused when the password is shorter than 12 characters.
+  Every password check goes through `checkAdminPassword` and `adminPasswordLimits`.
+- **Personal staff login = a session + an active staff row** (the fallback, `/admin/login?staff=1`),
+  checked server-side on every page
+  (`requireStaff`) and API (`staffRoute`), through `authorizeStaffRequest` / `getStaffForPage`,
+  which accept the shared session first.
   Cloud: Supabase Auth email OTP (a Supabase user alone is nothing; no signups). Hub
   (`FTL_ROLE=hub`): name + 6-digit PIN, scrypt-hashed in `StaffRepository.setPin`, never returned
   by `list()`/`get()`; first staff only via the console setup code (`lib/staff-auth/setup.ts`).
-- **Kiosk and staff auth never substitute for each other.** Kiosk APIs read only the kiosk
-  cookie; staff APIs read only the staff session (Supabase cookies or `ftl_staff`). The staff
-  cookie MAC key is derived with a staff-only label. Booth help mode (`/api/kiosk/help`, D59)
+- **Kiosk and staff auth never substitute for each other**, even though the booth and /admin now
+  share one password. Kiosk APIs read only the kiosk cookie; staff APIs read only a staff session
+  (`ftl_admin`, Supabase cookies or `ftl_staff`). Each cookie's MAC key is derived with its own
+  label. Enrolling never signs in; signing in never enrolls. Booth help mode (`/api/kiosk/help`, D59)
   checks a staff PIN but issues no session; every PIN check goes through `attemptStaffPin`.
 - **Every state change is audited atomically**: moderation, deletion, token rotation, kiosk
   rename/revoke, enrollment codes, settings, staff changes go through ONE backend call (a SQL
@@ -57,10 +66,22 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Moderation rules live in `lib/ops/moderation.ts`.** APPROVED requires wall consent; DELETED is
   terminal and removes the image. No AI moderation, no face anything.
 - **PAUSE SUBMISSIONS never blocks photography or QR delivery** — only new wall consent.
-- **The wall only ever receives `wall_eligible_photos` ids**, through `/api/wall/feed`. PAUSE WALL
-  and SHOW HOLDING SCREEN are applied on the server, and so are the opening hours (`wallOpen` in
-  `lib/wall/hours.ts`, D62): outside them the feed is `closed` and sends no ids. Never give the
-  wall anon database access, tokens or storage URLs.
+- **The wall page needs no enrollment; the feed decides what each viewer gets** (D86). A valid
+  kiosk cookie is an enrolled venue display: it receives `wall_eligible_photos` ids, through
+  `/api/wall/feed`, and it alone may report (`/api/wall/shown`, heartbeat). Anyone else is the
+  public audience (`lib/wall/audience.ts`): only `wall_public_photos` ids (the wall rule AND
+  `photos.wall_public`), newest first, and none while `settings.wallPublic` is off (the default).
+  `wall_public` is set only by the consent transition, only with a YES given while the public-wall
+  line was on screen and the switch was on; a NO clears it; nothing else may ever set it.
+  PAUSE WALL and SHOW HOLDING SCREEN are applied on the server for both audiences, and so are the
+  opening hours (`wallOpen` in `lib/wall/hours.ts`, D62): outside them the feed is `closed` and
+  sends no ids. Never give the wall anon database access, tokens or storage URLs.
+- **Wall themes are data** (D85): `config/wall-themes.ts` + a picture in `public/wall/themes/`
+  (`scripts/wall-backgrounds.mjs`). Never branch on a theme id in `components/wall`. Every theme
+  must pass `tests/unit/wall-themes.test.ts` (every frame format inside the picture, neighbours
+  apart, wordmark never behind a photo). The active theme comes from the feed
+  (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
+  FOLLOW THE LIGHTS scene: selectable, never the default.
 - **Phone uploads (D66) are ordinary photos** with `frame_id = 'phone-photo'` (`config/mobile.ts`):
   one per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
@@ -134,6 +155,7 @@ app/api/kiosk/heartbeat kiosk liveness (kiosk cookie)
 app/wall               media wall (server gate: config + enrolled display) → components/wall
 app/api/wall           wall feed (ordered eligible ids) + exposure report + image proxy (kiosk cookie)
 lib/wall               wall states, pure rotation order + scheduler, server feed (emergency switches),
+                       who is asking (audience.ts, D86), themes (themes.ts, D85),
                        clothesline layout + phone-photo card, watchdog, opening hours (D62),
                        dedicated wall hostname rules (host.ts, D68)
 app/api/hub            cloud side of the hub's QR copy: put / reissue / delete / video (Bearer HUB_SYNC_SECRET),
@@ -144,7 +166,8 @@ lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock,
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models,
                        hub retention (D47/D58: rules in hub-retention.ts, timer in -server.ts),
                        USB backup + disk status (D60: backup.ts, backup-server.ts), event close (D64)
-lib/staff-auth         staff sessions: Supabase Auth (cloud) or PIN + signed cookie (hub), setup code
+lib/staff-auth         staff sessions: shared password (shared.ts, D84), Supabase Auth (cloud) or
+                       PIN + signed cookie (hub), setup code
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
 components/brand.tsx   the STUDIO SHALOM lockup and one-line wordmark as text (styles in app/globals.css)
@@ -163,7 +186,8 @@ scripts                hub-start.mjs (launcher), hub-restore.mjs, event-check.mj
                        check), staff-add.mjs (plain Node, unit tested)
 ops                    desktop-icon wrappers: start-hub / restore-backup / event-check (.bat/.command),
                        start-wall
-config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71)
+config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71),
+                       wall themes (wall-themes.ts, D85)
 design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
 tests/integration      real Supabase (npm run test:supabase)
@@ -179,7 +203,8 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
 - Kiosk copy: short Korean, large touch targets (`btn-primary`/`btn-secondary` are ≥ 80px tall).
 - Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
   backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
-- Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`, PIN login; the setup code is
+- Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`; /admin opens with
+  `KIOSK_ENROLL_SECRET`, or with a PIN at `/admin/login?staff=1`, whose setup code is
   printed in the server console) or on Supabase (`npx supabase start`, codes in Mailpit
   `http://127.0.0.1:54324`). `npm run test:e2e` runs as the hub; `E2E_STORE=supabase` runs the
   cloud admin specs (see docs/ADMIN.md).

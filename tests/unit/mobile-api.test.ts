@@ -175,6 +175,36 @@ describe("phone upload (D66)", () => {
     expect(rows).toHaveLength(1);
   });
 
+  // D86: a phone photo is public-wall material only when the page showed that line AND staff have
+  // the public wall on when it arrives.
+  it("records the public scope only with the header and only while the public wall is on", async () => {
+    const { getBackend } = await routes.storage();
+    const backend = getBackend();
+    const staffId = crypto.randomUUID();
+    const sent = async (headers: Record<string, string>) => {
+      const { url, sessionId } = (await (await newQr(cookie)).json()) as {
+        url: string;
+        sessionId: string;
+      };
+      expect((await upload(tokenOf(url), await phoneJpeg(), headers)).status).toBe(201);
+      return (await backend.photos.findBySessionId(sessionId))!;
+    };
+    // Switch off: the header alone records nothing.
+    expect(await sent({ "x-wall-scope": "public" })).toMatchObject({
+      wallConsent: true,
+      wallPublic: false,
+    });
+    await backend.settings.update({ wallPublic: true }, staffId);
+    expect(await sent({ "x-wall-scope": "public" })).toMatchObject({
+      wallConsent: true,
+      wallPublic: true,
+      moderationStatus: "PENDING", // still reviewed by a person, like any other photo
+    });
+    expect((await sent({})).wallPublic).toBe(false);
+    expect((await sent({ "x-wall-scope": "everyone" })).wallPublic).toBe(false);
+    await backend.settings.update({ wallPublic: false }, staffId);
+  });
+
   it("refuses: no consent, forged/expired QR, wrong type, not an image, too small, other site", async () => {
     const { url } = (await (await newQr(cookie)).json()) as { url: string };
     const token = tokenOf(url);

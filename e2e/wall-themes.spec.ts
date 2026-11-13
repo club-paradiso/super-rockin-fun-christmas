@@ -238,6 +238,18 @@ test("staff change the background in 설정; an open wall follows without a relo
     "data-selected",
     "true",
   );
+  if (process.env.SCREENSHOTS === "1") {
+    await form.screenshot({
+      path: "docs/screenshots/admin-820x1180-05-wall-look.jpg",
+      type: "jpeg",
+      quality: 80,
+    });
+    await staff.getByTestId("public-wall").screenshot({
+      path: "docs/screenshots/admin-820x1180-06-public-wall.jpg",
+      type: "jpeg",
+      quality: 80,
+    });
+  }
   // Every card shows its bundled preview.
   for (const img of await form.locator("img").all())
     expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(640);

@@ -1,4 +1,4 @@
-import type { ConsentStore, QueueStore } from "./queue-store";
+import type { ConsentScope, ConsentStore, QueueStore } from "./queue-store";
 
 /**
  * Durable delivery of the guest's media-wall answer. The answer is stored first, then sent by
@@ -14,7 +14,12 @@ export type ConsentOutcome =
   /** network, 5xx, 429 or kiosk not enrolled: try again later */
   | "retry";
 
-export type ConsentSender = (sessionId: string, consent: boolean) => Promise<ConsentOutcome>;
+export type ConsentSender = (
+  sessionId: string,
+  consent: boolean,
+  /** What the guest was told the consent covers when they answered (D86). */
+  scope: ConsentScope | undefined,
+) => Promise<ConsentOutcome>;
 
 const DEFAULT_BACKOFF = [2_000, 5_000, 15_000, 30_000, 60_000];
 
@@ -29,11 +34,15 @@ export class ConsentQueue {
     private readonly backoff: number[] = DEFAULT_BACKOFF,
   ) {}
 
-  /** Record (or change) the answer for a session. The latest answer wins. */
-  async enqueue(sessionId: string, consent: boolean) {
+  /**
+   * Record (or change) the answer for a session. The latest answer wins, scope included: the
+   * scope is what the consent screen showed at that moment, and a "no" never carries one.
+   */
+  async enqueue(sessionId: string, consent: boolean, scope?: ConsentScope) {
     await this.store.put({
       sessionId,
       consent,
+      ...(consent && scope ? { scope } : {}),
       createdAt: this.now(),
       attempts: 0,
       nextAttemptAt: this.now(),
@@ -54,7 +63,7 @@ export class ConsentQueue {
           if (await this.uploads.get(entry.sessionId)) continue;
           let outcome: ConsentOutcome;
           try {
-            outcome = await this.send(entry.sessionId, entry.consent);
+            outcome = await this.send(entry.sessionId, entry.consent, entry.scope);
           } catch {
             outcome = "retry";
           }

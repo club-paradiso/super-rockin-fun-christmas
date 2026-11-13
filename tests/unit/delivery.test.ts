@@ -64,7 +64,7 @@ describe("uploadOnce", () => {
 describe("sendWallConsent", () => {
   it("sends the session id, never a token", async () => {
     const fetchImpl = respond(200);
-    expect(await sendWallConsent("s-1", true, fetchImpl)).toBe("done");
+    expect(await sendWallConsent("s-1", true, undefined, fetchImpl)).toBe("done");
     const [, init] = fetchImpl.mock.calls[0]!;
     expect(JSON.parse(init.body)).toEqual({ sessionId: "s-1", consent: true });
   });
@@ -78,12 +78,26 @@ describe("sendWallConsent", () => {
     [404, "done"],
     [409, "done"],
   ])("HTTP %i → %s", async (status, expected) => {
-    expect(await sendWallConsent("s", true, respond(status))).toBe(expected);
+    expect(await sendWallConsent("s", true, undefined, respond(status))).toBe(expected);
   });
 
   it("a thrown fetch (offline) → retry", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new TypeError("offline"));
-    expect(await sendWallConsent("s", false, fetchImpl)).toBe("retry");
+    expect(await sendWallConsent("s", false, undefined, fetchImpl)).toBe("retry");
+  });
+
+  // D86: the scope travels with a YES only; a NO never claims anything.
+  it("sends the public scope with a yes, and never with a no", async () => {
+    const yes = respond(200);
+    await sendWallConsent("s-2", true, "public", yes);
+    expect(JSON.parse(yes.mock.calls[0]![1].body)).toEqual({
+      sessionId: "s-2",
+      consent: true,
+      scope: "public",
+    });
+    const no = respond(200);
+    await sendWallConsent("s-2", false, "public", no);
+    expect(JSON.parse(no.mock.calls[0]![1].body)).toEqual({ sessionId: "s-2", consent: false });
   });
 });
 

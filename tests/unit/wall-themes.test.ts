@@ -11,7 +11,6 @@ import {
   getWallTheme,
 } from "@/config/wall-themes";
 import {
-  PHONE_CARD,
   framedPhotoBox,
   lineYAt,
   phoneCardBox,

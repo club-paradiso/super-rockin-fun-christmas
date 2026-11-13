@@ -1,5 +1,6 @@
 import type { QueuedUpload } from "@/lib/offline/queue-store";
 import type { ConsentOutcome } from "@/lib/offline/consent-queue";
+import type { ConsentScope } from "@/lib/offline/queue-store";
 import type { UploadOutcome, UploadSuccess } from "@/lib/offline/upload-queue";
 
 /**
@@ -58,10 +59,14 @@ export async function uploadOnce(
  * One attempt to record the guest's media-wall answer for a session (the ConsentQueue retries).
  * "done" also covers answers the server will never take (submissions paused → 409, photo gone →
  * 404, bad request → 400): retrying those would not change anything.
+ *
+ * `scope` "public" says the consent screen showed the public-wall notice (D86). The server
+ * records it only while the public wall is on; it is never sent with a "no".
  */
 export async function sendWallConsent(
   sessionId: string,
   consent: boolean,
+  scope?: ConsentScope,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ConsentOutcome> {
   try {
@@ -69,7 +74,7 @@ export async function sendWallConsent(
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId, consent }),
+      body: JSON.stringify({ sessionId, consent, ...(consent && scope ? { scope } : {}) }),
     });
     if (response.ok) return "done";
     if (response.status === 401 || response.status === 429 || response.status >= 500)

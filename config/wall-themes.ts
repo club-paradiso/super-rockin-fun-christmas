@@ -262,7 +262,7 @@ export const WALL_THEMES: readonly WallTheme[] = [
   {
     id: "night-window",
     name: "제주 밤 11시 창가 (이전 장면)",
-    note: "FOLLOW THE LIGHTS 때의 밤 장면. 기록용으로 남겨 둔 이전 디자인",
+    note: "FOLLOW THE LIGHTS 때의 밤 장면. 기록용으로 남겨 뒀어요",
     source: "Figma FTL · 미디어월 (Wall / Composite preview v3)",
     status: "legacy",
     background: WALL_CONFIG.scene.background,

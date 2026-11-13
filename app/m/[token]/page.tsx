@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { readUploadToken } from "@/lib/mobile/server";
-import { getPhotoService } from "@/lib/storage/server";
+import { getBackend, getPhotoService } from "@/lib/storage/server";
 import { BrandLockup } from "@/components/brand";
 import { MobileUpload } from "./mobile-upload";
 
@@ -26,9 +26,13 @@ export default async function MobileUploadPage({ params }: { params: Promise<{ t
     verified.claims.kioskId,
   );
   if (status === "closed") return <Closed testId="mobile-expired" />;
+  // Public wall on (D86): the page says so before the guest agrees, and the upload carries that
+  // scope. The server checks the switch again when the photo arrives.
+  const publicWall = (await getBackend().settings.get()).wallPublic;
   return (
     <MobileUpload
       token={token}
+      publicWall={publicWall}
       expiresAt={new Date(verified.claims.expiresAt * 1000).toISOString()}
       alreadySent={status === "received"}
     />

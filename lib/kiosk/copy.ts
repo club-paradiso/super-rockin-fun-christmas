@@ -118,6 +118,9 @@ const ko = {
     yes: "네, 띄워주세요",
     no: "아니요, 저만 볼게요",
     note: "사진은 정해진 기간이 지나면 지워져요.\n띄운 뒤에도 안내 봉사자에게 말하면 바로 내려드려요.",
+    // D86, shown only while staff have the public wall on. Written by Claude (2026-11-13), not
+    // yet the user's wording (D76): it has to say plainly that the wall is also on the internet.
+    publicNote: "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.",
     finished: "완성된 사진",
     making: "사진을 만들고 있어요",
   },
@@ -292,6 +295,7 @@ const en: KioskCopy = {
     yes: "Yes, show it",
     no: "No, just for me",
     note: "Photos are deleted after a set period.\nIf you change your mind later, tell a volunteer and we’ll take it down right away.",
+    publicNote: "The media wall is shown on the screen here and at its web address.",
     finished: "Your finished photo",
     making: "Making your photo",
   },
