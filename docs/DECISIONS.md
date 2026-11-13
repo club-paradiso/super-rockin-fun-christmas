@@ -963,3 +963,25 @@ screen until the 2.0 release (#29), which replaced it with the two-choice welcom
 - E2E: `openWelcome` in `e2e/helpers.ts` taps through the attract screen; after a reset the specs
   expect `screen-attract`.
 - Figma: KIOSK `0 · 화면을 눌러 시작 (인트로 · 봉인)` in the first section, seals removed from 1a–1c.
+
+## D81 · The letter sheet becomes a faded diary page
+
+User request (2026-11-13): make the kiosk screens feel more like a faded diary ("빛 바랜 다이어리").
+The brand rules stay: no new colour, no gradient, no glow, one filled button per view.
+
+- `.letter-sheet` (`app/globals.css`): the paper is `paper` with 18 % `backdrop` mixed in
+  (`--sheet-faded`), a fine ink grain (`--grain-ink`, an SVG `feTurbulence` data URI, ink at a few
+  percent) and faint ruled lines (`--ruled-lines`, `accent` at 12 %, one line every
+  `max(40px, 5.6vh)`). Its edge is `accent`/20 instead of `ink`/10. Textures are SVG images, not CSS
+  gradients.
+- The booth's backdrop gets the same grain (`.kiosk-desk` on the kiosk `<main>`), so the sheet
+  sits on a desk instead of a flat colour. Only the booth: admin, phone pages and the wall are
+  unchanged.
+- Easy mode keeps the faded paper and grain but drops the ruled lines: nothing behind the big type.
+- Contrast on the faded sheet: ink 13.5:1, ink/75 6.54:1, accent 6.38:1. Paper boxes on the sheet
+  (welcome card, QR box) keep the plain `paper`, so they read as cards laid on the page.
+- Figma (ZbeBrS0o5012SNFrGZNyIU, KIOSK page): every `편지지` frame (27) has the same layers:
+  `color/paper`, `color/backdrop` at 18 %, a ruled-line image tile (none on 1b, the easy screen),
+  a monotone noise effect, and a `color/accent` edge at 20 %.
+
+Not verified: how the grain and lines look on the real booth screen and under the venue's light.

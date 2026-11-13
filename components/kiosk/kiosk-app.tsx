@@ -721,7 +721,7 @@ export function KioskApp({
   return (
     <KioskChromeContext.Provider value={chrome}>
       <main
-        className={`relative min-h-dvh select-none overflow-hidden ${state.mode === "easy" ? "kiosk-easy" : ""}`}
+        className={`kiosk-desk relative min-h-dvh select-none overflow-hidden ${state.mode === "easy" ? "kiosk-easy" : ""}`}
         data-phase={state.phase}
         data-mode={state.mode}
         data-lang={state.lang}

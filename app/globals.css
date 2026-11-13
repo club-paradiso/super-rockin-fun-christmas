@@ -27,6 +27,14 @@
   --font-myeongjo: "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
 }
 
+/* D81 booth textures, derived from the tokens above (no new colour): the faded sheet is paper with
+   18 % backdrop; grain is ink (#2b1a10) at a few percent; ruled lines are accent (#7a440e) at 12 %. */
+:root {
+  --sheet-faded: color-mix(in srgb, var(--color-paper) 82%, var(--color-backdrop));
+  --grain-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .169 0 0 0 0 .102 0 0 0 0 .063 0 0 0 -.45 .26'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E");
+  --ruled-lines: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='40' viewBox='0 0 8 40' preserveAspectRatio='none'%3E%3Crect y='39' width='8' height='1' fill='%237a440e' fill-opacity='.12'/%3E%3C/svg%3E");
+}
+
 html,
 body {
   background: var(--color-backdrop);
@@ -281,10 +289,31 @@ body {
   }
   /* Welcome: the two big choices. Equal size; the camera one is the filled primary. */
   /* D79: one sheet of letter paper on the backdrop; the seal is pressed on its corner. */
+  /* D81: a faded diary page. Paper toned a little toward the backdrop (ink on it 13.5:1, ink/75 6.54:1), a fine
+     ink grain and faint ruled lines (accent at 12 %). Textures are SVG data URIs, not gradients. */
   .letter-sheet {
-    @apply relative rounded-lg border border-ink/10 bg-paper;
+    @apply relative rounded-lg border border-accent/20;
+    background-color: var(--sheet-faded);
+    background-image: var(--grain-ink), var(--ruled-lines);
+    background-size:
+      240px 240px,
+      8px max(40px, 5.6vh);
+    background-position:
+      0 0,
+      0 max(20px, 2.6vh);
     margin-block: max(8px, 1vh) max(12px, 1.4vh);
     padding: max(20px, 2.6vh) max(16px, 2.4vw);
+  }
+  /* Easy mode keeps the paper and grain but drops the ruled lines: less behind the big type. */
+  .kiosk-easy .letter-sheet {
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
+  }
+  /* The booth's desk: the same grain on the backdrop, so the sheet does not look pasted on. */
+  .kiosk-desk {
+    background-color: var(--color-backdrop);
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
   }
   .wax-seal {
     @apply pointer-events-none absolute select-none;
