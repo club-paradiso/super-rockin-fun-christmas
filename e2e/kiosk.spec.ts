@@ -4,6 +4,7 @@ import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
+  openWelcome,
   photoForToken,
   shootFourWithMock,
   startSession,
@@ -13,6 +14,15 @@ import {
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
+});
+
+test("guest kiosk never asks for a name on welcome or frame picker", async ({ page }) => {
+  await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
 test("happy path: frame → 6 shots → frame again → consent YES → upload → QR → phone page → PENDING", async ({
@@ -41,6 +51,8 @@ test("happy path: frame → 6 shots → frame again → consent YES → upload �
   await page.getByRole("button", { name: "이 틀로 할게요" }).click();
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
+  // No guest name field may appear on the finalization or media-wall consent screen.
+  await expect(page.getByRole("textbox")).toHaveCount(0);
   const finalImage = page.getByTestId("final-image");
   const dims = await finalImage.evaluate(async (el: HTMLImageElement) => {
     await el.decode();
