@@ -51,6 +51,15 @@ describe("frame definitions", () => {
     expect(isKnownFrameId("nope")).toBe(false);
   });
 
+  it("does not embed visitor names in photo frame text", () => {
+    for (const frame of FRAMES) {
+      for (const decoration of frame.decorations) {
+        if (decoration.type !== "text") continue;
+        expect(decoration.text).not.toMatch(/\{(?:guestName|visitorName|name|이름|성함|닉네임)\}/i);
+      }
+    }
+  });
+
   it("have unique ids and fall back to the default", () => {
     expect(new Set(FRAMES.map((f) => f.id)).size).toBe(FRAMES.length);
     expect(getFrame("nope").id).toBe(DEFAULT_FRAME_ID);
