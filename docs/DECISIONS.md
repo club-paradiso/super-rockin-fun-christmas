@@ -941,7 +941,7 @@ look pasted on; the booth screens look like **letter paper** so the seal belongs
   full width in portrait, which keeps the sealed corner clear.
 - Figma: the KIOSK page has the same sheet on every screen, the seal on 1a, 1b, 1c and 8a.
 
-Not done: the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
+Not done (fixed later in D81b): the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
 photos are tall). Frames and the media wall do not use the seal.
 
 ## D80 · "화면을 눌러 시작" comes back as the first screen
@@ -1001,6 +1001,10 @@ option A (things taped and mounted) with option C (an aged, torn edge).
 - **Photo corners** (`PhotoCorners`, `.photo-corner-*`): album corners in `ink` at 85 % on the
   camera preview and on each photo of the review screen. Those prints are now 4 px corners
   (`rounded-sm`), not cards. No pointer events, so a touch on a photo still works.
+- The **review screen** (4) no longer scrolls: six prints in one row on a landscape booth, 3 × 2
+  on a portrait tablet (`review-grid`). Before, 4 × 2 (landscape) and 2 × 3 (portrait) pushed
+  "이대로 좋아요" below the screen at 1280 × 800 and 820 × 1180. E2E checks 1280 × 800,
+  1920 × 1080 and 820 × 1180: every print and the button fully on screen, no scroll.
 - Not on: buttons (the welcome choices stay as they are), easy mode differences (tape and corners
   show in both modes), frames, phone pages, the wall.
 - Figma KIOSK: every `편지지` holds a `종이 (찢긴 가장자리)` vector (paper, backdrop 18 %, ruled-line

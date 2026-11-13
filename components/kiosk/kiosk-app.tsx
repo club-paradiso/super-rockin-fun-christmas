@@ -1218,7 +1218,12 @@ function Screen(p: ScreenProps) {
       return (
         <BoothScreen testId="screen-review" progress={progress}>
           <h1 className="booth-title">{t.review.title}</h1>
-          <div className="mt-[3vh] grid w-full grid-cols-4 gap-[max(12px,1.1vw)] portrait:grid-cols-2">
+          {/* Six prints in one row on a landscape booth, 3 × 2 on a portrait tablet: with the
+              retake buttons and "이대로 좋아요" the screen fits without scrolling. */}
+          <div
+            className="mt-[3vh] grid w-full grid-cols-6 gap-[max(10px,1vw)] portrait:grid-cols-3"
+            data-testid="review-grid"
+          >
             {state.shots.map((shot, i) => (
               <div key={i} className="flex flex-col gap-[1.6vh]">
                 <div
