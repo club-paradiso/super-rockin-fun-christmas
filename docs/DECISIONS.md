@@ -1058,3 +1058,23 @@ User decision (2026-11-13): the seal on the letter frame stays, and the six name
 
 Not verified: how the 13 px captions (26 px in the saved file) read on a real phone, and the set on
 the real media wall screen.
+
+## D83 · Landscape frames: ticket, card, Advent calendar
+
+User request (2026-11-13): pretty landscape frames too ("가로 프레임도 이쁜것도").
+
+| id              | 이름        | 사진 | 크기 (저장은 2배) | 모양                                                                             |
+| --------------- | ----------- | ---- | ----------------- | -------------------------------------------------------------------------------- |
+| `shalom-ticket` | 티켓        | 3    | 960 × 470         | 둥근 종이 티켓, 사진 셋 한 줄, 양옆 홈과 점선 절취선, 아래 ADMIT ONE·날짜        |
+| `shalom-card`   | 카드        | 4    | 1000 × 720        | 펼친 크리스마스 카드: 가운데 2×2, 양옆 여백에 행사명·별·날짜·MT 5:9, 가는 테두리 |
+| `shalom-advent` | 대림절 달력 | 6    | 900 × 700         | 대림절 달력 문 여섯 개(DEC 01·06·12·18·24·25), 25일 문만 짙은 색                 |
+
+- Same rules as D82: 4:3 slots, the lockup below the last photo, centred, ≥ 38 % of the width (so a
+  landscape frame needs a wide foot: 136–142 px tall at 1×), brand tokens only (the Christmas door
+  uses `button`), captions in the D82 type styles. The side margins carry the small captions so the
+  foot holds only the lockup.
+- Picker: after the letter set, before Template A–D. Wall: `framedPhotoBox` hangs them at the
+  phone-card width (340 px wide).
+- New frame words: "ADMIT ONE", "No. {date}", "DEC 01"–"DEC 25", "MERRY CHRISTMAS". Written here, not
+  by the user: they need the user's check, like any guest copy.
+- Figma: not drawn yet (SS 02 has the D82 row only).
