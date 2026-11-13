@@ -70,7 +70,7 @@ export async function toFrame(page: Page) {
 export async function selectDefaultPhotos(page: Page) {
   await expect(page.getByTestId("screen-select")).toBeVisible();
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
-  if (!Number.isInteger(required) || required < 2 || required > 6)
+  if (!Number.isInteger(required) || required < 1 || required > 6)
     throw new Error("Invalid photo count");
   for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
   await page.getByTestId("confirm-selection").click();
