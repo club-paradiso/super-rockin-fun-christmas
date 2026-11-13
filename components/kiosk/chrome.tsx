@@ -41,7 +41,7 @@ export function BoothFooter() {
   const btn = easy ? "booth-chrome-btn booth-chrome-btn-easy" : "booth-chrome-btn";
   return (
     <footer
-      className={`mt-[2vh] flex flex-wrap items-center gap-3 ${easy ? "justify-between" : "justify-start"}`}
+      className={`booth-footer ${easy ? "booth-footer-easy" : ""}`}
       data-testid="booth-footer"
     >
       {chrome.goHome && (
@@ -108,24 +108,21 @@ export function KioskDialog({
     };
   }, [onClose]);
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-6"
-      onClick={onClose}
-    >
+    <div className="kiosk-overlay" onClick={onClose}>
       <div
         ref={boxRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         data-testid={testId}
-        className="kiosk-dialog flex max-h-[90dvh] w-full max-w-3xl flex-col gap-6 overflow-y-auto rounded-3xl bg-paper p-[max(24px,4vh)] text-left"
+        className="kiosk-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="booth-title">
           {title}
         </h2>
         {children}
-        <div className="flex flex-wrap justify-end gap-4">{actions}</div>
+        <div className="kiosk-dialog-actions">{actions}</div>
       </div>
     </div>
   );

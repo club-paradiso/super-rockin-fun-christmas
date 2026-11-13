@@ -5,26 +5,6 @@ import { BrandLockup, BrandWordmark } from "@/components/brand";
 import type { EasyStepKey } from "@/lib/kiosk/copy";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 
-/** Full-screen stage every kiosk screen sits on. */
-export function Stage({
-  children,
-  testId,
-  className = "",
-}: {
-  children: React.ReactNode;
-  testId: string;
-  className?: string;
-}) {
-  return (
-    <section
-      data-testid={testId}
-      className={`flex min-h-dvh w-full flex-col items-center justify-center gap-8 px-8 py-10 text-center ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
-
 export { BrandLockup, BrandWordmark };
 
 /**
@@ -44,6 +24,8 @@ const LINE_ICONS = {
       <path d="M11 17.5h2" />
     </>
   ),
+  /** "More below": shown only when a screen is taller than the booth. */
+  down: <path d="M6 9l6 6 6-6" />,
 } as const;
 
 export function LineIcon({ name }: { name: keyof typeof LINE_ICONS }) {
@@ -69,16 +51,16 @@ export function LineIcon({ name }: { name: keyof typeof LINE_ICONS }) {
 export function Stepper({ step, total }: { step: number; total: number }) {
   const t = useKioskCopy();
   return (
-    <div className="flex items-center gap-[14px]" aria-label={t.steps.of(step, total)}>
-      <span className="font-mono text-xl tracking-[0.08em] text-ink" data-testid="step-progress">
+    <div className="booth-steps" aria-label={t.steps.of(step, total)}>
+      <span className="booth-steps-count" data-testid="step-progress">
         {step} / {total}
       </span>
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
           aria-hidden
-          className={`h-4 w-4 rounded-full ${
-            i + 1 === step ? "bg-button" : i + 1 < step ? "bg-accent" : "bg-ink/20"
+          className={`booth-steps-dot ${
+            i + 1 === step ? "booth-steps-dot-now" : i + 1 < step ? "booth-steps-dot-done" : ""
           }`}
         />
       ))}
@@ -98,12 +80,12 @@ export function EasyStep({
 }) {
   const t = useKioskCopy();
   return (
-    <div className="flex flex-col items-end gap-2" data-testid="easy-step">
-      <p className="text-[clamp(24px,3.4vh,38px)] font-bold text-ink">
+    <div className="booth-easy-step" data-testid="easy-step">
+      <p className="booth-easy-step-label">
         <span className="text-accent">{t.steps.easy(step)}</span> · {t.steps.labels[stepKey]}
         <span className="sr-only"> ({t.steps.of(step, total)})</span>
       </p>
-      <div className="h-3 w-[min(36vw,320px)] overflow-hidden rounded-full bg-ink/20" aria-hidden>
+      <div className="booth-easy-step-bar" aria-hidden>
         <div className="h-full bg-button" style={{ width: `${(step / total) * 100}%` }} />
       </div>
     </div>
@@ -111,15 +93,19 @@ export function EasyStep({
 }
 
 /**
- * Full-screen booth screen on the flat paper backdrop: the wordmark top left and the step dots
- * top right (none on the attract screen).
+ * One booth screen: header (way back, wordmark, progress), the letter sheet, footer. The sheet
+ * takes the height that is left; `className` lays out what is on it (see "Screens" in
+ * app/globals.css). The screen fills the booth and grows only when its content cannot fit, in
+ * which case the booth's scroll area scrolls.
  */
 export function BoothScreen({
   children,
   testId,
   progress,
-  className = "",
+  className = "sheet-center",
   seal = false,
+  header = true,
+  onClick,
 }: {
   children: React.ReactNode;
   testId: string;
@@ -127,18 +113,25 @@ export function BoothScreen({
   className?: string;
   /** Press the wax seal on this sheet's corner (D79, D80: the attract screen and the QR only). */
   seal?: boolean;
+  /** The attract and welcome screens have no header and no footer: the sheet is the screen. */
+  header?: boolean;
+  onClick?: () => void;
 }) {
   const chrome = useKioskChrome();
   const easy = chrome?.mode === "easy";
   const back = chrome?.goBack ?? null;
+  const showHeader = header && (progress || back || (easy && chrome?.easyStep));
   return (
     <section
       data-testid={testId}
-      className="relative flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] pb-[max(20px,3vh)] pt-[max(20px,4.4vh)]"
+      className={`booth-screen ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
     >
-      {(progress || back || (easy && chrome?.easyStep)) && (
-        <header className="flex min-h-[max(56px,7.4vh)] items-center justify-between gap-4">
-          <div className="flex items-center gap-[max(16px,2vw)]">
+      {showHeader && (
+        <header
+          className={`booth-header ${easy ? "booth-header-easy" : ""} ${back ? "booth-header-back" : ""}`}
+        >
+          <div className="booth-header-left">
             {/* One step back, where nothing the guest made is lost (D78). */}
             {back && (
               <button
@@ -150,7 +143,7 @@ export function BoothScreen({
                 <span aria-hidden>‹</span> {chrome!.t.chrome.back}
               </button>
             )}
-            <BrandWordmark className="text-[clamp(20px,2.8vh,30px)]" />
+            <BrandWordmark className="booth-wordmark" />
           </div>
           {easy && chrome?.easyStep ? (
             <EasyStep
@@ -163,13 +156,10 @@ export function BoothScreen({
           )}
         </header>
       )}
-      <LetterSheet
-        seal={seal}
-        className={`flex flex-1 flex-col items-center justify-center ${className}`}
-      >
+      <LetterSheet seal={seal} className={className}>
         {children}
       </LetterSheet>
-      <BoothFooter />
+      {header && <BoothFooter />}
     </section>
   );
 }
@@ -229,36 +219,11 @@ export function WaxSeal() {
   );
 }
 
-export function Title({ children }: { children: React.ReactNode }) {
-  return <h1 className="text-4xl font-bold leading-tight text-ink md:text-5xl">{children}</h1>;
-}
-
-export function Lead({ children }: { children: React.ReactNode }) {
-  return <p className="max-w-2xl text-2xl leading-relaxed text-ink/75">{children}</p>;
-}
-
-/** "●●○○  2 / 4" — always visible while shooting so nobody wonders how many are left. */
-export function ShotProgress({ done, total }: { done: number; total: number }) {
-  return (
-    <div className="flex items-center gap-4" aria-label={`${total}장 중 ${done}장 촬영`}>
-      <div className="flex gap-3">
-        {Array.from({ length: total }, (_, i) => (
-          <span
-            key={i}
-            className={`h-5 w-5 rounded-full border-2 border-ink ${i < done ? "bg-ink" : "bg-transparent"}`}
-          />
-        ))}
-      </div>
-      <span className="text-2xl font-semibold tabular-nums text-ink" data-testid="shot-progress">
-        {done} / {total}
-      </span>
-    </div>
-  );
-}
-
 /**
  * Live camera preview. Same aspect box + object-fit: cover + mirror flag as the capture code,
- * so the guest sees exactly the crop that will be saved.
+ * so the guest sees exactly the crop that will be saved. The box takes its size from the stage
+ * it sits in (.shoot-stage): as wide and as tall as the stage allows, always `aspect`. Turning
+ * the tablet changes the stage, never the ratio.
  */
 export function CameraPreview({
   stream,
@@ -286,23 +251,22 @@ export function CameraPreview({
 
   return (
     <div
-      className="relative w-full max-w-[min(90vw,calc(62dvh*4/3))] overflow-hidden rounded-sm border border-ink/20 bg-ink/10"
-      style={{ aspectRatio: String(aspect) }}
+      className="camera-preview"
+      data-testid="camera-preview-box"
+      style={{ aspectRatio: String(aspect), "--aspect": String(aspect) } as React.CSSProperties}
     >
+      {/* muted + playsInline: iOS Safari plays a camera stream inline only with both. */}
       <video
         ref={videoRef}
         data-testid="camera-preview"
         muted
         playsInline
         autoPlay
+        disablePictureInPicture
         className="h-full w-full object-cover"
         style={{ transform: mirror ? "scaleX(-1)" : undefined }}
       />
-      {!stream && (
-        <div className="absolute inset-0 flex items-center justify-center text-xl text-ink/75">
-          {t.camera.preview}
-        </div>
-      )}
+      {!stream && <div className="camera-preview-wait">{t.camera.preview}</div>}
       <PhotoCorners />
       {children}
     </div>
