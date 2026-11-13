@@ -8,7 +8,7 @@ describe("frame fonts", () => {
     const requests = frameFontRequests(FRAMES);
     const specs = requests.map((r) => r.spec);
     expect(new Set(specs).size).toBe(specs.length);
-    // The four approved frames use 400/20. The STUDIO SHALOM 2×2 and the letter set (D81) keep to
+    // The four approved frames use 400/20. The STUDIO SHALOM 2×2 and the letter set (D82) keep to
     // three caption styles: 600/13 labels, 600/15 headings, 500/15 body.
     expect([...specs].sort()).toEqual([
       '400 16px "Noto Sans KR Variable"',

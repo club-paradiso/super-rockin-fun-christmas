@@ -33,7 +33,7 @@ describe("frame definitions", () => {
     expect(words).toContain("MT 5:9");
   });
 
-  it("follows the 2×2 with the letter set, 1 to 6 photos (D81)", () => {
+  it("follows the 2×2 with the letter set, 1 to 6 photos (D82)", () => {
     expect(FRAMES.slice(1, 7).map((f) => [f.id, f.slots.length])).toEqual([
       ["shalom-single", 1],
       ["shalom-postcard", 2],
@@ -53,7 +53,7 @@ describe("frame definitions", () => {
     ]);
   });
 
-  // D81: the letter set draws with the brand tokens only, and its decorations (the wax seal,
+  // D82: the letter set draws with the brand tokens only, and its decorations (the wax seal,
   // the stamp) never cover a photo.
   it("keeps the letter set to the brand tokens, with no decoration over a photo", () => {
     const tokens = new Set(["#DDBDA1", "#F6EEE4", "#2B1A10", "#412D1B", "#7A440E"]);
@@ -176,7 +176,7 @@ describe("frame definitions", () => {
     });
 
     // Strips keep the Figma 600 × 1800; the STUDIO SHALOM 2×2 is 600 × 750 (4:5, D77); the letter
-    // set has one paper size per object (D81).
+    // set has one paper size per object (D82).
     it("keeps its Figma size and square photo corners", () => {
       const sizes: Record<string, [number, number]> = {
         "shalom-grid": [600, 750],

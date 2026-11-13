@@ -15,7 +15,7 @@ import { shalomGrid } from "./shalom-grid";
 
 /**
  * Picker order: the STUDIO SHALOM 2×2 first (D77), then the STUDIO SHALOM letter set by number of
- * photos, 1 to 6 (D81), then Figma order (Template A–D). The preselected frame stays the navy strip
+ * photos, 1 to 6 (D82), then Figma order (Template A–D). The preselected frame stays the navy strip
  * (DEFAULT_FRAME_ID).
  */
 export const FRAMES: readonly FrameDefinition[] = [
@@ -46,7 +46,7 @@ export const RETIRED_FRAME_IDS: readonly string[] = [
   "starlight-strip",
   "village-window",
   "snow-paper-strip",
-  // The plain 2/3/5/6-photo strips, replaced by the letter set (D81).
+  // The plain 2/3/5/6-photo strips, replaced by the letter set (D82).
   "two-stars",
   "three-moments",
   "five-lights",

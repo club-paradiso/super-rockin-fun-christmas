@@ -162,3 +162,24 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
   await expect(page.getByTestId("delivery-ready")).toBeVisible();
   await expect(page.getByTestId("screen-delivery").getByTestId("wax-seal")).toBeVisible();
 });
+
+test("the review screen fits without scrolling, landscape and portrait", async ({ page }) => {
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 1920, height: 1080 },
+    { width: 820, height: 1180 },
+  ]) {
+    await page.setViewportSize(size);
+    await shootSixWithMock(page);
+    const confirm = page.getByRole("button", { name: "이대로 좋아요" });
+    await expect(confirm).toBeInViewport({ ratio: 1 });
+    for (let i = 0; i < 6; i++) {
+      await expect(page.getByTestId(`review-shot-${i}`)).toBeInViewport({ ratio: 1 });
+    }
+    const overflow = await page.evaluate(() => ({
+      y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }));
+    expect(overflow, `${size.width}×${size.height}`).toEqual({ y: 0, x: 0 });
+  }
+});

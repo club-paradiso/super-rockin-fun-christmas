@@ -95,7 +95,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **The booth is a letter** (D79): booth content sits on one `LetterSheet` (paper on the backdrop).
   The wax seal (`public/brand/wax-seal.webp`) is decoration only (`alt=""`, no pointer events,
   never over a button, never causing scroll) and is pressed on two screens only: the attract screen and
-  the QR once it is real. Of the frames, only the letter frame (`shalom-letter`, D81) carries it.
+  the QR once it is real. The sheet is a faded diary page (D81): paper with 18 % backdrop, ink grain
+  and accent ruled lines as SVG data URIs in `app/globals.css` (never CSS gradients); easy mode has
+  no ruled lines. Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
+  `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button). Of the frames, only the letter frame (`shalom-letter`,
+  D82) carries the seal.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
@@ -103,6 +107,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
+
+## The user's words
+
+- **밤티**: Korean slang for "tacky, unrefined, ugly, not good enough" (a meme from an old avatar-game
+  screenshot; its opposite in the same slang is "장원영"). "시안이 밤티" means the design still looks
+  cheap or clumsy: push the craft further, do not defend the current version.
 
 ## Layout
 

@@ -941,9 +941,9 @@ look pasted on; the booth screens look like **letter paper** so the seal belongs
   full width in portrait, which keeps the sealed corner clear.
 - Figma: the KIOSK page has the same sheet on every screen, the seal on 1a, 1b, 1c and 8a.
 
-Not done: the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
+Not done (fixed later in D81b): the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
 photos are tall). The media wall does not use the seal; frames did not either until the letter
-frame (D81).
+frame (D82).
 
 ## D80 · "화면을 눌러 시작" comes back as the first screen
 
@@ -965,7 +965,55 @@ screen until the 2.0 release (#29), which replaced it with the two-choice welcom
   expect `screen-attract`.
 - Figma: KIOSK `0 · 화면을 눌러 시작 (인트로 · 봉인)` in the first section, seals removed from 1a–1c.
 
-## D81 · The STUDIO SHALOM letter set: frames for 1 to 6 photos
+## D81 · The letter sheet becomes a faded diary page
+
+User request (2026-11-13): make the kiosk screens feel more like a faded diary ("빛 바랜 다이어리").
+The brand rules stay: no new colour, no gradient, no glow, one filled button per view.
+
+- `.letter-sheet` (`app/globals.css`): the paper is `paper` with 18 % `backdrop` mixed in
+  (`--sheet-faded`), a fine ink grain (`--grain-ink`, an SVG `feTurbulence` data URI, ink at a few
+  percent) and faint ruled lines (`--ruled-lines`, `accent` at 12 %, one line every
+  `max(40px, 5.6vh)`). Its edge is `accent`/20 instead of `ink`/10. Textures are SVG images, not CSS
+  gradients.
+- The booth's backdrop gets the same grain (`.kiosk-desk` on the kiosk `<main>`), so the sheet
+  sits on a desk instead of a flat colour. Only the booth: admin, phone pages and the wall are
+  unchanged.
+- Easy mode keeps the faded paper and grain but drops the ruled lines: nothing behind the big type.
+- Contrast on the faded sheet: ink 13.5:1, ink/75 6.54:1, accent 6.38:1. Paper boxes on the sheet
+  (welcome card, QR box) keep the plain `paper`, so they read as cards laid on the page.
+- Figma (ZbeBrS0o5012SNFrGZNyIU, KIOSK page): every `편지지` frame (27) has the same layers:
+  `color/paper`, `color/backdrop` at 18 %, a ruled-line image tile (none on 1b, the easy screen),
+  a monotone noise effect, and a `color/accent` edge at 20 %.
+
+Not verified: how the grain and lines look on the real booth screen and under the venue's light.
+
+### D81b · Torn edge, tape and photo corners (2026-11-13)
+
+User verdict on the first pass: still "밤티" (a filter over an app, not a diary). User choice: mix
+option A (things taped and mounted) with option C (an aged, torn edge).
+
+- The sheet's paper moves to `.letter-sheet::before`, cut by a **torn edge** (SVG mask tiles
+  `--torn-*`, 520 px long so the repeat does not show). `::after` tones a **rough rim** just inside
+  it with `backdrop` at 30 % (`--rim-*`), the way old paper yellows from the edge. The sheet itself
+  is not clipped, so the seal still hangs over its corner. No border.
+- **Masking tape** (`Tape`, `.tape`): two strips on the sheet's top corners and one on each QR box
+  (delivery and phone upload). `accent` at 20 % with the ink grain, torn ends (`clip-path`). It
+  sits at most 4 px above the sheet, never over a button, `aria-hidden`, no pointer events.
+- **Photo corners** (`PhotoCorners`, `.photo-corner-*`): album corners in `ink` at 85 % on the
+  camera preview and on each photo of the review screen. Those prints are now 4 px corners
+  (`rounded-sm`), not cards. No pointer events, so a touch on a photo still works.
+- The **review screen** (4) no longer scrolls: six prints in one row on a landscape booth, 3 × 2
+  on a portrait tablet (`review-grid`). Before, 4 × 2 (landscape) and 2 × 3 (portrait) pushed
+  "이대로 좋아요" below the screen at 1280 × 800 and 820 × 1180. E2E checks 1280 × 800,
+  1920 × 1080 and 820 × 1180: every print and the button fully on screen, no scroll.
+- Not on: buttons (the welcome choices stay as they are), easy mode differences (tape and corners
+  show in both modes), frames, phone pages, the wall.
+- Figma KIOSK: every `편지지` holds a `종이 (찢긴 가장자리)` vector (paper, backdrop 18 %, ruled-line
+  tile except 1b, 10 px inside rim stroke backdrop 30 %, noise) and two `테이프` vectors; the QR
+  boxes on 8a and M1 have `테이프 · 가운데`; the camera previews (3b–3d) and the six photos of 4 have
+  `사진 모서리` vectors.
+
+## D82 · The STUDIO SHALOM letter set: frames for 1 to 6 photos
 
 User request (2026-11-13): keep improving the frames already made in the STUDIO SHALOM version, and
 add trendy photo-booth templates that are not only four-cut: one, two, three and six photos too.

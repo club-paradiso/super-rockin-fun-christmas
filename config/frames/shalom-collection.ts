@@ -2,7 +2,7 @@ import type { FrameDecoration, FrameDefinition, FrameSlot } from "@/lib/composit
 import { lockupBox } from "./shared";
 
 /**
- * STUDIO SHALOM · 편지 세트 (D81): one frame per thing you would put in an envelope — a single
+ * STUDIO SHALOM · 편지 세트 (D82): one frame per thing you would put in an envelope — a single
  * print, a postcard, a strip of film, a letter, a highlight sheet and a sheet of stamps. Each holds
  * a different number of photos (1–6), so every kiosk session of six shots can end in any of them.
  *
