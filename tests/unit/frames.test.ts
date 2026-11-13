@@ -25,6 +25,14 @@ describe("frame definitions", () => {
     expect(DEFAULT_FRAME_ID).toBe("navy-strip");
   });
 
+  it("draws the approved Matthew 5:9 verse on the STUDIO SHALOM grid", () => {
+    const frame = getFrame("shalom-grid");
+    const words = frame.decorations.flatMap((d) => (d.type === "text" ? [d.text] : []));
+    expect(words).toContain("Blessed are the peacemakers,");
+    expect(words).toContain("for they will be called children of God.");
+    expect(words).toContain("MT 5:9");
+  });
+
   it("preserves four Figma templates and adds four flexible templates", () => {
     expect(FRAMES.slice(1, 5).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],

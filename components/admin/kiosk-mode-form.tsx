@@ -7,7 +7,7 @@ import { errorText, postJson } from "./api";
 
 const OPTIONS: { mode: KioskMode; label: string; hint: string }[] = [
   { mode: "standard", label: "기본 화면", hint: "Figma 디자인 그대로" },
-  { mode: "easy", label: "쉬운 화면", hint: "큰 글씨 · 높은 대비 · 선택지 줄임 · 긴 카운트다운" },
+  { mode: "easy", label: "간편 화면", hint: "큰 글씨 · 큰 버튼 · 선택 단계 줄임" },
 ];
 
 /**

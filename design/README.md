@@ -50,7 +50,10 @@ Figma와 코드는 **자동으로 동기화되지 않는다.** Figma에서 바�
 `SHALOM`(Cormorant Garamond 500, 자간 0.04em) / 짧고 가는 구분선 / `평화의 벽`(나눔명조, 자간 0.3em,
 띄어쓰기는 보통 한 칸). 화면에서는 진짜 글자다(`components/brand.tsx`, `.brand-lockup`). 화면 글자는
 Noto Sans KR 그대로이고, 카운트다운 숫자도 Noto Sans KR 이다(Cormorant의 숫자 10은 IO처럼 보인다).
-주제 성구 표기는 `MT 5:9` 이다. 성구 본문은 아직 정하지 않았으므로 어디에도 적지 않는다.
+주제 성구는 `MT 5:9`로 표기한다. 2026-11-13 확정한 영문 본문은 다음과 같다:
+`Blessed are the peacemakers,` / `for they will be called children of God.`
+Figma 네컷 프레임의 ‘구절 있음’ 버전과 코드 `config/frames/shalom-grid.ts`에 반영한다.
+‘구절 없음’ 편집용 버전은 그대로 둔다. 키오스크는 `기본 화면 / 간편 화면`으로 명칭을 통일하고 ‘가+’ 표기는 사용하지 않는다.
 
 미디어월은 밤 장면을 그대로 두므로 자기 색을 따로 가진다: `app/globals.css` 의 `.wall-stage`
 (`--wall-*`). 다른 화면에서 쓰지 않는다.
