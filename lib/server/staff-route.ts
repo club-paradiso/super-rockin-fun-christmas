@@ -6,11 +6,12 @@ import {
   denialStatus,
   logStaffDenied,
 } from "@/lib/staff-auth/server";
+import { isSharedOperator } from "@/lib/staff-auth/shared";
 import type { StaffMember } from "@/lib/storage/types";
 import { getServerConfig } from "./env";
 import { NO_STORE, route } from "./http";
 import { RateLimiter } from "./rate-limit";
-import { isSameOrigin } from "./request";
+import { clientIp, isSameOrigin } from "./request";
 
 const staffLimiter = new RateLimiter(240, 60_000);
 
@@ -55,7 +56,12 @@ export function staffRoute<P>(
         pending,
       );
     }
-    if (!staffLimiter.take(result.staff.userId)) {
+    // Per person; the shared operator (D84) is many people, so per person-and-address there, or
+    // a few volunteers loading thumbnails would use up one another's budget.
+    const limitKey = isSharedOperator(result.staff.userId)
+      ? `${result.staff.userId}:${clientIp(request)}`
+      : result.staff.userId;
+    if (!staffLimiter.take(limitKey)) {
       return NextResponse.json({ error: "too many requests" }, { status: 429, headers: NO_STORE });
     }
     const params = (routeCtx ? await routeCtx.params : undefined) as P;

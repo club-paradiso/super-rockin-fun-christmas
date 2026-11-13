@@ -66,10 +66,6 @@ export function WallApp({
   const slotsRef = useRef(slotCount);
   // Only an enrolled venue display reports back (heartbeat, exposure log).
   const isDisplay = feed?.audience === "display";
-  const isDisplayRef = useRef(false);
-  useEffect(() => {
-    isDisplayRef.current = isDisplay;
-  }, [isDisplay]);
 
   const [lastOkAt, setLastOkAt] = useState<number | null>(null);
   const [online, setOnline] = useState(true);
