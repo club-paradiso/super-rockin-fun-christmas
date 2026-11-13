@@ -56,6 +56,20 @@ const selectFour = (frame: S, askConsent: boolean) =>
     { type: "CONFIRM_SELECTION", askConsent },
   );
 
+describe("guest-facing screen mode labels", () => {
+  it("uses plain, accurate names for both modes", () => {
+    const ko = KIOSK_COPY.ko;
+    const en = KIOSK_COPY.en;
+    expect(ko.welcome.modeGroup).toBe("화면 방식");
+    expect(ko.welcome.modeStandard).toBe("기본 화면");
+    expect(ko.welcome.modeEasy).toBe("간편 화면");
+    expect(ko.chrome.toEasy).toBe("간편 화면");
+    expect(ko.chrome.toStandard).toBe("기본 화면");
+    expect(en.welcome.modeEasy).toBe("Easy view");
+    expect(en.chrome.toEasy).toBe("Easy view");
+  });
+});
+
 describe("countdown", () => {
   it("counts 3 → 2 → 1 → capturing", () => {
     let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
