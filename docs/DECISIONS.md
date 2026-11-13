@@ -942,7 +942,8 @@ look pasted on; the booth screens look like **letter paper** so the seal belongs
 - Figma: the KIOSK page has the same sheet on every screen, the seal on 1a, 1b, 1c and 8a.
 
 Not done: the review screen (4) still scrolls on a portrait tablet (it did before; its two-column
-photos are tall). Frames and the media wall do not use the seal.
+photos are tall). The media wall does not use the seal; frames did not either until the letter
+frame (D81).
 
 ## D80 · "화면을 눌러 시작" comes back as the first screen
 
@@ -963,3 +964,47 @@ screen until the 2.0 release (#29), which replaced it with the two-choice welcom
 - E2E: `openWelcome` in `e2e/helpers.ts` taps through the attract screen; after a reset the specs
   expect `screen-attract`.
 - Figma: KIOSK `0 · 화면을 눌러 시작 (인트로 · 봉인)` in the first section, seals removed from 1a–1c.
+
+## D81 · The STUDIO SHALOM letter set: frames for 1 to 6 photos
+
+User request (2026-11-13): keep improving the frames already made in the STUDIO SHALOM version, and
+add trendy photo-booth templates that are not only four-cut: one, two, three and six photos too.
+
+- **One idea for the set: things you put in an envelope.** The booth is already a letter (D79), so
+  each new frame is a paper object of its own size, not the same strip with fewer photos. Picker
+  order: the 2×2 (D77) first, then the set by number of photos, then Template A–D. The preselected
+  frame stays the navy strip.
+
+  | id                 | 이름       | 사진 | 크기 (저장은 2배) | 모양                                                   |
+  | ------------------ | ---------- | ---- | ----------------- | ------------------------------------------------------ |
+  | `shalom-single`    | 한 장      | 1    | 600 × 750         | 종이 위 사진 한 장, 아래 가는 선과 행사·날짜 한 줄     |
+  | `shalom-postcard`  | 엽서       | 2    | 900 × 600 (가로)  | 사진 두 장 나란히, 아래 POST CARD 글과 별 우표(MT 5:9) |
+  | `shalom-film`      | 필름       | 3    | 600 × 1500        | 짙은 갈색 필름, 양옆 구멍, 사진마다 01·02·03 번호      |
+  | `shalom-letter`    | 편지       | 4    | 600 × 1800        | 가는 테두리 편지지에 네 장, 로고 옆 밀랍 봉인          |
+  | `shalom-highlight` | 하이라이트 | 5    | 600 × 1050        | 큰 사진 한 장 + 작은 사진 넷, 종이 매트                |
+  | `shalom-stamps`    | 우표       | 6    | 600 × 960         | 톱니 우표 여섯 장(No.01–06), 2열 3줄                   |
+
+- **Rules kept.** Every slot is 4:3 (preview = result), square-cornered; the lockup is below the last
+  photo, ≥ 38 % of the width and ≥ 80 px tall, centred; colours are only the five brand tokens
+  (`backdrop`, `paper`, `ink`, `button`, `accent`), no gradient, no glow. A unit test checks the
+  set uses only those colours and that no image decoration (seal, star) covers a photo.
+- **New assets.** `public/frames/shalom-lockup-paper.svg` (the same lockup in `paper`, divider in
+  `backdrop`, for the dark film), `public/frames/shalom-star-ink.svg` (the O-star alone, for the
+  postcard stamp), `public/frames/wax-seal.webp` (a copy of `public/brand/wax-seal.webp`: frame
+  assets all live under `/frames/`).
+- **The seal on a frame.** D79 kept the seal off frames. The letter frame now carries it, at the
+  foot beside the lockup, because a letter is where a seal belongs and the user's own Figma frame
+  ("10 네컷 프레임 · 구절 있음") already presses one there. The booth screens still show it only on
+  the attract and QR screens; the seal is decoration in the image, not a colour token.
+- **Type.** Canvas text is Noto Sans KR only, so the set keeps to three caption styles: 600/13
+  labels, 600/15 headings, 500/15 body (the 2×2 captions moved to the same 600/13). Figma has no
+  Noto Sans KR SemiBold; Figma "Bold" stands for code 600.
+- **Retired.** The plain strips `two-stars`, `three-moments`, `five-lights`, `six-lights` (old
+  navy/gold colours, photos floating in a 600 × 1800 strip) are gone from the picker. Their ids
+  stay in `RETIRED_FRAME_IDS`, so an upload waiting in a kiosk queue is still accepted.
+- **Wall.** Nothing new: every non-strip frame hangs as a box at the phone-card width
+  (`framedPhotoBox`, D77). The landscape postcard hangs 340 × 227.
+- Figma: SS 02 page, "편지 세트" row (`20`–`25`), at the saved 2× size, editable layers.
+
+Not verified: how the 13 px captions (26 px in the saved file) read on a real phone, and the set on
+the real media wall screen.

@@ -103,10 +103,13 @@ for (const frame of [
   "wood-window",
   "clothesline",
   "cream-strip",
-  "two-stars",
-  "three-moments",
-  "five-lights",
-  "six-lights",
+  "shalom-grid",
+  "shalom-single",
+  "shalom-postcard",
+  "shalom-film",
+  "shalom-letter",
+  "shalom-highlight",
+  "shalom-stamps",
 ]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);
