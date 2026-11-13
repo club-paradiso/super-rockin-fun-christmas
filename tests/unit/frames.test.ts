@@ -33,8 +33,19 @@ describe("frame definitions", () => {
     expect(words).toContain("MT 5:9");
   });
 
-  it("preserves four Figma templates and adds four flexible templates", () => {
-    expect(FRAMES.slice(1, 5).map((f) => [f.id, f.label])).toEqual([
+  it("follows the 2×2 with the letter set, 1 to 6 photos (D82)", () => {
+    expect(FRAMES.slice(1, 7).map((f) => [f.id, f.slots.length])).toEqual([
+      ["shalom-single", 1],
+      ["shalom-postcard", 2],
+      ["shalom-film", 3],
+      ["shalom-letter", 4],
+      ["shalom-highlight", 5],
+      ["shalom-stamps", 6],
+    ]);
+  });
+
+  it("preserves the four Figma templates A–D after the letter set", () => {
+    expect(FRAMES.slice(7).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],
       ["wood-window", "창틀"],
       ["clothesline", "빨랫줄"],
@@ -42,20 +53,38 @@ describe("frame definitions", () => {
     ]);
   });
 
-  it("provides 2 through 6 output slots", () => {
-    expect(FRAMES.slice(5).map((f) => f.id)).toEqual([
-      "two-stars",
-      "three-moments",
-      "five-lights",
-      "six-lights",
-    ]);
-    expect(new Set(FRAMES.map((f) => f.slots.length))).toEqual(new Set([2, 3, 4, 5, 6]));
+  // D82: the letter set draws with the brand tokens only, and its decorations (the wax seal,
+  // the stamp) never cover a photo.
+  it("keeps the letter set to the brand tokens, with no decoration over a photo", () => {
+    const tokens = new Set(["#DDBDA1", "#F6EEE4", "#2B1A10", "#412D1B", "#7A440E"]);
+    for (const frame of FRAMES.filter((f) => f.id.startsWith("shalom-"))) {
+      if (frame.background.type === "solid") expect(tokens).toContain(frame.background.color);
+      const firstPhoto = frame.decorations.findIndex((d) => d.type === "photo");
+      frame.decorations.forEach((d, i) => {
+        if (d.type === "rect" || d.type === "text") expect(tokens).toContain(d.color);
+        if (d.type !== "image" || i < firstPhoto) return;
+        for (const s of frame.slots) {
+          const overlap =
+            d.x < s.x + s.width &&
+            s.x < d.x + d.width &&
+            d.y < s.y + s.height &&
+            s.y < d.y + d.height;
+          expect(overlap, `${frame.id}: ${d.src}`).toBe(false);
+        }
+      });
+    }
+  });
+
+  it("provides 1 through 6 output slots", () => {
+    expect(new Set(FRAMES.map((f) => f.slots.length))).toEqual(new Set([1, 2, 3, 4, 5, 6]));
   });
 
   it("still accept retired ids on upload, so queued photos survive a deploy", () => {
     expect(isKnownFrameId("navy-strip")).toBe(true);
     expect(isKnownFrameId("starlight-strip")).toBe(true);
     expect(isKnownFrameId("village-window")).toBe(true);
+    expect(isKnownFrameId("two-stars")).toBe(true);
+    expect(isKnownFrameId("six-lights")).toBe(true);
     expect(isKnownFrameId("nope")).toBe(false);
   });
 
@@ -74,8 +103,8 @@ describe("frame definitions", () => {
   });
 
   describe.each(FRAMES.map((f) => [f.id, f] as const))("%s", (_, frame) => {
-    it("uses two to six shots without exceeding captured photos", () => {
-      expect(frame.slots.length).toBeGreaterThanOrEqual(2);
+    it("uses one to six shots without exceeding captured photos", () => {
+      expect(frame.slots.length).toBeGreaterThanOrEqual(1);
       expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
     });
 
@@ -146,9 +175,18 @@ describe("frame definitions", () => {
       }
     });
 
-    // Strips keep the Figma 600 × 1800; the STUDIO SHALOM 2×2 is 600 × 750 (4:5, D77).
+    // Strips keep the Figma 600 × 1800; the STUDIO SHALOM 2×2 is 600 × 750 (4:5, D77); the letter
+    // set has one paper size per object (D82).
     it("keeps its Figma size and square photo corners", () => {
-      const size = frame.id === "shalom-grid" ? [600, 750] : [600, 1800];
+      const sizes: Record<string, [number, number]> = {
+        "shalom-grid": [600, 750],
+        "shalom-single": [600, 750],
+        "shalom-postcard": [900, 600],
+        "shalom-film": [600, 1500],
+        "shalom-highlight": [600, 1050],
+        "shalom-stamps": [600, 960],
+      };
+      const size = sizes[frame.id] ?? [600, 1800];
       expect([frame.outputWidth, frame.outputHeight]).toEqual(size);
       for (const slot of frame.slots) expect(slot.radius ?? 0).toBe(0);
     });

@@ -313,15 +313,19 @@ describe("ordered selection", () => {
     );
     expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [5, 1, 3, 0]]);
   });
-  it("accepts a 2-slot or a 6-slot template and prevents overflow", () => {
-    let two = prepare("two-stars");
+  it("accepts a 1-slot, a 2-slot or a 6-slot template and prevents overflow", () => {
+    let one = prepare("shalom-single");
+    one = run(one, ...[3, 1].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
+    expect(one.selectedShotIndices).toEqual([3]);
+    expect(run(one, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
+    let two = prepare("shalom-postcard");
     two = run(
       two,
       ...[2, 4, 5].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
     expect(two.selectedShotIndices).toEqual([2, 4]);
     expect(run(two, { type: "CONFIRM_SELECTION", askConsent: false }).phase).toBe("delivery");
-    let six = prepare("six-lights");
+    let six = prepare("shalom-stamps");
     six = run(
       six,
       ...[5, 4, 3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),

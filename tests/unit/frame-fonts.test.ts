@@ -8,20 +8,21 @@ describe("frame fonts", () => {
     const requests = frameFontRequests(FRAMES);
     const specs = requests.map((r) => r.spec);
     expect(new Set(specs).size).toBe(specs.length);
-    // Other templates use 400/20; the Shalom grid additionally uses 400/16 for the
-    // two verse lines, 400/14 for the reference, and 500/16 for the dated caption.
+    // The four approved frames use 400/20. The STUDIO SHALOM 2×2 and the letter set (D82) keep to
+    // three caption styles: 600/13 labels, 600/15 headings, 500/15 body.
     expect([...specs].sort()).toEqual([
-      '400 14px "Noto Sans KR Variable"',
       '400 16px "Noto Sans KR Variable"',
       '400 20px "Noto Sans KR Variable"',
-      '500 16px "Noto Sans KR Variable"',
+      '500 15px "Noto Sans KR Variable"',
+      '600 13px "Noto Sans KR Variable"',
+      '600 15px "Noto Sans KR Variable"',
     ]);
     const text = (spec: string) => requests.find((r) => r.spec.startsWith(spec))!.text;
     expect(text("400 20px")).toContain("Matthew 5:9");
     expect(text("400 16px")).toContain("Blessed are the peacemakers,");
     expect(text("400 16px")).toContain("for they will be called children of God.");
-    expect(text("400 14px")).toContain("MT 5:9");
-    expect(text("500 16px")).toContain("Christmas Village 2026");
+    expect(text("600 13px")).toContain("MT 5:9");
+    expect(text("500 15px")).toContain("Christmas Village 2026");
   });
 
   it("fills the date token with the digits it will draw", () => {

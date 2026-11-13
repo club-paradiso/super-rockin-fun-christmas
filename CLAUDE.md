@@ -98,7 +98,8 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   the QR once it is real. The sheet is a faded diary page (D81): paper with 18 % backdrop, ink grain
   and accent ruled lines as SVG data URIs in `app/globals.css` (never CSS gradients); easy mode has
   no ruled lines. Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
-  `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button).
+  `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button). Of the frames, only the letter frame (`shalom-letter`,
+  D82) carries the seal.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
