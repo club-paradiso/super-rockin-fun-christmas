@@ -56,7 +56,15 @@ import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import type { KioskMode } from "@/lib/storage/types";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import { BoothScreen, BrandLockup, CameraPreview, LetterSheet, LineIcon } from "./ui";
+import {
+  BoothScreen,
+  BrandLockup,
+  CameraPreview,
+  LetterSheet,
+  LineIcon,
+  PhotoCorners,
+  Tape,
+} from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -1214,10 +1222,11 @@ function Screen(p: ScreenProps) {
             {state.shots.map((shot, i) => (
               <div key={i} className="flex flex-col gap-[1.6vh]">
                 <div
-                  className="overflow-hidden rounded-lg bg-ink/10"
+                  className="relative overflow-hidden rounded-sm bg-ink/10"
                   style={{ aspectRatio: String(aspect) }}
                   data-testid={`review-shot-${i}`}
                 >
+                  <PhotoCorners />
                   {shot && (
                     // eslint-disable-next-line @next/next/no-img-element -- local object URL
                     <img
@@ -1393,7 +1402,8 @@ function Screen(p: ScreenProps) {
               </button>
               <p className="booth-caption portrait:order-5">{t.delivery.resetSoon}</p>
             </div>
-            <div className="flex flex-col items-center gap-5 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)] portrait:order-3 portrait:p-[max(20px,2.6vh)]">
+            <div className="relative flex flex-col items-center gap-5 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)] portrait:order-3 portrait:p-[max(20px,2.6vh)]">
+              <Tape side="center" />
               <div
                 data-testid="qr-code"
                 data-url={d.url}
@@ -1566,7 +1576,8 @@ function MobileScreen({
           </p>
         )}
       </div>
-      <div className="flex flex-col items-center gap-4 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)]">
+      <div className="relative flex flex-col items-center gap-4 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)]">
+        <Tape side="center" />
         {ready ? (
           <div
             data-testid="mobile-qr"

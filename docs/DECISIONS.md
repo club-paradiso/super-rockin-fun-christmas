@@ -985,3 +985,25 @@ The brand rules stay: no new colour, no gradient, no glow, one filled button per
   a monotone noise effect, and a `color/accent` edge at 20 %.
 
 Not verified: how the grain and lines look on the real booth screen and under the venue's light.
+
+### D81b · Torn edge, tape and photo corners (2026-11-13)
+
+User verdict on the first pass: still "밤티" (a filter over an app, not a diary). User choice: mix
+option A (things taped and mounted) with option C (an aged, torn edge).
+
+- The sheet's paper moves to `.letter-sheet::before`, cut by a **torn edge** (SVG mask tiles
+  `--torn-*`, 520 px long so the repeat does not show). `::after` tones a **rough rim** just inside
+  it with `backdrop` at 30 % (`--rim-*`), the way old paper yellows from the edge. The sheet itself
+  is not clipped, so the seal still hangs over its corner. No border.
+- **Masking tape** (`Tape`, `.tape`): two strips on the sheet's top corners and one on each QR box
+  (delivery and phone upload). `accent` at 20 % with the ink grain, torn ends (`clip-path`). It
+  sits at most 4 px above the sheet, never over a button, `aria-hidden`, no pointer events.
+- **Photo corners** (`PhotoCorners`, `.photo-corner-*`): album corners in `ink` at 85 % on the
+  camera preview and on each photo of the review screen. Those prints are now 4 px corners
+  (`rounded-sm`), not cards. No pointer events, so a touch on a photo still works.
+- Not on: buttons (the welcome choices stay as they are), easy mode differences (tape and corners
+  show in both modes), frames, phone pages, the wall.
+- Figma KIOSK: every `편지지` holds a `종이 (찢긴 가장자리)` vector (paper, backdrop 18 %, ruled-line
+  tile except 1b, 10 px inside rim stroke backdrop 30 %, noise) and two `테이프` vectors; the QR
+  boxes on 8a and M1 have `테이프 · 가운데`; the camera previews (3b–3d) and the six photos of 4 have
+  `사진 모서리` vectors.

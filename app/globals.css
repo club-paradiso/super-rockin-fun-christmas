@@ -33,6 +33,16 @@
   --sheet-faded: color-mix(in srgb, var(--color-paper) 82%, var(--color-backdrop));
   --grain-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .169 0 0 0 0 .102 0 0 0 0 .063 0 0 0 -.45 .26'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E");
   --ruled-lines: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='40' viewBox='0 0 8 40' preserveAspectRatio='none'%3E%3Crect y='39' width='8' height='1' fill='%237a440e' fill-opacity='.12'/%3E%3C/svg%3E");
+  /* Mask tiles (black = keep): a torn paper edge, and the aged rim just inside it. */
+  --paper-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23000'/%3E%3C/svg%3E");
+  --torn-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='12' viewBox='0 0 520 12' preserveAspectRatio='none'%3E%3Cpath d='M0%2C4.15 L5%2C3.0 L19%2C2.5 L21%2C4.7 L22%2C6.4 L23%2C3.9 L31%2C4.3 L39%2C3.3 L40%2C6.6 L41%2C7.7 L67%2C2.4 L81%2C7.7 L102%2C6.6 L103%2C3.4 L104%2C2.3 L106%2C5.6 L121%2C4.5 L128%2C4.8 L139%2C8.0 L140%2C7.9 L156%2C5.7 L167%2C4.3 L171%2C1.6 L181%2C0.9 L188%2C6.6 L189%2C2.3 L192%2C5.5 L193%2C2.6 L197%2C2.0 L198%2C5.6 L204%2C1.6 L220%2C0.8 L230%2C8.0 L233%2C3.4 L235%2C3.1 L239%2C6.4 L243%2C1.9 L250%2C6.4 L255%2C2.1 L276%2C5.9 L284%2C6.1 L299%2C1.1 L302%2C3.2 L309%2C6.8 L316%2C4.1 L317%2C3.6 L318%2C0.8 L328%2C1.5 L342%2C7.6 L350%2C7.9 L360%2C4.3 L361%2C5.4 L362%2C1.3 L370%2C7.6 L383%2C5.1 L394%2C5.9 L397%2C6.9 L402%2C2.1 L404%2C5.7 L432%2C3.9 L434%2C2.6 L440%2C1.6 L441%2C5.8 L447%2C1.7 L462%2C1.6 L463%2C3.2 L465%2C3.6 L468%2C3.7 L477%2C2.0 L487%2C7.8 L494%2C1.1 L520%2C4.15 L520%2C12 L0%2C12 Z' fill='%23000'/%3E%3C/svg%3E");
+  --torn-bottom: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='12' viewBox='0 0 520 12' preserveAspectRatio='none'%3E%3Cpath d='M0%2C7.85 L5%2C9.0 L19%2C9.5 L21%2C7.3 L22%2C5.6 L23%2C8.1 L31%2C7.7 L39%2C8.7 L40%2C5.4 L41%2C4.3 L67%2C9.6 L81%2C4.3 L102%2C5.4 L103%2C8.6 L104%2C9.7 L106%2C6.4 L121%2C7.5 L128%2C7.2 L139%2C4.0 L140%2C4.1 L156%2C6.3 L167%2C7.7 L171%2C10.4 L181%2C11.1 L188%2C5.4 L189%2C9.7 L192%2C6.5 L193%2C9.4 L197%2C10.0 L198%2C6.4 L204%2C10.4 L220%2C11.2 L230%2C4.0 L233%2C8.6 L235%2C8.9 L239%2C5.6 L243%2C10.1 L250%2C5.6 L255%2C9.9 L276%2C6.1 L284%2C5.9 L299%2C10.9 L302%2C8.8 L309%2C5.2 L316%2C7.9 L317%2C8.4 L318%2C11.2 L328%2C10.5 L342%2C4.4 L350%2C4.1 L360%2C7.7 L361%2C6.6 L362%2C10.7 L370%2C4.4 L383%2C6.9 L394%2C6.1 L397%2C5.1 L402%2C9.9 L404%2C6.3 L432%2C8.1 L434%2C9.4 L440%2C10.4 L441%2C6.2 L447%2C10.3 L462%2C10.4 L463%2C8.8 L465%2C8.4 L468%2C8.3 L477%2C10.0 L487%2C4.2 L494%2C10.9 L520%2C7.85 L520%2C0 L0%2C0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --torn-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='520' viewBox='0 0 12 520' preserveAspectRatio='none'%3E%3Cpath d='M4.15%2C0 L3.0%2C5 L2.5%2C19 L4.7%2C21 L6.4%2C22 L3.9%2C23 L4.3%2C31 L3.3%2C39 L6.6%2C40 L7.7%2C41 L2.4%2C67 L7.7%2C81 L6.6%2C102 L3.4%2C103 L2.3%2C104 L5.6%2C106 L4.5%2C121 L4.8%2C128 L8.0%2C139 L7.9%2C140 L5.7%2C156 L4.3%2C167 L1.6%2C171 L0.9%2C181 L6.6%2C188 L2.3%2C189 L5.5%2C192 L2.6%2C193 L2.0%2C197 L5.6%2C198 L1.6%2C204 L0.8%2C220 L8.0%2C230 L3.4%2C233 L3.1%2C235 L6.4%2C239 L1.9%2C243 L6.4%2C250 L2.1%2C255 L5.9%2C276 L6.1%2C284 L1.1%2C299 L3.2%2C302 L6.8%2C309 L4.1%2C316 L3.6%2C317 L0.8%2C318 L1.5%2C328 L7.6%2C342 L7.9%2C350 L4.3%2C360 L5.4%2C361 L1.3%2C362 L7.6%2C370 L5.1%2C383 L5.9%2C394 L6.9%2C397 L2.1%2C402 L5.7%2C404 L3.9%2C432 L2.6%2C434 L1.6%2C440 L5.8%2C441 L1.7%2C447 L1.6%2C462 L3.2%2C463 L3.6%2C465 L3.7%2C468 L2.0%2C477 L7.8%2C487 L1.1%2C494 L4.15%2C520 L12%2C520 L12%2C0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --torn-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='520' viewBox='0 0 12 520' preserveAspectRatio='none'%3E%3Cpath d='M7.85%2C0 L9.0%2C5 L9.5%2C19 L7.3%2C21 L5.6%2C22 L8.1%2C23 L7.7%2C31 L8.7%2C39 L5.4%2C40 L4.3%2C41 L9.6%2C67 L4.3%2C81 L5.4%2C102 L8.6%2C103 L9.7%2C104 L6.4%2C106 L7.5%2C121 L7.2%2C128 L4.0%2C139 L4.1%2C140 L6.3%2C156 L7.7%2C167 L10.4%2C171 L11.1%2C181 L5.4%2C188 L9.7%2C189 L6.5%2C192 L9.4%2C193 L10.0%2C197 L6.4%2C198 L10.4%2C204 L11.2%2C220 L4.0%2C230 L8.6%2C233 L8.9%2C235 L5.6%2C239 L10.1%2C243 L5.6%2C250 L9.9%2C255 L6.1%2C276 L5.9%2C284 L10.9%2C299 L8.8%2C302 L5.2%2C309 L7.9%2C316 L8.4%2C317 L11.2%2C318 L10.5%2C328 L4.4%2C342 L4.1%2C350 L7.7%2C360 L6.6%2C361 L10.7%2C362 L4.4%2C370 L6.9%2C383 L6.1%2C394 L5.1%2C397 L9.9%2C402 L6.3%2C404 L8.1%2C432 L9.4%2C434 L10.4%2C440 L6.2%2C441 L10.3%2C447 L10.4%2C462 L8.8%2C463 L8.4%2C465 L8.3%2C468 L10.0%2C477 L4.2%2C487 L10.9%2C494 L7.85%2C520 L0%2C520 L0%2C0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --rim-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='28' viewBox='0 0 520 28' preserveAspectRatio='none'%3E%3Cpath d='M0%2C4.15 L5%2C3.0 L19%2C2.5 L21%2C4.7 L22%2C6.4 L23%2C3.9 L31%2C4.3 L39%2C3.3 L40%2C6.6 L41%2C7.7 L67%2C2.4 L81%2C7.7 L102%2C6.6 L103%2C3.4 L104%2C2.3 L106%2C5.6 L121%2C4.5 L128%2C4.8 L139%2C8.0 L140%2C7.9 L156%2C5.7 L167%2C4.3 L171%2C1.6 L181%2C0.9 L188%2C6.6 L189%2C2.3 L192%2C5.5 L193%2C2.6 L197%2C2.0 L198%2C5.6 L204%2C1.6 L220%2C0.8 L230%2C8.0 L233%2C3.4 L235%2C3.1 L239%2C6.4 L243%2C1.9 L250%2C6.4 L255%2C2.1 L276%2C5.9 L284%2C6.1 L299%2C1.1 L302%2C3.2 L309%2C6.8 L316%2C4.1 L317%2C3.6 L318%2C0.8 L328%2C1.5 L342%2C7.6 L350%2C7.9 L360%2C4.3 L361%2C5.4 L362%2C1.3 L370%2C7.6 L383%2C5.1 L394%2C5.9 L397%2C6.9 L402%2C2.1 L404%2C5.7 L432%2C3.9 L434%2C2.6 L440%2C1.6 L441%2C5.8 L447%2C1.7 L462%2C1.6 L463%2C3.2 L465%2C3.6 L468%2C3.7 L477%2C2.0 L487%2C7.8 L494%2C1.1 L520%2C4.15 L520%2C18.0 L520%2C18.0 L462%2C19.9 L438%2C12.1 L409%2C13.2 L352%2C23.5 L350%2C16.7 L326%2C22.9 L316%2C11.9 L313%2C18.9 L291%2C15.4 L287%2C21.9 L253%2C25.9 L246%2C22.1 L204%2C21.3 L193%2C22.0 L156%2C17.1 L121%2C10.2 L111%2C25.6 L90%2C21.6 L60%2C25.6 L47%2C13.5 L41%2C24.5 L36%2C17.3 L0%2C18.0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --rim-bottom: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='28' viewBox='0 0 520 28' preserveAspectRatio='none'%3E%3Cpath d='M0%2C23.85 L5%2C25.0 L19%2C25.5 L21%2C23.3 L22%2C21.6 L23%2C24.1 L31%2C23.7 L39%2C24.7 L40%2C21.4 L41%2C20.3 L67%2C25.6 L81%2C20.3 L102%2C21.4 L103%2C24.6 L104%2C25.7 L106%2C22.4 L121%2C23.5 L128%2C23.2 L139%2C20.0 L140%2C20.1 L156%2C22.3 L167%2C23.7 L171%2C26.4 L181%2C27.1 L188%2C21.4 L189%2C25.7 L192%2C22.5 L193%2C25.4 L197%2C26.0 L198%2C22.4 L204%2C26.4 L220%2C27.2 L230%2C20.0 L233%2C24.6 L235%2C24.9 L239%2C21.6 L243%2C26.1 L250%2C21.6 L255%2C25.9 L276%2C22.1 L284%2C21.9 L299%2C26.9 L302%2C24.8 L309%2C21.2 L316%2C23.9 L317%2C24.4 L318%2C27.2 L328%2C26.5 L342%2C20.4 L350%2C20.1 L360%2C23.7 L361%2C22.6 L362%2C26.7 L370%2C20.4 L383%2C22.9 L394%2C22.1 L397%2C21.1 L402%2C25.9 L404%2C22.3 L432%2C24.1 L434%2C25.4 L440%2C26.4 L441%2C22.2 L447%2C26.3 L462%2C26.4 L463%2C24.8 L465%2C24.4 L468%2C24.3 L477%2C26.0 L487%2C20.2 L494%2C26.9 L520%2C23.85 L520%2C10.0 L520%2C10.0 L462%2C8.100000000000001 L438%2C15.9 L409%2C14.8 L352%2C4.5 L350%2C11.3 L326%2C5.100000000000001 L316%2C16.1 L313%2C9.100000000000001 L291%2C12.6 L287%2C6.100000000000001 L253%2C2.1000000000000014 L246%2C5.899999999999999 L204%2C6.699999999999999 L193%2C6.0 L156%2C10.899999999999999 L121%2C17.8 L111%2C2.3999999999999986 L90%2C6.399999999999999 L60%2C2.3999999999999986 L47%2C14.5 L41%2C3.5 L36%2C10.7 L0%2C10.0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --rim-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='520' viewBox='0 0 28 520' preserveAspectRatio='none'%3E%3Cpath d='M4.15%2C0 L3.0%2C5 L2.5%2C19 L4.7%2C21 L6.4%2C22 L3.9%2C23 L4.3%2C31 L3.3%2C39 L6.6%2C40 L7.7%2C41 L2.4%2C67 L7.7%2C81 L6.6%2C102 L3.4%2C103 L2.3%2C104 L5.6%2C106 L4.5%2C121 L4.8%2C128 L8.0%2C139 L7.9%2C140 L5.7%2C156 L4.3%2C167 L1.6%2C171 L0.9%2C181 L6.6%2C188 L2.3%2C189 L5.5%2C192 L2.6%2C193 L2.0%2C197 L5.6%2C198 L1.6%2C204 L0.8%2C220 L8.0%2C230 L3.4%2C233 L3.1%2C235 L6.4%2C239 L1.9%2C243 L6.4%2C250 L2.1%2C255 L5.9%2C276 L6.1%2C284 L1.1%2C299 L3.2%2C302 L6.8%2C309 L4.1%2C316 L3.6%2C317 L0.8%2C318 L1.5%2C328 L7.6%2C342 L7.9%2C350 L4.3%2C360 L5.4%2C361 L1.3%2C362 L7.6%2C370 L5.1%2C383 L5.9%2C394 L6.9%2C397 L2.1%2C402 L5.7%2C404 L3.9%2C432 L2.6%2C434 L1.6%2C440 L5.8%2C441 L1.7%2C447 L1.6%2C462 L3.2%2C463 L3.6%2C465 L3.7%2C468 L2.0%2C477 L7.8%2C487 L1.1%2C494 L4.15%2C520 L18.0%2C520 L18.0%2C520 L19.9%2C462 L12.1%2C438 L13.2%2C409 L23.5%2C352 L16.7%2C350 L22.9%2C326 L11.9%2C316 L18.9%2C313 L15.4%2C291 L21.9%2C287 L25.9%2C253 L22.1%2C246 L21.3%2C204 L22.0%2C193 L17.1%2C156 L10.2%2C121 L25.6%2C111 L21.6%2C90 L25.6%2C60 L13.5%2C47 L24.5%2C41 L17.3%2C36 L18.0%2C0 Z' fill='%23000'/%3E%3C/svg%3E");
+  --rim-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='520' viewBox='0 0 28 520' preserveAspectRatio='none'%3E%3Cpath d='M23.85%2C0 L25.0%2C5 L25.5%2C19 L23.3%2C21 L21.6%2C22 L24.1%2C23 L23.7%2C31 L24.7%2C39 L21.4%2C40 L20.3%2C41 L25.6%2C67 L20.3%2C81 L21.4%2C102 L24.6%2C103 L25.7%2C104 L22.4%2C106 L23.5%2C121 L23.2%2C128 L20.0%2C139 L20.1%2C140 L22.3%2C156 L23.7%2C167 L26.4%2C171 L27.1%2C181 L21.4%2C188 L25.7%2C189 L22.5%2C192 L25.4%2C193 L26.0%2C197 L22.4%2C198 L26.4%2C204 L27.2%2C220 L20.0%2C230 L24.6%2C233 L24.9%2C235 L21.6%2C239 L26.1%2C243 L21.6%2C250 L25.9%2C255 L22.1%2C276 L21.9%2C284 L26.9%2C299 L24.8%2C302 L21.2%2C309 L23.9%2C316 L24.4%2C317 L27.2%2C318 L26.5%2C328 L20.4%2C342 L20.1%2C350 L23.7%2C360 L22.6%2C361 L26.7%2C362 L20.4%2C370 L22.9%2C383 L22.1%2C394 L21.1%2C397 L25.9%2C402 L22.3%2C404 L24.1%2C432 L25.4%2C434 L26.4%2C440 L22.2%2C441 L26.3%2C447 L26.4%2C462 L24.8%2C463 L24.4%2C465 L24.3%2C468 L26.0%2C477 L20.2%2C487 L26.9%2C494 L23.85%2C520 L10.0%2C520 L10.0%2C520 L8.100000000000001%2C462 L15.9%2C438 L14.8%2C409 L4.5%2C352 L11.3%2C350 L5.100000000000001%2C326 L16.1%2C316 L9.100000000000001%2C313 L12.6%2C291 L6.100000000000001%2C287 L2.1000000000000014%2C253 L5.899999999999999%2C246 L6.699999999999999%2C204 L6.0%2C193 L10.899999999999999%2C156 L17.8%2C121 L2.3999999999999986%2C111 L6.399999999999999%2C90 L2.3999999999999986%2C60 L14.5%2C47 L3.5%2C41 L10.7%2C36 L10.0%2C0 Z' fill='%23000'/%3E%3C/svg%3E");
 }
 
 html,
@@ -289,10 +299,33 @@ body {
   }
   /* Welcome: the two big choices. Equal size; the camera one is the filled primary. */
   /* D79: one sheet of letter paper on the backdrop; the seal is pressed on its corner. */
-  /* D81: a faded diary page. Paper toned a little toward the backdrop (ink on it 13.5:1, ink/75 6.54:1), a fine
-     ink grain and faint ruled lines (accent at 12 %). Textures are SVG data URIs, not gradients. */
+  /* D81: a faded diary page. The paper is drawn by ::before (faded tone 13.5:1 for ink, ink/75
+     6.54:1, a fine grain, faint ruled lines) and cut with a torn edge; ::after tones a rough rim
+     inside that edge with backdrop, the way old paper yellows from the outside in. Masks and
+     textures are SVG data URIs, not gradients. The sheet itself stays unclipped, so the seal can
+     still hang over its corner. */
   .letter-sheet {
-    @apply relative rounded-lg border border-accent/20;
+    @apply relative;
+    isolation: isolate;
+    margin-block: max(8px, 1vh) max(12px, 1.4vh);
+    padding: max(20px, 2.6vh) max(16px, 2.4vw);
+  }
+  .letter-sheet::before,
+  .letter-sheet::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    mask-repeat: no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+    mask-position:
+      center,
+      top left,
+      bottom left,
+      top left,
+      top right;
+  }
+  .letter-sheet::before {
     background-color: var(--sheet-faded);
     background-image: var(--grain-ink), var(--ruled-lines);
     background-size:
@@ -301,13 +334,96 @@ body {
     background-position:
       0 0,
       0 max(20px, 2.6vh);
-    margin-block: max(8px, 1vh) max(12px, 1.4vh);
-    padding: max(20px, 2.6vh) max(16px, 2.4vw);
+    mask-image:
+      var(--paper-solid), var(--torn-top), var(--torn-bottom), var(--torn-left), var(--torn-right);
+    mask-size:
+      calc(100% - 20px) calc(100% - 20px),
+      520px 12px,
+      520px 12px,
+      12px 520px,
+      12px 520px;
+  }
+  .letter-sheet::after {
+    background-color: color-mix(in srgb, var(--color-backdrop) 30%, transparent);
+    mask-image: none, var(--rim-top), var(--rim-bottom), var(--rim-left), var(--rim-right);
+    mask-size:
+      0 0,
+      520px 28px,
+      520px 28px,
+      28px 520px,
+      28px 520px;
   }
   /* Easy mode keeps the paper and grain but drops the ruled lines: less behind the big type. */
-  .kiosk-easy .letter-sheet {
+  .kiosk-easy .letter-sheet::before {
     background-image: var(--grain-ink);
     background-size: 240px 240px;
+  }
+  /* A strip of masking tape (D81): decoration only, torn ends, never over a button. */
+  .tape {
+    @apply pointer-events-none absolute z-10 select-none;
+    width: clamp(96px, 10vw, 160px);
+    height: clamp(26px, 3.2vh, 38px);
+    background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
+    clip-path: polygon(
+      0 8%,
+      4% 0,
+      96% 4%,
+      100% 14%,
+      97% 30%,
+      100% 48%,
+      96% 66%,
+      100% 84%,
+      97% 100%,
+      3% 94%,
+      0 78%,
+      3% 60%,
+      0 42%,
+      4% 24%
+    );
+  }
+  .tape-left {
+    top: -4px;
+    left: clamp(24px, 5vw, 72px);
+    transform: rotate(-5deg);
+  }
+  .tape-right {
+    top: -4px;
+    right: clamp(24px, 5vw, 72px);
+    transform: rotate(4deg);
+  }
+  .tape-center {
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+  }
+  /* Photo corners (D81): the pockets an album uses to hold a print. Decoration only. */
+  .photo-corner {
+    @apply pointer-events-none absolute z-10;
+    width: clamp(18px, 2.6vh, 32px);
+    height: clamp(18px, 2.6vh, 32px);
+    background: color-mix(in srgb, var(--color-ink) 85%, transparent);
+  }
+  .photo-corner-tl {
+    top: 0;
+    left: 0;
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+  }
+  .photo-corner-tr {
+    top: 0;
+    right: 0;
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+  }
+  .photo-corner-bl {
+    bottom: 0;
+    left: 0;
+    clip-path: polygon(0 0, 0 100%, 100% 100%);
+  }
+  .photo-corner-br {
+    bottom: 0;
+    right: 0;
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
   }
   /* The booth's desk: the same grain on the backdrop, so the sheet does not look pasted on. */
   .kiosk-desk {

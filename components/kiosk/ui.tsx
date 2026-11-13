@@ -189,9 +189,27 @@ export function LetterSheet({
 }) {
   return (
     <div className={`letter-sheet ${className}`} data-testid="letter-sheet">
+      <Tape side="left" />
+      <Tape side="right" />
       {children}
       {seal && <WaxSeal />}
     </div>
+  );
+}
+
+/** A strip of masking tape (D81). Decoration only: no text, no touch, never over a button. */
+export function Tape({ side }: { side: "left" | "right" | "center" }) {
+  return <span aria-hidden className={`tape tape-${side}`} data-testid="tape" />;
+}
+
+/** Album photo corners (D81) around a print. Decoration only. */
+export function PhotoCorners() {
+  return (
+    <>
+      {(["tl", "tr", "bl", "br"] as const).map((c) => (
+        <span key={c} aria-hidden className={`photo-corner photo-corner-${c}`} />
+      ))}
+    </>
   );
 }
 
@@ -268,7 +286,7 @@ export function CameraPreview({
 
   return (
     <div
-      className="relative w-full max-w-[min(90vw,calc(62dvh*4/3))] overflow-hidden rounded-3xl border border-ink/20 bg-ink/10"
+      className="relative w-full max-w-[min(90vw,calc(62dvh*4/3))] overflow-hidden rounded-sm border border-ink/20 bg-ink/10"
       style={{ aspectRatio: String(aspect) }}
     >
       <video
@@ -285,6 +303,7 @@ export function CameraPreview({
           {t.camera.preview}
         </div>
       )}
+      <PhotoCorners />
       {children}
     </div>
   );
