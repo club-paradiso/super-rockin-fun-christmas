@@ -25,6 +25,14 @@ describe("frame definitions", () => {
     expect(DEFAULT_FRAME_ID).toBe("navy-strip");
   });
 
+  it("draws the approved Matthew 5:9 verse on the STUDIO SHALOM grid", () => {
+    const frame = getFrame("shalom-grid");
+    const words = frame.decorations.flatMap((d) => (d.type === "text" ? [d.text] : []));
+    expect(words).toContain("Blessed are the peacemakers,");
+    expect(words).toContain("for they will be called children of God.");
+    expect(words).toContain("MT 5:9");
+  });
+
   it("follows the 2×2 with the letter set, 1 to 6 photos (D81)", () => {
     expect(FRAMES.slice(1, 7).map((f) => [f.id, f.slots.length])).toEqual([
       ["shalom-single", 1],
@@ -78,6 +86,15 @@ describe("frame definitions", () => {
     expect(isKnownFrameId("two-stars")).toBe(true);
     expect(isKnownFrameId("six-lights")).toBe(true);
     expect(isKnownFrameId("nope")).toBe(false);
+  });
+
+  it("does not embed visitor names in photo frame text", () => {
+    for (const frame of FRAMES) {
+      for (const decoration of frame.decorations) {
+        if (decoration.type !== "text") continue;
+        expect(decoration.text).not.toMatch(/\{(?:guestName|visitorName|name|이름|성함|닉네임)\}/i);
+      }
+    }
   });
 
   it("have unique ids and fall back to the default", () => {

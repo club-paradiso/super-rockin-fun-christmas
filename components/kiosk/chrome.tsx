@@ -31,7 +31,7 @@ export const useKioskCopy = (): KioskCopy => useContext(KioskChromeContext)?.t ?
 
 /**
  * Footer of every booth screen. Standard: two quiet buttons. Easy: the same two, large, high
- * contrast, with words and icons together (WCAG 2.2: target size, visible labels).
+ * contrast, with a plain, descriptive mode label (WCAG 2.2: target size, visible labels).
  */
 export function BoothFooter() {
   const chrome = useKioskChrome();
@@ -56,7 +56,6 @@ export function BoothFooter() {
         aria-pressed={easy}
         data-testid="toggle-mode"
       >
-        <span aria-hidden>{easy ? t.iconStandard : t.iconEasy}</span>{" "}
         {easy ? t.toStandard : t.toEasy}
       </button>
     </footer>

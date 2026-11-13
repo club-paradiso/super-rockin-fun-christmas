@@ -11,6 +11,7 @@ describe("frame fonts", () => {
     // The four approved frames use 400/20. The STUDIO SHALOM 2×2 and the letter set (D81) keep to
     // three caption styles: 600/13 labels, 600/15 headings, 500/15 body.
     expect([...specs].sort()).toEqual([
+      '400 16px "Noto Sans KR Variable"',
       '400 20px "Noto Sans KR Variable"',
       '500 15px "Noto Sans KR Variable"',
       '600 13px "Noto Sans KR Variable"',
@@ -18,6 +19,8 @@ describe("frame fonts", () => {
     ]);
     const text = (spec: string) => requests.find((r) => r.spec.startsWith(spec))!.text;
     expect(text("400 20px")).toContain("Matthew 5:9");
+    expect(text("400 16px")).toContain("Blessed are the peacemakers,");
+    expect(text("400 16px")).toContain("for they will be called children of God.");
     expect(text("600 13px")).toContain("MT 5:9");
     expect(text("500 15px")).toContain("Christmas Village 2026");
   });

@@ -25,7 +25,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   keeps the legible lockup rule in `tests/unit/frames.test.ts`; mirror frame changes in Figma
   (`design/README.md`).
 - **The brand is STUDIO SHALOM** (D73; lockup `STUDIO` / `SHALOM` / divider / `평화의 벽`, event
-  "Christmas Village 2026", verse reference "MT 5:9" with no verse text). Colours are the tokens in
+  "Christmas Village 2026", verse reference "MT 5:9" and approved English verse in the Shalom 2×2 frame). Colours are the tokens in
   `app/globals.css` (`backdrop`, `ink`, `button`, `button-text`/`paper`, `accent`, plus the staff
   status colours): no other brand colours, no gradients or glow, one filled button per view,
   `accent` as text only at ≥ 24 px, never `button-text` on `backdrop`. The on-screen lockup is real
