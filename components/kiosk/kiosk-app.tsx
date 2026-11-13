@@ -1331,7 +1331,8 @@ function Screen(p: ScreenProps) {
           <div className="select-head">
             <h1 className="booth-title">{t.select.title(required, total)}</h1>
             <p className="booth-lead" data-testid="select-required" data-required={required}>
-              {t.select.lead(selected.length, required)}
+              {/* "2 / 4장" stays on one line (no-break spaces): the count is one thing to read. */}
+              {t.select.lead(selected.length, required).replace(" / ", "\u00a0/\u00a0")}
             </p>
           </div>
           <div className="fit-stage">

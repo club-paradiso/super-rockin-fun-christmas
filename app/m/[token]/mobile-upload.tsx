@@ -386,12 +386,14 @@ function Steps({ phase }: { phase: Phase["name"] }) {
           : 2;
   const steps = ["사진 고르기", "확인하고 보내기", "운영팀 확인"];
   return (
-    <ol className="mt-4 flex justify-center gap-2 text-sm" aria-label="진행 단계">
+    // On a narrow phone the three steps do not fit in one row: a step moves to the next row whole
+    // (it used to break in the middle of a word).
+    <ol className="mt-4 flex flex-wrap justify-center gap-2 text-sm" aria-label="진행 단계">
       {steps.map((s, i) => (
         <li
           key={s}
           aria-current={i + 1 === current ? "step" : undefined}
-          className={`rounded-full px-3 py-1 ${
+          className={`whitespace-nowrap rounded-full px-3 py-1 ${
             i + 1 === current
               ? "bg-ink font-bold text-button-text"
               : "border border-ink/40 text-ink/75"

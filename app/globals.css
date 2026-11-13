@@ -209,6 +209,7 @@ body {
   line-height: 1.5;
   color: color-mix(in srgb, var(--color-ink) 75%, transparent);
   word-break: keep-all;
+  text-wrap: pretty;
 }
 .kiosk-easy .booth-title {
   line-height: 1.25;
@@ -547,7 +548,9 @@ body {
     gap: var(--gap-m);
     min-width: 0;
     min-height: var(--ctl-h);
-    margin-bottom: var(--gap-s);
+    /* Never less than the tape reaches above the sheet (.tape: 4 px up, plus its tilt), so the
+       tape cannot touch "이전" on a short screen. */
+    margin-bottom: max(14px, var(--gap-s));
   }
   .booth-header-left {
     display: flex;
@@ -600,8 +603,9 @@ body {
     gap: clamp(4px, 0.8 * var(--bh), 8px);
     min-width: 0;
   }
+  /* Never under 24 px: the step number is accent text (brand rule: accent as text at ≥ 24 px). */
   .booth-easy-step-label {
-    font-size: clamp(20px, min(3.2 * var(--bh), 3.4 * var(--bw)), 38px);
+    font-size: clamp(24px, min(3.2 * var(--bh), 3.4 * var(--bw)), 38px);
     font-weight: 700;
     line-height: 1.2;
     white-space: nowrap;
@@ -722,12 +726,12 @@ body {
     );
   }
   .tape-left {
-    top: -6px;
+    top: -4px;
     left: clamp(20px, 5 * var(--bw, 1vw), 72px);
     transform: rotate(-5deg);
   }
   .tape-right {
-    top: -6px;
+    top: -4px;
     right: clamp(20px, 5 * var(--bw, 1vw), 72px);
     transform: rotate(4deg);
   }
@@ -1504,6 +1508,10 @@ body {
       grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
       grid-template-areas: "stage head" "stage actions";
       gap: var(--gap-m) var(--gap-l);
+    }
+    /* "이대로 좋아요" needs less room than the two selection buttons: more for the prints. */
+    .review {
+      grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr);
     }
     .review .fit-stage,
     .select .fit-stage {
