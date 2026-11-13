@@ -10,12 +10,15 @@ import {
   shalomLetter,
   shalomHighlight,
   shalomStamps,
+  shalomTicket,
+  shalomCard,
+  shalomAdvent,
 } from "./shalom-collection";
 import { shalomGrid } from "./shalom-grid";
 
 /**
  * Picker order: the STUDIO SHALOM 2×2 first (D77), then the STUDIO SHALOM letter set by number of
- * photos, 1 to 6 (D82), then Figma order (Template A–D). The preselected frame stays the navy strip
+ * photos, 1 to 6 (D82), then the landscape ones (D83), then Figma order (Template A–D). The preselected frame stays the navy strip
  * (DEFAULT_FRAME_ID).
  */
 export const FRAMES: readonly FrameDefinition[] = [
@@ -26,6 +29,9 @@ export const FRAMES: readonly FrameDefinition[] = [
   shalomLetter,
   shalomHighlight,
   shalomStamps,
+  shalomTicket,
+  shalomCard,
+  shalomAdvent,
   navyStrip,
   woodWindow,
   clothesline,

@@ -110,6 +110,9 @@ for (const frame of [
   "shalom-letter",
   "shalom-highlight",
   "shalom-stamps",
+  "shalom-ticket",
+  "shalom-card",
+  "shalom-advent",
 ]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);

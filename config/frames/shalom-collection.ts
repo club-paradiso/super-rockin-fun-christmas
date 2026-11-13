@@ -355,3 +355,187 @@ export const shalomStamps: FrameDefinition = {
     text("Christmas Village 2026 · {date}", 300, 924, 13, SHALOM.ink, { weight: 600, spacing: 2 }),
   ],
 };
+
+// ── 가로 (D83): the same paper objects turned on their side ─────────────────────────────────
+// Landscape frames still keep the lockup below the last photo, centred, ≥ 38 % of the width, so
+// each one leaves a wide foot for it and uses the space on either side for small captions.
+
+// ── 3컷 · 티켓 — a ticket: three photos in a row, a torn line with notches, the stub below ───
+const TICKET = { width: 960, height: 470 } as const;
+const ticketBody = { x: 24, y: 24, width: 912, height: 422 };
+const TEAR_Y = 282;
+const ticketSlots = [0, 1, 2].map((i) => slot(48 + i * (832 / 3 + 16), 48, 832 / 3)); // 277.3 × 208
+const tearDashes: FrameDecoration[] = [];
+for (let x = 52; x + 8 <= ticketBody.x + ticketBody.width - 24; x += 16)
+  tearDashes.push(hairline(x, TEAR_Y - 0.75, 8, SHALOM.accent, 1.5));
+export const shalomTicket: FrameDefinition = {
+  id: "shalom-ticket",
+  name: "STUDIO SHALOM · Ticket",
+  label: "티켓",
+  labelEn: "Ticket",
+  outputWidth: TICKET.width,
+  outputHeight: TICKET.height,
+  background: { type: "solid", color: SHALOM.backdrop },
+  slots: ticketSlots,
+  decorations: [
+    { type: "rect", ...ticketBody, radius: 18, color: SHALOM.paper },
+    // Notches cut into both edges at the tear line, in the background colour.
+    ...[ticketBody.x, ticketBody.x + ticketBody.width].map((cx): FrameDecoration => ({
+      type: "rect",
+      x: cx - 16,
+      y: TEAR_Y - 16,
+      width: 32,
+      height: 32,
+      radius: 16,
+      color: SHALOM.backdrop,
+    })),
+    ...tearDashes,
+    ...ticketSlots.map((_, i): FrameDecoration => ({ type: "photo", slot: i })),
+    text("ADMIT ONE", 48, 340, 15, SHALOM.ink, { weight: 600, align: "left", spacing: 5 }),
+    hairline(48, 356, 200, SHALOM.ink),
+    text("Christmas Village 2026", 48, 384, 15, SHALOM.ink, { align: "left" }),
+    text("No. {date}", 912, 340, 15, SHALOM.ink, { weight: 600, align: "right", spacing: 2 }),
+    hairline(712, 356, 200, SHALOM.ink),
+    text("MT 5:9", 912, 384, 15, SHALOM.ink, { align: "right", spacing: 3 }),
+    {
+      type: "image",
+      src: INK_LOCKUP,
+      ...lockupBox(298, 136, TICKET.width),
+      brand: { color: SHALOM.ink, on: SHALOM.paper },
+    },
+  ],
+};
+
+// ── 4컷 · 카드 — an opened Christmas card: four photos in the middle, captions in the margins ─
+const CARD = { width: 1000, height: 720 } as const;
+const CARD_PHOTO = 300;
+const cardGridX = (CARD.width - (2 * CARD_PHOTO + 12)) / 2; // 194
+const cardSlots = [0, 1, 2, 3].map((i) =>
+  slot(cardGridX + (i % 2) * (CARD_PHOTO + 12), 40 + Math.floor(i / 2) * (225 + 12), CARD_PHOTO),
+);
+const CARD_INSET = 20;
+const leftCol = cardGridX / 2; // centre of the left margin
+const rightCol = CARD.width - cardGridX / 2;
+export const shalomCard: FrameDefinition = {
+  id: "shalom-card",
+  name: "STUDIO SHALOM · Card",
+  label: "카드",
+  labelEn: "Card",
+  outputWidth: CARD.width,
+  outputHeight: CARD.height,
+  background: { type: "solid", color: SHALOM.paper },
+  slots: cardSlots,
+  decorations: [
+    hairline(CARD_INSET, CARD_INSET, CARD.width - 2 * CARD_INSET, SHALOM.accent, 1.5),
+    hairline(
+      CARD_INSET,
+      CARD.height - CARD_INSET - 1.5,
+      CARD.width - 2 * CARD_INSET,
+      SHALOM.accent,
+      1.5,
+    ),
+    {
+      type: "rect",
+      x: CARD_INSET,
+      y: CARD_INSET,
+      width: 1.5,
+      height: CARD.height - 2 * CARD_INSET,
+      color: SHALOM.accent,
+    },
+    {
+      type: "rect",
+      x: CARD.width - CARD_INSET - 1.5,
+      y: CARD_INSET,
+      width: 1.5,
+      height: CARD.height - 2 * CARD_INSET,
+      color: SHALOM.accent,
+    },
+    ...cardSlots.map((_, i): FrameDecoration => ({ type: "photo", slot: i })),
+    // Left margin: the event, stacked. Right margin: the star, the date and the verse reference.
+    text("CHRISTMAS", leftCol, 238, 15, SHALOM.ink, { weight: 600, spacing: 5 }),
+    hairline(leftCol - 24, 256, 48, SHALOM.accent),
+    text("VILLAGE", leftCol, 284, 15, SHALOM.ink, { weight: 600, spacing: 5 }),
+    hairline(leftCol - 24, 302, 48, SHALOM.accent),
+    text("2026", leftCol, 330, 15, SHALOM.ink, { weight: 600, spacing: 5 }),
+    { type: "image", src: STAR, x: rightCol - 11.34, y: 196, width: 22.68, height: 36 },
+    text("{date}", rightCol, 284, 15, SHALOM.ink, { spacing: 1 }),
+    hairline(rightCol - 24, 302, 48, SHALOM.accent),
+    text("MT 5:9", rightCol, 330, 15, SHALOM.ink, { weight: 600, spacing: 4 }),
+    {
+      type: "image",
+      src: INK_LOCKUP,
+      ...lockupBox(548, 142, CARD.width),
+      brand: { color: SHALOM.ink, on: SHALOM.paper },
+    },
+  ],
+};
+
+// ── 6컷 · 대림절 달력 — six little doors of an Advent calendar, numbered up to Christmas ─────
+const ADV = { width: 900, height: 700 } as const;
+const DOOR_PAD = 8;
+const DOOR_FOOT = 28;
+const doorW = (ADV.width - 64 - 2 * 18) / 3; // 266.7
+const doorPhotoW = doorW - 2 * DOOR_PAD; // 250.7 × 188
+const DOOR_H = DOOR_PAD + (doorPhotoW * 3) / 4 + DOOR_FOOT; // 224
+const doors = [0, 1, 2, 3, 4, 5].map((i) => ({
+  x: 32 + (i % 3) * (doorW + 18),
+  y: 32 + Math.floor(i / 3) * (DOOR_H + 18),
+  width: doorW,
+  height: DOOR_H,
+}));
+const doorSlots = doors.map((d) => slot(d.x + DOOR_PAD, d.y + DOOR_PAD, doorPhotoW));
+const DOOR_DAYS = ["01", "06", "12", "18", "24", "25"];
+export const shalomAdvent: FrameDefinition = {
+  id: "shalom-advent",
+  name: "STUDIO SHALOM · Advent",
+  label: "대림절 달력",
+  labelEn: "Advent",
+  outputWidth: ADV.width,
+  outputHeight: ADV.height,
+  background: { type: "solid", color: SHALOM.backdrop },
+  slots: doorSlots,
+  decorations: [
+    ...doors.flatMap((d, i): FrameDecoration[] => {
+      const christmas = i === doors.length - 1;
+      const footY = d.y + d.height - 9;
+      return [
+        // The last door, Christmas Day, is the dark one.
+        { type: "rect", ...d, radius: 4, color: christmas ? SHALOM.button : SHALOM.paper },
+        { type: "photo", slot: i },
+        text(
+          `DEC ${DOOR_DAYS[i]}`,
+          d.x + DOOR_PAD,
+          footY,
+          13,
+          christmas ? SHALOM.paper : SHALOM.ink,
+          {
+            weight: 600,
+            align: "left",
+            spacing: 2,
+          },
+        ),
+        christmas
+          ? text("MERRY CHRISTMAS", d.x + d.width - DOOR_PAD, footY, 13, SHALOM.paper, {
+              weight: 600,
+              align: "right",
+              spacing: 2,
+            })
+          : text("SHALOM", d.x + d.width - DOOR_PAD, footY, 13, SHALOM.ink, {
+              weight: 600,
+              align: "right",
+              spacing: 3,
+            }),
+      ];
+    }),
+    {
+      type: "image",
+      src: INK_LOCKUP,
+      ...lockupBox(522, 128, ADV.width),
+      brand: { color: SHALOM.ink, on: SHALOM.backdrop },
+    },
+    text("Christmas Village 2026 · {date}", ADV.width / 2, 682, 13, SHALOM.ink, {
+      weight: 600,
+      spacing: 2,
+    }),
+  ],
+};
