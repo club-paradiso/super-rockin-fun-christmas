@@ -4,6 +4,7 @@ import {
   normalizeEnrollmentCode,
   generateEnrollmentCode,
 } from "@/lib/ops/enrollment-code";
+import { defaultWallLook } from "@/config/wall-themes";
 import { PhotoService } from "@/lib/storage/photo-service";
 import { newKioskRow } from "@/lib/storage/rows";
 import type { StorageBackend } from "@/lib/storage/types";
@@ -457,6 +458,103 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
         wall_force: "off",
       });
       expect(JSON.parse(last!.toState!)).toMatchObject({ wall_hours: null, wall_force: "auto" });
+    });
+
+    // D86. What an anonymous viewer of the wall address may be sent is a second, narrower rule
+    // than the wall rule, and it is decided by what the guest was told when they said yes.
+    it("public wall: only photos whose consent covered the public address, on every backend", async () => {
+      const { svc, backend, shoot, staffId, kioskId } = await setup();
+      const venue = await shoot(true);
+      const open = await shoot(false);
+      const withdrawn = await shoot(false);
+      for (const p of [open, withdrawn])
+        expect(
+          await svc.setWallConsent(p.token, true, kioskId, {
+            submissionsPaused: false,
+            publicScope: true,
+          }),
+        ).toMatchObject({ ok: true, wallConsent: true, moderationStatus: "PENDING" });
+      expect(await backend.photos.getById(venue.id)).toMatchObject({ wallPublic: false });
+      expect(await backend.photos.getById(open.id)).toMatchObject({ wallPublic: true });
+      // The scope is in the audit trail with the answer.
+      const [consentEvent] = await backend.audit.list({
+        subjectType: "photo",
+        subjectId: open.id,
+        limit: 1,
+      });
+      expect(consentEvent).toMatchObject({ action: "guest_consent_yes" });
+      expect(consentEvent!.details).toMatchObject({ wall_public: true });
+
+      // A NO takes the public scope away with the consent; a later plain YES is venue-only.
+      await svc.setWallConsent(withdrawn.token, false, kioskId);
+      expect(await backend.photos.getById(withdrawn.id)).toMatchObject({
+        wallConsent: false,
+        wallPublic: false,
+      });
+      await svc.setWallConsent(withdrawn.token, true, kioskId);
+      expect(await backend.photos.getById(withdrawn.id)).toMatchObject({
+        wallConsent: true,
+        wallPublic: false,
+      });
+
+      for (const p of [venue, open, withdrawn]) await svc.moderate(p.id, "approve", staffId);
+      // Staff actions never widen (or narrow) the scope.
+      expect(await backend.photos.getById(venue.id)).toMatchObject({ wallPublic: false });
+      expect(await backend.photos.getById(open.id)).toMatchObject({ wallPublic: true });
+
+      const ours = new Set([venue, open, withdrawn].map((p) => p.id));
+      const ids = async (publicOnly: boolean) =>
+        (await svc.wallPhotos(1000, publicOnly)).map((p) => p.id).filter((id) => ours.has(id));
+      expect((await ids(false)).sort()).toEqual([venue.id, open.id, withdrawn.id].sort());
+      expect(await ids(true)).toEqual([open.id]);
+      expect(await svc.wallImage(open.id, true)).not.toBeNull();
+      expect(await svc.wallImage(venue.id, true)).toBeNull();
+      expect(await svc.wallImage(withdrawn.id, true)).toBeNull();
+      expect(await svc.wallImage(venue.id)).not.toBeNull(); // the venue display still gets it
+
+      // Hidden and deleted leave the public wall like the venue wall.
+      await svc.moderate(open.id, "hide", staffId);
+      expect(await ids(true)).toEqual([]);
+      expect(await svc.wallImage(open.id, true)).toBeNull();
+      await svc.moderate(open.id, "unhide", staffId);
+      expect(await ids(true)).toEqual([open.id]);
+      await svc.moderate(open.id, "delete", staffId);
+      expect(await ids(true)).toEqual([]);
+      expect(await svc.wallImage(open.id, true)).toBeNull();
+    });
+
+    it("public wall switch and wall background (D85, D86): default off / default look, stored, audited", async () => {
+      const { backend, staffId } = await setup();
+      await backend.settings.update({ wallPublic: false, wallLook: defaultWallLook() }, staffId);
+      expect(await backend.settings.get()).toMatchObject({
+        wallPublic: false,
+        wallLook: defaultWallLook(),
+      });
+      const look = {
+        theme: "bethlehem",
+        rotate: true,
+        rotateMinutes: 20,
+        rotation: ["bethlehem", "winter-sea"],
+      };
+      const s = await backend.settings.update({ wallPublic: true, wallLook: look }, staffId);
+      expect(s).toMatchObject({ wallPublic: true, wallLook: look });
+      // Another setting leaves both alone.
+      expect(await backend.settings.update({ pauseWall: false }, staffId)).toMatchObject({
+        wallPublic: true,
+        wallLook: look,
+      });
+      const back = await backend.settings.update(
+        { wallPublic: false, wallLook: defaultWallLook() },
+        staffId,
+      );
+      expect(back).toMatchObject({ wallPublic: false, wallLook: defaultWallLook() });
+      const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
+      expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
+      expect(JSON.parse(last!.fromState!)).toMatchObject({ wall_public: true, wall_look: look });
+      expect(JSON.parse(last!.toState!)).toMatchObject({
+        wall_public: false,
+        wall_look: defaultWallLook(),
+      });
     });
 
     it("booth start mode (D67): defaults to standard, stored, audited, left alone otherwise", async () => {
