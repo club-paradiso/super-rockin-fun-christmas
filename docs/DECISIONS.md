@@ -1006,5 +1006,7 @@ add trendy photo-booth templates that are not only four-cut: one, two, three and
   (`framedPhotoBox`, D77). The landscape postcard hangs 340 × 227.
 - Figma: SS 02 page, "편지 세트" row (`20`–`25`), at the saved 2× size, editable layers.
 
+User decision (2026-11-13): the seal on the letter frame stays, and the six names are final.
+
 Not verified: how the 13 px captions (26 px in the saved file) read on a real phone, and the set on
 the real media wall screen.
