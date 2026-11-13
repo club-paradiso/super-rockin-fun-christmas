@@ -106,6 +106,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
 
+## The user's words
+
+- **밤티**: Korean slang for "tacky, unrefined, ugly, not good enough" (a meme from an old avatar-game
+  screenshot; its opposite in the same slang is "장원영"). "시안이 밤티" means the design still looks
+  cheap or clumsy: push the craft further, do not defend the current version.
+
 ## Layout
 
 ```
