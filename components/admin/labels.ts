@@ -1,6 +1,6 @@
 import type { ModerationAction } from "@/lib/ops/moderation";
 import type { KioskHealth } from "@/lib/ops/kiosks";
-import type { ModerationStatus } from "@/lib/storage/types";
+import type { AiReviewStatus, ModerationStatus } from "@/lib/storage/types";
 
 export const STATUS_LABEL: Record<ModerationStatus, string> = {
   NONE: "미디어월 안 띄움",
@@ -23,6 +23,25 @@ export const STATUS_TONE: Record<ModerationStatus, string> = {
   REJECTED: "bg-ink/10 text-ink",
   HIDDEN: "bg-ink/10 text-alert",
   DELETED: "bg-danger text-button-text",
+};
+
+/** AI review in staff words (D95). What the AI thinks is a hint for the person, not a decision. */
+export const AI_LABEL: Record<Exclude<AiReviewStatus, "NONE">, string> = {
+  QUEUED: "AI 확인 중",
+  SAFE: "AI: 문제없음",
+  UNSAFE: "AI 주의",
+  UNCERTAIN: "AI 판단 보류",
+  FAILED: "AI 확인 실패",
+  SKIPPED: "AI 확인 안 함",
+};
+
+export const AI_TONE: Record<Exclude<AiReviewStatus, "NONE">, string> = {
+  QUEUED: "bg-ink/10 text-ink/75",
+  SAFE: "bg-approve/15 text-approve",
+  UNSAFE: "bg-danger text-button-text",
+  UNCERTAIN: "bg-alert text-button-text",
+  FAILED: "bg-ink/10 text-alert",
+  SKIPPED: "bg-ink/10 text-ink/75",
 };
 
 export const ACTION_LABEL: Record<ModerationAction, string> = {

@@ -19,8 +19,23 @@ export async function register() {
         kioskAuth: c.kioskAuth.mode,
         publicBaseUrl: c.publicBaseUrl?.origin ?? null,
         cloud: c.cloudSync?.baseUrl.origin ?? null,
+        ai: c.aiModeration
+          ? c.aiModeration.kind === "chat"
+            ? c.aiModeration.id
+            : c.aiModeration.kind
+          : null,
       }),
     );
+    if (c.aiModerationProblem) {
+      // Not fatal on purpose: the booth and human review work without the AI (D95).
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "ai_moderation_off",
+          problem: c.aiModerationProblem,
+        }),
+      );
+    }
     if (c.role === "hub" && c.cloudSync) {
       // Copies queued while offline go out in the background (lib/cloud).
       const { startCloudSyncWorker } = await import("./lib/cloud/server");
@@ -33,6 +48,12 @@ export async function register() {
       // USB backup, if HUB_BACKUP_DIR is set (lib/ops/backup.ts).
       const { startHubBackup } = await import("./lib/ops/backup-server");
       startHubBackup();
+    }
+    if (c.role === "hub") {
+      // The AI review queue (D95) is worked from this one long-lived process. With no provider
+      // configured it only hands anything still queued back to people.
+      const { startAiReviewWorker } = await import("./lib/moderation/server");
+      startAiReviewWorker();
     }
     if (c.role === "hub") {
       // A fresh hub prints its one-time first-staff code in this console window.

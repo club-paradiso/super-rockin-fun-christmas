@@ -48,7 +48,16 @@ import {
   localizedLabel,
   type KioskCopy,
 } from "@/lib/kiosk/copy";
-import { deliverVideo, requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
+import {
+  deliverVideo,
+  fetchReviewStatus,
+  requestQr,
+  reviewLine,
+  sendWallConsent,
+  uploadOnce,
+  type ReviewLine,
+} from "@/lib/kiosk/delivery";
+import { MODERATION_CONFIG } from "@/config/moderation";
 import {
   SessionRecorder,
   browserRecorderEnv,
@@ -97,6 +106,7 @@ export function KioskApp({
   cameraMode,
   initialWallSubmissions = "open",
   initialWallPublic = false,
+  initialAiReview = false,
   staffHelp = false,
 }: {
   cameraMode: CameraMode;
@@ -104,6 +114,8 @@ export function KioskApp({
   initialWallSubmissions?: "open" | "paused";
   /** Staff have the public wall on (D86): the consent screen says so and sends that scope. */
   initialWallPublic?: boolean;
+  /** Staff have the automatic check on (D95): the consent screen says so before the answer. */
+  initialAiReview?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
 }) {
@@ -439,6 +451,11 @@ export function KioskApp({
   const [wallSubmissions, setWallSubmissions] = useState(initialWallSubmissions);
   // Public wall (D86), kept current by the heartbeat like the pause flag.
   const [wallPublic, setWallPublic] = useState(initialWallPublic);
+  // Automatic check (D95), kept current the same way.
+  const [aiReview, setAiReview] = useState(initialAiReview);
+  // The session whose guest said yes with the automatic-check notice on screen, and the line the
+  // QR screen shows for it. Any other session shows the usual line.
+  const [aiConsent, setAiConsent] = useState<{ sessionId: string; line: ReviewLine } | null>(null);
 
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
     if (result.wallSubmissions) setWallSubmissions(result.wallSubmissions);
@@ -463,7 +480,10 @@ export function KioskApp({
     let unsubscribe = () => {};
     const opened = openQueueStore();
     const consents = opened.then(
-      ({ store, consents }) => new ConsentQueue(consents, store, sendWallConsent),
+      ({ store, consents }) =>
+        new ConsentQueue(consents, store, (id, consent, scope, aiNotice) =>
+          sendWallConsent(id, consent, scope, fetch, aiNotice),
+        ),
     );
     const ready = opened.then(({ store, durable }) => {
       const queue = new UploadQueue(store, uploadOnce);
@@ -578,16 +598,47 @@ export function KioskApp({
     // The scope is what THIS consent screen showed: this handler belongs to the render the guest
     // tapped, so `wallPublic` here is whether the public-wall line was on screen (D86).
     const publicScope = consent === "yes" && wallPublic ? ("public" as const) : undefined;
+    // The same for the automatic check: only a yes given with its notice on screen (D95).
+    const aiNotice = consent === "yes" && aiReview;
+    setAiConsent(aiNotice ? { sessionId, line: "checking" } : null);
     void photoQueued(sessionId)
       .done.then(() => consentRef.current)
       .then(async (c) => {
         if (!c) return;
-        await c.enqueue(sessionId, consent === "yes", publicScope);
+        await c.enqueue(sessionId, consent === "yes", publicScope, aiNotice);
         await c.processDue(true);
         photoQueuedRef.current.delete(sessionId);
       });
     dispatch({ type: "SET_CONSENT", consent });
   };
+
+  // While this guest is on the QR screen after a yes with the automatic check (D95), ask the
+  // server how the review is going and say only what it says. It never blocks anything: the QR
+  // is already there, "다 받았어요" works, and the next guest starts a new session.
+  const reviewSession =
+    state.phase === "delivery" && aiConsent?.sessionId === state.sessionId ? state.sessionId : null;
+  useEffect(() => {
+    if (!reviewSession) return;
+    const started = Date.now();
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = async () => {
+      const status = await fetchReviewStatus(reviewSession);
+      if (stopped) return;
+      const waited = Date.now() - started;
+      const line = reviewLine(status, waited, MODERATION_CONFIG.kioskStatusDelayedMs);
+      setAiConsent((cur) => (cur?.sessionId === reviewSession ? { ...cur, line } : cur));
+      // Settled, or long enough: stop asking. The line stays as it is.
+      if (status === "approved" || status === "staff") return;
+      if (waited >= MODERATION_CONFIG.kioskStatusGiveUpMs) return;
+      timer = setTimeout(ask, MODERATION_CONFIG.kioskStatusPollMs);
+    };
+    timer = setTimeout(ask, MODERATION_CONFIG.kioskStatusPollMs);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [reviewSession]);
 
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
@@ -756,9 +807,11 @@ export function KioskApp({
           const data = (await res.json()) as {
             wallSubmissions?: "open" | "paused";
             wallPublic?: boolean;
+            aiReview?: boolean;
           };
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
+          if (typeof data.aiReview === "boolean") setAiReview(data.aiReview);
         }
       } catch {
         // Offline: the queue badge already tells staff; the next beat will retry.
@@ -821,6 +874,8 @@ export function KioskApp({
             onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
             wallSubmissionsOpen={wallSubmissions === "open"}
             wallPublic={wallPublic}
+            aiReview={aiReview}
+            reviewLine={aiConsent?.sessionId === state.sessionId ? aiConsent.line : null}
             videoNotice={canRecordVideo}
           />
         </div>
@@ -914,6 +969,10 @@ interface ScreenProps {
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
   wallPublic: boolean;
+  /** The automatic check is on (D95): the consent screen says so. */
+  aiReview: boolean;
+  /** This guest said yes with that notice: which line the QR screen shows. Null = the usual one. */
+  reviewLine: ReviewLine | null;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
   videoNotice: boolean;
 }
@@ -1363,7 +1422,12 @@ function Screen(p: ScreenProps) {
 
     case "consent":
       return (
-        <BoothScreen testId="screen-consent" progress={progress} className="consent">
+        <BoothScreen
+          testId="screen-consent"
+          progress={progress}
+          // Each notice line above the answers takes its room from the preview (app/globals.css).
+          className={`consent consent-notes-${Number(p.wallPublic) + Number(p.aiReview)}`}
+        >
           <FinalPreview finalImage={p.finalImage} frameId={state.frameId} t={t} />
           <div className="consent-body">
             <h1 className="booth-title">
@@ -1376,6 +1440,12 @@ function Screen(p: ScreenProps) {
             {p.wallPublic && (
               <p className="booth-lead" data-testid="consent-public-note">
                 {t.consent.publicNote}
+              </p>
+            )}
+            {/* D95: the outside check is said before the answer too, at the same size. */}
+            {p.aiReview && (
+              <p className="booth-lead" data-testid="consent-ai-note">
+                {t.consent.aiNote}
               </p>
             )}
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}
@@ -1420,7 +1490,14 @@ function Screen(p: ScreenProps) {
                   {state.consent === "yes" && (
                     <>
                       <br />
-                      {t.delivery.onWall}
+                      {/* D95: "on the wall" only once the server says the photo is approved. */}
+                      <span data-testid="review-line" data-review={p.reviewLine ?? "usual"}>
+                        {p.reviewLine === "checking"
+                          ? t.delivery.reviewChecking
+                          : p.reviewLine === "delayed"
+                            ? t.delivery.reviewDelayed
+                            : t.delivery.onWall}
+                      </span>
                     </>
                   )}
                 </p>

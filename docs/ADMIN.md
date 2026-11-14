@@ -208,3 +208,14 @@ npm run dev  →  http://localhost:3000/admin
 
 Tests do the same thing automatically: `e2e/staff-helpers.ts` reads the code from the Mailpit
 API, and the integration tests use the Auth admin API.
+
+## AI-assisted review (D95)
+
+`/admin` (개요) and `/admin/moderation` (검수) carry the "사진 확인 방식" card: the current mode
+(사람이 모두 확인 / 자동 확인), whether the AI service is answering, today's request count against
+the configured limit (this server's own count, labelled 추정치), and the switch. The review page
+has five sections: 검수 대기 (AI-flagged photos first), AI 주의, AI 승인, 반려, 숨김. A photo card
+shows the AI's state as a chip and, for a flagged photo, what it named, in fixed Korean; never the
+provider's text, never a score. Every staff action works on every photo regardless of what the AI
+said. Volunteer instructions: `docs/STAFF_GUIDE.md`. Design, provider, privacy, activation and
+rollback: `docs/AI_MODERATION.md`.

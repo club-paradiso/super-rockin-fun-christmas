@@ -6,7 +6,7 @@ import type { StaffPhotoView } from "@/lib/ops/admin";
 import type { ModerationAction } from "@/lib/ops/moderation";
 import { errorText, postJson } from "./api";
 import { ConfirmDialog } from "./confirm-dialog";
-import { ACTION_LABEL, STATUS_LABEL, STATUS_TONE, formatTime } from "./labels";
+import { ACTION_LABEL, AI_LABEL, AI_TONE, STATUS_LABEL, STATUS_TONE, formatTime } from "./labels";
 import { QrRecovery } from "./qr-recovery";
 
 const ACTION_STYLE: Record<ModerationAction, string> = {
@@ -119,7 +119,26 @@ export function PhotoCard({
           {photo.wallEligible && (
             <span className="admin-chip bg-approve/15 text-approve">미디어월 게시 가능</span>
           )}
+          {photo.ai && (
+            <span
+              className={`admin-chip ${AI_TONE[photo.ai.status]}`}
+              data-testid="photo-ai"
+              data-ai={photo.ai.status}
+            >
+              {photo.ai.approvedByAi ? "AI가 승인" : AI_LABEL[photo.ai.status]}
+            </span>
+          )}
         </div>
+        {/* What the AI named, in our own fixed words. A hint for the person deciding, not a fact. */}
+        {photo.ai && photo.ai.notes.length > 0 && (
+          <p
+            className={`text-base ${photo.ai.status === "UNSAFE" ? "font-semibold text-danger" : "text-ink/75"}`}
+            data-testid="photo-ai-notes"
+          >
+            {photo.ai.status === "UNSAFE" ? "AI가 본 것: " : ""}
+            {photo.ai.notes.join(" · ")}
+          </p>
+        )}
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-ink/75">
           <dt>{photo.source === "mobile" ? "접수" : "촬영"}</dt>
           <dd className="text-ink">{formatTime(photo.createdAt)}</dd>

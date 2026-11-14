@@ -1,5 +1,13 @@
 import type { VideoMime } from "@/lib/video/format";
 import type {
+  AiClaim,
+  AiCompletion,
+  AiCompletionResult,
+  AiReview,
+  AiReviewRepository,
+  AiReviewStatus,
+  AiReviewStatusView,
+  AiUsage,
   AuditEvent,
   CloudCopy,
   AuditRepository,
@@ -33,7 +41,7 @@ import type {
 } from "./types";
 import { defaultWallLook } from "@/config/wall-themes";
 import { isPublicWallEligible, isWallEligible } from "@/lib/ops/moderation";
-import { MODERATION_STATES } from "./types";
+import { AI_REVIEW_STATES, MODERATION_STATES } from "./types";
 
 /**
  * In-memory backend. Used by tests, wrapped by the local-file backend, and the reference
@@ -132,6 +140,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
       wallConsent,
       wallPublic,
       deletedAt: row.deletedAt ?? t.deletedAt ?? null,
+      ...aiAfterLeavingPending(row, t.to),
     });
     this.audit.append({
       actorType: t.actor.type,
@@ -194,6 +203,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
           (!f.kioskless || r.kioskId === null) &&
           (!f.frameId || r.frameId === f.frameId) &&
           (!f.frameIdPrefix || r.frameId.startsWith(f.frameIdPrefix)) &&
+          (!f.aiStatuses || f.aiStatuses.includes(r.ai?.status ?? "NONE")) &&
           (!f.sessionShort || r.sessionId.startsWith(f.sessionShort.toLowerCase())),
       )
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1) * (f.oldestFirst ? -1 : 1))
@@ -247,6 +257,232 @@ export class MemoryPhotoRepository implements PhotoRepository {
       }
     }
     return { byStatus, storedCount, storedBytes };
+  }
+}
+
+/** A fresh AI review record (status NONE). */
+export function emptyAiReview(): AiReview {
+  return {
+    status: "NONE",
+    attempts: 0,
+    nextAttemptAt: null,
+    claim: null,
+    claimUntil: null,
+    reason: null,
+    categories: [],
+    provider: null,
+    model: null,
+    latencyMs: null,
+    queuedAt: null,
+    reviewedAt: null,
+  };
+}
+
+/**
+ * The same rule as the `photos_guard` trigger (D95): a photo that leaves PENDING while it is
+ * still queued for the AI is out of the AI's hands. The guest took the consent back → not queued
+ * any more. Anyone else decided (approve, reject, delete) → SKIPPED, so a late AI answer finds
+ * nothing to do and can never undo a person's decision. An AI approval is not a "leaving while
+ * queued": `complete` sets the verdict in the same write.
+ */
+function aiAfterLeavingPending(
+  row: PhotoRow,
+  to: ModerationStatus,
+): { ai: AiReview } | Record<string, never> {
+  if (row.ai?.status !== "QUEUED" || row.moderationStatus !== "PENDING" || to === "PENDING")
+    return {};
+  const released = { ...row.ai, claim: null, claimUntil: null, nextAttemptAt: null };
+  return to === "NONE"
+    ? { ai: { ...released, status: "NONE", queuedAt: null } }
+    : { ai: { ...released, status: "SKIPPED", reason: "human_decided" } };
+}
+
+const emptyUsage = (day: string): AiUsage => ({
+  day,
+  requests: 0,
+  succeeded: 0,
+  failed: 0,
+  approved: 0,
+  flagged: 0,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  lastFailureReason: null,
+});
+
+/**
+ * AI review queue on the photo rows themselves. Every method is synchronous inside, which is the
+ * atomicity the SQL functions give on Supabase (`ftl_ai_*`).
+ */
+export class MemoryAiReviewRepository implements AiReviewRepository {
+  readonly usage = new Map<string, AiUsage>();
+  constructor(
+    private readonly photos: MemoryPhotoRepository,
+    private readonly settings: MemorySettingsRepository,
+    private readonly audit: MemoryAuditLog,
+  ) {}
+
+  private set(row: PhotoRow, ai: AiReview) {
+    const next = { ...row, ai, updatedAt: now() };
+    this.photos.rows.set(row.id, next);
+    return next;
+  }
+
+  private static reviewable(row: PhotoRow) {
+    return row.moderationStatus === "PENDING" && row.wallConsent && row.deletedAt === null;
+  }
+
+  async enqueue(photoId: string, nowIso: string, maxAttempts: number) {
+    const row = this.photos.rows.get(photoId);
+    if (!row || !MemoryAiReviewRepository.reviewable(row)) return false;
+    const ai = row.ai ?? emptyAiReview();
+    if (ai.status !== "NONE" || ai.attempts >= maxAttempts) return false;
+    this.set(row, {
+      ...ai,
+      status: "QUEUED",
+      nextAttemptAt: nowIso,
+      queuedAt: nowIso,
+      reason: null,
+      categories: [],
+    });
+    return true;
+  }
+
+  async claim(input: {
+    nowIso: string;
+    leaseUntilIso: string;
+    limit: number;
+    maxAttempts: number;
+    photoId?: string;
+  }): Promise<AiClaim[]> {
+    const out: AiClaim[] = [];
+    const rows = [...this.photos.rows.values()]
+      .filter((r) => !input.photoId || r.id === input.photoId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    for (const row of rows) {
+      const ai = row.ai;
+      if (ai?.status !== "QUEUED" || !MemoryAiReviewRepository.reviewable(row)) continue;
+      if (ai.claimUntil && ai.claimUntil > input.nowIso) continue;
+      if (ai.attempts >= input.maxAttempts) {
+        // Every attempt was started and none came back: stop asking, a person looks at it.
+        this.set(row, {
+          ...ai,
+          status: "FAILED",
+          reason: "interrupted",
+          claim: null,
+          claimUntil: null,
+          nextAttemptAt: null,
+          reviewedAt: input.nowIso,
+        });
+        continue;
+      }
+      if ((ai.nextAttemptAt ?? "") > input.nowIso || out.length >= input.limit) continue;
+      const claim = crypto.randomUUID();
+      const next = this.set(row, {
+        ...ai,
+        attempts: ai.attempts + 1,
+        claim,
+        claimUntil: input.leaseUntilIso,
+      });
+      out.push({ photo: { ...next }, claim });
+    }
+    return out;
+  }
+
+  async complete(c: AiCompletion): Promise<AiCompletionResult> {
+    const row = this.photos.rows.get(c.photoId);
+    const ai = row?.ai;
+    if (c.called) this.count(c);
+    if (!row || ai?.status !== "QUEUED" || ai.claim !== c.claim)
+      return { applied: false, approved: false };
+    if (c.outcome === "RETRY") {
+      this.set(row, { ...ai, claim: null, claimUntil: null, nextAttemptAt: c.nextAttemptAt });
+      return { applied: true, approved: false };
+    }
+    const done: AiReview = {
+      ...ai,
+      status: c.outcome,
+      claim: null,
+      claimUntil: null,
+      nextAttemptAt: null,
+      reason: c.reason,
+      categories: [...c.categories],
+      provider: c.provider,
+      model: c.model,
+      latencyMs: c.latencyMs,
+      reviewedAt: c.nowIso,
+    };
+    const approve =
+      c.outcome === "SAFE" &&
+      MemoryAiReviewRepository.reviewable(row) &&
+      this.settings.value.moderationMode === "auto";
+    this.photos.rows.set(row.id, {
+      ...row,
+      ai: done,
+      moderationStatus: approve ? "APPROVED" : row.moderationStatus,
+      updatedAt: now(),
+    });
+    if (approve) {
+      this.usageOf(c.day).approved++;
+      this.audit.append({
+        actorType: "system",
+        actorId: null,
+        action: "ai_approve",
+        subjectType: "photo",
+        subjectId: row.id,
+        fromState: "PENDING",
+        toState: "APPROVED",
+        details: { provider: c.provider, model: c.model },
+      });
+    } else if (c.outcome === "UNSAFE") {
+      this.audit.append({
+        actorType: "system",
+        actorId: null,
+        action: "ai_flag",
+        subjectType: "photo",
+        subjectId: row.id,
+        fromState: row.moderationStatus,
+        toState: row.moderationStatus,
+        details: { provider: c.provider, model: c.model, categories: [...c.categories] },
+      });
+    }
+    return { applied: true, approved: approve };
+  }
+
+  private usageOf(day: string) {
+    let u = this.usage.get(day);
+    if (!u) this.usage.set(day, (u = emptyUsage(day)));
+    return u;
+  }
+
+  /** The provider's answer counts for the day even when the photo moved on meanwhile. */
+  private count(c: AiCompletion) {
+    const u = this.usageOf(c.day);
+    if (c.outcome === "SAFE" || c.outcome === "UNSAFE" || c.outcome === "UNCERTAIN") {
+      u.succeeded++;
+      u.lastSuccessAt = c.nowIso;
+      if (c.outcome === "UNSAFE") u.flagged++;
+    } else if (c.outcome === "FAILED" || c.outcome === "RETRY") {
+      u.failed++;
+      u.lastFailureAt = c.nowIso;
+      u.lastFailureReason = c.reason;
+    }
+  }
+
+  async takeBudget(day: string, limit: number) {
+    const u = this.usageOf(day);
+    if (u.requests >= limit) return { allowed: false, used: u.requests };
+    u.requests++;
+    return { allowed: true, used: u.requests };
+  }
+
+  async status(day: string): Promise<AiReviewStatusView> {
+    const pending = Object.fromEntries(AI_REVIEW_STATES.map((s) => [s, 0])) as Record<
+      AiReviewStatus,
+      number
+    >;
+    for (const r of this.photos.rows.values())
+      if (MemoryAiReviewRepository.reviewable(r)) pending[r.ai?.status ?? "NONE"]++;
+    return { usage: { ...(this.usage.get(day) ?? emptyUsage(day)) }, pending };
   }
 }
 
@@ -409,6 +645,7 @@ export class MemorySettingsRepository implements SettingsRepository {
     wallForce: "auto",
     wallPublic: false,
     wallLook: defaultWallLook(),
+    moderationMode: "manual",
     updatedAt: now(),
     updatedBy: null,
   };
@@ -428,6 +665,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         wall_force: s.wallForce,
         wall_public: s.wallPublic,
         wall_look: s.wallLook,
+        moderation_mode: s.moderationMode,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
@@ -442,6 +680,7 @@ export class MemorySettingsRepository implements SettingsRepository {
       wallLook: patch.wallLook
         ? { ...patch.wallLook, rotation: [...patch.wallLook.rotation] }
         : before.wallLook,
+      moderationMode: patch.moderationMode ?? before.moderationMode,
       updatedAt: now(),
       updatedBy: staffUserId,
     };
@@ -585,18 +824,22 @@ export type MemoryBackend = StorageBackend & {
   audit: MemoryAuditLog;
   retentionRuns: MemoryRetentionRunRepository;
   wall: MemoryWallRepository;
+  aiReviews: MemoryAiReviewRepository;
 };
 
 export function createMemoryBackend(): MemoryBackend {
   const audit = new MemoryAuditLog();
   const kiosks = new MemoryKioskRepository(audit);
+  const photos = new MemoryPhotoRepository(audit);
+  const settings = new MemorySettingsRepository(audit);
   return {
     name: "memory",
-    photos: new MemoryPhotoRepository(audit),
+    photos,
+    aiReviews: new MemoryAiReviewRepository(photos, settings, audit),
     objects: new MemoryObjectStorage(),
     kiosks,
     enrollmentCodes: new MemoryEnrollmentCodeRepository(audit, kiosks),
-    settings: new MemorySettingsRepository(audit),
+    settings,
     staff: new MemoryStaffRepository(audit),
     audit,
     retentionRuns: new MemoryRetentionRunRepository(),

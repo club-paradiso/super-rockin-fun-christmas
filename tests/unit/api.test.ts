@@ -264,10 +264,13 @@ describe("wall consent", () => {
     expect(await (await send(true)).json()).toEqual({
       wallConsent: true,
       moderationStatus: "PENDING",
+      // No automatic check here (D95): a person reviews it.
+      review: "staff",
     });
     expect(await (await send(false)).json()).toEqual({
       wallConsent: false,
       moderationStatus: "NONE",
+      review: "staff",
     });
     expect((await image(token)).status).toBe(200);
   });
@@ -292,6 +295,8 @@ describe("wall consent", () => {
     expect(await (await send({ sessionId, consent: true })).json()).toEqual({
       wallConsent: true,
       moderationStatus: "PENDING",
+      // No automatic check here (D95): a person reviews it.
+      review: "staff",
     });
   });
 });
@@ -337,6 +342,7 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
     expect(await beat.json()).toEqual({
       wallSubmissions: "open",
       wallPublic: false,
+      aiReview: false,
     });
     const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;
     expect(kiosk).toMatchObject({ queueDepth: 4, cameraState: "error", enrolledVia: "code" });

@@ -5,6 +5,7 @@ import { StaffNotice } from "@/components/staff-notice";
 import { resolveCameraMode } from "@/lib/camera";
 import { authenticateKiosk } from "@/lib/kiosk-auth/server";
 import { KIOSK_COOKIE } from "@/lib/kiosk-auth/session";
+import { getAiReview } from "@/lib/moderation/server";
 import { ConfigError, getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { getBackend } from "@/lib/storage/server";
@@ -73,6 +74,7 @@ export default async function KioskPage({
       cameraMode={cameraMode}
       initialWallSubmissions={settings.pauseSubmissions ? "paused" : "open"}
       initialWallPublic={settings.wallPublic}
+      initialAiReview={await getAiReview().active()}
       staffHelp={getServerConfig().staffAuth?.mode === "pin"}
     />
   );

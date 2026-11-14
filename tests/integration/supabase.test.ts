@@ -7,6 +7,7 @@ import { PhotoService } from "@/lib/storage/photo-service";
 import { createSupabaseBackend } from "@/lib/storage/supabase-backend";
 import type { StorageBackend } from "@/lib/storage/types";
 import { JPEG, uuid } from "../helpers/images";
+import { aiReviewContract } from "../helpers/ai-contract";
 import { opsContract } from "../helpers/ops-contract";
 import { photoServiceContract } from "../helpers/photo-contract";
 
@@ -51,6 +52,9 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
     newUser: newAuthUser,
     objectExists: async (path) => !(await service().storage.from("photos").download(path)).error,
   }));
+
+  // The AI review queue (D95) through the real adapter: PostgREST, the SQL functions, the grants.
+  aiReviewContract("supabase", async () => ({ backend, staffId: (await newAuthUser()).id }));
 
   describe("kiosk registry", () => {
     it("revokes and reports unknown kiosks", async () => {
@@ -183,6 +187,7 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
       "event_settings",
       "retention_runs",
       "wall_eligible_photos",
+      "ai_usage",
     ];
 
     it.each(["anon", "authenticated"])(

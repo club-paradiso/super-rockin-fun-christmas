@@ -3,6 +3,8 @@ import { NO_STORE, jsonError } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
 import { readJson, staffRoute } from "@/lib/server/staff-route";
 import { getBackend } from "@/lib/storage/server";
+import { getServerConfig } from "@/lib/server/env";
+import { MODERATION_MODES, type ModerationMode } from "@/lib/storage/types";
 import type { SettingsPatch, WallForce } from "@/lib/storage/types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { isValidHours } from "@/lib/wall/hours";
@@ -28,7 +30,9 @@ export const GET = staffRoute("admin_settings", async () =>
  * "wallForce": "auto" | "on" | "off", "wallHours": {"start":"HH:MM","end":"HH:MM"} | null,
  * "wallPublic": boolean (D86),
  * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85),
- * "wallPace": {"showSeconds","halfLifeMinutes"} (D92; stored inside the look). Audited.
+ * "wallPace": {"showSeconds","halfLifeMinutes"} (D92; stored inside the look),
+ * "moderationMode": "manual" | "auto" (D95; "auto" is refused with 409 while no AI provider is
+ * configured on this server, so the switch can never promise a check that is not there). Audited.
  * pauseSubmissions stops NEW media-wall submissions only; photography and QR delivery continue.
  */
 export const POST = staffRoute("admin_settings_update", async (request, { staff }) => {
@@ -44,6 +48,13 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
     if (!FORCES.includes(body.wallForce as WallForce))
       return jsonError(400, "wallForce must be auto, on or off");
     patch.wallForce = body.wallForce as WallForce;
+  }
+  if (body && "moderationMode" in body) {
+    if (!MODERATION_MODES.includes(body.moderationMode as ModerationMode))
+      return jsonError(400, "moderationMode must be manual or auto");
+    if (body.moderationMode === "auto" && !getServerConfig().aiModeration)
+      return jsonError(409, "ai_not_configured");
+    patch.moderationMode = body.moderationMode as ModerationMode;
   }
   if (body && "wallHours" in body) {
     if (body.wallHours !== null && !isValidHours(body.wallHours))

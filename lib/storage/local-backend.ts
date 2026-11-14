@@ -3,6 +3,7 @@ import path from "node:path";
 import { defaultWallLook } from "@/config/wall-themes";
 import { createMemoryBackend, type MemoryBackend } from "./memory-backend";
 import type {
+  AiUsage,
   AuditEvent,
   EnrollmentCodeRow,
   EventSettings,
@@ -40,6 +41,8 @@ interface DbFile {
   /** Wall rotation (absent in files written before Phase 2-3). */
   wallExposures?: WallExposure[];
   wallShowNow?: WallShowNow[];
+  /** AI review usage by day (absent in files written before D95). */
+  aiUsage?: AiUsage[];
 }
 
 /**
@@ -100,6 +103,8 @@ class FileDb {
         // Files written before D85/D86: the default background, and a wall that is not public.
         wallPublic: db.settings.wallPublic ?? false,
         wallLook: db.settings.wallLook ?? defaultWallLook(),
+        // Files written before D95: a person approves every photo.
+        moderationMode: db.settings.moderationMode ?? "manual",
       };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);
@@ -107,6 +112,7 @@ class FileDb {
     this.mem.retentionRuns.runs.push(...(db.retentionRuns ?? []));
     for (const e of db.wallExposures ?? []) this.mem.wall.exposureRows.set(e.photoId, e);
     for (const r of db.wallShowNow ?? []) this.mem.wall.showNow.set(r.photoId, r);
+    for (const u of db.aiUsage ?? []) this.mem.aiReviews.usage.set(u.day, u);
   }
 
   private serialize(): string {
@@ -123,6 +129,8 @@ class FileDb {
       retentionRuns: m.retentionRuns.runs,
       wallExposures: [...m.wall.exposureRows.values()],
       wallShowNow: [...m.wall.showNow.values()],
+      // A month of days is plenty for the overview; older days are dropped on save.
+      aiUsage: [...m.aiReviews.usage.values()].sort((a, b) => (a.day < b.day ? -1 : 1)).slice(-31),
     };
     return JSON.stringify(db);
   }
@@ -256,6 +264,7 @@ export function createLocalBackend(rootDir: string): StorageBackend {
     audit: wrap(db, m.audit, []),
     retentionRuns: wrap(db, m.retentionRuns, ["record"]),
     wall: wrap(db, m.wall, ["requestShowNow"], ["report"]),
+    aiReviews: wrap(db, m.aiReviews, ["enqueue", "claim", "complete", "takeBudget"]),
   };
 }
 

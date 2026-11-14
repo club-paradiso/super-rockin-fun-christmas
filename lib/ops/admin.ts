@@ -1,14 +1,19 @@
 import "server-only";
 import { getFrame } from "@/config/frames";
 import { mobileBoothFrame, photoSource, type PhotoSource } from "@/config/mobile";
+import { CATEGORY_LABEL_KO, REASON_LABEL_KO, type ModerationCategory } from "@/config/moderation";
 import { getCloudSync, getHubInbox } from "@/lib/cloud/server";
+import { getAiReview } from "@/lib/moderation/server";
+import type { AiStatus } from "@/lib/moderation/service";
 import type { HubInboxStatus } from "@/lib/cloud/inbox";
 import { getServerConfig } from "@/lib/server/env";
+import { logEvent } from "@/lib/server/log";
 import { SHARED_OPERATOR, isSharedOperator } from "@/lib/staff-auth/shared";
 import { opsStatus, type OpsStatus } from "./backup-server";
 import type { CloudSyncStatus } from "@/lib/cloud/sync";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 import type {
+  AiReviewStatus,
   AuditEvent,
   EventSettings,
   KioskRow,
@@ -43,6 +48,37 @@ export interface StaffPhotoView {
   deleted: boolean;
   actions: ModerationAction[];
   canShowQrAgain: boolean;
+  /** AI review (D95), in staff words. Null = the AI was never asked about this photo. */
+  ai: StaffAiView | null;
+}
+
+/**
+ * What staff see of an AI review. `notes` are our own fixed Korean sentences for the codes the
+ * review stored; nothing a provider wrote is ever shown, and there is no score.
+ */
+export interface StaffAiView {
+  status: Exclude<AiReviewStatus, "NONE">;
+  /** This photo reached the wall on the AI's word (no person approved it). */
+  approvedByAi: boolean;
+  notes: string[];
+  reviewedAt: string | null;
+}
+
+function toStaffAiView(row: PhotoRow): StaffAiView | null {
+  const ai = row.ai;
+  if (!ai || ai.status === "NONE") return null;
+  const notes =
+    ai.status === "UNSAFE"
+      ? ai.categories.map((c) => CATEGORY_LABEL_KO[c as ModerationCategory] ?? "확인 필요")
+      : ai.status === "SAFE" || ai.status === "QUEUED" || !ai.reason
+        ? []
+        : [REASON_LABEL_KO[ai.reason] ?? "AI가 확인하지 못했어요"];
+  return {
+    status: ai.status,
+    approvedByAi: ai.status === "SAFE" && row.moderationStatus === "APPROVED",
+    notes,
+    reviewedAt: ai.reviewedAt,
+  };
 }
 
 export function toStaffPhotoView(
@@ -71,6 +107,7 @@ export function toStaffPhotoView(
     actions: availableActions(row),
     canShowQrAgain:
       photoSource(row) === "booth" && !deleted && new Date(row.retentionExpiresAt).getTime() > now,
+    ai: toStaffAiView(row),
   };
 }
 
@@ -124,6 +161,8 @@ export interface PhotoQuery {
   sessionShort?: string;
   /** Only booth or only phone photos (D66). */
   source?: PhotoSource;
+  /** Only these AI review states (D95). */
+  aiStatuses?: AiReviewStatus[];
   limit?: number;
 }
 
@@ -138,6 +177,7 @@ export async function listStaffPhotos(q: PhotoQuery): Promise<StaffPhotoView[]> 
       kioskId: q.kioskId,
       sessionShort:
         q.sessionShort && /^[0-9a-f]{4,8}$/i.test(q.sessionShort) ? q.sessionShort : undefined,
+      aiStatuses: q.aiStatuses,
       limit: Math.min(Math.max(q.limit ?? 60, 1), 200),
     }),
     kioskLabelMap(),
@@ -146,7 +186,10 @@ export async function listStaffPhotos(q: PhotoQuery): Promise<StaffPhotoView[]> 
   return q.source ? views.filter((v) => v.source === q.source) : views;
 }
 
-/** The moderation queue: consented AND pending, oldest first so nobody waits forever. */
+/**
+ * The moderation queue: consented AND pending, oldest first so nobody waits forever. Photos the
+ * AI flagged come first (D95): they are the ones most likely to need a "no".
+ */
 export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<StaffPhotoView[]> {
   const rows = await listStaffPhotos({
     statuses: ["PENDING"],
@@ -154,7 +197,79 @@ export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<St
     limit: 200,
     source,
   });
-  return rows.reverse().slice(0, limit);
+  const oldestFirst = rows.reverse();
+  const flagged = oldestFirst.filter((p) => p.ai?.status === "UNSAFE");
+  const rest = oldestFirst.filter((p) => p.ai?.status !== "UNSAFE");
+  return [...flagged, ...rest].slice(0, limit);
+}
+
+export const MODERATION_VIEWS = ["queue", "flagged", "ai-approved", "rejected", "hidden"] as const;
+export type ModerationView = (typeof MODERATION_VIEWS)[number];
+
+/** The sections of the review page other than the queue (D95). Newest first, bounded. */
+export async function moderationSection(
+  view: Exclude<ModerationView, "queue">,
+  limit = 60,
+): Promise<StaffPhotoView[]> {
+  switch (view) {
+    case "flagged":
+      return listStaffPhotos({
+        statuses: ["PENDING"],
+        wallConsent: true,
+        aiStatuses: ["UNSAFE"],
+        limit,
+      });
+    case "ai-approved":
+      return listStaffPhotos({ statuses: ["APPROVED"], aiStatuses: ["SAFE"], limit });
+    case "rejected":
+      return listStaffPhotos({ statuses: ["REJECTED"], limit });
+    case "hidden":
+      return listStaffPhotos({ statuses: ["HIDDEN"], limit });
+  }
+}
+
+export interface AiOverview extends AiStatus {
+  /** Why the AI settings on this server were refused, or null. For the technical contact. */
+  problem: string | null;
+}
+
+/**
+ * Never throws: the overview is where staff find the emergency switches, and it must open even
+ * when the AI review tables are not there yet (code deployed before its migration) or the
+ * database hiccups. The card then says the AI is unavailable and everything else works.
+ */
+export async function getAiOverview(): Promise<AiOverview> {
+  const config = getServerConfig();
+  try {
+    return { ...(await getAiReview().status()), problem: config.aiModerationProblem };
+  } catch (err) {
+    logEvent("ai_status_failed", { message: (err as Error).message.slice(0, 200) }, "warn");
+    const zero = { NONE: 0, QUEUED: 0, SAFE: 0, UNSAFE: 0, UNCERTAIN: 0, FAILED: 0, SKIPPED: 0 };
+    return {
+      configured: false,
+      provider: null,
+      model: null,
+      mode: "manual",
+      active: false,
+      dailyLimit: 0,
+      pausedUntil: null,
+      usage: {
+        day: "",
+        requests: 0,
+        succeeded: 0,
+        failed: 0,
+        approved: 0,
+        flagged: 0,
+        lastSuccessAt: null,
+        lastFailureAt: null,
+        lastFailureReason: null,
+      },
+      pending: zero,
+      problem:
+        config.aiModerationProblem ??
+        "AI review status could not be read (is migration 20261114120000_ai_review.sql applied?)",
+    };
+  }
 }
 
 export interface Overview {
@@ -180,6 +295,8 @@ export interface Overview {
   inbox: HubInboxStatus | null;
   /** Review queue split by where the photos came from (D66). */
   pendingBySource: Record<PhotoSource, number>;
+  /** AI review: mode, provider health, today's usage (D95). */
+  ai: AiOverview;
   /** What gets deleted when, as configured (shown so staff can tell guests). */
   retention:
     | { where: "cloud"; days: number }
@@ -201,7 +318,7 @@ function retentionView(): Overview["retention"] {
 /** Only measured values. Anything we cannot measure is absent, not shown as green. */
 export async function getOverview(): Promise<Overview> {
   const backend = getBackend();
-  const [stats, kiosks, lastRetention, settings, cloud, ops, pending] = await Promise.all([
+  const [stats, kiosks, lastRetention, settings, cloud, ops, pending, ai] = await Promise.all([
     getPhotoService().stats(),
     backend.kiosks.list(),
     backend.retentionRuns.latest(),
@@ -209,6 +326,7 @@ export async function getOverview(): Promise<Overview> {
     getCloudSync()?.status() ?? null,
     opsStatus(),
     getPhotoService().list({ statuses: ["PENDING"], limit: 500 }),
+    getAiOverview(),
   ]);
   const phone = pending.filter((r) => photoSource(r) === "mobile").length;
   const views = kiosks.map((k) => toStaffKioskView(k));
@@ -234,6 +352,7 @@ export async function getOverview(): Promise<Overview> {
     ops,
     inbox: getHubInbox()?.status() ?? null,
     pendingBySource: { booth: pending.length - phone, mobile: phone },
+    ai,
     retention: retentionView(),
   };
 }

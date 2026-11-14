@@ -1,6 +1,13 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
+  AiClaim,
+  AiCompletion,
+  AiCompletionResult,
+  AiReview,
+  AiReviewRepository,
+  AiReviewStatus,
+  AiReviewStatusView,
   AuditEvent,
   AuditRepository,
   AuditSubject,
@@ -30,7 +37,7 @@ import type {
   WallEligibleRow,
   WallRepository,
 } from "./types";
-import { MODERATION_STATES } from "./types";
+import { AI_REVIEW_STATES, MODERATION_STATES } from "./types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { normalizeLook } from "@/lib/wall/themes";
 import type { VideoMime } from "@/lib/video/format";
@@ -44,7 +51,32 @@ import type { VideoMime } from "@/lib/video/format";
 type Row = Record<string, unknown>;
 const iso = (v: unknown) => (v == null ? null : new Date(v as string).toISOString());
 
-const toPhoto = (r: Row): PhotoRow => ({
+/** Absent before the D95 migration, and for a photo that was never queued: no `ai` at all. */
+const toAiReview = (r: Row): AiReview | undefined => {
+  const status = r.ai_status as AiReviewStatus | undefined;
+  if (!status || (status === "NONE" && !r.ai_attempts)) return undefined;
+  return {
+    status,
+    attempts: Number(r.ai_attempts ?? 0),
+    nextAttemptAt: iso(r.ai_next_attempt_at),
+    claim: (r.ai_claim as string | null) ?? null,
+    claimUntil: iso(r.ai_claim_until),
+    reason: (r.ai_reason as string | null) ?? null,
+    categories: (r.ai_categories as string[] | null) ?? [],
+    provider: (r.ai_provider as string | null) ?? null,
+    model: (r.ai_model as string | null) ?? null,
+    latencyMs: (r.ai_latency_ms as number | null) ?? null,
+    queuedAt: iso(r.ai_queued_at),
+    reviewedAt: iso(r.ai_reviewed_at),
+  };
+};
+
+const toPhoto = (r: Row): PhotoRow => {
+  const ai = toAiReview(r);
+  return { ...toPhotoBase(r), ...(ai ? { ai } : {}) };
+};
+
+const toPhotoBase = (r: Row): PhotoRow => ({
   id: r.id as string,
   sessionId: r.session_id as string,
   kioskId: (r.kiosk_id as string | null) ?? null,
@@ -113,6 +145,8 @@ const toSettings = (r: Row): EventSettings => ({
   wallForce: (r.wall_force as EventSettings["wallForce"]) ?? "auto",
   wallPublic: (r.wall_public as boolean | null) ?? false,
   wallLook: normalizeLook(r.wall_look, WALL_THEMES, DEFAULT_WALL_THEME),
+  // Absent before the D95 migration: a person approves every photo.
+  moderationMode: r.moderation_mode === "auto" ? "auto" : "manual",
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -139,6 +173,12 @@ const toAudit = (r: Row): AuditEvent => ({
   note: (r.note as string | null) ?? null,
   details: (r.details as Record<string, unknown>) ?? {},
 });
+
+/**
+ * Row mappers, exported for the SQL-level tests (tests/helpers/pg-backend.ts), so those read the
+ * database through exactly the code the deployment uses.
+ */
+export const fromDb = { photo: toPhoto, settings: toSettings, audit: toAudit };
 
 export class SupabaseError extends Error {
   constructor(
@@ -301,6 +341,7 @@ class SupabasePhotoRepository implements PhotoRepository {
     // Frame ids are [a-z0-9-] only (database check), so the prefix holds no LIKE wildcard.
     if (f.frameIdPrefix) q = q.like("frame_id", `${f.frameIdPrefix}%`);
     if (f.sessionShort) q = q.like("session_short", `${f.sessionShort.toLowerCase()}%`);
+    if (f.aiStatuses) q = q.in("ai_status", f.aiStatuses);
     const { data, error } = await q
       .order("created_at", { ascending: !!f.oldestFirst })
       .limit(f.limit);
@@ -501,6 +542,10 @@ class SupabaseSettingsRepository implements SettingsRepository {
       p_kiosk_default_mode: null,
       p_wall_public: patch.wallPublic ?? null,
       p_wall_look: patch.wallLook ?? null,
+      // Only sent when the mode changes (D95). Every other change keeps calling the signature
+      // that exists before AND after the D95 migration, so the emergency switches work whichever
+      // of the two is deployed first.
+      ...(patch.moderationMode !== undefined ? { p_moderation_mode: patch.moderationMode } : {}),
       p_actor_id: staffUserId,
     });
     return toSettings(rows[0]!);
@@ -607,6 +652,91 @@ class SupabaseRetentionRunRepository implements RetentionRunRepository {
   }
 }
 
+/** The AI review queue (D95): every method is one SQL function, so each step is atomic. */
+class SupabaseAiReviewRepository implements AiReviewRepository {
+  constructor(private readonly db: SupabaseClient) {}
+
+  async enqueue(photoId: string, nowIso: string, maxAttempts: number) {
+    const { data, error } = await this.db.rpc("ftl_ai_enqueue", {
+      p_photo_id: photoId,
+      p_now: nowIso,
+      p_max_attempts: maxAttempts,
+    });
+    if (error) throw new SupabaseError("ftl_ai_enqueue", error);
+    return data === true;
+  }
+
+  async claim(input: {
+    nowIso: string;
+    leaseUntilIso: string;
+    limit: number;
+    maxAttempts: number;
+    photoId?: string;
+  }): Promise<AiClaim[]> {
+    const rows = await rpcRows(this.db, "ftl_ai_claim", {
+      p_now: input.nowIso,
+      p_lease_until: input.leaseUntilIso,
+      p_limit: input.limit,
+      p_max_attempts: input.maxAttempts,
+      p_photo_id: input.photoId ?? null,
+    });
+    return rows.map((r) => ({ photo: toPhoto(r), claim: r.ai_claim as string }));
+  }
+
+  async complete(c: AiCompletion): Promise<AiCompletionResult> {
+    const { data, error } = await this.db.rpc("ftl_ai_complete", {
+      p_photo_id: c.photoId,
+      p_claim: c.claim,
+      p_outcome: c.outcome,
+      p_reason: c.reason,
+      p_categories: c.categories,
+      p_provider: c.provider,
+      p_model: c.model,
+      p_latency_ms: c.latencyMs,
+      p_next_attempt_at: c.nextAttemptAt,
+      p_called: c.called,
+      p_now: c.nowIso,
+      p_day: c.day,
+    });
+    if (error) throw new SupabaseError("ftl_ai_complete", error);
+    const raw = (data ?? {}) as { applied?: boolean; approved?: boolean };
+    return { applied: raw.applied === true, approved: raw.approved === true };
+  }
+
+  async takeBudget(day: string, limit: number) {
+    const { data, error } = await this.db.rpc("ftl_ai_budget_take", {
+      p_day: day,
+      p_limit: limit,
+    });
+    if (error) throw new SupabaseError("ftl_ai_budget_take", error);
+    const raw = (data ?? {}) as { allowed?: boolean; used?: number };
+    return { allowed: raw.allowed === true, used: Number(raw.used ?? 0) };
+  }
+
+  async status(day: string): Promise<AiReviewStatusView> {
+    const { data, error } = await this.db.rpc("ftl_ai_status", { p_day: day });
+    if (error) throw new SupabaseError("ftl_ai_status", error);
+    const raw = (data ?? {}) as { usage?: Row | null; pending?: Record<string, number> };
+    const u = raw.usage ?? {};
+    return {
+      usage: {
+        day,
+        requests: Number(u.requests ?? 0),
+        succeeded: Number(u.succeeded ?? 0),
+        failed: Number(u.failed ?? 0),
+        approved: Number(u.approved ?? 0),
+        flagged: Number(u.flagged ?? 0),
+        lastSuccessAt: iso(u.last_success_at),
+        lastFailureAt: iso(u.last_failure_at),
+        lastFailureReason: (u.last_failure_reason as string | null) ?? null,
+      },
+      pending: Object.fromEntries(
+        AI_REVIEW_STATES.map((s) => [s, Number(raw.pending?.[s] ?? 0)]),
+      ) as AiReviewStatusView["pending"],
+    };
+  }
+}
+
 export function createServiceClient(opts: { url: string; serviceRoleKey: string }): SupabaseClient {
   return createClient(opts.url, opts.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -623,6 +753,7 @@ export function createSupabaseBackend(opts: {
   return {
     name: "supabase",
     photos: new SupabasePhotoRepository(db),
+    aiReviews: new SupabaseAiReviewRepository(db),
     objects: new SupabaseObjectStorage(db, opts.bucket),
     kiosks: new SupabaseKioskRepository(db),
     enrollmentCodes: new SupabaseEnrollmentCodeRepository(db),

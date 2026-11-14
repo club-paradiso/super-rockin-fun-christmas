@@ -105,6 +105,11 @@ const ko = {
     // D86, shown only while staff have the public wall on. Written by Claude (2026-11-13), not
     // yet the user's wording (D76): it has to say plainly that the wall is also on the internet.
     publicNote: "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.",
+    // D95, shown only while staff have the automatic check on. Written by Claude (2026-11-14),
+    // not yet the user's wording (D76). It has to say plainly that the photo goes to an outside
+    // service before the guest answers: a "yes" given without this line is never sent there.
+    // One line on a tablet: a second line pushed the answers down (measured, docs/STATUS.md D95).
+    aiNote: "사진은 띄우기 전에 외부 AI 서비스로 보내 확인해요.",
     finished: "완성된 사진",
     making: "사진을 만들고 있어요",
   },
@@ -112,6 +117,9 @@ const ko = {
     title: "휴대폰으로 사진을 받아 가세요",
     lead: "휴대폰 카메라로 QR을 비춰 주세요.",
     onWall: "잠시 뒤 큰 화면에서 내 사진을 찾아보세요.",
+    // D95: what the booth says while the automatic check runs. The user's wording (mission brief).
+    reviewChecking: "사진을 확인하고 있어요. 잠시만 기다려 주세요.",
+    reviewDelayed: "사진 확인이 조금 지연되고 있어요. 안전하게 확인한 뒤 화면에 표시할게요.",
     done: "다 받았어요",
     resetSoon: "잠시 뒤 처음 화면으로 돌아가요",
     qrNote: "휴대폰으로 찍으면\n사진 파일을 받을 수 있어요",
@@ -263,6 +271,7 @@ const en: KioskCopy = {
     no: "No, just for me",
     note: "Photos are deleted after a set period.\nIf you change your mind later, tell a volunteer and we’ll take it down right away.",
     publicNote: "The media wall is shown on the screen here and at its web address.",
+    aiNote: "Before it goes up, the photo is sent to an outside AI service to be checked.",
     finished: "Your finished photo",
     making: "Making your photo",
   },
@@ -270,6 +279,9 @@ const en: KioskCopy = {
     title: "Get your photo on your phone",
     lead: "Point your phone’s camera at the QR code.",
     onWall: "Look for your photo on the big screen in a little while.",
+    reviewChecking: "We are checking your photo. One moment, please.",
+    reviewDelayed:
+      "The check is taking a little longer. We will show your photo once it has been checked.",
     done: "All done",
     resetSoon: "This screen will reset in a moment",
     qrNote: "Scan it with your phone\nto download the photo",
@@ -418,6 +430,7 @@ const zh: KioskCopy = {
     no: "不用，只给我自己看",
     note: "照片会在规定期限后删除。\n放上去之后，只要告诉引导志愿者，我们会马上撤下。",
     publicNote: "媒体墙会同时显示在活动现场的屏幕和网络地址上。",
+    aiNote: "上墙之前，照片会发送到外部 AI 服务进行检查。",
     finished: "完成的照片",
     making: "正在制作照片",
   },
@@ -425,6 +438,8 @@ const zh: KioskCopy = {
     title: "请用手机领取照片",
     lead: "请用手机摄像头扫描二维码。",
     onWall: "稍后请在大屏幕上找找你的照片。",
+    reviewChecking: "正在确认照片，请稍等。",
+    reviewDelayed: "照片确认需要多一点时间。确认无误后会显示在屏幕上。",
     done: "已经领取了",
     resetSoon: "稍后会回到开头画面",
     qrNote: "用手机扫描后\n就能下载照片文件",

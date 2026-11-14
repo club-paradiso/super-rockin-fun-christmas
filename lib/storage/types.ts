@@ -20,6 +20,51 @@ export const MODERATION_STATES = [
 ] as const;
 export type ModerationStatus = (typeof MODERATION_STATES)[number];
 
+/**
+ * AI review of a photo waiting for the wall (D95). Separate from `moderationStatus`: this is what
+ * the machine thinks, that is what was decided. Only QUEUED can ever lead to an automatic
+ * approval, and only through `AiReviewRepository.complete`.
+ *
+ *   NONE       never sent to the AI (manual mode, no notice shown, or not configured)
+ *   QUEUED     waiting for the AI, or being looked at right now (a claim holds it)
+ *   SAFE       the AI found nothing; approved automatically if every other rule allowed it
+ *   UNSAFE     the AI flagged it: stays PENDING for a person, shown first
+ *   UNCERTAIN  the AI could not say: stays PENDING for a person
+ *   FAILED     the AI could not be asked (timeout, outage, bad answer): stays PENDING
+ *   SKIPPED    not asked on purpose (daily limit, switched to manual, a person decided first)
+ */
+export const AI_REVIEW_STATES = [
+  "NONE",
+  "QUEUED",
+  "SAFE",
+  "UNSAFE",
+  "UNCERTAIN",
+  "FAILED",
+  "SKIPPED",
+] as const;
+export type AiReviewStatus = (typeof AI_REVIEW_STATES)[number];
+
+/** A photo's AI review. Codes only: never the provider's free text, never image data. */
+export interface AiReview {
+  status: AiReviewStatus;
+  /** Provider requests started for this photo, ever. Bounded (config/moderation.ts). */
+  attempts: number;
+  /** QUEUED: not before this. */
+  nextAttemptAt: string | null;
+  /** QUEUED and being looked at: who holds it, and until when. Server-only. */
+  claim: string | null;
+  claimUntil: string | null;
+  /** A short code: a policy reason, or why the AI was not asked or could not answer. */
+  reason: string | null;
+  /** Policy categories the AI named (lib/moderation/policy.ts). */
+  categories: string[];
+  provider: string | null;
+  model: string | null;
+  latencyMs: number | null;
+  queuedAt: string | null;
+  reviewedAt: string | null;
+}
+
 export type PhotoMime = "image/jpeg" | "image/png";
 /** Anything the private bucket may hold: photos and their derived JPEGs, and session videos. */
 export type ObjectMime = PhotoMime | VideoMime;
@@ -72,6 +117,8 @@ export interface PhotoRow {
   updatedAt: string;
   /** Hub only: state of the QR copy in the cloud (docs/ARCHITECTURE.md 1.5). Absent elsewhere. */
   cloud?: CloudCopy;
+  /** AI review (D95). Absent = NONE: the photo was never queued for the AI. */
+  ai?: AiReview;
 }
 
 /**
@@ -129,6 +176,8 @@ export interface PhotoListFilter {
   /** Only frame ids starting with this (phone photos, framed or not: "phone-", D66/D93). */
   frameIdPrefix?: string;
   sessionShort?: string;
+  /** Only these AI review states (D95). A row without an AI review counts as NONE. */
+  aiStatuses?: AiReviewStatus[];
   /** Oldest first instead of newest first. */
   oldestFirst?: boolean;
   limit: number;
@@ -263,6 +312,9 @@ export interface WallHours {
   end: string;
 }
 
+export const MODERATION_MODES = ["manual", "auto"] as const;
+export type ModerationMode = (typeof MODERATION_MODES)[number];
+
 /** Staff override of the opening hours: follow them, or keep the wall on / off for now. */
 export type WallForce = "auto" | "on" | "off";
 
@@ -281,6 +333,12 @@ export interface EventSettings {
   wallPublic: boolean;
   /** Which background the wall shows (D85). Stored as given; read through `normalizeLook`. */
   wallLook: WallLook;
+  /**
+   * Who approves photos for the wall (D95). "manual" (default): a person, always. "auto": the AI
+   * looks first and approves only what it finds clearly fine; everything else still waits for a
+   * person. There is no mode without review.
+   */
+  moderationMode: ModerationMode;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -295,6 +353,7 @@ export type SettingsPatch = Partial<
     | "wallForce"
     | "wallPublic"
     | "wallLook"
+    | "moderationMode"
   >
 >;
 
@@ -402,8 +461,95 @@ export interface WallRepository {
   showNowQueue(): Promise<WallShowNow[]>;
 }
 
+/** A photo handed to one worker for AI review. `claim` must come back with the answer. */
+export interface AiClaim {
+  photo: PhotoRow;
+  claim: string;
+}
+
+/** What a worker reports for a claimed photo. Codes and numbers only. */
+export interface AiCompletion {
+  photoId: string;
+  claim: string;
+  /**
+   * SAFE asks for the automatic approval (granted only if the photo is still PENDING with wall
+   * consent, not deleted, and the mode is still "auto"). RETRY puts the photo back in the queue
+   * for `nextAttemptAt`. Everything else leaves the photo PENDING for a person.
+   */
+  outcome: Exclude<AiReviewStatus, "NONE" | "QUEUED"> | "RETRY";
+  reason: string | null;
+  categories: string[];
+  provider: string | null;
+  model: string | null;
+  latencyMs: number | null;
+  /** RETRY only. */
+  nextAttemptAt: string | null;
+  /** A provider request was made (counts toward the day's successes or failures). */
+  called: boolean;
+  nowIso: string;
+  /** The usage day (event time zone), "YYYY-MM-DD". */
+  day: string;
+}
+
+export interface AiCompletionResult {
+  /** False: the claim was no longer valid (a person decided, consent withdrawn, lease lost). */
+  applied: boolean;
+  /** True only when this call moved the photo PENDING → APPROVED. */
+  approved: boolean;
+}
+
+/** One day of AI requests, counted here. An estimate of the provider's own quota, not its books. */
+export interface AiUsage {
+  day: string;
+  requests: number;
+  succeeded: number;
+  failed: number;
+  approved: number;
+  flagged: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastFailureReason: string | null;
+}
+
+export interface AiReviewStatusView {
+  usage: AiUsage;
+  /** PENDING photos with wall consent, by AI review state. */
+  pending: Record<AiReviewStatus, number>;
+}
+
+/**
+ * The AI review queue (D95). The photo row is the job: durable, claimed with a lease, finished
+ * with a compare-and-set. Nothing here can approve a photo except `complete` with SAFE, and that
+ * is one atomic call that also writes the audit event.
+ */
+export interface AiReviewRepository {
+  /**
+   * NONE → QUEUED for a PENDING photo with wall consent that has attempts left. False otherwise
+   * (also when it is already queued or reviewed): the photo then simply waits for a person.
+   */
+  enqueue(photoId: string, nowIso: string, maxAttempts: number): Promise<boolean>;
+  /**
+   * Hand out due photos, each to one caller only: QUEUED, PENDING, wall consent, not deleted, no
+   * live claim. Counts the attempt. A queued photo that used up its attempts without an answer
+   * (a worker died) becomes FAILED here. `photoId`: only that photo.
+   */
+  claim(input: {
+    nowIso: string;
+    leaseUntilIso: string;
+    limit: number;
+    maxAttempts: number;
+    photoId?: string;
+  }): Promise<AiClaim[]>;
+  /** Atomic: verdict + (for SAFE) the approval and its audit event. */
+  complete(input: AiCompletion): Promise<AiCompletionResult>;
+  /** Count one provider request against the day, unless the day is already at `limit`. */
+  takeBudget(day: string, limit: number): Promise<{ allowed: boolean; used: number }>;
+  status(day: string): Promise<AiReviewStatusView>;
+}
+
 export interface StorageBackend {
   name: "memory" | "local" | "supabase";
+  aiReviews: AiReviewRepository;
   photos: PhotoRepository;
   objects: ObjectStorage;
   kiosks: KioskRepository;

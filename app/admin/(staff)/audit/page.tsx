@@ -11,6 +11,9 @@ const ACTION: Record<string, string> = {
   unhide: "다시 보이기",
   reopen: "다시 검수",
   delete: "삭제",
+  // D95: the AI's two entries. The actor is always "시스템"; a person's action is never these.
+  ai_approve: "AI 자동 승인",
+  ai_flag: "AI 주의 표시",
   retention_delete: "보관 기간 만료 삭제",
   guest_consent_yes: "방문객 미디어월 동의",
   guest_consent_no: "방문객 미디어월 거절",

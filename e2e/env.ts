@@ -21,6 +21,9 @@ export const E2E_ENV: Record<string, string> = {
   KIOSK_SESSION_SECRET: "e2e-session-secret-0123456789-abcdefghijklmnop",
   KIOSK_ENROLL_SECRET: ENROLL_SECRET,
   CRON_SECRET: "e2e-cron-secret-0123456789-abcdefghijklmnopqrstuv",
+  // Automatic check (D95): the built-in mock provider (it calls nobody and answers "safe"). The
+  // event stays in manual mode unless a spec switches it, so every other spec is unaffected.
+  AI_MODERATION_PROVIDER: "mock",
   ...(USE_SUPABASE
     ? {
         PHOTO_STORE: "supabase",

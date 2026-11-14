@@ -6,10 +6,13 @@ import { logEvent } from "@/lib/server/log";
 import { limiters } from "@/lib/server/rate-limit";
 import { isSameOrigin } from "@/lib/server/request";
 import { isUuid } from "@/lib/server/validate";
+import { requestAiReview } from "@/lib/moderation/server";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Room for one AI check after the response has gone out (lib/moderation/server.ts).
+export const maxDuration = 30;
 
 /**
  * Record the guest's media-wall choice, from the kiosk that took the photo. Independent of
@@ -20,6 +23,11 @@ export const dynamic = "force-dynamic";
  * "scope":"public" when the booth showed the guest the public-wall notice (D86). That scope is
  * recorded only if the public wall is switched on right now; otherwise the consent is for the
  * venue wall alone.
+ *
+ * "aiNotice": true when the booth showed the guest the automatic-check notice (D95). Only then,
+ * and only while staff have the event in "auto" mode, is the photo queued for the AI; the answer
+ * says which: "review": "ai" | "staff". Either way the photo is PENDING and private. A failure to
+ * queue is not an error: the photo simply waits for a person.
  */
 export const POST = route("consent", async (request: Request) => {
   const config = getServerConfig();
@@ -38,11 +46,12 @@ export const POST = route("consent", async (request: Request) => {
   } catch {
     return jsonError(400, "invalid json");
   }
-  const { token, sessionId, consent, scope } = (body ?? {}) as {
+  const { token, sessionId, consent, scope, aiNotice } = (body ?? {}) as {
     token?: unknown;
     sessionId?: unknown;
     consent?: unknown;
     scope?: unknown;
+    aiNotice?: unknown;
   };
   if (typeof consent !== "boolean" || (typeof token !== "string" && !isUuid(sessionId))) {
     return jsonError(400, "consent and a sessionId or token are required");
@@ -61,9 +70,23 @@ export const POST = route("consent", async (request: Request) => {
     if (result.reason === "paused") return jsonError(409, "wall submissions paused");
     return jsonError(404, "not found");
   }
-  logEvent("wall_consent", { kioskId: auth.kioskId, consent, moderation: result.moderationStatus });
+  // The automatic check (D95): only for a YES given with the notice on screen. Never fatal.
+  let review: "ai" | "staff" = "staff";
+  if (consent && aiNotice === true && result.moderationStatus === "PENDING") {
+    const queued = await requestAiReview(result.photoId).catch((err: Error) => {
+      logEvent("ai_review_error", { photoId: result.photoId, message: err.message }, "warn");
+      return false;
+    });
+    if (queued) review = "ai";
+  }
+  logEvent("wall_consent", {
+    kioskId: auth.kioskId,
+    consent,
+    moderation: result.moderationStatus,
+    review,
+  });
   return NextResponse.json(
-    { wallConsent: result.wallConsent, moderationStatus: result.moderationStatus },
+    { wallConsent: result.wallConsent, moderationStatus: result.moderationStatus, review },
     { headers: NO_STORE },
   );
 });

@@ -72,7 +72,32 @@ export interface ServerConfig {
    * configured (the overview says so).
    */
   hubOps: { backupDir: string | null; backupMinutes: number; diskWarnBytes: number } | null;
+  /**
+   * AI review provider (D95). Null = none: every photo waits for a person, and nothing is sent
+   * anywhere. A mistake in these settings never stops the booth: it turns the AI off and
+   * `aiModerationProblem` says why (shown on /admin).
+   */
+  aiModeration: AiModerationConfig | null;
+  aiModerationProblem: string | null;
 }
+
+export type AiModerationConfig = {
+  /** Provider requests per day, counted locally; past it photos wait for a person. */
+  dailyLimit: number;
+  timeoutMs: number;
+} & (
+  | {
+      /** An OpenAI-style chat/completions endpoint with a vision model. */
+      kind: "chat";
+      /** Stored with each review: "cloudflare", or "openai-compatible". */
+      id: string;
+      baseUrl: URL;
+      apiKey: string;
+      model: string;
+    }
+  | { kind: "gemini"; apiKey: string; model: string }
+  | { kind: "mock"; behaviour: "safe" | "unsafe" | "unsure" | "fail" | "slow" }
+);
 
 export class ConfigError extends Error {
   constructor(readonly problems: string[]) {
@@ -332,6 +357,8 @@ export function parseServerConfig(env: Env): ServerConfig {
     problems.push("HUB_BACKUP_DIR is for the hub (FTL_ROLE=hub) only");
   }
 
+  const ai = parseAiModeration(env, strict);
+
   if (problems.length) throw new ConfigError(problems);
 
   return {
@@ -355,7 +382,107 @@ export function parseServerConfig(env: Env): ServerConfig {
     hubSyncSecret: role === "cloud" ? syncSecret : null,
     hubRetention,
     hubOps,
+    aiModeration: ai.config,
+    aiModerationProblem: ai.problem,
   };
+}
+
+/**
+ * AI review settings (D95). Unlike the rest of this file a problem here is not a ConfigError:
+ * photography, QR delivery and human review must keep working when the AI settings are wrong, so
+ * a bad value switches the AI off and is reported, never thrown.
+ *
+ *   AI_MODERATION_PROVIDER   cloudflare | openai-compatible | gemini | mock   (unset = off)
+ *   AI_MODERATION_API_KEY    server-only; never NEXT_PUBLIC_
+ *   AI_MODERATION_MODEL      the provider's model id (required; gemini has a default)
+ *   AI_MODERATION_ACCOUNT_ID cloudflare only: the account that owns the Workers AI token
+ *   AI_MODERATION_BASE_URL   openai-compatible only: https root that has /chat/completions
+ *   AI_MODERATION_DAILY_LIMIT, AI_MODERATION_TIMEOUT_MS
+ *   AI_MODERATION_PAID_TIER_CONFIRMED=1   gemini only (see below)
+ */
+function parseAiModeration(
+  env: Env,
+  strict: boolean,
+): { config: AiModerationConfig | null; problem: string | null } {
+  const provider = env.AI_MODERATION_PROVIDER?.trim().toLowerCase();
+  if (!provider) return { config: null, problem: null };
+  const off = (problem: string) => ({ config: null, problem });
+
+  const num = (key: string, fallback: number, min: number, max: number) => {
+    const raw = env[key]?.trim();
+    if (!raw) return fallback;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= min && n <= max ? n : null;
+  };
+  const dailyLimit = num("AI_MODERATION_DAILY_LIMIT", 300, 1, 100_000);
+  if (dailyLimit === null)
+    return off("AI_MODERATION_DAILY_LIMIT must be a whole number from 1 to 100000");
+  // Under Vercel's shortest function limit (10 s) with room for the database calls around it.
+  const timeoutMs = num("AI_MODERATION_TIMEOUT_MS", 8000, 1000, 25_000);
+  if (timeoutMs === null)
+    return off("AI_MODERATION_TIMEOUT_MS must be a whole number from 1000 to 25000");
+  const base = { dailyLimit, timeoutMs };
+
+  if (!["cloudflare", "openai-compatible", "gemini", "mock"].includes(provider))
+    return off(
+      `AI_MODERATION_PROVIDER must be cloudflare, openai-compatible, gemini or mock (got "${provider.slice(0, 40)}")`,
+    );
+
+  if (provider === "mock") {
+    // Approves without looking at anything: never on a real deployment.
+    if (strict) return off("AI_MODERATION_PROVIDER=mock is for development and tests only");
+    const behaviour = env.AI_MODERATION_MOCK?.trim() || "safe";
+    if (!["safe", "unsafe", "unsure", "fail", "slow"].includes(behaviour))
+      return off("AI_MODERATION_MOCK must be safe, unsafe, unsure, fail or slow");
+    return {
+      config: { ...base, kind: "mock", behaviour: behaviour as "safe" },
+      problem: null,
+    };
+  }
+
+  const apiKey = env.AI_MODERATION_API_KEY?.trim();
+  if (!apiKey) return off("AI_MODERATION_API_KEY is missing");
+  const model = env.AI_MODERATION_MODEL?.trim();
+  if (model && !/^[\w@./:-]{1,120}$/.test(model))
+    return off("AI_MODERATION_MODEL has characters a model id cannot have");
+
+  if (provider === "gemini") {
+    // Google's unpaid tier may use submitted content to improve its products, with human
+    // reviewers: not acceptable for guests' photos. The API cannot tell us which tier a key is
+    // on, so the operator has to say so, in writing, here.
+    if (env.AI_MODERATION_PAID_TIER_CONFIRMED !== "1")
+      return off(
+        "Gemini is allowed on the paid tier only: enable billing for the key's project, then set AI_MODERATION_PAID_TIER_CONFIRMED=1",
+      );
+    return {
+      config: { ...base, kind: "gemini", apiKey, model: model || "gemini-3.5-flash-lite" },
+      problem: null,
+    };
+  }
+
+  // cloudflare, or any other OpenAI-style chat/completions endpoint.
+  if (!model) return off("AI_MODERATION_MODEL is required (the provider's vision model id)");
+  let rawBase: string;
+  if (provider === "cloudflare") {
+    const account = env.AI_MODERATION_ACCOUNT_ID?.trim();
+    if (!account || !/^[0-9a-f]{32}$/i.test(account))
+      return off("AI_MODERATION_ACCOUNT_ID must be the 32-character Cloudflare account id");
+    rawBase = `https://api.cloudflare.com/client/v4/accounts/${account}/ai/v1`;
+  } else {
+    rawBase = env.AI_MODERATION_BASE_URL?.trim() ?? "";
+  }
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(rawBase);
+  } catch {
+    return off("AI_MODERATION_BASE_URL is not a valid URL");
+  }
+  // Photos travel in the request: never over plain HTTP, never to a private address by typo.
+  if (baseUrl.protocol !== "https:" || baseUrl.search || baseUrl.hash || baseUrl.username)
+    return off("AI_MODERATION_BASE_URL must be a plain https URL");
+  if (strict && isPrivateHost(baseUrl.hostname))
+    return off("AI_MODERATION_BASE_URL points at a private/local host");
+  return { config: { ...base, kind: "chat", id: provider, baseUrl, apiKey, model }, problem: null };
 }
 
 /**

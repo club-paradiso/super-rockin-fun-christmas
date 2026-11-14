@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   deliverVideo,
+  fetchReviewStatus,
   requestQr,
+  reviewLine,
   sendWallConsent,
   uploadOnce,
   uploadVideoOnce,
@@ -185,5 +187,60 @@ describe("session video delivery (D72): best-effort, never queued", () => {
     );
     expect(later).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("automatic check (D95): what the booth sends and says", () => {
+  it("sends aiNotice only with a yes given while the notice was on screen", async () => {
+    const bodies: unknown[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init!.body)));
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    await sendWallConsent("s-1", true, undefined, fetchImpl, true);
+    await sendWallConsent("s-2", true, "public", fetchImpl, true);
+    await sendWallConsent("s-3", true, undefined, fetchImpl, false);
+    await sendWallConsent("s-4", true, undefined, fetchImpl);
+    await sendWallConsent("s-5", false, undefined, fetchImpl, true);
+    expect(bodies).toEqual([
+      { sessionId: "s-1", consent: true, aiNotice: true },
+      { sessionId: "s-2", consent: true, scope: "public", aiNotice: true },
+      { sessionId: "s-3", consent: true },
+      { sessionId: "s-4", consent: true },
+      { sessionId: "s-5", consent: false },
+    ]);
+  });
+
+  it("reads the review status, and treats every failure as 'ask again'", async () => {
+    const answer = (status: number, body: unknown) =>
+      vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+    for (const review of ["checking", "approved", "staff", "none"])
+      expect(await fetchReviewStatus("s", answer(200, { review }))).toBe(review);
+    expect(await fetchReviewStatus("s", answer(200, { review: "flagged" }))).toBeNull();
+    expect(await fetchReviewStatus("s", answer(200, {}))).toBeNull();
+    expect(await fetchReviewStatus("s", answer(404, { error: "not found" }))).toBeNull();
+    expect(await fetchReviewStatus("s", answer(500, {}))).toBeNull();
+    const offline = vi.fn(async () => {
+      throw new TypeError("offline");
+    }) as unknown as typeof fetch;
+    expect(await fetchReviewStatus("s", offline)).toBeNull();
+    const asked = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    await fetchReviewStatus("a b", asked);
+    expect(vi.mocked(asked).mock.calls[0]![0]).toBe("/api/photos/review?sessionId=a%20b");
+  });
+
+  it("says 'on the wall' only when the server said approved", () => {
+    const D = 12_000;
+    expect(reviewLine("approved", 0, D)).toBe("approved");
+    expect(reviewLine("approved", 99_999, D)).toBe("approved");
+    // A person will look: the same gentle line as a slow check, at once.
+    expect(reviewLine("staff", 0, D)).toBe("delayed");
+    for (const status of ["checking", "none", null] as const) {
+      expect(reviewLine(status, 0, D)).toBe("checking");
+      expect(reviewLine(status, D - 1, D)).toBe("checking");
+      expect(reviewLine(status, D, D)).toBe("delayed");
+      // However long it takes, waiting alone never turns into "approved".
+      expect(reviewLine(status, 10 * 60_000, D)).toBe("delayed");
+    }
   });
 });

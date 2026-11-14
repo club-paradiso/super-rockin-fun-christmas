@@ -82,7 +82,9 @@ night) with five strips clipped to its clothesline, fitted to the screen without
 ## 5. Out of scope
 
 Printing of any kind; contact collection; accounts; face recognition or any biometric
-processing; analytics; AI moderation; multi-event SaaS; proprietary vendor integrations.
+processing; analytics; multi-event SaaS; proprietary vendor integrations. AI that rejects,
+hides or deletes photos, or that publishes without the event's own review rules (AI-assisted
+approval of clearly fine photos was brought into scope by D95; see `docs/AI_MODERATION.md`).
 
 ## 6. Privacy
 

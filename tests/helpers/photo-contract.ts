@@ -121,17 +121,20 @@ export function photoServiceContract(
       const { token } = await put();
       expect(await svc.setWallConsent(token, true, KIOSK)).toEqual({
         ok: true,
+        photoId: expect.any(String),
         wallConsent: true,
         moderationStatus: "PENDING",
       });
       expect(await svc.setWallConsent(token, true, KIOSK)).toEqual({
         ok: true,
+        photoId: expect.any(String),
         wallConsent: true,
         moderationStatus: "PENDING",
       });
       expect("data" in (await svc.read(token))).toBe(true);
       expect(await svc.setWallConsent(token, false, KIOSK)).toEqual({
         ok: true,
+        photoId: expect.any(String),
         wallConsent: false,
         moderationStatus: "NONE",
       });
@@ -152,6 +155,7 @@ export function photoServiceContract(
       now = new Date("2026-12-28T10:00:00Z");
       expect(await svc.setWallConsentForSession(SESSION, true, KIOSK)).toEqual({
         ok: true,
+        photoId: expect.any(String),
         wallConsent: true,
         moderationStatus: "PENDING",
       });
@@ -160,6 +164,7 @@ export function photoServiceContract(
       ).toEqual({ ok: false, reason: "paused" });
       expect(await svc.setWallConsentForSession(SESSION, false, KIOSK)).toEqual({
         ok: true,
+        photoId: expect.any(String),
         wallConsent: false,
         moderationStatus: "NONE",
       });
