@@ -363,16 +363,24 @@ export function photoServiceContract(
       expect(isWallEligible(row)).toBe(false);
       const plain = uuid();
       await putMobile({ sessionId: plain, kioskId: null });
-      await put({ sessionId: uuid(), kioskId: null });
+      const booth = uuid();
+      await put({ sessionId: booth, kioskId: null });
+      // The store may hold phone photos from other tests (a shared Supabase stack): check ours
+      // are there, the booth photo is not, and everything listed is a kioskless phone photo.
       const byPrefix = await backend.photos.list({
         frameIdPrefix: "phone-",
         kioskless: true,
         limit: 500,
       });
-      expect(byPrefix.map((r) => r.sessionId).sort()).toEqual([SESSION, plain].sort());
-      expect((await svc.mobileInbox()).map((r) => r.sessionId).sort()).toEqual(
-        [SESSION, plain].sort(),
+      const listed = byPrefix.map((r) => r.sessionId);
+      expect(listed).toEqual(expect.arrayContaining([SESSION, plain]));
+      expect(listed).not.toContain(booth);
+      expect(byPrefix.every((r) => r.frameId.startsWith("phone-") && r.kioskId === null)).toBe(
+        true,
       );
+      const inbox = (await svc.mobileInbox(500)).map((r) => r.sessionId);
+      expect(inbox).toEqual(expect.arrayContaining([SESSION, plain]));
+      expect(inbox).not.toContain(booth);
       for (const frameId of ["shalom-letter", "phone-six-lights", "phone-nope", "starlight-strip"])
         await expect(putMobile({ sessionId: uuid(), frameId })).rejects.toThrow();
     });
