@@ -476,6 +476,11 @@ body {
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
+  /* The sign-in screen keeps 48 px controls (D84, e2e/admin-password.spec.ts): it is the one staff
+     screen used before anything else is known, and often with one thumb. The rest of /admin is 44. */
+  .admin-login :is(.admin-btn, .admin-input) {
+    min-height: 3rem;
+  }
   .admin-h1 {
     @apply text-[22px] leading-tight font-bold tracking-tight md:text-[28px];
   }
