@@ -1,6 +1,6 @@
 import "server-only";
 import { getFrame } from "@/config/frames";
-import { photoSource, type PhotoSource } from "@/config/mobile";
+import { mobileBoothFrame, photoSource, type PhotoSource } from "@/config/mobile";
 import { getCloudSync, getHubInbox } from "@/lib/cloud/server";
 import type { HubInboxStatus } from "@/lib/cloud/inbox";
 import { getServerConfig } from "@/lib/server/env";
@@ -55,7 +55,7 @@ export function toStaffPhotoView(
     id: row.id,
     createdAt: row.createdAt,
     frameId: row.frameId,
-    frameLabel: photoSource(row) === "mobile" ? "휴대폰 사진" : getFrame(row.frameId).label,
+    frameLabel: mobileLabel(row.frameId) ?? getFrame(row.frameId).label,
     source: photoSource(row),
     status: row.moderationStatus,
     wallConsent: row.wallConsent,
@@ -269,4 +269,11 @@ export async function listAudit(filter: {
               ? (staffNames.get(e.actorId) ?? e.actorId.slice(0, 8))
               : "스태프",
   }));
+}
+
+/** "휴대폰 사진", or "휴대폰 사진 · 편지" for one the guest put in a booth frame (D93). */
+function mobileLabel(frameId: string): string | null {
+  if (photoSource({ frameId }) !== "mobile") return null;
+  const frame = mobileBoothFrame(frameId);
+  return frame ? `휴대폰 사진 · ${frame.label}` : "휴대폰 사진";
 }

@@ -1,3 +1,4 @@
+import { isMobileFrameId, MOBILE_FRAME_ID } from "@/config/mobile";
 import { hasImageSignature } from "@/lib/server/request";
 import type { PhotoService } from "@/lib/storage/photo-service";
 import type { StorageBackend } from "@/lib/storage/types";
@@ -54,14 +55,14 @@ export class HubInbox {
     this.state.lastPullAt = this.now().toISOString();
     this.state.lastError = null;
     for (const item of list.value) {
-      const done = await this.takeOne(item.sessionId);
+      const done = await this.takeOne(item.sessionId, item.frameId);
       // Still failing: the cloud is probably unreachable; the next pass tries again.
       if (!done) break;
     }
   }
 
   /** True when this item is finished (stored and acknowledged), false to stop the pass. */
-  private async takeOne(sessionId: string): Promise<boolean> {
+  private async takeOne(sessionId: string, cloudFrameId: string | undefined): Promise<boolean> {
     const existing = await this.backend.photos.findBySessionId(sessionId);
     if (existing) {
       // Taken in before, but maybe only half (the hub stopped between storing the row and
@@ -86,6 +87,9 @@ export class HubInbox {
         data: image.value,
         // The guest uploaded through a QR the hub issued; review still decides.
         submissionsPaused: false,
+        // The frame the guest chose (D93). A frame this hub does not know (a cloud deployed
+        // ahead of it) is stored as a plain phone photo: the picture itself already has it.
+        frameId: cloudFrameId && isMobileFrameId(cloudFrameId) ? cloudFrameId : MOBILE_FRAME_ID,
       });
       if (stored.ok && !stored.duplicate) this.state.imported++;
     }

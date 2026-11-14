@@ -355,6 +355,36 @@ export function photoServiceContract(
       if (KIOSK !== OTHER) expect(await svc.mobileStatus(SESSION, OTHER)).toBe("waiting");
     });
 
+    // D93: a phone photo the guest put in a booth frame keeps that frame in its id.
+    it("framed phone photo: stored as phone-<frame>, found by the inbox prefix; anything else refused", async () => {
+      await putMobile({ kioskId: null, frameId: "phone-shalom-letter" });
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+      expect(isWallEligible(row)).toBe(false);
+      const plain = uuid();
+      await putMobile({ sessionId: plain, kioskId: null });
+      const booth = uuid();
+      await put({ sessionId: booth, kioskId: null });
+      // The store may hold phone photos from other tests (a shared Supabase stack): check ours
+      // are there, the booth photo is not, and everything listed is a kioskless phone photo.
+      const byPrefix = await backend.photos.list({
+        frameIdPrefix: "phone-",
+        kioskless: true,
+        limit: 500,
+      });
+      const listed = byPrefix.map((r) => r.sessionId);
+      expect(listed).toEqual(expect.arrayContaining([SESSION, plain]));
+      expect(listed).not.toContain(booth);
+      expect(byPrefix.every((r) => r.frameId.startsWith("phone-") && r.kioskId === null)).toBe(
+        true,
+      );
+      const inbox = (await svc.mobileInbox(500)).map((r) => r.sessionId);
+      expect(inbox).toEqual(expect.arrayContaining([SESSION, plain]));
+      expect(inbox).not.toContain(booth);
+      for (const frameId of ["shalom-letter", "phone-six-lights", "phone-nope", "starlight-strip"])
+        await expect(putMobile({ sessionId: uuid(), frameId })).rejects.toThrow();
+    });
+
     it("list filters: frame id, kioskless, oldest first — applied before the limit", async () => {
       const phone = SESSION;
       await putMobile({ kioskId: null });

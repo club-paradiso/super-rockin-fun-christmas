@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "@/components/brand";
-import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
+import { FRAMES, getFrame } from "@/config/frames";
+import { KIOSK_CONFIG } from "@/config/kiosk";
+import { MOBILE_UPLOAD_CONFIG, mobileFramesFor } from "@/config/mobile";
 import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
+import { loadFrameAssets } from "@/lib/compositor/assets";
+import { composeFrame, formatDateLabel } from "@/lib/compositor/compose";
+import { loadFrameFonts } from "@/lib/compositor/fonts";
+import type { ComposeImage } from "@/lib/compositor/types";
 import {
-  CROP_CHOICES,
+  cycleOrder,
   decodePhotoFile,
   drawPhoto,
-  nextRotation,
-  type CropAspect,
-  type DecodedPhoto,
+  limitPicked,
   type DecodeFailure,
-  type Rotation,
 } from "@/lib/mobile/prepare";
 
 type Phase =
@@ -45,6 +48,7 @@ const ERRORS: Record<string, { message: string; retry: boolean }> = {
   },
   closed: { message: "이 QR로 보낸 사진은 이미 처리됐어요.", retry: false },
   too_large: { message: "사진이 너무 커요. 다른 사진을 골라 주세요.", retry: false },
+  frame: { message: "사진을 틀에 담지 못했어요. 사진을 다시 골라 주세요.", retry: false },
   network: {
     message: "인터넷 연결이 불안정해요. 연결을 확인한 뒤 다시 보내기를 눌러 주세요.",
     retry: true,
@@ -58,6 +62,8 @@ type SendOutcome = "ok" | "expired" | keyof typeof ERRORS;
 function send(
   token: string,
   blob: Blob,
+  /** The booth frame the photos are in (D93). */
+  frameId: string,
   /** The consent text on screen included the public-wall line (D86). */
   publicWall: boolean,
   onProgress: (fraction: number) => void,
@@ -68,6 +74,7 @@ function send(
     xhr.setRequestHeader("content-type", "image/jpeg");
     xhr.setRequestHeader("x-upload-token", token);
     xhr.setRequestHeader("x-wall-consent", "yes");
+    xhr.setRequestHeader("x-frame-id", frameId);
     if (publicWall) xhr.setRequestHeader("x-wall-scope", "public");
     xhr.timeout = 60_000;
     xhr.upload.onprogress = (e) => {
@@ -87,6 +94,7 @@ function send(
       else if (xhr.status === 413) resolve("too_large");
       else if (xhr.status === 400 && code === "too_small") resolve("too_small");
       else if (xhr.status === 400 && code === "consent required") resolve("consent");
+      else if (xhr.status === 400 && code === "frame") resolve("frame");
       else if (xhr.status === 400 || xhr.status === 415) resolve("unreadable");
       else resolve("server");
     };
@@ -109,10 +117,19 @@ export function MobileUpload({
   alreadySent: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>(alreadySent ? { name: "done" } : { name: "pick" });
-  const [photo, setPhoto] = useState<DecodedPhoto | null>(null);
-  const [rotation, setRotation] = useState<Rotation>(0);
-  const [aspect, setAspect] = useState<CropAspect>(null);
-  const [preview, setPreview] = useState<{ url: string; blob: Blob } | null>(null);
+  // The picked photos, already shrunk (MOBILE_UPLOAD_CONFIG.sourceLongEdge), in slot order.
+  const [photos, setPhotos] = useState<ComposeImage[]>([]);
+  const [dropped, setDropped] = useState(0);
+  const [frameId, setFrameId] = useState<string | null>(null);
+  const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
+  // The encoded picture, with the frame and photo list it was made from: composing is async, so
+  // the guest's current choice can be ahead of it for a moment.
+  const [preview, setPreview] = useState<{
+    url: string;
+    blob: Blob;
+    frameId: string;
+    photos: ComposeImage[];
+  } | null>(null);
   const [consent, setConsent] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sending = useRef(false);
@@ -132,26 +149,59 @@ export function MobileUpload({
     };
   }, [preview]);
 
-  // Free the decoded bitmap when a new photo replaces it.
+  // The frames draw the brand font and their own pictures: load both before composing (D93),
+  // as the booth does. A font or picture that fails to load never blocks the guest.
   useEffect(() => {
+    let cancelled = false;
+    void Promise.all([loadFrameFonts(FRAMES), loadFrameAssets(FRAMES)]).then(([, loaded]) => {
+      if (!cancelled) setAssets(loaded.assets);
+    });
     return () => {
-      if (photo && "close" in photo.source) (photo.source as ImageBitmap).close();
+      cancelled = true;
     };
-  }, [photo]);
+  }, []);
 
-  // The JPEG that will be sent, redrawn whenever the guest turns or crops: preview = result.
+  // Free the shrunk photos' pixels when the page goes away. A new pick frees the old ones itself
+  // (`release`); reordering keeps the same canvases, so it must not free anything.
+  const photosRef = useRef<ComposeImage[]>([]);
   useEffect(() => {
-    if (!photo) return;
+    photosRef.current = photos;
+  }, [photos]);
+  useEffect(() => () => release(photosRef.current), []);
+
+  const frames = useMemo(() => mobileFramesFor(photos.length), [photos.length]);
+  const dateLabel = useMemo(() => formatDateLabel(new Date()), []);
+
+  // Small pictures of each frame this many photos fit, with the guest's own photos in them.
+  const thumbs = useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!assets || photos.length === 0) return out;
+    for (const frame of frames) {
+      const canvas = composeFrame(frame, photos, {
+        createCanvas: createDomCanvas,
+        context: { dateLabel, assets },
+        scale: KIOSK_CONFIG.thumbScale / 2,
+      }) as HTMLCanvasElement;
+      out[frame.id] = canvas.toDataURL("image/jpeg", 0.8);
+      canvas.width = canvas.height = 0;
+    }
+    return out;
+  }, [assets, frames, photos, dateLabel]);
+
+  // The JPEG that will be sent: the photos in the chosen frame at the booth's saved size, redrawn
+  // whenever the guest changes the frame or the order. Preview = result.
+  useEffect(() => {
+    if (!assets || !frameId || photos.length === 0) return;
+    const frame = getFrame(frameId);
+    if (frame.id !== frameId || frame.slots.length !== photos.length) return;
     let cancelled = false;
     (async () => {
       try {
-        const canvas = drawPhoto(
-          photo,
-          rotation,
-          aspect,
-          MOBILE_UPLOAD_CONFIG.longEdge,
-          createDomCanvas,
-        ) as HTMLCanvasElement;
+        const canvas = composeFrame(frame, photos, {
+          createCanvas: createDomCanvas,
+          context: { dateLabel, assets },
+          scale: KIOSK_CONFIG.outputScale,
+        }) as HTMLCanvasElement;
         const blob = await canvasToBlob(
           canvas,
           "image/jpeg",
@@ -159,7 +209,7 @@ export function MobileUpload({
         );
         canvas.width = canvas.height = 0; // let the browser drop the pixels now
         if (cancelled) return;
-        setPreview({ url: URL.createObjectURL(blob), blob });
+        setPreview({ url: URL.createObjectURL(blob), blob, frameId: frame.id, photos });
         setPhase((p) => (p.name === "preparing" || p.name === "preview" ? { name: "preview" } : p));
       } catch {
         if (!cancelled) setPhase({ name: "error", ...ERRORS.unreadable! });
@@ -168,29 +218,60 @@ export function MobileUpload({
     return () => {
       cancelled = true;
     };
-  }, [photo, rotation, aspect]);
+  }, [assets, frameId, photos, dateLabel]);
 
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
+  const pick = async (list: FileList | null) => {
+    const files = list ? [...list] : [];
+    if (files.length === 0) return;
+    const { kept, dropped: left } = limitPicked(files, MOBILE_UPLOAD_CONFIG.maxPhotos);
     setPhase({ name: "preparing" });
-    setRotation(0);
-    setAspect(null);
+    setPreview(null);
+    release(photosRef.current);
+    photosRef.current = [];
+    setPhotos([]);
+    const shrunk: ComposeImage[] = [];
     try {
-      setPhoto(await decodePhotoFile(file));
+      // One at a time, each shrunk and its full-size bitmap freed before the next is opened.
+      for (const file of kept) {
+        const decoded = await decodePhotoFile(file);
+        try {
+          const canvas = drawPhoto(
+            decoded,
+            0,
+            null,
+            MOBILE_UPLOAD_CONFIG.sourceLongEdge,
+            createDomCanvas,
+          ) as HTMLCanvasElement;
+          shrunk.push({ source: canvas, width: canvas.width, height: canvas.height });
+        } finally {
+          if ("close" in decoded.source) (decoded.source as ImageBitmap).close();
+        }
+      }
     } catch (failure) {
+      release(shrunk);
       const key = (failure as DecodeFailure) === "heic" ? "heic" : "unreadable";
-      setPhoto(null);
+      setPhotos([]);
+      setFrameId(null);
       setPhase({ name: "error", ...ERRORS[key]! });
+      return;
     }
+    setDropped(left);
+    setPhotos(shrunk);
+    // The first frame in picker order for this many photos, as on the booth.
+    setFrameId(mobileFramesFor(shrunk.length)[0]?.id ?? null);
   };
 
+  // Only a picture made from what is on screen now may be sent: never an older frame's picture
+  // under the new frame's id (the server would refuse it), never the photos in an older order.
+  const previewCurrent = !!preview && preview.frameId === frameId && preview.photos === photos;
+
   const submit = useCallback(async () => {
-    if (!preview || !consent || sending.current) return;
+    if (!preview || !previewCurrent || !consent || sending.current) return;
     sending.current = true;
     try {
       for (let attempt = 0; ; attempt++) {
         setPhase({ name: "uploading", progress: 0, attempt });
-        const outcome = await send(token, preview.blob, publicWall, (progress) =>
+        const outcome = await send(token, preview.blob, preview.frameId, publicWall, (progress) =>
           setPhase({ name: "uploading", progress, attempt }),
         );
         if (outcome === "ok") return setPhase({ name: "done" });
@@ -205,7 +286,7 @@ export function MobileUpload({
     } finally {
       sending.current = false;
     }
-  }, [preview, consent, token, publicWall]);
+  }, [preview, previewCurrent, consent, token, publicWall]);
 
   const choose = () => inputRef.current?.click();
 
@@ -223,11 +304,12 @@ export function MobileUpload({
           type="file"
           // image/* lets iPhone hand over a JPEG where it can; HEIC is handled below if not.
           accept="image/*"
+          multiple
           className="sr-only"
           data-testid="mobile-file"
           aria-label="사진 고르기"
           onChange={(e) => {
-            void pick(e.target.files?.[0]);
+            void pick(e.target.files);
             e.target.value = "";
           }}
         />
@@ -235,12 +317,12 @@ export function MobileUpload({
         {phase.name === "pick" && (
           <section className="flex flex-col gap-4 text-center">
             <p className="text-lg leading-relaxed text-ink/75">
-              휴대폰에 있는 사진 한 장을 골라 보내면,
+              휴대폰에 있는 사진을 1~6장 골라 포토부스 틀에 담아 보내면,
               <br />
               운영팀이 확인한 뒤 미디어월에 걸어 드려요.
             </p>
             <button type="button" className="btn-primary w-full" onClick={choose}>
-              사진 고르기
+              사진 고르기 (최대 6장)
             </button>
           </section>
         )}
@@ -264,47 +346,38 @@ export function MobileUpload({
             </figure>
             {phase.name === "preview" && (
               <>
-                <div
-                  className="flex flex-wrap justify-center gap-2"
-                  role="group"
-                  aria-label="자르기"
-                >
-                  {CROP_CHOICES.map((c) => (
-                    <button
-                      key={c.label}
-                      type="button"
-                      aria-pressed={aspect === c.aspect}
-                      onClick={() => setAspect(c.aspect)}
-                      className={`min-h-12 rounded-full px-4 text-base font-semibold ${
-                        aspect === c.aspect
-                          ? "bg-ink text-button-text"
-                          : "border border-ink/50 text-ink"
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+                {dropped > 0 && (
+                  <p className="text-center text-base text-ink/75" data-testid="mobile-dropped">
+                    한 틀에는 6장까지 담겨요. 앞의 6장만 담았어요.
+                  </p>
+                )}
+                <FramePicker
+                  frames={frames.map((f) => ({ id: f.id, label: f.label, thumb: thumbs[f.id] }))}
+                  selected={frameId}
+                  onSelect={setFrameId}
+                />
+                {photos.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => setRotation(nextRotation)}
-                    className="min-h-12 rounded-full border border-ink/50 px-4 text-base font-semibold text-ink"
-                    data-testid="mobile-rotate"
+                    className="min-h-12 self-center rounded-full border border-ink/50 px-5 text-base font-semibold text-ink"
+                    data-testid="mobile-reorder"
+                    onClick={() => setPhotos(cycleOrder)}
                   >
-                    ↻ 돌리기
+                    ↻ 사진 순서 바꾸기
                   </button>
-                </div>
+                )}
                 <Consent checked={consent} onChange={setConsent} publicWall={publicWall} />
                 <button
                   type="button"
                   className="btn-primary w-full"
                   data-testid="mobile-submit"
-                  disabled={!consent}
+                  disabled={!consent || !previewCurrent}
                   onClick={() => void submit()}
                 >
                   미디어월로 보내기
                 </button>
                 <button type="button" className="btn-quiet self-center" onClick={choose}>
-                  다른 사진 고르기
+                  사진 다시 고르기
                 </button>
               </>
             )}
@@ -381,6 +454,57 @@ export function MobileUpload({
   );
 }
 
+/** Let the browser drop the pixels of shrunk photos (canvases) now. */
+function release(photos: readonly ComposeImage[]) {
+  for (const p of photos) {
+    const canvas = p.source as HTMLCanvasElement;
+    if ("width" in canvas) canvas.width = canvas.height = 0;
+  }
+}
+
+/** The booth frames that hold this many photos, each shown with the guest's own photos in it. */
+function FramePicker({
+  frames,
+  selected,
+  onSelect,
+}: {
+  frames: { id: string; label: string; thumb: string | undefined }[];
+  selected: string | null;
+  onSelect: (id: string) => void;
+}) {
+  if (frames.length < 2) return null;
+  return (
+    <div
+      role="radiogroup"
+      aria-label="틀 고르기"
+      className="flex flex-wrap justify-center gap-3"
+      data-testid="mobile-frames"
+    >
+      {frames.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          role="radio"
+          aria-checked={selected === f.id}
+          data-frame-id={f.id}
+          onClick={() => onSelect(f.id)}
+          className={`flex min-h-12 w-24 flex-col items-center gap-1 rounded-2xl p-2 text-sm font-semibold text-ink ${
+            selected === f.id ? "bg-paper ring-2 ring-ink" : "border border-ink/30"
+          }`}
+        >
+          {f.thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element -- local data URL
+            <img src={f.thumb} alt="" className="h-20 w-auto object-contain" />
+          ) : (
+            <span className="h-20" aria-hidden />
+          )}
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Steps({ phase }: { phase: Phase["name"] }) {
   const current =
     phase === "pick" || phase === "preparing"
@@ -390,7 +514,7 @@ function Steps({ phase }: { phase: Phase["name"] }) {
         : phase === "done"
           ? 3
           : 2;
-  const steps = ["사진 고르기", "확인하고 보내기", "운영팀 확인"];
+  const steps = ["사진 고르기", "틀 고르고 보내기", "운영팀 확인"];
   return (
     // On a narrow phone the three steps do not fit in one row: a step moves to the next row whole
     // (it used to break in the middle of a word).

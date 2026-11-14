@@ -128,6 +128,8 @@ describe("cloud side: /api/hub/uploads/*", () => {
 /** A scripted cloud inbox holding phone photos by session id. */
 class FakeInboxCloud implements CloudInboxClient {
   items = new Map<string, Uint8Array>();
+  /** Frame ids the cloud reports per session (D93); none = a cloud from before D93. */
+  frames = new Map<string, string>();
   online = true;
   acks: string[] = [];
   failAckOnce = false;
@@ -145,7 +147,11 @@ class FakeInboxCloud implements CloudInboxClient {
     if (!this.online) return this.off<{ sessionId: string; createdAt: string }[]>();
     return {
       ok: true as const,
-      value: [...this.items.keys()].map((sessionId) => ({ sessionId, createdAt: "x" })),
+      value: [...this.items.keys()].map((sessionId) => ({
+        sessionId,
+        createdAt: "x",
+        ...(this.frames.has(sessionId) ? { frameId: this.frames.get(sessionId)! } : {}),
+      })),
     };
   }
   async inboxImage(sessionId: string): Promise<CloudResult<Uint8Array>> {
@@ -230,6 +236,18 @@ describe("hub side: HubInbox", () => {
     const after = (await backend.photos.findBySessionId(a))!;
     expect(after.moderationStatus).toBe("DELETED");
     expect(cloud.items.has(a)).toBe(false);
+  });
+
+  it("keeps the frame the guest chose (D93); an unknown one is taken in as a plain phone photo", async () => {
+    const framed = uuid();
+    const unknown = uuid();
+    const old = uuid();
+    cloud.items.set(framed, JPEG).set(unknown, JPEG).set(old, JPEG);
+    cloud.frames.set(framed, "phone-shalom-film").set(unknown, "phone-from-the-future");
+    await inbox.pull();
+    expect((await backend.photos.findBySessionId(framed))!.frameId).toBe("phone-shalom-film");
+    expect((await backend.photos.findBySessionId(unknown))!.frameId).toBe("phone-photo");
+    expect((await backend.photos.findBySessionId(old))!.frameId).toBe("phone-photo");
   });
 
   it("refuses anything that is not a JPEG and skips photos gone from the cloud", async () => {
