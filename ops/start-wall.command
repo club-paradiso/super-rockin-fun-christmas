@@ -7,7 +7,6 @@
 # See wall-screen.js. The Mac does not sleep while this window is open (caffeinate).
 DIR="$(cd "$(dirname "$0")" && pwd)"
 HUB="$(head -n 1 "$DIR/wall-hub.txt" | tr -d '\r')"
-SCREEN="$(sed -n 2p "$DIR/wall-hub.txt" | tr -d '\r')"
 # Keep the display and the Mac awake for as long as this script runs (-w: until this process ends).
 caffeinate -dimsu -w $$ &
 PROFILE="$HOME/Library/Application Support/follow-the-lights/wall"
@@ -23,7 +22,9 @@ if [ -z "$BROWSER" ]; then
 fi
 while true; do
   echo "Opening $HUB/wall"
-  # Read the screens again on every (re)open: the LED may have been plugged in since.
+  # Read the screens and the screen= line again on every (re)open: the LED may have been plugged
+  # in, or the second line of wall-hub.txt changed, since.
+  SCREEN="$(sed -n 2p "$DIR/wall-hub.txt" | tr -d '\r')"
   PLACE=()
   GEOM="$(osascript -l JavaScript "$DIR/wall-screen.js" "$SCREEN" 2>/dev/null)"
   if [[ "$GEOM" =~ ^-?[0-9]+,-?[0-9]+,[1-9][0-9]*,[1-9][0-9]*$ ]]; then
