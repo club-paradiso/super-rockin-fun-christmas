@@ -1305,3 +1305,19 @@ User decision (2026-11-14): "간편 모드는 그냥 날리자. 대신 중국어
 - **Checked by:** unit (copy shape for all three languages, Han characters in every Chinese
   string, no Korean left except the quoted phone button, frame and pose labels), E2E whole Chinese
   session at the two iPad Air sizes in `e2e/tablet-matrix.spec.ts`, and `e2e/shalom-booth.spec.ts`.
+
+## D90 · The wall clothespin is the user's picture, and a clip is placed by its own numbers
+
+- **Why:** on the LED wall the old peg (`peg-wood.svg`, seven flat rectangles) read as cheap, and
+  it was drawn 20 px too high: `Clip` measured from the strip top although its box starts at the
+  line, so the peg floated above the line instead of holding the photo.
+- **Picture:** the user's wooden clothespin (transparent PNG, 793 × 1983), cut to the wood
+  (323 × 1975), faint fringe removed, saved as `public/wall/peg-wood.webp` (105 × 640, about 28 KB).
+- **Placement is data:** `hang: WallClip` = `{ image, width, height, centerX, lineY }`
+  (`lib/wall/themes.ts`). `Clip` draws it with its top `lineY` above the line. The peg is drawn
+  23 × 140 with the line at the top of its notch (the photo's weight pulls it down), so the jaw ends
+  30 px under the line, 10 px over the strip top. The legacy brass clip (`night-window`) keeps
+  exactly where it was drawn (`lineY` 28.8).
+- **Checked by:** `tests/unit/wall-themes.test.ts` (the wordmark is clear of every photo plus its
+  clip's real reach; a clip reaches below the strip top and stays inside the picture) and the six
+  theme screenshots from `e2e/wall-themes.spec.ts` (`SCREENSHOTS=1`).

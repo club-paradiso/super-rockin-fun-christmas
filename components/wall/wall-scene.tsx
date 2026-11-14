@@ -116,24 +116,26 @@ export function WallScene({
 }
 
 /**
- * What holds a photo, drawn at the hang point (top centre of the photo): the theme's clip picture.
- * Nothing for a theme whose pegs are already in the picture. The clip pictures are 37 × 70 with a
- * 22.4 × 56 clip at (7, 2.8); its top sits 6 px above the line, i.e. 26 px above a strip.
+ * What holds a photo: the theme's clip picture, drawn in the photo's box, whose top is the line at
+ * the hang point. Placed by its own numbers (`WallClip`): the line crosses it `lineY` px below its
+ * top. Nothing for a theme whose pegs are already in the picture.
  */
-export function Clip({ theme, dropToStrip }: { theme: WallTheme; dropToStrip: number }) {
-  if (theme.hang.kind !== "clip") return null;
+export function Clip({ theme }: { theme: WallTheme }) {
+  const { hang } = theme;
+  if (hang.kind !== "clip") return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline
     <img
-      src={theme.hang.image}
+      src={hang.image}
       alt=""
       aria-hidden
-      className="absolute left-1/2"
+      draggable={false}
+      className="pointer-events-none absolute left-1/2 max-w-none"
       style={{
-        top: -dropToStrip - 6 - 2.8,
-        width: 37,
-        height: 70,
-        marginLeft: -11.2 - 7,
+        top: -hang.lineY,
+        width: hang.width,
+        height: hang.height,
+        marginLeft: -hang.centerX,
         zIndex: 2,
       }}
     />

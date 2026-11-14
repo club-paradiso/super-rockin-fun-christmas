@@ -1,5 +1,5 @@
 import { WALL_CONFIG } from "./wall";
-import { ROTATE_MINUTES, type WallLook, type WallTheme } from "@/lib/wall/themes";
+import { ROTATE_MINUTES, type WallClip, type WallLook, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * The media-wall themes (D85). Every `current` theme is a background from Figma
@@ -20,7 +20,31 @@ import { ROTATE_MINUTES, type WallLook, type WallTheme } from "@/lib/wall/themes
  * replaces the file without touching these numbers, as long as the composition is the same.
  */
 const CANVAS = { width: 3840, height: 1080 } as const;
-const PEG = { kind: "clip", image: "/wall/peg-wood.svg" } as const;
+/**
+ * The wooden clothespin (the user's own picture, 2026-11): 323 × 1975 cut to 105 × 640 WebP.
+ * Drawn 23 × 140. The photo's weight pulls it down, so the line rests at the top of its notch
+ * (78.5 % down) and the jaw ends 30 px below the line, over the strip top.
+ */
+const PEG: WallClip = {
+  kind: "clip",
+  image: "/wall/peg-wood.webp",
+  width: 23,
+  height: 140,
+  centerX: 11.5,
+  lineY: 110,
+};
+/**
+ * The old brass clip, where it has always been drawn: 37 × 70, a 22.4 × 56 clip at (7, 2.8) whose
+ * top is 26 px above the line, so it reaches 10 px over the strip top.
+ */
+const BRASS: WallClip = {
+  kind: "clip",
+  image: WALL_CONFIG.scene.clip,
+  width: 37,
+  height: 70,
+  centerX: 18.2,
+  lineY: 28.8,
+};
 const TWINE = "#B48F5E";
 const FIGMA = "Figma SS 03";
 
@@ -271,7 +295,7 @@ export const WALL_THEMES: readonly WallTheme[] = [
     tone: "dark",
     scene: WALL_CONFIG.scene,
     liteSlots: WALL_CONFIG.liteSlots,
-    hang: { kind: "clip", image: WALL_CONFIG.scene.clip },
+    hang: BRASS,
     rope: null,
     wideMax: 340,
     wordmark: null,
