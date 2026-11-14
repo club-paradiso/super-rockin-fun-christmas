@@ -1,4 +1,4 @@
-import type { WallSceneConfig } from "./layout";
+import { PHONE_CARD, type WallSceneConfig } from "./layout";
 
 /**
  * Media-wall themes (D85). A theme is DATA: one bundled background picture and the numbers that
@@ -57,6 +57,96 @@ export interface WallTheme {
   emptyTextY: number;
   /** Ambient animation. None of the current themes animate: a still picture is the design. */
   motion: "none";
+  /**
+   * The same picture cut for a screen of another shape (D91), e.g. a 2.4:1 board. The wall uses
+   * whichever of the theme itself and these is closest to the screen's shape (`fitTheme`).
+   */
+  variants?: readonly WallThemeLook[];
+}
+
+/** What changes when the same theme is cut for another screen shape. */
+export type WallThemeLook = Pick<
+  WallTheme,
+  "background" | "scene" | "liteSlots" | "rope" | "wideMax" | "wordmark" | "emptyTextY"
+>;
+
+/**
+ * How a variant picture relates to the theme's own picture: a point (x, y) of the theme's
+ * picture is at (scale · x − left, scale · (y + top)) in the variant (the variant shows `top` more
+ * of the original above, and starts `left` pixels further right).
+ */
+export interface Recut {
+  background: string;
+  width: number;
+  height: number;
+  scale: number;
+  left: number;
+  top: number;
+  /**
+   * Where photos hang, in the theme's own picture (before the cut). Default: the theme's slots.
+   * Only those whose widest photo stays inside the variant picture are kept.
+   */
+  slots?: readonly { x: number; tilt: number }[];
+}
+
+/**
+ * The theme's numbers carried into a recut picture (D91). Pure arithmetic on numbers measured
+ * once in Figma: nothing is measured again, so a variant keeps the designer's placement.
+ * Photos keep their pixel size (strip, wideMax, phone card); the line, the slots, the wordmark
+ * and the empty-wall text move with the picture.
+ */
+export function recutTheme(theme: WallTheme, cut: Recut): WallThemeLook {
+  const { scale, left, top } = cut;
+  const x = (v: number) => scale * v - left;
+  const y = (v: number) => scale * (v + top);
+  const half = Math.max(theme.wideMax, PHONE_CARD.width, theme.scene.strip.width) / 2;
+  const slots = (cut.slots ?? theme.scene.slots)
+    .map((s) => ({ x: Math.round(x(s.x)), tilt: s.tilt }))
+    .filter((s) => s.x - half > 0 && s.x + half < cut.width);
+  // Low-spec mode shows at most four: of five, drop the middle one, as the themes do.
+  const all = slots.map((_, i) => i);
+  const liteSlots = all.length === 5 ? [0, 1, 3, 4] : all.slice(0, 4);
+  return {
+    background: cut.background,
+    scene: {
+      width: cut.width,
+      height: cut.height,
+      line: {
+        midX: x(theme.scene.line.midX),
+        y0: y(theme.scene.line.y0),
+        curve: theme.scene.line.curve / scale,
+      },
+      strip: theme.scene.strip,
+      slots,
+    },
+    liteSlots,
+    rope: theme.rope && {
+      ...theme.rope,
+      x1: Math.max(0, x(theme.rope.x1)),
+      x2: Math.min(cut.width, x(theme.rope.x2)),
+    },
+    wideMax: theme.wideMax,
+    wordmark: theme.wordmark && {
+      ...theme.wordmark,
+      x: Math.round(x(theme.wordmark.x)),
+      y: Math.round(y(theme.wordmark.y)),
+    },
+    emptyTextY: Math.round(y(theme.emptyTextY)),
+  };
+}
+
+/**
+ * The theme cut for a screen of this shape (width / height): the theme itself or the variant
+ * whose picture is closest in shape (by ratio, so 2:1 is as far from 4:1 as 4:1 from 8:1). The
+ * scene is still fitted without stretching (D65); this only makes the bands as small as the
+ * pictures allow. Null or no variants → the theme as it is.
+ */
+export function fitTheme(theme: WallTheme, aspect: number | null | undefined): WallTheme {
+  if (!aspect || !(aspect > 0) || !theme.variants?.length) return theme;
+  const off = (l: WallThemeLook) => Math.abs(Math.log(l.scene.width / l.scene.height / aspect));
+  let best: WallThemeLook = theme;
+  for (const v of theme.variants) if (off(v) < off(best)) best = v;
+  return best === theme ? theme : { ...theme, ...best };
 }
 
 /** Staff setting: which theme, and whether the wall changes background by itself. */
