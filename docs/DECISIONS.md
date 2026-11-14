@@ -1277,3 +1277,29 @@ were in use. Two of the defects were functional: the invisible staff-help corner
 - **Left as is**: the idle-warning bar covers the footer while it shows (the first touch
   dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
   wide empty paper beside the preview on the frame and consent screens.
+
+## D89 · The macOS wall opens on the second display by itself and keeps the Mac awake
+
+Context: the media wall will run on the church's iMac, with the LED (or TV) as its second display.
+`start-wall.command` opened Chrome in kiosk mode without saying where, so the wall would most
+likely cover the iMac's own screen and leave the LED on the desktop; and only a runbook line kept
+the iMac from sleeping.
+
+- **Which screen:** before every (re)open the launcher runs `ops/wall-screen.js` with
+  `osascript -l JavaScript` (built into macOS, no install). It reads `NSScreen.screens` and passes
+  the chosen screen to Chrome as `--window-position` / `--window-size`; kiosk mode then fills that
+  screen. Default `auto`: the largest screen that is not the main (menu bar) one, or the main
+  screen when it is alone. The optional second line of `wall-hub.txt` overrides it:
+  `screen=main` or `screen=x,y` (a point on the wanted screen). If the screens cannot be read the
+  launcher opens as before, on the main screen. The pure choice (`pickScreen`) is unit tested
+  (`tests/unit/wall-screen.test.ts`).
+- **Any resolution:** the launcher passes no size to the page. The wall already fits its 3840 ×
+  1080 scene into whatever window it gets (D65: no stretching; bands top/bottom or sides). Filling
+  a screen of another aspect ratio without bands needs a scene designed for that ratio; not done.
+- **Awake:** `caffeinate -dimsu -w <launcher pid>` keeps the display and the Mac awake while the
+  launcher window is open, and stops with it.
+- **Windows unchanged:** `start-wall.ps1` still opens on the primary screen; there the wall PC is
+  expected to have the LED as its only or primary display.
+- **Not verified:** nothing here has run on a Mac. In particular, that Chrome's kiosk window honours
+  `--window-position` on macOS with the profile's saved window state, and the macOS setting
+  "Displays have separate Spaces" (on is expected), need the iMac (`docs/DEVICE_ACCEPTANCE.md` D12–D15).
