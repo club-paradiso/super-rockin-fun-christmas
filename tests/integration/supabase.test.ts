@@ -224,16 +224,18 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
       },
     );
 
-    // D85/D86 rollout: the migration is applied before the new code is deployed, so the
-    // signature the running code calls is kept, as a plain SQL wrapper around the new function.
-    // One implementation of each rule; both signatures closed to anon and authenticated. A
-    // follow-up migration drops the wrappers once the new code is live (docs/DEPLOYMENT.md 10).
+    // D85/D86 and D95 rollouts: a migration is applied before the code that needs it is deployed,
+    // so every signature that running code may still call is kept, as a plain SQL wrapper that
+    // only forwards. One implementation of each rule; every signature closed to anon and
+    // authenticated. A follow-up migration drops the wrappers after the event
+    // (docs/DEPLOYMENT.md 10). ftl_settings_update has two: the 9-argument one from before
+    // D85/D86 and the 11-argument one from before D95.
     it.each([
-      ["ftl_settings_update", /p_wall_public boolean, p_wall_look jsonb/],
-      ["ftl_photo_transition", /p_wall_consent boolean, p_wall_public boolean/],
-    ])(
-      "%s: one implementation plus the legacy wrapper, both closed to anon and authenticated",
-      async (name, newArgs) => {
+      ["ftl_settings_update", /p_moderation_mode text/, 2],
+      ["ftl_photo_transition", /p_wall_consent boolean, p_wall_public boolean/, 1],
+    ] as const)(
+      "%s: one implementation plus its legacy wrappers, all closed to anon and authenticated",
+      async (name, newArgs, wrappers) => {
         const { rows } = await client.query(
           "select pg_get_function_identity_arguments(p.oid) as args, l.lanname as lang, " +
             "p.prosrc as src, " +
@@ -245,17 +247,19 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
             "where n.nspname = 'public' and p.proname = $1",
           [name],
         );
-        expect(rows).toHaveLength(2);
+        expect(rows).toHaveLength(1 + wrappers);
         for (const r of rows) expect([r.anon, r.authed, r.service]).toEqual([false, false, true]);
         const current = rows.filter((r) => newArgs.test(r.args));
         const legacy = rows.filter((r) => !newArgs.test(r.args));
         expect(current).toHaveLength(1);
-        expect(legacy).toHaveLength(1);
-        // The rule lives in exactly one place: the wrapper only forwards.
+        expect(legacy).toHaveLength(wrappers);
+        // The rule lives in exactly one place: a wrapper only forwards.
         expect(current[0].lang).toBe("plpgsql");
-        expect(legacy[0].lang).toBe("sql");
-        expect(legacy[0].src).toContain(`public.${name}(`);
-        expect(legacy[0].src).not.toMatch(/\b(update|insert|delete)\b/i);
+        for (const wrapper of legacy) {
+          expect(wrapper.lang).toBe("sql");
+          expect(wrapper.src).toContain(`public.${name}(`);
+          expect(wrapper.src).not.toMatch(/\b(update|insert|delete)\b/i);
+        }
       },
     );
 
@@ -267,6 +271,15 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
           await expect(
             client.query(
               "select public.ftl_settings_update(true, null, null, null, false, null, null, null, true, null, gen_random_uuid())",
+            ),
+          ).rejects.toThrow(/permission denied/);
+          await client.query("rollback");
+          await client.query("begin");
+          await client.query(`set local role ${role}`);
+          // D95: the signature that can switch the event to automatic approval.
+          await expect(
+            client.query(
+              "select public.ftl_settings_update(null, null, null, null, false, null, null, null, null, null, 'auto', gen_random_uuid())",
             ),
           ).rejects.toThrow(/permission denied/);
         } finally {
