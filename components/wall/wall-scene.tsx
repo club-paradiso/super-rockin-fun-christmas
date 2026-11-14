@@ -3,24 +3,28 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
-import type { WallTheme } from "@/lib/wall/themes";
+import { fitTheme, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
  * STUDIO SHALOM wordmark where no photo reaches, and the hung photos on top. Drawn in scene pixels
- * (3840 × 1080); the parent scales it to the screen. Nothing comes from the internet.
+ * (3840 × 1080, or the size of the theme's cut for this screen shape, D90); the parent scales it
+ * to the screen. Nothing comes from the internet.
  *
  * When the theme changes the new picture fades in over the old one (no fade in low-spec mode or
  * with reduced motion); the old picture is dropped once the new one covers it.
  */
 export function WallScene({
   theme,
+  aspect = null,
   layout,
   lite,
   children,
   overlay,
 }: {
   theme: WallTheme;
+  /** The screen's shape: the picture fading out is cut for it too (D90). */
+  aspect?: number | null;
   layout: SceneLayout;
   lite: boolean;
   children: ReactNode;
@@ -38,7 +42,7 @@ export function WallScene({
     const id = setTimeout(() => setUnder(null), 2_000);
     return () => clearTimeout(id);
   }, [under]);
-  const underTheme = under ? getWallTheme(under) : null;
+  const underTheme = under ? fitTheme(getWallTheme(under), aspect) : null;
 
   return (
     <div
@@ -47,6 +51,7 @@ export function WallScene({
       data-testid="wall-scene"
       data-slots={layout.slots.length}
       data-theme={theme.id}
+      data-scene-size={`${layout.width}x${layout.height}`}
       data-tone={theme.tone}
     >
       {underTheme && (
@@ -55,7 +60,9 @@ export function WallScene({
           src={underTheme.background}
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full"
+          // A picture of another shape (a 32:9 theme under a 2.4:1 one, D90) is cropped, never
+          // stretched, for the two seconds it fades out.
+          className="absolute inset-0 h-full w-full object-cover"
         />
       )}
       {/* eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline */}

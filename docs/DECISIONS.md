@@ -1303,3 +1303,33 @@ the iMac from sleeping.
 - **Not verified:** nothing here has run on a Mac. In particular, that Chrome's kiosk window honours
   `--window-position` on macOS with the profile's saved window state, and the macOS setting
   "Displays have separate Spaces" (on is expected), need the iMac (`docs/DEVICE_ACCEPTANCE.md` D12–D15).
+
+## D90 · A theme can be cut again for another screen shape; the wall picks the closest
+
+Context: the media wall at 성안교회 is the church's mission board, 3096 × 1290 (2.4:1), driven as
+the iMac's second display (D89). The wall scene is 3840 × 1080 (3.56:1). Fitted without
+stretching (D65) it would fill 3096 × 871 and leave a third of the board as bands, photos at 81 %.
+The user asked for any screen shape to apply by itself.
+
+- **Data, not a fork:** a theme may carry `variants`, each a full look (picture, scene, low-spec
+  slots, rope, wordmark, empty-wall line). `recutTheme` derives one from the theme's own numbers
+  and the cut (`x' = scale · x − left`, `y' = scale · (y + top)`); nothing is measured again, so
+  the designer's placement survives. Photos keep their pixel size. Slots whose widest photo
+  would leave the picture are dropped.
+- **Choice:** `fitTheme(theme, width / height)` takes the theme or the variant closest in shape
+  (log ratio). The shape is `WALL_CANVAS` / `?canvas=` if set, else the window. The server, the
+  feed, staff settings and rotation still speak theme ids only; the cut is a view. The picture
+  fading out during a theme change is cut for the same shape and never stretched.
+- **2.4:1 board cuts:** only the four 3:1 originals (S01–S04, 2048 × 682) have the height: they are
+  scaled to 1290 rows and cut to 3096 columns (`scripts/wall-backgrounds.mjs` `board`). Three keep
+  the right edge of the original so the cross (and the chapel) stay whole; star-of-peace cannot
+  keep the cross with four free pegs, so its cut leaves the cross out entirely. Bethlehem hangs on
+  the other four pegs (its first is cut off; positions measured in the picture). Each board cut
+  hangs four photos. The four 32:9 originals (C01–C04) are too short and keep bands on a board:
+  the user's choice (2026-11-14).
+- **Checked by** `tests/unit/wall-themes.test.ts` (every rule of every theme also on every cut;
+  the line maps through the cut; script and config cut at the same place) and
+  `e2e/wall-themes.spec.ts` (a 2.4:1 window: board cut fills it, a 32:9 theme keeps bands).
+- **Not covered:** an LED controller that takes a standard signal (1920 × 1080, 3840 × 2160) and
+  shows only a region of it. The wall centres its scene in the window; if the board shows, for
+  example, only the top-left 3096 × 1290 of a larger signal, an offset setting is still needed.

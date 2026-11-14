@@ -1,5 +1,5 @@
 import { WALL_CONFIG } from "./wall";
-import { ROTATE_MINUTES, type WallLook, type WallTheme } from "@/lib/wall/themes";
+import { ROTATE_MINUTES, recutTheme, type WallLook, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * The media-wall themes (D85). Every `current` theme is a background from Figma
@@ -24,7 +24,7 @@ const PEG = { kind: "clip", image: "/wall/peg-wood.svg" } as const;
 const TWINE = "#B48F5E";
 const FIGMA = "Figma SS 03";
 
-export const WALL_THEMES: readonly WallTheme[] = [
+const BASE_THEMES: readonly WallTheme[] = [
   {
     id: "peace-wall",
     name: "평화의 벽 · 십자가 · 겨울 햇살",
@@ -279,6 +279,55 @@ export const WALL_THEMES: readonly WallTheme[] = [
     motion: "none",
   },
 ];
+
+/**
+ * 2.4:1 boards (D90), e.g. the 3096 × 1290 LED at 성안교회. The four 3:1 originals (S01–S04,
+ * 2048 × 682) are cut again at their full height, so only the sides are lost; the four 32:9
+ * originals (C01–C04) are too short for that and keep bands on such a board (user's choice,
+ * 2026-11-14). Pictures made by scripts/wall-backgrounds.mjs (`board`; keep these numbers equal).
+ *
+ * - `top`: rows of the scaled original above the theme's own picture (the script's `top`).
+ * - `left`: board pixels cut from the left. 778 = the right edge of the original, which keeps
+ *   the cross (and the chapel) whole. Star of peace cannot keep the cross with four pegs free of
+ *   it, so its board leaves the cross out entirely (it ends 33 px before the crossbar) and
+ *   keeps the lantern.
+ * - `slots`: Bethlehem's board hangs on the other four pegs (measured in the picture: brightness
+ *   peaks of the pegs, corrected by the offset of the four known ones), because its first peg is
+ *   cut off.
+ */
+const BOARD = { width: 3096, height: 1290 } as const;
+const ORIGINAL_3x1 = { width: 2048, height: 682 } as const;
+const BOARD_SCALE = BOARD.height / ORIGINAL_3x1.height / (CANVAS.width / ORIGINAL_3x1.width); // ≈ 1.0088
+const BOARD_CUTS: Record<
+  string,
+  { top: number; left: number; slots?: readonly { x: number; tilt: number }[] }
+> = {
+  "peace-wall": { top: 150, left: 778 },
+  "snowy-chapel": { top: 100, left: 778 },
+  "star-of-peace": { top: 60, left: 200 },
+  bethlehem: {
+    top: 100,
+    left: 778,
+    slots: [
+      { x: 1092, tilt: -0.5 },
+      { x: 1752, tilt: 0.4 },
+      { x: 2424, tilt: -0.3 },
+      { x: 3088, tilt: 0.5 },
+    ],
+  },
+};
+
+export const WALL_THEMES: readonly WallTheme[] = BASE_THEMES.map((theme) => {
+  const cut = BOARD_CUTS[theme.id];
+  if (!cut) return theme;
+  const board = recutTheme(theme, {
+    ...BOARD,
+    ...cut,
+    scale: BOARD_SCALE,
+    background: `/wall/themes/${theme.id}.board.jpg`,
+  });
+  return { ...theme, variants: [board] };
+});
 
 /**
  * The theme a wall shows before staff choose one. Picked by Claude on 2026-11-13 from the eight

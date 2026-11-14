@@ -18,7 +18,14 @@ import {
   wallLayout,
   type Rect,
 } from "@/lib/wall/layout";
-import { ROTATE_MINUTES, activeThemeId, normalizeLook } from "@/lib/wall/themes";
+import { readFileSync } from "node:fs";
+import {
+  ROTATE_MINUTES,
+  activeThemeId,
+  fitTheme,
+  normalizeLook,
+  type WallTheme,
+} from "@/lib/wall/themes";
 
 const file = (publicPath: string) => path.join(process.cwd(), "public", publicPath);
 const overlaps = (a: Rect, b: Rect) =>
@@ -27,9 +34,16 @@ const overlaps = (a: Rect, b: Rect) =>
 /**
  * Every theme is data (D85), so every theme gets the same checks: the picture is the wall canvas,
  * photos of every format hang inside it without touching a neighbour, and the wordmark is never
- * behind a photo.
+ * behind a photo. A theme's cut for another screen shape (D90) is checked the same way.
  */
-describe.each(WALL_THEMES.map((t) => [t.id, t] as const))("wall theme %s", (_id, theme) => {
+const LOOKS: (readonly [string, WallTheme, boolean])[] = WALL_THEMES.flatMap((t) => [
+  [t.id, t, false] as const,
+  ...(t.variants ?? []).map(
+    (v) => [`${t.id} @ ${v.scene.width}×${v.scene.height}`, { ...t, ...v }, true] as const,
+  ),
+]);
+
+describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
   const layout = wallLayout(theme.scene);
   const frames = FRAMES.map((f) => ({ id: f.id, width: f.outputWidth, height: f.outputHeight }));
   /** The box a photo of each kind takes in a slot: strip, every booth frame, phone card. */
@@ -42,11 +56,10 @@ describe.each(WALL_THEMES.map((t) => [t.id, t] as const))("wall theme %s", (_id,
     ];
   };
 
-  it("has a 3840 × 1080 picture, a 640 × 180 preview and its clip, all bundled", async () => {
-    expect(theme.scene.width).toBe(3840);
-    expect(theme.scene.height).toBe(1080);
+  it("has a 3840 × 1080 picture (3096 × 1290 for a board cut), a preview and its clip, all bundled", async () => {
+    expect([theme.scene.width, theme.scene.height]).toEqual(isCut ? [3096, 1290] : [3840, 1080]);
     const bg = await sharp(file(theme.background)).metadata();
-    expect([bg.width, bg.height]).toEqual([3840, 1080]);
+    expect([bg.width, bg.height]).toEqual([theme.scene.width, theme.scene.height]);
     const preview = await sharp(file(theme.preview)).metadata();
     expect([preview.width, preview.height]).toEqual([640, 180]);
     if (theme.hang.kind === "clip") expect(existsSync(file(theme.hang.image))).toBe(true);
@@ -147,6 +160,71 @@ describe.each(WALL_THEMES.map((t) => [t.id, t] as const))("wall theme %s", (_id,
     }
     // A picture with its own pegs draws no clip and hangs the photo right under the peg.
     if (theme.hang.kind === "in-picture") expect(theme.scene.strip.drop).toBe(0);
+  });
+});
+
+describe("a theme cut for the screen's shape (D90)", () => {
+  const board = (id: string) => getWallTheme(id).variants?.[0];
+  const S = ["peace-wall", "snowy-chapel", "star-of-peace", "bethlehem"];
+
+  it("the four 3:1 themes have a 2.4:1 board cut; the 32:9 ones and the old scene do not", () => {
+    for (const t of WALL_THEMES)
+      expect(t.variants?.length ?? 0, t.id).toBe(S.includes(t.id) ? 1 : 0);
+  });
+
+  it("a 3096 × 1290 board gets the board cut; the 32:9 themes keep their picture (with bands)", () => {
+    for (const t of WALL_THEMES) {
+      const fit = fitTheme(t, 3096 / 1290);
+      expect(fit.id).toBe(t.id);
+      expect(fit.scene.width, t.id).toBe(S.includes(t.id) ? 3096 : t.scene.width);
+      if (S.includes(t.id)) expect(fit.background).toBe(`/wall/themes/${t.id}.board.jpg`);
+      else expect(fit).toBe(t);
+    }
+  });
+
+  it("a 32:9 wall keeps the original; an unknown shape keeps it too; 16:9 is closer to 2.4:1", () => {
+    for (const t of WALL_THEMES) {
+      expect(fitTheme(t, 3840 / 1080)).toBe(t);
+      expect(fitTheme(t, null)).toBe(t);
+      expect(fitTheme(t, 0)).toBe(t);
+    }
+    expect(fitTheme(getWallTheme("peace-wall"), 16 / 9).scene.width).toBe(3096);
+    // Halfway in ratio (geometric mean of 2.4 and 3.56) is where the choice flips.
+    const flip = Math.sqrt(2.4 * (3840 / 1080));
+    expect(fitTheme(getWallTheme("peace-wall"), flip * 0.99).scene.width).toBe(3096);
+    expect(fitTheme(getWallTheme("peace-wall"), flip * 1.01).scene.width).toBe(3840);
+  });
+
+  it("moves the line with the picture: the same point of the original, in either cut", () => {
+    for (const id of S) {
+      const base = getWallTheme(id);
+      const cut = board(id)!;
+      const k = 1290 / 682 / (3840 / 2048);
+      const left = k * base.scene.line.midX - cut.scene.line.midX;
+      const top = cut.scene.line.y0 / k - base.scene.line.y0;
+      for (const x of [800, 1500, 2200, 2900]) {
+        expect(lineYAt(cut.scene.line, k * x - left)).toBeCloseTo(
+          k * (lineYAt(base.scene.line, x) + top),
+          6,
+        );
+      }
+      // Photos keep their size; the wordmark keeps its size.
+      expect(cut.scene.strip).toEqual(base.scene.strip);
+      expect(cut.wordmark!.size).toBe(base.wordmark!.size);
+    }
+  });
+
+  it("the picture script cuts at the same places as the config (top, left)", () => {
+    const script = readFileSync(path.join(process.cwd(), "scripts/wall-backgrounds.mjs"), "utf8");
+    for (const id of S) {
+      const m = new RegExp(`id: "${id}", top: (\\d+), board: (\\d+)`).exec(script);
+      expect(m, id).not.toBeNull();
+      const base = getWallTheme(id);
+      const cut = board(id)!;
+      const k = 1290 / 682 / (3840 / 2048);
+      expect(k * base.scene.line.midX - cut.scene.line.midX).toBeCloseTo(Number(m![2]), 6);
+      expect(cut.scene.line.y0 / k - base.scene.line.y0).toBeCloseTo(Number(m![1]), 6);
+    }
   });
 });
 
