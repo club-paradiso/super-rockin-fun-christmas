@@ -39,8 +39,8 @@ export default async function SettingsPage() {
     .filter(([status]) => status !== "DELETED")
     .reduce((sum, [, n]) => sum + n, 0);
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold">설정</h1>
+    <div className="flex flex-col gap-4 md:gap-6">
+      <h1 className="admin-h1">설정</h1>
       <EmergencyPanel
         settings={settings}
         wallStatus={wallOpen(settings, new Date(), WALL_CONFIG.timeZone)}

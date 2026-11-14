@@ -91,7 +91,7 @@ export function PhotoCard({
     >
       <div className="flex h-72 items-center justify-center bg-backdrop">
         {photo.deleted ? (
-          <p className="text-lg text-ink/75">이미지 삭제됨</p>
+          <p className="text-base text-ink/75">이미지 삭제됨</p>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- private staff-only proxy, no caching
           <img
@@ -104,25 +104,20 @@ export function PhotoCard({
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-bold ${STATUS_TONE[photo.status]}`}
-            data-testid="photo-status"
-          >
+          <span className={`admin-chip ${STATUS_TONE[photo.status]}`} data-testid="photo-status">
             {STATUS_LABEL[photo.status]}
           </span>
           <span
-            className={`rounded-full px-3 py-1 text-sm font-bold ${
+            className={`admin-chip ${
               photo.source === "mobile" ? "bg-alert text-button-text" : "bg-ink/15"
             }`}
             data-testid="photo-source"
           >
             {photo.source === "mobile" ? "휴대폰 사진" : "현장 촬영"}
           </span>
-          {photo.wallConsent && (
-            <span className="rounded-full bg-ink/15 px-3 py-1 text-sm">미디어월 동의</span>
-          )}
+          {photo.wallConsent && <span className="admin-chip bg-ink/15">미디어월 동의</span>}
           {photo.wallEligible && (
-            <span className="rounded-full bg-approve/15 px-3 py-1 text-sm">월 게시 가능</span>
+            <span className="admin-chip bg-approve/15 text-approve">미디어월 게시 가능</span>
           )}
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-ink/75">
@@ -155,7 +150,7 @@ export function PhotoCard({
               type="button"
               disabled={busy !== null}
               onClick={() => ask(a)}
-              className={`admin-btn ${ACTION_STYLE[a]} ${primaryOnly ? "flex-1 min-h-16 text-xl" : ""}`}
+              className={`admin-btn ${ACTION_STYLE[a]} flex-1`}
               data-testid={`action-${a}`}
             >
               {busy === a ? "…" : ACTION_LABEL[a]}

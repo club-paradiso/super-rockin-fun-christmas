@@ -427,9 +427,38 @@ body {
   .btn-secondary {
     @apply inline-flex min-h-20 items-center justify-center rounded-full border-2 border-ink px-10 text-2xl font-semibold text-ink transition active:scale-[0.98] active:bg-ink/10 disabled:opacity-50;
   }
-  /* Staff control panel: big, obvious, touch-friendly (desktop, tablet, phone). */
+  /* Staff control panel, phone first. A logbook, not a poster: hairline borders and no shadows
+     (depth comes from paper on backdrop), three radii (chip 6 / control 10 / card 14, a segmented
+     control's track 12 = its 10 + 2 padding), a 44 px control, and one type scale (22 page title,
+     17 card title, 15-16 body, 14 help, 13 chip). Colours are the tokens above, nothing else.
+     Korean never breaks inside a word: that is what made labels read "촬/영" on a phone. */
+  .admin-root,
+  .admin-login {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .admin-root :where(p, li, dd) {
+    text-wrap: pretty;
+  }
+  .admin-root :where(h1, h2, h3) {
+    text-wrap: balance;
+  }
+  /* The sign-in screen keeps 48 px controls (D84, e2e/admin-password.spec.ts): it is the one staff
+     screen used before anything else is known, and often with one thumb. The rest of /admin is 44. */
+  .admin-login :is(.admin-btn, .admin-input) {
+    min-height: 3rem;
+  }
+  .admin-h1 {
+    @apply text-[22px] leading-tight font-bold tracking-tight md:text-[28px];
+  }
+  .admin-h2 {
+    @apply text-[17px] leading-snug font-bold tracking-tight;
+  }
+  .admin-help {
+    @apply text-sm leading-relaxed text-ink/75;
+  }
   .admin-btn {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-full px-5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-base leading-tight font-semibold transition active:scale-[0.98] disabled:opacity-50;
   }
   .admin-btn-primary {
     @apply bg-button text-button-text;
@@ -441,13 +470,60 @@ body {
     @apply bg-danger text-button-text;
   }
   .admin-btn-quiet {
-    @apply border border-ink/60 text-ink active:bg-ink/10;
+    @apply border border-ink/40 text-ink active:bg-ink/10;
   }
   .admin-card {
-    @apply rounded-3xl border border-ink/15 bg-paper;
+    @apply rounded-[14px] border border-ink/15 bg-paper;
   }
   .admin-input {
-    @apply min-h-14 rounded-lg border border-ink/50 bg-paper px-4 text-lg text-ink placeholder:text-ink/70;
+    @apply min-h-11 rounded-[10px] border border-ink/40 bg-paper px-3.5 text-base text-ink placeholder:text-ink/70;
+  }
+  /* A short status word (state, source, count). Square-ish on purpose: pills are for nothing here. */
+  .admin-chip {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-[13px] leading-5 font-semibold;
+  }
+  /* One choice out of a few, in one row of equal columns (never wrapping into uneven pills). The
+     chosen segment is the lighter, raised one; an inset track reads as "pick here". */
+  .admin-seg {
+    @apply grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl bg-ink/10 p-0.5;
+  }
+  .admin-seg-btn {
+    @apply inline-flex min-h-10 items-center justify-center rounded-[10px] px-2 text-center text-[15px] leading-tight font-semibold text-ink/75 transition active:scale-[0.98] disabled:opacity-50;
+  }
+  .admin-seg-btn:where([aria-checked="true"], [aria-current="page"], [aria-pressed="true"]) {
+    @apply bg-paper text-ink ring-1 ring-ink/40;
+  }
+  /* A switch row: text on the left, the toggle and its state word on the right. */
+  .admin-switch-row {
+    @apply flex min-h-16 w-full items-center gap-4 px-4 py-3 text-left transition-colors active:bg-ink/5 disabled:opacity-60;
+  }
+  .admin-switch-track {
+    @apply relative block h-[26px] w-[46px] shrink-0 rounded-full bg-ink/55 transition-colors;
+  }
+  .admin-switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--color-paper);
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .admin-switch-track[data-on="true"] {
+    background: var(--color-danger);
+  }
+  .admin-switch-track[data-on="true"]::after {
+    transform: translateX(20px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .admin-switch-track,
+    .admin-switch-track::after,
+    .admin-btn,
+    .admin-seg-btn {
+      transition: none;
+    }
   }
   /* Administrator login (D84): one centred column on phones, tablets and desktops. The page may
      scroll when a software keyboard or a short window leaves too little room; nothing is clipped. */
@@ -1700,6 +1776,15 @@ main input:focus-visible,
 .kiosk-dialog button:focus-visible {
   outline: 4px solid var(--color-ink);
   outline-offset: 3px;
+}
+
+/* Staff screens are denser than the booth: 2 px with a 2 px gap (still the WCAG 2.4.13 minimum).
+   This sits outside @layer on purpose: an unlayered rule beats a layered one whatever its
+   specificity, so it has to be unlayered, after the rule above, to replace it. */
+.admin-root :is(button, a, input, select, textarea, summary):focus-visible,
+.admin-login :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }
 
 @keyframes flash {

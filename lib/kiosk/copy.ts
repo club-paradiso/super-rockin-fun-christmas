@@ -30,7 +30,7 @@ const ko = {
     cameraLead: "여섯 장 찍고 골라서 휴대폰으로 받아요",
     mobile: "내 사진으로 참여하기",
     mobileLead: "휴대폰에 있는 사진을 미디어월로 보내요",
-    paused: "지금은 사진 접수를 잠시 멈췄어요",
+    paused: "미디어월 게시 신청을 잠시 멈췄어요. 사진 찍기는 지금도 할 수 있어요",
   },
   chrome: {
     back: "이전",
@@ -144,7 +144,7 @@ const ko = {
         lead: "내 사진 보내기는 인터넷이 필요해요. 사진 찍기는 지금도 할 수 있어요.",
       },
       paused: {
-        title: "지금은 사진 접수를 잠시 멈췄어요",
+        title: "미디어월 게시 신청을 잠시 멈췄어요",
         lead: "잠시 뒤 다시 시도해 주세요. 사진 찍기는 지금도 할 수 있어요.",
       },
       error: { title: "QR을 만들지 못했어요", lead: "다시 시도를 눌러 주세요." },
@@ -190,7 +190,7 @@ const en: KioskCopy = {
     cameraLead: "Take six, pick your favorites, and get them on your phone",
     mobile: "Share a photo from your phone",
     mobileLead: "Send a photo from your phone to the media wall",
-    paused: "Photo submissions are paused right now",
+    paused: "Media wall submissions are paused right now. You can still take photos here",
   },
   chrome: {
     back: "Back",
@@ -302,7 +302,7 @@ const en: KioskCopy = {
         lead: "Sending your own photo needs the internet. You can still take photos here.",
       },
       paused: {
-        title: "Photo submissions are paused right now",
+        title: "Media wall submissions are paused right now",
         lead: "Please try again in a little while. You can still take photos here.",
       },
       error: { title: "We couldn’t make a QR code", lead: "Tap “Try again.”" },

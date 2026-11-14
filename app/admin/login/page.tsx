@@ -20,16 +20,17 @@ export const metadata: Metadata = {
 const DENIED: Record<string, string> = {
   not_staff: "이 계정은 스태프 명단에 없어요. 운영 책임자에게 문의하세요.",
   inactive: "비활성화된 스태프 계정이에요. 운영 책임자에게 문의하세요.",
-  not_configured: "스태프 로그인이 설정되지 않았어요 (Supabase 또는 FTL_ROLE=hub 필요).",
+  not_configured:
+    "스태프 로그인이 아직 설정되지 않았어요. 기술 담당에게 문의하세요. (Supabase 또는 FTL_ROLE=hub 필요)",
 };
 
 /** Why the shared password login is off (shown instead of a field that could never work). */
 const PASSWORD_OFF: Record<string, string> = {
   no_password:
-    "키오스크 등록 비밀번호(KIOSK_ENROLL_SECRET)가 설정되지 않아 비밀번호 로그인을 쓸 수 없어요.",
+    "키오스크 등록 비밀번호가 설정되지 않아 비밀번호 로그인을 쓸 수 없어요. 기술 담당에게 문의하세요. (KIOSK_ENROLL_SECRET)",
   password_too_short:
-    "키오스크 등록 비밀번호(KIOSK_ENROLL_SECRET)가 12자보다 짧아 관리자 로그인에는 쓸 수 없어요. 12자 이상으로 바꿔 주세요.",
-  auth_disabled: "개발 모드(KIOSK_AUTH_DISABLED=1)에서는 비밀번호 로그인을 쓸 수 없어요.",
+    "키오스크 등록 비밀번호가 12자보다 짧아 관리자 로그인에는 쓸 수 없어요. 기술 담당에게 12자 이상으로 바꿔 달라고 하세요. (KIOSK_ENROLL_SECRET)",
+  auth_disabled: "개발 모드에서는 비밀번호 로그인을 쓸 수 없어요. (KIOSK_AUTH_DISABLED=1)",
 };
 
 export default async function LoginPage({

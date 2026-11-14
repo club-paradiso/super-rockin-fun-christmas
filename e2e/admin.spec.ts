@@ -142,7 +142,7 @@ test("PAUSE SUBMISSIONS: photography and QR keep working, wall consent is skippe
     "aria-checked",
     "true",
   );
-  await expect(staff.getByTestId("emergency-banner")).toContainText("미디어월 참여 중지");
+  await expect(staff.getByTestId("emergency-banner")).toContainText("미디어월 게시 신청 중지");
 
   const { url } = await kioskPhotoToQr(kiosk); // fresh page load picks up the setting
   await expect(kiosk.locator("main")).toHaveAttribute("data-wall-submissions", "paused");
