@@ -19,14 +19,14 @@ import sharp from "sharp";
 const CANVAS = { width: 3840, height: 1080 };
 const PREVIEW = { width: 640, height: 180 };
 /**
- * A 2.4:1 board (D90, e.g. a 3096 × 1290 LED): the whole height of a 3:1 original, scaled to the
+ * A 2.4:1 board (D91, e.g. a 3096 × 1290 LED): the whole height of a 3:1 original, scaled to the
  * board height, cut to the board width. No new picture: only the sides are cut.
  */
 const BOARD = { width: 3096, height: 1290 };
 
 /**
  * file (in the source folder) → theme id (config/wall-themes.ts), its vertical cut, and for the
- * 3:1 originals `board`: how many pixels the 2.4:1 board picture cuts from the left (D90). Keep
+ * 3:1 originals `board`: how many pixels the 2.4:1 board picture cuts from the left (D91). Keep
  * `top` and `board` equal to `BOARD_CUTS` in config/wall-themes.ts.
  */
 const SOURCES = [

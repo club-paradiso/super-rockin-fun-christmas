@@ -58,7 +58,7 @@ export function WallApp({
   }, []);
   const [feed, setFeed] = useState<WallFeed | null>(null);
   // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them. A theme cut
-  // for another screen shape (D90: a 2.4:1 board) is used when it fits this screen better.
+  // for another screen shape (D91: a 2.4:1 board) is used when it fits this screen better.
   const themeId = feed?.theme ?? initialTheme;
   const shape = canvas ?? viewport;
   const aspect = shape ? shape.width / shape.height : null;

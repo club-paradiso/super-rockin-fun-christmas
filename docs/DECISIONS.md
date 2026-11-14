@@ -1278,7 +1278,7 @@ were in use. Two of the defects were functional: the invisible staff-help corner
   dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
   wide empty paper beside the preview on the frame and consent screens.
 
-## D89 · The macOS wall opens on the second display by itself and keeps the Mac awake
+## D90 · The macOS wall opens on the second display by itself and keeps the Mac awake
 
 Context: the media wall will run on the church's iMac, with the LED (or TV) as its second display.
 `start-wall.command` opened Chrome in kiosk mode without saying where, so the wall would most
@@ -1304,10 +1304,10 @@ the iMac from sleeping.
   `--window-position` on macOS with the profile's saved window state, and the macOS setting
   "Displays have separate Spaces" (on is expected), need the iMac (`docs/DEVICE_ACCEPTANCE.md` D12–D15).
 
-## D90 · A theme can be cut again for another screen shape; the wall picks the closest
+## D91 · A theme can be cut again for another screen shape; the wall picks the closest
 
 Context: the media wall at 성안교회 is the church's mission board, 3096 × 1290 (2.4:1), driven as
-the iMac's second display (D89). The wall scene is 3840 × 1080 (3.56:1). Fitted without
+the iMac's second display (D90). The wall scene is 3840 × 1080 (3.56:1). Fitted without
 stretching (D65) it would fill 3096 × 871 and leave a third of the board as bands, photos at 81 %.
 The user asked for any screen shape to apply by itself.
 

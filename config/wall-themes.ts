@@ -281,7 +281,7 @@ const BASE_THEMES: readonly WallTheme[] = [
 ];
 
 /**
- * 2.4:1 boards (D90), e.g. the 3096 × 1290 LED at 성안교회. The four 3:1 originals (S01–S04,
+ * 2.4:1 boards (D91), e.g. the 3096 × 1290 LED at 성안교회. The four 3:1 originals (S01–S04,
  * 2048 × 682) are cut again at their full height, so only the sides are lost; the four 32:9
  * originals (C01–C04) are too short for that and keep bands on such a board (user's choice,
  * 2026-11-14). Pictures made by scripts/wall-backgrounds.mjs (`board`; keep these numbers equal).

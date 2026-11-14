@@ -360,7 +360,7 @@ for (const theme of WALL_THEMES) {
   });
 }
 
-// D90: on a 2.4:1 board (성안교회 3096 × 1290) a 3:1 theme uses its board cut and fills the
+// D91: on a 2.4:1 board (성안교회 3096 × 1290) a 3:1 theme uses its board cut and fills the
 // screen; a 32:9 theme keeps its picture with bands. Photos stay inside the picture either way.
 for (const [id, cut] of [
   ["peace-wall", true],

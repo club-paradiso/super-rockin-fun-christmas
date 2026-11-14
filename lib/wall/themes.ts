@@ -58,7 +58,7 @@ export interface WallTheme {
   /** Ambient animation. None of the current themes animate: a still picture is the design. */
   motion: "none";
   /**
-   * The same picture cut for a screen of another shape (D90), e.g. a 2.4:1 board. The wall uses
+   * The same picture cut for a screen of another shape (D91), e.g. a 2.4:1 board. The wall uses
    * whichever of the theme itself and these is closest to the screen's shape (`fitTheme`).
    */
   variants?: readonly WallThemeLook[];
@@ -90,7 +90,7 @@ export interface Recut {
 }
 
 /**
- * The theme's numbers carried into a recut picture (D90). Pure arithmetic on numbers measured
+ * The theme's numbers carried into a recut picture (D91). Pure arithmetic on numbers measured
  * once in Figma: nothing is measured again, so a variant keeps the designer's placement.
  * Photos keep their pixel size (strip, wideMax, phone card); the line, the slots, the wordmark
  * and the empty-wall text move with the picture.

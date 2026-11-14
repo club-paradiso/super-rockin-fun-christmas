@@ -82,7 +82,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   apart, wordmark never behind a photo). The active theme comes from the feed
   (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
   FOLLOW THE LIGHTS scene: selectable, never the default. A theme may carry `variants`: the same
-  picture cut for another screen shape (D90, the 2.4:1 board), derived with `recutTheme` from the
+  picture cut for another screen shape (D91, the 2.4:1 board), derived with `recutTheme` from the
   theme's own numbers; the wall picks the closest shape with `fitTheme` and never stretches. Every
   variant passes the same theme tests.
 - **Phone uploads (D66) are ordinary photos** with `frame_id = 'phone-photo'` (`config/mobile.ts`):

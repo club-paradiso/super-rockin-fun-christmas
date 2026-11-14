@@ -34,7 +34,7 @@ const overlaps = (a: Rect, b: Rect) =>
 /**
  * Every theme is data (D85), so every theme gets the same checks: the picture is the wall canvas,
  * photos of every format hang inside it without touching a neighbour, and the wordmark is never
- * behind a photo. A theme's cut for another screen shape (D90) is checked the same way.
+ * behind a photo. A theme's cut for another screen shape (D91) is checked the same way.
  */
 const LOOKS: (readonly [string, WallTheme, boolean])[] = WALL_THEMES.flatMap((t) => [
   [t.id, t, false] as const,
@@ -163,7 +163,7 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
   });
 });
 
-describe("a theme cut for the screen's shape (D90)", () => {
+describe("a theme cut for the screen's shape (D91)", () => {
   const board = (id: string) => getWallTheme(id).variants?.[0];
   const S = ["peace-wall", "snowy-chapel", "star-of-peace", "bethlehem"];
 
