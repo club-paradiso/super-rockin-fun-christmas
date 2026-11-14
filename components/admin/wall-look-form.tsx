@@ -39,7 +39,7 @@ export function WallLookForm({
     rotation.join() !== look.rotation.join();
   const rotationShort = rotate && rotation.length < 2;
 
-  async function save(next: WallLook) {
+  async function save(next: Omit<WallLook, "showSeconds" | "halfLifeMinutes">) {
     setBusy(true);
     setMessage(null);
     const res = await postJson("/api/admin/settings", { wallLook: next });

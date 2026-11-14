@@ -82,6 +82,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   apart, wordmark never behind a photo). The active theme comes from the feed
   (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
   FOLLOW THE LIGHTS scene: selectable, never the default.
+- **The wall's pace is a staff setting** (D89): `showSeconds` and `halfLifeMinutes` live inside the
+  audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
+  `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo
+  comes up (`ageWeight` in `lib/wall/rotation.ts`); it never removes one, and with it off the
+  order is exactly the fair order.
 - **Phone uploads (D66) are ordinary photos** with `frame_id = 'phone-photo'` (`config/mobile.ts`):
   one per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review

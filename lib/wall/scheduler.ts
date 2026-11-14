@@ -23,6 +23,11 @@ export interface WallSchedule {
   slots: WallSlot[];
   /** photoId → when it last finished EXIT, ms. Only eligible photos are kept. */
   lastShown: Record<string, number>;
+  /**
+   * photoId → turns taken so far, each counted as 1 / share (D89). The photo with the lowest
+   * number is the most overdue; with equal shares this is plain round-robin. Eligible photos only.
+   */
+  turns?: Record<string, number>;
 }
 
 export function emptySchedule(slotCount: number, now = 0): WallSchedule {
@@ -43,6 +48,11 @@ export interface StepInput {
   ordering?: "fair" | "newest";
   /** Staff asked for these now. */
   showNow?: ReadonlySet<string>;
+  /**
+   * `newest` ordering only (D89): each photo's share of the wall (lib/wall/rotation.ts
+   * `ageWeight`). A photo with half the share is picked half as often. Absent = all equal.
+   */
+  weights?: ReadonlyMap<string, number>;
 }
 
 export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedule {
@@ -50,6 +60,8 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
   const allowed = new Set(eligible);
   const lastShown: Record<string, number> = {};
   for (const [id, at] of Object.entries(state.lastShown)) if (allowed.has(id)) lastShown[id] = at;
+  const turns: Record<string, number> = {};
+  for (const [id, n] of Object.entries(state.turns ?? {})) if (allowed.has(id)) turns[id] = n;
 
   const empty = (): WallSlot => ({ photoId: null, phase: null, since: now });
   const slots = state.slots.map((slot): WallSlot => {
@@ -71,10 +83,17 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
 
   const free = slots.findIndex((s) => !s.photoId);
   if (free >= 0) {
-    const next = pickNext({ ...input, slots, lastShown });
-    if (next) slots[free] = { photoId: next, phase: "ENTER", since: now };
+    const next = pickNext({ ...input, slots, lastShown, turns });
+    if (next) {
+      slots[free] = { photoId: next, phase: "ENTER", since: now };
+      // A photo new to the count starts level with the least-shown one, not at zero: it must
+      // not get a burst of turns to "catch up" with photos that were here all along.
+      const floor = Math.min(...Object.values(turns), Infinity);
+      const start = Math.max(turns[next] ?? 0, Number.isFinite(floor) ? floor : 0);
+      turns[next] = start + 1 / Math.max(input.weights?.get(next) ?? 1, 1e-12);
+    }
   }
-  return { slots, lastShown };
+  return { slots, lastShown, turns };
 }
 
 /**
@@ -99,8 +118,14 @@ function makeRoomForShowNow(slots: WallSlot[], input: StepInput) {
   if (victim >= 0) slots[victim] = { ...slots[victim]!, phase: "EXIT", since: now };
 }
 
-function pickNext(input: StepInput & { slots: WallSlot[]; lastShown: Record<string, number> }) {
-  const { now, eligible, ready, timings, slots, lastShown, showNow = new Set() } = input;
+function pickNext(
+  input: StepInput & {
+    slots: WallSlot[];
+    lastShown: Record<string, number>;
+    turns: Record<string, number>;
+  },
+) {
+  const { now, eligible, ready, timings, slots, lastShown, turns, showNow = new Set() } = input;
   const onWall = new Set(slots.map((s) => s.photoId));
   const candidates = eligible.filter((id) => ready.has(id) && !onWall.has(id));
   const resting = (id: string) =>
@@ -111,13 +136,16 @@ function pickNext(input: StepInput & { slots: WallSlot[]; lastShown: Record<stri
   if (input.ordering === "fair") return candidates.find((id) => !resting(id)) ?? null;
 
   // Cloud fallback: never-shown photos first (newest first), then the one that has rested longest.
+  // With shares (D89), the photo with the fewest share-weighted turns goes first, so a photo
+  // with half the share comes up half as often; ties go to the one that has rested longest.
   const fresh = candidates.find((id) => lastShown[id] === undefined);
   if (fresh) return fresh;
   let best: string | null = null;
   for (const id of candidates) {
     const at = lastShown[id]!;
     if (now - at < timings.cooldownMs) continue;
-    if (best === null || at < lastShown[best]!) best = id;
+    const d = best === null ? -1 : (turns[id] ?? 0) - (turns[best] ?? 0);
+    if (d < -1e-9 || (Math.abs(d) <= 1e-9 && at < lastShown[best!]!)) best = id;
   }
   return best;
 }

@@ -11,7 +11,13 @@ import {
 } from "@/lib/storage/types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { isValidHours } from "@/lib/wall/hours";
-import { ROTATE_MINUTES, normalizeLook, type WallLook } from "@/lib/wall/themes";
+import {
+  HALF_LIFE_MINUTES,
+  ROTATE_MINUTES,
+  SHOW_SECONDS,
+  normalizeLook,
+  type WallLook,
+} from "@/lib/wall/themes";
 
 const FORCES: WallForce[] = ["auto", "on", "off"];
 
@@ -26,7 +32,8 @@ export const GET = staffRoute("admin_settings", async () =>
  * POST any of {"pauseSubmissions","pauseWall","showHoldingScreen"} as booleans,
  * "wallForce": "auto" | "on" | "off", "wallHours": {"start":"HH:MM","end":"HH:MM"} | null,
  * "kioskDefaultMode": "standard" | "easy" (D67), "wallPublic": boolean (D86),
- * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85). Audited.
+ * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85),
+ * "wallPace": {"showSeconds","halfLifeMinutes"} (D89; stored inside the look). Audited.
  * pauseSubmissions stops NEW media-wall submissions only; photography and QR delivery continue.
  */
 export const POST = staffRoute("admin_settings_update", async (request, { staff }) => {
@@ -64,6 +71,18 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
     if (problem) return jsonError(400, problem);
     patch.wallLook = normalizeLook(body.wallLook, WALL_THEMES, DEFAULT_WALL_THEME);
   }
+  if (body && "wallPace" in body) {
+    const problem = wallPaceProblem(body.wallPace);
+    if (problem) return jsonError(400, problem);
+    patch.wallLook = {
+      ...(patch.wallLook ?? (await currentLook())),
+      ...(body.wallPace as Pick<WallLook, "showSeconds" | "halfLifeMinutes">),
+    };
+  } else if (patch.wallLook) {
+    // The background form knows nothing about the pace: saving a background keeps it.
+    const { showSeconds, halfLifeMinutes } = await currentLook();
+    patch.wallLook = { ...patch.wallLook, showSeconds, halfLifeMinutes };
+  }
   if (!Object.keys(patch).length) return jsonError(400, "nothing to change");
   const settings = await getBackend().settings.update(patch, staff.userId);
   const { wallHours, wallLook, ...flags } = patch;
@@ -75,6 +94,8 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
       wallRotate: wallLook.rotate
         ? `${wallLook.rotateMinutes}m:${wallLook.rotation.join(",")}`
         : "off",
+      wallShowSeconds: wallLook.showSeconds,
+      wallHalfLifeMinutes: wallLook.halfLifeMinutes,
     }),
     ...(wallHours !== undefined && {
       wallHours: wallHours ? `${wallHours.start}-${wallHours.end}` : null,
@@ -82,6 +103,23 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
   });
   return NextResponse.json({ settings }, { headers: NO_STORE });
 });
+
+async function currentLook(): Promise<WallLook> {
+  const settings = await getBackend().settings.get();
+  return normalizeLook(settings.wallLook, WALL_THEMES, DEFAULT_WALL_THEME);
+}
+
+function wallPaceProblem(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return "wallPace must be an object";
+  const pace = raw as Record<string, unknown>;
+  const whole = (v: unknown, r: { min: number; max: number }) =>
+    typeof v === "number" && Number.isInteger(v) && v >= r.min && v <= r.max;
+  if (!whole(pace.showSeconds, SHOW_SECONDS))
+    return `wallPace.showSeconds must be a whole number from ${SHOW_SECONDS.min} to ${SHOW_SECONDS.max}`;
+  if (!whole(pace.halfLifeMinutes, HALF_LIFE_MINUTES))
+    return `wallPace.halfLifeMinutes must be a whole number from ${HALF_LIFE_MINUTES.min} to ${HALF_LIFE_MINUTES.max}`;
+  return null;
+}
 
 /** Strict on the way in (a typo must not silently become the default theme). */
 function wallLookProblem(raw: unknown): string | null {

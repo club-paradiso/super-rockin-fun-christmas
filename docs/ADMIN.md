@@ -57,15 +57,15 @@ yourself. The very first staff member is created once from a terminal:
 
 ## Menu
 
-| Tab           | Use it for                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
-| **개요**      | Emergency switches, waiting-for-review count, kiosk status, kiosk upload backlog, stored photos, last cleanup |
-| **검수**      | The moderation queue: photos whose guest said **yes** to the media wall, oldest first. **승인** / **반려**    |
-| **최근 세션** | Helping a guest whose QR didn't appear or got lost (last 1–24 h only)                                         |
-| **사진**      | Library with filters (status, time window, kiosk, session code) and every action                              |
-| **키오스크**  | Kiosk status, rename, **등록 해제** (revoke), one-time enrollment codes                                       |
-| **설정**      | Emergency switches, wall hours, **미디어월 배경**, **공개 미디어월**, booth start screen, the staff list      |
-| **기록**      | Append-only history of every change (who, what, when)                                                         |
+| Tab           | Use it for                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **개요**      | Emergency switches, waiting-for-review count, kiosk status, kiosk upload backlog, stored photos, last cleanup                    |
+| **검수**      | The moderation queue: photos whose guest said **yes** to the media wall, oldest first. **승인** / **반려**                       |
+| **최근 세션** | Helping a guest whose QR didn't appear or got lost (last 1–24 h only)                                                            |
+| **사진**      | Library with filters (status, time window, kiosk, session code) and every action                                                 |
+| **키오스크**  | Kiosk status, rename, **등록 해제** (revoke), one-time enrollment codes                                                          |
+| **설정**      | Emergency switches, wall hours, **미디어월 배경**, **미디어월 사진 속도**, **공개 미디어월**, booth start screen, the staff list |
+| **기록**      | Append-only history of every change (who, what, when)                                                                            |
 
 ## Moderation rules
 
@@ -141,6 +141,15 @@ lasts the normal link lifetime, but never past the photo's retention date.
 | **대기 화면 표시** (SHOW HOLDING SCREEN)   | The wall shows a holding message and receives no photos. Wins over PAUSE WALL                                                                   | `/wall` feed    |
 
 While any switch is on, a red banner appears on every admin page.
+
+## 미디어월 사진 속도 (설정, D89)
+
+- **한 장이 떠 있는 시간**: 5–120 s (default 14 s). Shorter turns photos over faster.
+- **반감기**: off by default (every photo gets the same number of turns). Set to, say, 1시간, a
+  photo taken an hour ago comes up half as often as a new one, two hours ago a quarter. Old
+  photos never disappear because of it; to take a photo off the wall, hide or delete it.
+- 속도 저장 applies within one poll (about 5 s) on every wall, venue and public. 기본값으로
+  되돌리기 goes back to 14 s and off. Changing the background does not change the pace.
 
 ## 미디어월 배경 (설정, D85)
 
