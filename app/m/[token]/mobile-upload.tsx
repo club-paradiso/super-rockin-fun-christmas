@@ -122,7 +122,14 @@ export function MobileUpload({
   const [dropped, setDropped] = useState(0);
   const [frameId, setFrameId] = useState<string | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
-  const [preview, setPreview] = useState<{ url: string; blob: Blob } | null>(null);
+  // The encoded picture, with the frame and photo list it was made from: composing is async, so
+  // the guest's current choice can be ahead of it for a moment.
+  const [preview, setPreview] = useState<{
+    url: string;
+    blob: Blob;
+    frameId: string;
+    photos: ComposeImage[];
+  } | null>(null);
   const [consent, setConsent] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sending = useRef(false);
@@ -202,7 +209,7 @@ export function MobileUpload({
         );
         canvas.width = canvas.height = 0; // let the browser drop the pixels now
         if (cancelled) return;
-        setPreview({ url: URL.createObjectURL(blob), blob });
+        setPreview({ url: URL.createObjectURL(blob), blob, frameId: frame.id, photos });
         setPhase((p) => (p.name === "preparing" || p.name === "preview" ? { name: "preview" } : p));
       } catch {
         if (!cancelled) setPhase({ name: "error", ...ERRORS.unreadable! });
@@ -254,13 +261,17 @@ export function MobileUpload({
     setFrameId(mobileFramesFor(shrunk.length)[0]?.id ?? null);
   };
 
+  // Only a picture made from what is on screen now may be sent: never an older frame's picture
+  // under the new frame's id (the server would refuse it), never the photos in an older order.
+  const previewCurrent = !!preview && preview.frameId === frameId && preview.photos === photos;
+
   const submit = useCallback(async () => {
-    if (!preview || !frameId || !consent || sending.current) return;
+    if (!preview || !previewCurrent || !consent || sending.current) return;
     sending.current = true;
     try {
       for (let attempt = 0; ; attempt++) {
         setPhase({ name: "uploading", progress: 0, attempt });
-        const outcome = await send(token, preview.blob, frameId!, publicWall, (progress) =>
+        const outcome = await send(token, preview.blob, preview.frameId, publicWall, (progress) =>
           setPhase({ name: "uploading", progress, attempt }),
         );
         if (outcome === "ok") return setPhase({ name: "done" });
@@ -275,7 +286,7 @@ export function MobileUpload({
     } finally {
       sending.current = false;
     }
-  }, [preview, frameId, consent, token, publicWall]);
+  }, [preview, previewCurrent, consent, token, publicWall]);
 
   const choose = () => inputRef.current?.click();
 
@@ -360,7 +371,7 @@ export function MobileUpload({
                   type="button"
                   className="btn-primary w-full"
                   data-testid="mobile-submit"
-                  disabled={!consent}
+                  disabled={!consent || !previewCurrent}
                   onClick={() => void submit()}
                 >
                   미디어월로 보내기
