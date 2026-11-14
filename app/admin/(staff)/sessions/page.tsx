@@ -29,36 +29,37 @@ export default async function SessionsPage({
   });
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">최근 세션</h1>
-      <p className="text-lg text-ink/75">
+      <h1 className="admin-h1">최근 세션</h1>
+      <p className="text-base text-ink/75">
         QR이 안 나왔거나 잃어버린 방문객을 도울 때 쓰세요. 최근 세션만 보여요.
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <nav className="admin-seg md:w-fit md:auto-cols-[7rem]" aria-label="기간">
         {WINDOWS.map((w) => (
           <Link
             key={w}
             href={`/admin/sessions?window=${w}`}
-            className={`admin-btn ${w === window ? "admin-btn-primary" : "admin-btn-quiet"}`}
+            aria-current={w === window ? "page" : undefined}
+            className="admin-seg-btn"
           >
-            최근 {PHOTO_WINDOWS[w]}시간
+            {PHOTO_WINDOWS[w]}시간
           </Link>
         ))}
-        <form className="flex gap-2" action="/admin/sessions">
-          <input type="hidden" name="window" value={window} />
-          <input
-            name="session"
-            defaultValue={session}
-            placeholder="세션 코드 (예: 3f2a9c1d)"
-            aria-label="세션 코드"
-            className="admin-input w-56 font-mono"
-          />
-          <button type="submit" className="admin-btn admin-btn-quiet">
-            찾기
-          </button>
-        </form>
-      </div>
+      </nav>
+      <form className="flex gap-2 md:max-w-md" action="/admin/sessions">
+        <input type="hidden" name="window" value={window} />
+        <input
+          name="session"
+          defaultValue={session}
+          placeholder="세션 코드 (예: 3f2a9c1d)"
+          aria-label="세션 코드"
+          className="admin-input min-w-0 flex-1 font-mono"
+        />
+        <button type="submit" className="admin-btn admin-btn-quiet shrink-0">
+          찾기
+        </button>
+      </form>
       {photos.length === 0 ? (
-        <p className="admin-card p-8 text-center text-xl text-ink/75">이 기간에 세션이 없어요.</p>
+        <p className="admin-card p-8 text-center text-base text-ink/75">이 기간에 세션이 없어요.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="session-list">
           {photos.map((p) => (

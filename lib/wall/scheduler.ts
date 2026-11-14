@@ -24,7 +24,7 @@ export interface WallSchedule {
   /** photoId → when it last finished EXIT, ms. Only eligible photos are kept. */
   lastShown: Record<string, number>;
   /**
-   * photoId → turns taken so far, each counted as 1 / share (D89). The photo with the lowest
+   * photoId → turns taken so far, each counted as 1 / share (D92). The photo with the lowest
    * number is the most overdue; with equal shares this is plain round-robin. Eligible photos only.
    */
   turns?: Record<string, number>;
@@ -51,7 +51,7 @@ export interface StepInput {
   /** Staff asked for these now. */
   showNow?: ReadonlySet<string>;
   /**
-   * `newest` ordering only (D89): each photo's share of the wall (lib/wall/rotation.ts
+   * `newest` ordering only (D92): each photo's share of the wall (lib/wall/rotation.ts
    * `ageWeight`). A photo with half the share is picked half as often. Absent = all equal.
    */
   weights?: ReadonlyMap<string, number>;
@@ -148,7 +148,7 @@ function pickNext(
   if (input.ordering === "fair") return candidates.find((id) => !resting(id)) ?? null;
 
   // Cloud fallback: never-shown photos first (newest first), then the one that has rested longest.
-  // With shares (D89), the photo with the fewest share-weighted turns goes first, so a photo
+  // With shares (D92), the photo with the fewest share-weighted turns goes first, so a photo
   // with half the share comes up half as often; ties go to the one that has rested longest.
   const fresh = candidates.find((id) => lastShown[id] === undefined);
   if (fresh) return fresh;

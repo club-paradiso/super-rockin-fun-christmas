@@ -61,7 +61,7 @@ describe("rotationOrder", () => {
 const T: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 20_000 };
 const onWall = (s: WallSchedule) => s.slots.map((x) => x.photoId);
 
-describe("half-life (D89)", () => {
+describe("half-life (D92)", () => {
   const MIN = 60_000;
   const at = (min: number) => Date.UTC(2026, 11, 1) + min * MIN;
 

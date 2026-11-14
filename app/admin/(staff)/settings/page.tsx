@@ -1,6 +1,5 @@
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
-import { KioskModeForm } from "@/components/admin/kiosk-mode-form";
 import { PublicWallForm } from "@/components/admin/public-wall-form";
 import { WallLookForm } from "@/components/admin/wall-look-form";
 import { WallPaceForm } from "@/components/admin/wall-pace-form";
@@ -41,8 +40,8 @@ export default async function SettingsPage() {
     .filter(([status]) => status !== "DELETED")
     .reduce((sum, [, n]) => sum + n, 0);
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold">설정</h1>
+    <div className="flex flex-col gap-4 md:gap-6">
+      <h1 className="admin-h1">설정</h1>
       <EmergencyPanel
         settings={settings}
         wallStatus={wallOpen(settings, new Date(), WALL_CONFIG.timeZone)}
@@ -67,7 +66,6 @@ export default async function SettingsPage() {
         publicCount={onPublicWall.length}
         venueOnlyCount={onWall.length - onPublicWall.length}
       />
-      <KioskModeForm mode={settings.kioskDefaultMode} />
       <p className="text-base text-ink/75">
         마지막 변경: {formatTime(settings.updatedAt)}
         {updater ? ` · ${updater.displayName}` : ""}

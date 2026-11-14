@@ -336,7 +336,6 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
     );
     expect(await beat.json()).toEqual({
       wallSubmissions: "open",
-      kioskDefaultMode: "standard",
       wallPublic: false,
     });
     const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;

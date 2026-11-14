@@ -69,7 +69,7 @@ export function PinLoginForm({ staff }: { staff: { userId: string; displayName: 
     setPin("");
     setMessage(
       res.status === 429
-        ? "시도가 너무 많아요. 15분 뒤에 다시 해 주세요."
+        ? "시도가 너무 많아요. 15분 뒤에 다시 시도해 주세요."
         : "PIN이 맞지 않아요. 다시 입력해 주세요.",
     );
   }
@@ -150,7 +150,7 @@ export function HubSetupForm() {
       res.status === 403
         ? "설정 코드가 맞지 않아요. 허브 노트북 검은 창의 코드를 다시 확인해 주세요."
         : res.status === 429
-          ? "시도가 너무 많아요. 15분 뒤에 다시 해 주세요."
+          ? "시도가 너무 많아요. 15분 뒤에 다시 시도해 주세요."
           : (res.error ?? "입력을 확인해 주세요."),
     );
   }

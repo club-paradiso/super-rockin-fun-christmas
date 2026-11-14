@@ -1278,7 +1278,91 @@ were in use. Two of the defects were functional: the invisible staff-help corner
   dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
   wide empty paper beside the preview on the frame and consent screens.
 
-## D89 · Staff set the wall's pace: how long a photo stays up, and a half-life
+## D89 · The easy screen mode is removed; the booth speaks Chinese
+
+User decision (2026-11-14): "간편 모드는 그냥 날리자. 대신 중국어를 추가하자."
+
+- **Removed (D67):** the guest's "기본 화면 / 간편 화면" switch, the staff setting 관리자 → 설정 →
+  부스 시작 화면 and `PATCH kioskDefaultMode`, `mode` / `defaultMode` / `SET_MODE` /
+  `SET_DEFAULT_MODE` / `easyStep` / `EASY_MIN_COUNTDOWN` in `lib/kiosk/machine.ts`, all `.kiosk-easy`
+  and `booth-easy-*` CSS, the easy copy, and the easy E2E specs. The booth has one screen; the idle
+  reset is one length. The footer now holds only "처음으로", and only where it makes sense.
+- **Kept on purpose (expand / contract):** the database column `event_settings.kiosk_default_mode`
+  and the `p_kiosk_default_mode` argument of `ftl_settings_update`. Code still running during a
+  deploy reads and passes them; the new code passes `null`. A later migration drops both once no
+  old code is live. The heartbeat no longer returns `kioskDefaultMode`; the old booth code ignores
+  a missing value.
+- **Chinese (Simplified, 简体中文):** `KioskLang` is `ko | en | zh`. The welcome screen has a third
+  language button "中文"; the attract screen shows the start line in all three languages. Every
+  guest string is in `lib/kiosk/copy.ts` (Claude's translation, **not yet checked by a Chinese
+  speaker**). Frames carry `labelZh`, poses `labelZh`; `localizedLabel` picks the name. The phone
+  page's button "미디어월로 보내기" stays Korean on the phone page and is quoted with its meaning,
+  as in English. The phone page and the guest download page are not translated here (not asked).
+- **Rendering:** `<html lang>` becomes `zh-Hans` (`HTML_LANG`), `@fontsource-variable/noto-sans-sc`
+  is bundled (OFL, loaded per glyph range, so the hub works offline), `:lang(zh-Hans)` puts it
+  first in `--font-sans` and turns off `word-break: keep-all` (it would stop Han text from
+  wrapping). Frame images keep their Korean/English text.
+- **Checked by:** unit (copy shape for all three languages, Han characters in every Chinese
+  string, no Korean left except the quoted phone button, frame and pose labels), E2E whole Chinese
+  session at the two iPad Air sizes in `e2e/tablet-matrix.spec.ts`, and `e2e/shalom-booth.spec.ts`.
+
+## D90 · The macOS wall opens on the second display by itself and keeps the Mac awake
+
+Context: the media wall will run on the church's iMac, with the LED (or TV) as its second display.
+`start-wall.command` opened Chrome in kiosk mode without saying where, so the wall would most
+likely cover the iMac's own screen and leave the LED on the desktop; and only a runbook line kept
+the iMac from sleeping.
+
+- **Which screen:** before every (re)open the launcher runs `ops/wall-screen.js` with
+  `osascript -l JavaScript` (built into macOS, no install). It reads `NSScreen.screens` and passes
+  the chosen screen to Chrome as `--window-position` / `--window-size`; kiosk mode then fills that
+  screen. Default `auto`: the largest screen that is not the main (menu bar) one, or the main
+  screen when it is alone. The optional second line of `wall-hub.txt` overrides it:
+  `screen=main` or `screen=x,y` (a point on the wanted screen). If the screens cannot be read the
+  launcher opens as before, on the main screen. The pure choice (`pickScreen`) is unit tested
+  (`tests/unit/wall-screen.test.ts`).
+- **Any resolution:** the launcher passes no size to the page. The wall already fits its 3840 ×
+  1080 scene into whatever window it gets (D65: no stretching; bands top/bottom or sides). Filling
+  a screen of another aspect ratio without bands needs a scene designed for that ratio; not done.
+- **Awake:** `caffeinate -dimsu -w <launcher pid>` keeps the display and the Mac awake while the
+  launcher window is open, and stops with it.
+- **Windows unchanged:** `start-wall.ps1` still opens on the primary screen; there the wall PC is
+  expected to have the LED as its only or primary display.
+- **Not verified:** nothing here has run on a Mac. In particular, that Chrome's kiosk window honours
+  `--window-position` on macOS with the profile's saved window state, and the macOS setting
+  "Displays have separate Spaces" (on is expected), need the iMac (`docs/DEVICE_ACCEPTANCE.md` D12–D15).
+
+## D91 · A theme can be cut again for another screen shape; the wall picks the closest
+
+Context: the media wall at 성안교회 is the church's mission board, 3096 × 1290 (2.4:1), driven as
+the iMac's second display (D90). The wall scene is 3840 × 1080 (3.56:1). Fitted without
+stretching (D65) it would fill 3096 × 871 and leave a third of the board as bands, photos at 81 %.
+The user asked for any screen shape to apply by itself.
+
+- **Data, not a fork:** a theme may carry `variants`, each a full look (picture, scene, low-spec
+  slots, rope, wordmark, empty-wall line). `recutTheme` derives one from the theme's own numbers
+  and the cut (`x' = scale · x − left`, `y' = scale · (y + top)`); nothing is measured again, so
+  the designer's placement survives. Photos keep their pixel size. Slots whose widest photo
+  would leave the picture are dropped.
+- **Choice:** `fitTheme(theme, width / height)` takes the theme or the variant closest in shape
+  (log ratio). The shape is `WALL_CANVAS` / `?canvas=` if set, else the window. The server, the
+  feed, staff settings and rotation still speak theme ids only; the cut is a view. The picture
+  fading out during a theme change is cut for the same shape and never stretched.
+- **2.4:1 board cuts:** only the four 3:1 originals (S01–S04, 2048 × 682) have the height: they are
+  scaled to 1290 rows and cut to 3096 columns (`scripts/wall-backgrounds.mjs` `board`). Three keep
+  the right edge of the original so the cross (and the chapel) stay whole; star-of-peace cannot
+  keep the cross with four free pegs, so its cut leaves the cross out entirely. Bethlehem hangs on
+  the other four pegs (its first is cut off; positions measured in the picture). Each board cut
+  hangs four photos. The four 32:9 originals (C01–C04) are too short and keep bands on a board:
+  the user's choice (2026-11-14).
+- **Checked by** `tests/unit/wall-themes.test.ts` (every rule of every theme also on every cut;
+  the line maps through the cut; script and config cut at the same place) and
+  `e2e/wall-themes.spec.ts` (a 2.4:1 window: board cut fills it, a 32:9 theme keeps bands).
+- **Not covered:** an LED controller that takes a standard signal (1920 × 1080, 3840 × 2160) and
+  shows only a region of it. The wall centres its scene in the window; if the board shows, for
+  example, only the top-left 3096 × 1290 of a larger signal, an offset setting is still needed.
+
+## D92 · Staff set the wall's pace: how long a photo stays up, and a half-life
 
 The owner asked (2026-11-14) to set, easily and from /admin, how long a photo is shown on the
 media wall and a half-life for photos on it.
@@ -1301,7 +1385,7 @@ media wall and a half-life for photos on it.
   60 s cooldown and the number of slots decide before the shares do.
 - **Stored inside `event_settings.wall_look`** (`showSeconds`, `halfLifeMinutes`), sent by the
   feed as `pace`. No migration: the look is already one audited jsonb setting, and a look stored
-  before D89 reads as the defaults. `POST /api/admin/settings {"wallPace": {...}}` changes only the
+  before D92 reads as the defaults. `POST /api/admin/settings {"wallPace": {...}}` changes only the
   pace; saving a background keeps the pace. Both audiences get the same pace.
 - **Not changed**: which photos may be shown (moderation, consent, `wall_public`), enter and exit
   animations (1.5 s each), the 60 s cooldown, the 5 s poll.

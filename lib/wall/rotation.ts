@@ -8,7 +8,7 @@
  *      already waiting for its first turn);
  *   3. everything else: fewest exposures first, then the one shown longest ago.
  *
- * With a half-life (D89, off by default) step 3 compares exposures divided by the photo's share
+ * With a half-life (D92, off by default) step 3 compares exposures divided by the photo's share
  * (`ageWeight`): a photo one half-life older is due half as often. Steps 1 and 2 do not change,
  * so every photo still gets its first turn in capture order.
  */

@@ -360,6 +360,74 @@ for (const theme of WALL_THEMES) {
   });
 }
 
+// D91: on a 2.4:1 board (성안교회 3096 × 1290) a 3:1 theme uses its board cut and fills the
+// screen; a 32:9 theme keeps its picture with bands. Photos stay inside the picture either way.
+for (const [id, cut] of [
+  ["peace-wall", true],
+  ["bethlehem", true],
+  ["sunset-window", false],
+] as const) {
+  test(`board 3096x1290: ${id} ${cut ? "fills the board" : "keeps its 32:9 picture with bands"}`, async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    await look(id);
+    const theme = WALL_THEMES.find((t) => t.id === id)!;
+    const shown = cut ? { ...theme, ...theme.variants![0]! } : theme;
+    // Half size, same shape: the choice depends on the shape, not the pixel count.
+    const page = await cleanWall(browser, { width: 1548, height: 645 });
+    const scene = page.getByTestId("wall-scene");
+    await expect(scene).toHaveAttribute("data-theme", id, { timeout: 15_000 });
+    await expect(scene).toHaveAttribute(
+      "data-scene-size",
+      `${shown.scene.width}x${shown.scene.height}`,
+    );
+    await expect(scene).toHaveAttribute("data-slots", String(shown.scene.slots.length));
+    const background = page.getByTestId("wall-background");
+    expect(await background.getAttribute("src")).toBe(shown.background);
+    await expect
+      .poll(() => background.evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBe(shown.scene.width);
+    const bg = (await background.boundingBox())!;
+    expect(bg.width / bg.height).toBeCloseTo(shown.scene.width / shown.scene.height, 2);
+    expect(bg.width).toBeCloseTo(1548, 0);
+    // The board cut fills the height; the 32:9 picture leaves bands above and below.
+    if (cut) expect(bg.height).toBeCloseTo(645, 0);
+    else expect(bg.height).toBeLessThan(645 * 0.75);
+
+    const visible = page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]');
+    await expect
+      .poll(() => visible.count(), { timeout: 60_000 })
+      .toBeGreaterThanOrEqual(Math.min(shown.scene.slots.length, publicIds.length));
+    await page.waitForTimeout(2_600);
+    for (const el of await page.getByTestId("wall-photo-image").all()) {
+      const b = (await el.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(bg.x);
+      expect(b.x + b.width).toBeLessThanOrEqual(bg.x + bg.width);
+      expect(b.y + b.height).toBeLessThanOrEqual(bg.y + bg.height);
+    }
+    if (shown.wordmark) {
+      const mark = (await page.getByTestId("wall-wordmark").boundingBox())!;
+      for (const el of await page.getByTestId("wall-photo").all()) {
+        const b = (await el.boundingBox())!;
+        const apart =
+          b.x >= mark.x + mark.width ||
+          mark.x >= b.x + b.width ||
+          b.y >= mark.y + mark.height ||
+          mark.y >= b.y + b.height;
+        expect(apart, `${id}: a photo covers the wordmark`).toBe(true);
+      }
+    }
+    if (process.env.SCREENSHOTS === "1")
+      await page.screenshot({
+        path: `docs/screenshots/wall-board-${id}.jpg`,
+        type: "jpeg",
+        quality: 80,
+      });
+    await page.context().close();
+  });
+}
+
 // The booth end of D86: the public-wall line is on the consent screen only while staff have the
 // public wall on, and a YES given under it is the only way a photo becomes public.
 for (const size of [
@@ -432,7 +500,7 @@ for (const size of [
   });
 }
 
-test("staff set how long a photo stays up and the half-life in 설정 (D89)", async ({ browser }) => {
+test("staff set how long a photo stays up and the half-life in 설정 (D92)", async ({ browser }) => {
   test.setTimeout(90_000);
   const anon = await cleanWall(browser);
   const pace = async () =>

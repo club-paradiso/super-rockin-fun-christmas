@@ -214,7 +214,7 @@ checked afterwards: column default `standard`, both settings functions present, 
 by anon or authenticated.
 
 Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
-schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
+schema change; the easy mode itself was removed in D89, the column stays until a later migration drops it). Apply it **before** deploying this code. It adds the 9-argument settings function
 and keeps the 8-argument one, so the code still running keeps working (emergency switches
 included) until the new code is live. After the 2.0 deploy, `20261109090000_v2_drop_old_settings_fn.sql`
 drops the 8-argument function (written only after #29/#30 were live and the deployed addresses

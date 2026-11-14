@@ -18,13 +18,22 @@ import sharp from "sharp";
 
 const CANVAS = { width: 3840, height: 1080 };
 const PREVIEW = { width: 640, height: 180 };
+/**
+ * A 2.4:1 board (D91, e.g. a 3096 × 1290 LED): the whole height of a 3:1 original, scaled to the
+ * board height, cut to the board width. No new picture: only the sides are cut.
+ */
+const BOARD = { width: 3096, height: 1290 };
 
-/** file (in the source folder) → theme id (config/wall-themes.ts) and its vertical cut. */
+/**
+ * file (in the source folder) → theme id (config/wall-themes.ts), its vertical cut, and for the
+ * 3:1 originals `board`: how many pixels the 2.4:1 board picture cuts from the left (D91). Keep
+ * `top` and `board` equal to `BOARD_CUTS` in config/wall-themes.ts.
+ */
 const SOURCES = [
-  { file: "s03.jpg", id: "peace-wall", top: 150 },
-  { file: "s01.jpg", id: "snowy-chapel", top: 100 },
-  { file: "s02.jpg", id: "star-of-peace", top: 60 },
-  { file: "s04.jpg", id: "bethlehem", top: 100 },
+  { file: "s03.jpg", id: "peace-wall", top: 150, board: 778 },
+  { file: "s01.jpg", id: "snowy-chapel", top: 100, board: 778 },
+  { file: "s02.jpg", id: "star-of-peace", top: 60, board: 200 },
+  { file: "s04.jpg", id: "bethlehem", top: 100, board: 778 },
   { file: "c01.jpg", id: "sunset-window", top: 0 },
   { file: "c02.jpg", id: "pastel-coast", top: 0 },
   { file: "c03.jpg", id: "festive-lights", top: 0 },
@@ -39,7 +48,7 @@ if (!from) {
 const out = path.join(import.meta.dirname, "..", "public", "wall", "themes");
 await mkdir(out, { recursive: true });
 
-for (const { file, id, top } of SOURCES) {
+for (const { file, id, top, board } of SOURCES) {
   const src = sharp(path.join(from, file));
   const meta = await src.metadata();
   const scaledHeight = Math.round((CANVAS.width / meta.width) * meta.height);
@@ -58,5 +67,16 @@ for (const { file, id, top } of SOURCES) {
     .toFile(path.join(out, `${id}.preview.jpg`));
   console.log(
     `${id}: ${meta.width}×${meta.height} → ${CANVAS.width}×${CANVAS.height}, ${buffer.length} bytes`,
+  );
+
+  if (board === undefined) continue;
+  const boardBuffer = await sharp(path.join(from, file))
+    .resize({ height: BOARD.height, kernel: "lanczos3" })
+    .extract({ left: board, top: 0, width: BOARD.width, height: BOARD.height })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
+  await writeFile(path.join(out, `${id}.board.jpg`), boardBuffer);
+  console.log(
+    `${id}: board ${BOARD.width}×${BOARD.height} from x ${board}, ${boardBuffer.length} bytes`,
   );
 }

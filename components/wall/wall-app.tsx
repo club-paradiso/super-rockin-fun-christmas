@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
+import { fitTheme } from "@/lib/wall/themes";
 import { MOBILE_FRAME_ID } from "@/config/mobile";
 import { getFrame } from "@/config/frames";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
@@ -57,8 +58,12 @@ export function WallApp({
     return () => window.removeEventListener("resize", measure);
   }, []);
   const [feed, setFeed] = useState<WallFeed | null>(null);
-  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them.
-  const theme = getWallTheme(feed?.theme ?? initialTheme);
+  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them. A theme cut
+  // for another screen shape (D91: a 2.4:1 board) is used when it fits this screen better.
+  const themeId = feed?.theme ?? initialTheme;
+  const shape = canvas ?? viewport;
+  const aspect = shape ? shape.width / shape.height : null;
+  const theme = useMemo(() => fitTheme(getWallTheme(themeId), aspect), [themeId, aspect]);
   const layout = useMemo(
     () => wallLayout(theme.scene, lite ? theme.liteSlots : undefined),
     [theme, lite],
@@ -312,7 +317,7 @@ export function WallApp({
   }, [eligible, allowed]);
 
   // Scheduler tick.
-  // Staff pace (D89). An older server that sends none keeps the built-in timing.
+  // Staff pace (D92). An older server that sends none keeps the built-in timing.
   const visibleMs = feed?.pace?.visibleMs ?? WALL_CONFIG.visibleMs;
   const halfLifeMs = feed?.pace?.halfLifeMs ?? 0;
   const taken = useMemo(
@@ -392,6 +397,7 @@ export function WallApp({
         >
           <WallScene
             theme={theme}
+            aspect={aspect}
             layout={layout}
             lite={lite}
             overlay={

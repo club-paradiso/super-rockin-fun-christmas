@@ -184,17 +184,6 @@ describe("opening hours on the hub", () => {
     expect((await settings({ wallHours: { start: "5pm", end: "10pm" } })).status).toBe(400);
   });
 
-  it("booth start mode (D67): staff only, standard or easy, audited", async () => {
-    expect((await settings({ kioskDefaultMode: "easy" }, "")).status).toBe(401);
-    expect((await settings({ kioskDefaultMode: "senior" })).status).toBe(400);
-    const res = await settings({ kioskDefaultMode: "easy" });
-    expect(res.status).toBe(200);
-    expect(
-      ((await res.json()) as { settings: { kioskDefaultMode: string } }).settings,
-    ).toMatchObject({ kioskDefaultMode: "easy" });
-    expect((await settings({ kioskDefaultMode: "standard" })).status).toBe(200);
-  });
-
   it("closed (staff off): no photo ids and no images reach the wall; on again: back", async () => {
     expect((await image(approved[0]!)).status).toBe(200);
     expect((await settings({ wallForce: "off" })).status).toBe(200);

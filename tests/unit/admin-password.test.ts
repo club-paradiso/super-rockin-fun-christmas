@@ -174,7 +174,7 @@ describe("POST /api/admin/auth/password", () => {
     await POST(post("/api/admin/settings", { pauseWall: false }, { cookie: admin }), noParams);
   });
 
-  it("wall pace (D89): saved, audited, strict, and kept when the background changes", async () => {
+  it("wall pace (D92): saved, audited, strict, and kept when the background changes", async () => {
     const admin = cookieOf(await login(PASSWORD), ADMIN_COOKIE);
     const { POST } = await import("@/app/api/admin/settings/route");
     const { getBackend } = await import("@/lib/storage/server");

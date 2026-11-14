@@ -9,7 +9,7 @@ import { BrandWordmark } from "@/components/brand";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "운영 · STUDIO SHALOM",
+  title: "Admin · STUDIO SHALOM",
   robots: { index: false, follow: false },
   // No per-page "no-referrer": it makes browsers send `Origin: null` on POSTs, and older Safari
   // (no Sec-Fetch-Site) would then fail the CSRF check. The global policy is "same-origin".
@@ -23,43 +23,46 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     );
   const settings = await getBackend().settings.get();
   const active = [
-    settings.pauseSubmissions && "미디어월 참여 중지",
+    settings.pauseSubmissions && "미디어월 게시 신청 중지",
     settings.pauseWall && "미디어월 일시정지",
     settings.showHoldingScreen && "대기 화면 표시",
   ].filter(Boolean) as string[];
 
   return (
-    <div className="min-h-dvh bg-backdrop text-ink">
+    <div className="admin-root min-h-dvh bg-backdrop text-ink">
       {active.length > 0 && (
         <Link
           href="/admin/settings"
           data-testid="emergency-banner"
-          className="block bg-danger px-4 py-3 text-center text-lg font-bold text-button-text"
+          className="block bg-danger px-4 py-2.5 text-center text-[15px] leading-snug font-bold text-button-text"
         >
           긴급 설정 작동 중: {active.join(" · ")}
         </Link>
       )}
-      <header className="sticky top-0 z-10 border-b border-ink/15 bg-backdrop">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Link href="/admin" aria-label="STUDIO SHALOM 운영">
-            <BrandWordmark className="text-[22px]" />
-            <span className="ml-3 text-base font-semibold text-ink/75">운영</span>
-          </Link>
-          <div className="flex items-center gap-3 text-sm text-ink/75">
-            <span data-testid="staff-name">{auth.staff.displayName}</span>
-            <form method="post" action="/api/admin/auth/signout">
-              <button
-                type="submit"
-                className="rounded-full border border-ink/60 px-4 py-2 text-ink"
-              >
-                로그아웃
-              </button>
-            </form>
-          </div>
+      {/* The top bar scrolls away; only the tabs stay (a phone has no height to spare). */}
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 pt-3 pb-1">
+        <Link
+          href="/admin"
+          aria-label="STUDIO SHALOM Admin"
+          className="flex items-baseline gap-1.5"
+        >
+          <BrandWordmark className="text-[15px]" />
+          <span className="text-[13px] font-semibold text-ink/75">Admin</span>
+        </Link>
+        <div className="flex items-center gap-1 text-xs text-ink/75">
+          <span data-testid="staff-name">{auth.staff.displayName}</span>
+          <form method="post" action="/api/admin/auth/signout">
+            <button
+              type="submit"
+              className="min-h-10 rounded-[10px] px-2 text-sm font-semibold text-ink underline decoration-ink/40 underline-offset-4 active:bg-ink/10"
+            >
+              로그아웃
+            </button>
+          </form>
         </div>
-        <AdminNav />
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <AdminNav />
+      <main className="mx-auto max-w-6xl px-4 py-5">{children}</main>
     </div>
   );
 }

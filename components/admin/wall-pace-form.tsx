@@ -12,7 +12,7 @@ const minutesText = (m: number) =>
   m < 60 ? `${m}분` : m % 60 === 0 ? `${m / 60}시간` : `${Math.floor(m / 60)}시간 ${m % 60}분`;
 
 /**
- * How fast the wall turns over (D89): how long one photo stays up, and the half-life that lets
+ * How fast the wall turns over (D92): how long one photo stays up, and the half-life that lets
  * newer photos come up more often. One audited setting; every wall follows within one poll.
  * Neither changes which photos may be shown: that is moderation and consent only.
  */
