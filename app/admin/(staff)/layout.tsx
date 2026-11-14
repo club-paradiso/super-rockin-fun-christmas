@@ -29,37 +29,36 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   ].filter(Boolean) as string[];
 
   return (
-    <div className="min-h-dvh bg-backdrop text-ink">
+    <div className="admin-root min-h-dvh bg-backdrop text-ink">
       {active.length > 0 && (
         <Link
           href="/admin/settings"
           data-testid="emergency-banner"
-          className="block bg-danger px-4 py-3 text-center text-lg font-bold text-button-text"
+          className="block bg-danger px-4 py-2.5 text-center text-[15px] leading-snug font-bold text-button-text"
         >
           긴급 설정 작동 중: {active.join(" · ")}
         </Link>
       )}
-      <header className="sticky top-0 z-10 border-b border-ink/15 bg-backdrop">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Link href="/admin" aria-label="STUDIO SHALOM 운영">
-            <BrandWordmark className="text-[22px]" />
-            <span className="ml-3 text-base font-semibold text-ink/75">운영</span>
-          </Link>
-          <div className="flex items-center gap-3 text-sm text-ink/75">
-            <span data-testid="staff-name">{auth.staff.displayName}</span>
-            <form method="post" action="/api/admin/auth/signout">
-              <button
-                type="submit"
-                className="rounded-full border border-ink/60 px-4 py-2 text-ink"
-              >
-                로그아웃
-              </button>
-            </form>
-          </div>
+      {/* The top bar scrolls away; only the tabs stay (a phone has no height to spare). */}
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 pt-3 pb-1">
+        <Link href="/admin" aria-label="STUDIO SHALOM 운영" className="flex items-baseline gap-2">
+          <BrandWordmark className="text-[16px]" />
+          <span className="text-sm font-semibold text-ink/75">운영</span>
+        </Link>
+        <div className="flex items-center gap-1 text-[13px] text-ink/75">
+          <span data-testid="staff-name">{auth.staff.displayName}</span>
+          <form method="post" action="/api/admin/auth/signout">
+            <button
+              type="submit"
+              className="min-h-10 rounded-[10px] px-2 text-sm font-semibold text-ink underline decoration-ink/40 underline-offset-4 active:bg-ink/10"
+            >
+              로그아웃
+            </button>
+          </form>
         </div>
-        <AdminNav />
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <AdminNav />
+      <main className="mx-auto max-w-6xl px-4 py-5">{children}</main>
     </div>
   );
 }

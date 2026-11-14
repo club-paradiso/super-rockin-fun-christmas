@@ -35,7 +35,7 @@ export default async function AuditPage() {
   const events = await listAudit({ limit: 200 });
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">기록</h1>
+      <h1 className="admin-h1">기록</h1>
       <p className="text-base text-ink/75">최근 200건 · 수정·삭제할 수 없는 기록이에요.</p>
       <ol className="flex flex-col gap-2" data-testid="audit-list">
         {events.map((e) => (
@@ -46,7 +46,7 @@ export default async function AuditPage() {
             data-action={e.action}
           >
             <span className="font-mono text-ink/75">{formatTime(e.occurredAt)}</span>
-            <strong className="text-lg">
+            <strong className="text-base">
               {ACTION[e.action] ?? e.action}
               {e.details?.wall_public === true && " (공개 미디어월 포함)"}
             </strong>

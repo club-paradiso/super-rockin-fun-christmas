@@ -31,11 +31,11 @@ export function KioskModeForm({ mode }: { mode: KioskMode }) {
 
   return (
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="kiosk-mode">
-      <h2 className="text-2xl font-bold">부스 시작 화면</h2>
-      <p className="text-base text-ink/75">
+      <h2 className="admin-h2">부스 시작 화면</h2>
+      <p className="admin-help">
         방문객은 어느 화면에서든 직접 바꿀 수 있어요. 여기서는 처음 보이는 화면만 정해요.
       </p>
-      <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="부스 시작 화면">
+      <div className="admin-seg" role="radiogroup" aria-label="부스 시작 화면">
         {OPTIONS.map((o) => (
           <button
             key={o.mode}
@@ -45,12 +45,10 @@ export function KioskModeForm({ mode }: { mode: KioskMode }) {
             disabled={busy !== null}
             onClick={() => void choose(o.mode)}
             data-testid={`kiosk-mode-${o.mode}`}
-            className={`admin-btn flex-col items-start py-2 ${
-              mode === o.mode ? "admin-btn-primary" : "admin-btn-quiet"
-            }`}
+            className="admin-seg-btn min-h-16 flex-col gap-0.5 py-2"
           >
             <span>{busy === o.mode ? "…" : o.label}</span>
-            <span className="text-sm font-normal opacity-80">{o.hint}</span>
+            <span className="text-[13px] font-normal text-ink/75">{o.hint}</span>
           </button>
         ))}
       </div>

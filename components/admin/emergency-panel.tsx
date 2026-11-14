@@ -25,7 +25,7 @@ const SWITCHES = [
 ] as const;
 
 const FORCE_OPTIONS: { value: WallForce; label: string }[] = [
-  { value: "auto", label: "자동 (운영 시간)" },
+  { value: "auto", label: "자동" },
   { value: "on", label: "계속 켜기" },
   { value: "off", label: "끄기" },
 ];
@@ -73,14 +73,15 @@ export function EmergencyPanel({
 
   return (
     <section
-      className="admin-card p-4"
+      className="admin-card overflow-hidden"
       aria-labelledby="emergency-title"
       data-testid="emergency-panel"
     >
-      <h2 id="emergency-title" className="mb-3 text-2xl font-bold">
+      <h2 id="emergency-title" className="admin-h2 px-4 pt-4 pb-3">
         긴급 제어
       </h2>
-      <div className="grid gap-3 md:grid-cols-3">
+      {/* One list, one hairline between rows: no card inside a card. A row that is ON is tinted. */}
+      <div className="divide-y divide-ink/10 border-t border-ink/10 md:grid md:grid-cols-3 md:divide-x md:divide-y-0">
         {SWITCHES.map((s) => {
           const on = settings[s.key];
           return (
@@ -92,34 +93,39 @@ export function EmergencyPanel({
               disabled={busy !== null}
               onClick={() => toggle(s.key)}
               data-testid={`switch-${s.key}`}
-              className={`flex min-h-28 flex-col items-start gap-1 rounded-3xl border-2 p-4 text-left transition ${
-                on ? "border-danger bg-danger/10" : "border-ink/20 bg-backdrop"
-              }`}
+              className={`admin-switch-row md:items-start ${on ? "bg-danger/[.07]" : ""}`}
             >
-              <span className="flex w-full items-center justify-between text-xl font-bold">
-                {s.title}
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-semibold">{s.title}</span>
+                <span className="admin-help mt-0.5 block">{s.help}</span>
+              </span>
+              <span className="flex shrink-0 flex-col items-center gap-1">
+                <span className="admin-switch-track" data-on={on} aria-hidden />
                 <span
-                  className={`rounded-full px-3 py-1 text-sm ${on ? "bg-danger text-button-text" : "bg-ink/10 text-ink/75"}`}
+                  className={`text-[13px] leading-none font-semibold ${on ? "text-danger" : "text-ink/75"}`}
                 >
                   {busy === s.key ? "…" : on ? "켜짐" : "꺼짐"}
                 </span>
               </span>
-              <span className="text-base text-ink/75">{s.help}</span>
             </button>
           );
         })}
       </div>
-      <div className="mt-4 flex flex-col gap-2" data-testid="wall-force">
-        <p className="text-xl font-bold">
-          미디어월 켜기/끄기{" "}
-          <span
-            className={`ml-2 rounded-full px-3 py-1 text-sm ${wallStatus.open ? "bg-approve text-button-text" : "bg-danger text-button-text"}`}
+      <div className="flex flex-col gap-3 border-t border-ink/10 p-4" data-testid="wall-force">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h3 className="text-base font-semibold">미디어월 켜기/끄기</h3>
+          <p
+            className="flex items-center gap-1.5 text-sm font-semibold"
             data-testid="wall-open-status"
           >
+            <span
+              aria-hidden
+              className={`size-2 shrink-0 rounded-full ${wallStatus.open ? "bg-approve" : "bg-danger"}`}
+            />
             지금 {OPEN_TEXT[wallStatus.reason]}
-          </span>
-        </p>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="미디어월 켜기/끄기">
+          </p>
+        </div>
+        <div className="admin-seg" role="radiogroup" aria-label="미디어월 켜기/끄기">
           {FORCE_OPTIONS.map((o) => (
             <button
               key={o.value}
@@ -129,22 +135,18 @@ export function EmergencyPanel({
               disabled={busy !== null}
               onClick={() => setForce(o.value)}
               data-testid={`wall-force-${o.value}`}
-              className={`min-h-14 rounded-full border-2 px-4 text-lg font-bold ${
-                settings.wallForce === o.value
-                  ? "border-accent bg-accent/15"
-                  : "border-ink/20 bg-backdrop"
-              }`}
+              className="admin-seg-btn"
             >
               {o.label}
             </button>
           ))}
         </div>
-        <p className="text-base text-ink/75">
-          자동이면 설정의 운영 시간에만 사진이 나와요. 시간 밖에는 &ldquo;오늘의 미디어월은
+        <p className="admin-help">
+          자동은 설정한 운영 시간에만 사진이 나와요. 시간 밖에는 &ldquo;오늘의 미디어월은
           여기까지예요&rdquo; 화면이 떠요.
         </p>
       </div>
-      {error && <p className="mt-3 text-danger">{error}</p>}
+      {error && <p className="px-4 pb-4 text-danger">{error}</p>}
     </section>
   );
 }
