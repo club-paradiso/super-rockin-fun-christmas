@@ -231,9 +231,16 @@ applied to Supabase project `follow-the-lights-preview`), so for about two minut
 could not upload, record consent, moderate or change settings; no photo was taken in that time.
 Checked afterwards over HTTP on the old addresses: the password form on `/admin/login`, the wall
 opening without enrollment in the 평화의 벽 background, 401 for cookieless staff and report calls.
-Nobody has signed in or taken a photo on production since the deploy: do that once (step 3).
-**Not done: steps 4–9** (`STUDIO_SHALOM_DOMAINS: NOT CONFIGURED`; the session had no access to the
-Vercel project).
+**Done 2026-11-14 04:07–04:17 UTC: most of step 3's check**, by the development session on the old
+addresses with a mock camera: enroll (one-time code) → six shots → consent → real QR → guest page,
+image and video → approve → the photo on the public wall and on the enrolled display → delete →
+every link 404 (`docs/STATUS.md`, "운영 점검"). 공개 미디어월 was switched **on** in that check and
+left on. Still for a person: sign in at `/admin` with the real password once and press the
+moderation and background buttons there (the session does not know the password and used the
+audited database functions instead).
+**Not done: steps 4–9** (`STUDIO_SHALOM_DOMAINS: NOT CONFIGURED`). Tried again 2026-11-14: the
+session's Vercel connection lists only the `visable` project, so it cannot add a domain, change a
+variable or redeploy `follow-the-lights`. Both new names still answer `404 DEPLOYMENT_NOT_FOUND`.
 
 Do these **in this order**. Each step leaves the site working.
 
