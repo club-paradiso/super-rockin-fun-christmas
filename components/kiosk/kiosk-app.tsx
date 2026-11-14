@@ -114,7 +114,7 @@ export function KioskApp({
   initialWallSubmissions?: "open" | "paused";
   /** Staff have the public wall on (D86): the consent screen says so and sends that scope. */
   initialWallPublic?: boolean;
-  /** Staff have the automatic check on (D95): the consent screen says so before the answer. */
+  /** Staff have the automatic check on (D95): the QR screen then says how the check is going. */
   initialAiReview?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
@@ -453,8 +453,8 @@ export function KioskApp({
   const [wallPublic, setWallPublic] = useState(initialWallPublic);
   // Automatic check (D95), kept current the same way.
   const [aiReview, setAiReview] = useState(initialAiReview);
-  // The session whose guest said yes with the automatic-check notice on screen, and the line the
-  // QR screen shows for it. Any other session shows the usual line.
+  // The session whose guest said yes while the automatic check was on, and the line the QR screen
+  // shows for it. Any other session shows the usual line.
   const [aiConsent, setAiConsent] = useState<{ sessionId: string; line: ReviewLine } | null>(null);
 
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
@@ -480,10 +480,7 @@ export function KioskApp({
     let unsubscribe = () => {};
     const opened = openQueueStore();
     const consents = opened.then(
-      ({ store, consents }) =>
-        new ConsentQueue(consents, store, (id, consent, scope, aiNotice) =>
-          sendWallConsent(id, consent, scope, fetch, aiNotice),
-        ),
+      ({ store, consents }) => new ConsentQueue(consents, store, sendWallConsent),
     );
     const ready = opened.then(({ store, durable }) => {
       const queue = new UploadQueue(store, uploadOnce);
@@ -598,21 +595,21 @@ export function KioskApp({
     // The scope is what THIS consent screen showed: this handler belongs to the render the guest
     // tapped, so `wallPublic` here is whether the public-wall line was on screen (D86).
     const publicScope = consent === "yes" && wallPublic ? ("public" as const) : undefined;
-    // The same for the automatic check: only a yes given with its notice on screen (D95).
-    const aiNotice = consent === "yes" && aiReview;
-    setAiConsent(aiNotice ? { sessionId, line: "checking" } : null);
+    // The server checks every yes while the automatic check is on (D95); the booth only needs to
+    // know whether to show how that check is going.
+    setAiConsent(consent === "yes" && aiReview ? { sessionId, line: "checking" } : null);
     void photoQueued(sessionId)
       .done.then(() => consentRef.current)
       .then(async (c) => {
         if (!c) return;
-        await c.enqueue(sessionId, consent === "yes", publicScope, aiNotice);
+        await c.enqueue(sessionId, consent === "yes", publicScope);
         await c.processDue(true);
         photoQueuedRef.current.delete(sessionId);
       });
     dispatch({ type: "SET_CONSENT", consent });
   };
 
-  // While this guest is on the QR screen after a yes with the automatic check (D95), ask the
+  // While this guest is on the QR screen after a yes with the automatic check on (D95), ask the
   // server how the review is going and say only what it says. It never blocks anything: the QR
   // is already there, "다 받았어요" works, and the next guest starts a new session.
   const reviewSession =
@@ -874,7 +871,6 @@ export function KioskApp({
             onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
             wallSubmissionsOpen={wallSubmissions === "open"}
             wallPublic={wallPublic}
-            aiReview={aiReview}
             reviewLine={aiConsent?.sessionId === state.sessionId ? aiConsent.line : null}
             videoNotice={canRecordVideo}
           />
@@ -969,9 +965,7 @@ interface ScreenProps {
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
   wallPublic: boolean;
-  /** The automatic check is on (D95): the consent screen says so. */
-  aiReview: boolean;
-  /** This guest said yes with that notice: which line the QR screen shows. Null = the usual one. */
+  /** This guest said yes while the automatic check was on (D95): the line the QR screen shows. */
   reviewLine: ReviewLine | null;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
   videoNotice: boolean;
@@ -1425,8 +1419,8 @@ function Screen(p: ScreenProps) {
         <BoothScreen
           testId="screen-consent"
           progress={progress}
-          // Each notice line above the answers takes its room from the preview (app/globals.css).
-          className={`consent consent-notes-${Number(p.wallPublic) + Number(p.aiReview)}`}
+          // A notice line above the answers takes its room from the preview (app/globals.css).
+          className={`consent consent-notes-${Number(p.wallPublic)}`}
         >
           <FinalPreview finalImage={p.finalImage} frameId={state.frameId} t={t} />
           <div className="consent-body">
@@ -1440,12 +1434,6 @@ function Screen(p: ScreenProps) {
             {p.wallPublic && (
               <p className="booth-lead" data-testid="consent-public-note">
                 {t.consent.publicNote}
-              </p>
-            )}
-            {/* D95: the outside check is said before the answer too, at the same size. */}
-            {p.aiReview && (
-              <p className="booth-lead" data-testid="consent-ai-note">
-                {t.consent.aiNote}
               </p>
             )}
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}

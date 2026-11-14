@@ -62,28 +62,19 @@ export async function uploadOnce(
  *
  * `scope` "public" says the consent screen showed the public-wall notice (D86). The server
  * records it only while the public wall is on; it is never sent with a "no".
- *
- * `aiNotice` says the consent screen showed the automatic-check notice (D95). Only then may the
- * server queue the photo for the AI; never sent with a "no".
  */
 export async function sendWallConsent(
   sessionId: string,
   consent: boolean,
   scope?: ConsentScope,
   fetchImpl: typeof fetch = fetch,
-  aiNotice = false,
 ): Promise<ConsentOutcome> {
   try {
     const response = await fetchImpl("/api/photos/consent", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sessionId,
-        consent,
-        ...(consent && scope ? { scope } : {}),
-        ...(consent && aiNotice ? { aiNotice: true } : {}),
-      }),
+      body: JSON.stringify({ sessionId, consent, ...(consent && scope ? { scope } : {}) }),
     });
     if (response.ok) return "done";
     if (response.status === 401 || response.status === 429 || response.status >= 500)
@@ -210,7 +201,7 @@ export async function fetchReviewStatus(
   }
 }
 
-/** The line under the QR for a guest who said yes while the automatic check was on. */
+/** The line under the QR for a guest who said yes while the automatic check was running. */
 export type ReviewLine = "checking" | "delayed" | "approved";
 
 /**

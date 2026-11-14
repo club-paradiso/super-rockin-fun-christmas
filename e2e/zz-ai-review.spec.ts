@@ -10,9 +10,9 @@ import {
 } from "./helpers";
 
 /**
- * The automatic check (D95), end to end in a real browser: staff switch it on, the booth tells
- * the guest before they answer, a "yes" is checked and approved without a person, the wall shows
- * it, and staff can still take it down. The provider is the built-in mock (it calls nobody).
+ * The automatic check (D95), end to end in a real browser: staff switch it on, a "yes" is checked
+ * and approved without a person, the wall shows it, and staff can still take it down. The booth
+ * does not announce the check (D96); it tells every guest that staff can hide a photo. The provider is the built-in mock (it calls nobody).
  * Named zz- so it runs last; it puts the event back in manual mode whatever happens.
  */
 test.describe.configure({ mode: "serial" });
@@ -42,7 +42,7 @@ test.afterAll(async ({ browser }) => {
   await page.close();
 });
 
-test("manual mode (the default): no notice on the booth, and a yes waits for a person", async ({
+test("manual mode (the default): a yes waits for a person, and the booth says staff can hide photos", async ({
   browser,
 }) => {
   const staff = await browser.newPage();
@@ -56,7 +56,10 @@ test("manual mode (the default): no notice on the booth, and a yes waits for a p
   await enrollKiosk(booth);
   await shootSixWithMock(booth);
   await toConsent(booth);
-  await expect(booth.getByTestId("consent-ai-note")).toHaveCount(0);
+  // Said on every consent screen, whatever the mode (D96): staff can hide a photo.
+  await expect(booth.getByTestId("screen-consent")).toContainText(
+    "화면에 어울리지 않는 사진은 운영팀이 숨길 수 있어요.",
+  );
   const url = await answerForQr(booth, "yes");
   await expect(booth.getByTestId("review-line")).toHaveAttribute("data-review", "usual");
   await expect
@@ -69,7 +72,7 @@ test("manual mode (the default): no notice on the booth, and a yes waits for a p
   await booth.close();
 });
 
-test("auto mode: staff switch it on, the booth says so, a yes reaches the wall without a person, staff can hide it", async ({
+test("auto mode: staff switch it on, a yes reaches the wall without a person, staff can hide it", async ({
   browser,
 }) => {
   const staff = await browser.newPage();
@@ -85,14 +88,17 @@ test("auto mode: staff switch it on, the booth says so, a yes reaches the wall w
   await expect(staff.getByTestId("ai-mode-message")).toContainText("자동 확인을 켰어요");
   await expect(staff.getByTestId("ai-usage")).toContainText("추정치");
 
-  // The booth learns it on load: the notice is on the consent screen, before the answer.
+  // The booth learns on load that a check is running (it only changes the line under the QR).
   const booth = await browser.newPage();
   await enrollKiosk(booth);
   await shootSixWithMock(booth);
   await toConsent(booth);
-  const note = booth.getByTestId("consent-ai-note");
-  await expect(note).toBeVisible();
-  await expect(note).toContainText("외부 AI 서비스");
+  // The consent screen is the same as in manual mode (D96): no line about the check, and the
+  // line that staff can hide a photo.
+  await expect(booth.getByTestId("screen-consent")).not.toContainText("AI");
+  await expect(booth.getByTestId("screen-consent")).toContainText(
+    "화면에 어울리지 않는 사진은 운영팀이 숨길 수 있어요.",
+  );
   // Both answers are still the same size: no nudge toward yes.
   const yes = await booth.getByTestId("consent-yes").boundingBox();
   const no = await booth.getByTestId("consent-no").boundingBox();
@@ -135,12 +141,11 @@ test("auto mode: staff switch it on, the booth says so, a yes reaches the wall w
   await wall.close();
 });
 
-test("auto mode: a no is never sent anywhere, notice or not", async ({ browser }) => {
+test("auto mode: a no is never sent anywhere", async ({ browser }) => {
   const booth = await browser.newPage();
   await enrollKiosk(booth);
   await shootSixWithMock(booth);
   await toConsent(booth);
-  await expect(booth.getByTestId("consent-ai-note")).toBeVisible();
   const noUrl = await answerForQr(booth, "no");
   await expect(booth.getByTestId("review-line")).toHaveCount(0);
   await booth.waitForTimeout(3000);

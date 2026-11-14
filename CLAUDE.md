@@ -19,8 +19,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **No face recognition, biometrics, or analytics.** Store only what the service needs.
 - **A person can always decide; the AI may only approve** (D95, a user decision that replaced
   "no AI moderation"). `moderationMode` is `manual` (default) or `auto`; there is no mode without
-  review. In `auto` the AI looks at a photo only when the guest said yes with the AI notice on
-  screen (`aiNotice`), and the only thing it can do is move PENDING → APPROVED, through
+  review. In `auto` the AI looks at every photo whose guest said yes to the wall (D96, a user
+  decision: the booth does not announce the check, so there is no notice flag; it tells every guest
+  instead that staff can hide a photo), and the only thing it can do is move PENDING → APPROVED, through
   `AiReviewRepository.complete` with SAFE (`ftl_ai_complete`): one atomic, audited call. Unsafe,
   unsure, error, timeout, rate limit, no budget, no configuration → the photo stays PENDING for a
   person. Never add a path where "could not check" becomes approved, never let the AI reject,

@@ -1425,13 +1425,10 @@ body {
   .consent > .frame-art {
     min-height: clamp(130px, 22 * var(--bh), 520px);
   }
-  /* A notice line (public wall D86, automatic check D95) is said before the answers, at the lead's
-     size. Its room comes out of the preview, so both answers stay on screen without scrolling. */
+  /* The public-wall line (D86) is said before the answers, at the lead's size. Its room comes out
+     of the preview, so both answers stay on screen without scrolling. */
   .consent-notes-1 > .frame-art {
-    min-height: clamp(130px, 19 * var(--bh), 520px);
-  }
-  .consent-notes-2 > .frame-art {
-    min-height: clamp(130px, 15 * var(--bh), 520px);
+    min-height: clamp(130px, 18 * var(--bh), 520px);
   }
   .consent-body {
     display: flex;

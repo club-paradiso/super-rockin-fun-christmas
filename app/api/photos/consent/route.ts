@@ -24,10 +24,10 @@ export const maxDuration = 30;
  * recorded only if the public wall is switched on right now; otherwise the consent is for the
  * venue wall alone.
  *
- * "aiNotice": true when the booth showed the guest the automatic-check notice (D95). Only then,
- * and only while staff have the event in "auto" mode, is the photo queued for the AI; the answer
- * says which: "review": "ai" | "staff". Either way the photo is PENDING and private. A failure to
- * queue is not an error: the photo simply waits for a person.
+ * While staff have the event in "auto" mode a YES is also queued for the automatic check (D95,
+ * D96: the booth does not announce the check); the answer says which: "review": "ai" | "staff".
+ * Either way the photo is PENDING and private. A failure to queue is not an error: the photo
+ * simply waits for a person.
  */
 export const POST = route("consent", async (request: Request) => {
   const config = getServerConfig();
@@ -46,12 +46,11 @@ export const POST = route("consent", async (request: Request) => {
   } catch {
     return jsonError(400, "invalid json");
   }
-  const { token, sessionId, consent, scope, aiNotice } = (body ?? {}) as {
+  const { token, sessionId, consent, scope } = (body ?? {}) as {
     token?: unknown;
     sessionId?: unknown;
     consent?: unknown;
     scope?: unknown;
-    aiNotice?: unknown;
   };
   if (typeof consent !== "boolean" || (typeof token !== "string" && !isUuid(sessionId))) {
     return jsonError(400, "consent and a sessionId or token are required");
@@ -70,9 +69,9 @@ export const POST = route("consent", async (request: Request) => {
     if (result.reason === "paused") return jsonError(409, "wall submissions paused");
     return jsonError(404, "not found");
   }
-  // The automatic check (D95): only for a YES given with the notice on screen. Never fatal.
+  // The automatic check (D95): every YES while the event is in "auto" mode. Never fatal.
   let review: "ai" | "staff" = "staff";
-  if (consent && aiNotice === true && result.moderationStatus === "PENDING") {
+  if (consent && result.moderationStatus === "PENDING") {
     const queued = await requestAiReview(result.photoId).catch((err: Error) => {
       logEvent("ai_review_error", { photoId: result.photoId, message: err.message }, "warn");
       return false;

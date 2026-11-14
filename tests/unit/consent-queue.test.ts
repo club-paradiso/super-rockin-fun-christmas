@@ -40,7 +40,7 @@ describe("ConsentQueue", () => {
 
     await uploads.delete(s); // the upload queue removes an entry once the server has it
     await q.processDue(true);
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined, false);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined);
     expect(await q.pending()).toBe(0);
   });
 
@@ -51,7 +51,7 @@ describe("ConsentQueue", () => {
     await q.enqueue(s, true);
     await q.enqueue(s, false);
     await q.processDue();
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, false, undefined, false);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, false, undefined);
   });
 
   // D86: the scope is what the consent screen showed when the guest answered. It is kept with
@@ -62,18 +62,18 @@ describe("ConsentQueue", () => {
     const a = uuid();
     await q.enqueue(a, true, "public");
     await q.processDue();
-    expect(send).toHaveBeenLastCalledWith(a, true, "public", false);
+    expect(send).toHaveBeenLastCalledWith(a, true, "public");
 
     const b = uuid();
     await q.enqueue(b, true, "public");
     await q.enqueue(b, true); // answered again after staff switched the public wall off
     await q.processDue();
-    expect(send).toHaveBeenLastCalledWith(b, true, undefined, false);
+    expect(send).toHaveBeenLastCalledWith(b, true, undefined);
 
     const c = uuid();
     await q.enqueue(c, false, "public");
     await q.processDue();
-    expect(send).toHaveBeenLastCalledWith(c, false, undefined, false);
+    expect(send).toHaveBeenLastCalledWith(c, false, undefined);
   });
 
   it("retries with backoff on retry and on a thrown sender, and forgets on done", async () => {
@@ -139,7 +139,7 @@ describe("ConsentQueue", () => {
       send,
     );
     await after.processDue(true);
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined, false);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined);
   });
 
   it("upgrading the version-1 database keeps photos that were waiting to upload", async () => {
@@ -160,28 +160,5 @@ describe("ConsentQueue", () => {
     expect((await uploads.get(s))?.sessionId).toBe(s);
     const consents = new IndexedDbConsentStore(idb);
     expect(await consents.all()).toEqual([]);
-  });
-
-  it("carries the automatic-check notice with a yes, never with a no (D95)", async () => {
-    const sent: unknown[][] = [];
-    const send: ConsentSender = async (...args) => {
-      sent.push(args);
-      return "done";
-    };
-    const q = new ConsentQueue(new MemoryConsentStore(), new MemoryQueueStore(), send);
-    const [a, b, c, d] = [uuid(), uuid(), uuid(), uuid()];
-    await q.enqueue(a, true, undefined, true);
-    await q.enqueue(b, true, "public", true);
-    await q.enqueue(c, false, undefined, true);
-    // Answered again after staff switched the automatic check off: the latest screen wins.
-    await q.enqueue(d, true, undefined, true);
-    await q.enqueue(d, true);
-    await q.processDue(true);
-    expect(sent).toEqual([
-      [a, true, undefined, true],
-      [b, true, "public", true],
-      [c, false, undefined, false],
-      [d, true, undefined, false],
-    ]);
   });
 });

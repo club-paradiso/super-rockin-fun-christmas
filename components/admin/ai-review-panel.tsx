@@ -38,7 +38,7 @@ export function AiReviewPanel({
     setMessage(
       res.ok
         ? mode === "auto"
-          ? "자동 확인을 켰어요. 부스 안내 문구는 1분 안에 바뀌고, 그 뒤 동의한 사진부터 AI가 먼저 봐요."
+          ? "자동 확인을 켰어요. 지금부터 미디어월에 동의한 사진을 AI가 먼저 봐요."
           : "사람이 확인하도록 바꿨어요. 지금부터 모든 사진이 검수 대기로 와요."
         : errorText(res.error),
     );
@@ -166,8 +166,8 @@ export function AiReviewPanel({
         onCancel={() => setConfirming(false)}
       >
         <p>
-          켜면 미디어월에 동의한 사진의 작은 사본이 외부 AI 서비스로 전송돼요. 부스 동의 화면에 그
-          안내가 붙고, 안내를 보고 동의한 사진만 보내요.
+          켜면 미디어월에 동의한 사진의 작은 사본이 외부 AI 서비스로 전송돼요. 부스 화면에는 이
+          사실을 따로 안내하지 않아요.
         </p>
         <p className="mt-2">
           AI는 틀릴 수 있어요. 켠 뒤에도 미디어월을 지켜보고, 이상한 사진은 바로 숨겨 주세요.
