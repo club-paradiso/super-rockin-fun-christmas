@@ -1221,3 +1221,59 @@ Wanted: `https://studio-shalom.vercel.app` (booth, staff, guest links) and
   and the booth host has no redirects at all (`tests/unit/wall-host.test.ts`).
 - **Internal names stay** (`FTL_*`, `ftl_*`, IndexedDB `follow-the-lights`, the Vercel project
   name, the Supabase `project_id`): renaming them loses queued uploads or breaks deployed hubs.
+
+## D88 · The booth has one layout system, sized from the booth's own box
+
+The owner ran the booth on an iPad Air 4 (Safari, 820 × 1180 and 1180 × 820) and found it broken:
+proportions off, buttons of several sizes, cramped or empty screens. A baseline capture of 11
+viewports × 29 screens showed why: screens were sized from `vh`/`vw` with fixed minimums, so most
+of them were taller than a tablet and the page scrolled (frame choice by up to 265 px, with the
+footer off screen and the main button drawn over the cards), and five different button formulas
+were in use. Two of the defects were functional: the invisible staff-help corner lay on top of
+"이전" on portrait tablets, and a scrolled screen carried its scroll position into the next one.
+
+- **One box, one scroll area.** `main.kiosk-root` is exactly the viewport (`100dvh`, `100vh`
+  fallback), never scrolls, and is a size container. `.kiosk-scroll` inside it is the only scroll
+  area; every new screen starts at its top.
+- **Two units, a handful of tokens.** `--bw` / `--bh` are 1 % of the booth's width and height
+  (container units, viewport units as fallback). Space (`--booth-pad`, `--sheet-pad-*`,
+  `--gap-*`), type (`--fs-title`, `--fs-lead`, `--fs-caption`), controls (`--btn-*`, `--ctl-*`)
+  and decoration (`--seal`, `--qr`) are all `clamp(floor, min(k·--bh, k·--bw), ceiling)`. Easy
+  mode overrides the same tokens; it has no layout of its own (D67).
+- **Three compositions, chosen by shape, not by device name**: wide
+  (`min-aspect-ratio: 5/4`: the picture beside the controls), tall (one column), short
+  (`max-height: 759px`: compact buttons). No user-agent sniffing.
+- **Pictures take the room that is left**: the camera preview is `min(100cqw, 100cqh × 4/3)` of
+  its stage, the six-print grid computes its width from the stage height, frames are shown whole
+  with `object-fit: contain`. Preview = result still holds (4:3, mirrored).
+- **Two button sizes, one shape.** L (`.booth-btn-primary` / `-secondary`): at least 80 px tall,
+  or 64–80 px when the booth is under 760 px tall. M (`.booth-btn-m`, chrome, segmented): at least
+  52 px. Pills, an `:active` state that sinks and darkens, `touch-action: manipulation`, labels
+  that wrap instead of clipping. Nothing depends on hover.
+- **When the screen is too short** (a software keyboard, Safari toolbars, 1024 × 560): gaps shrink
+  first, type and targets stop at their floors, then the screen grows and scrolls inside the booth
+  with a hint. An action is never clipped.
+- **Safe areas**: padding is `max(token, env(safe-area-inset-*))`; `/kiosk` sets
+  `viewport-fit=cover`. Zoom is not disabled.
+- **Two screens changed composition** (Figma and D81b said otherwise): frame choice is one large
+  preview plus small tiles for every frame (no inner scrolling list); photo review on a wide
+  screen is 3 × 2 beside the title and button, not six in one row.
+- **Around the layout**: a finger tap in the first 350 ms of a new screen is ignored
+  (`lib/kiosk/tap-guard.ts`: a double tap no longer presses the button that appears under the
+  finger; touch and pen only). The camera is taken again when the page returns from the background
+  (`lib/kiosk/camera-recovery.ts`), and a stream that arrives after the guest has left is stopped
+  (`BrowserCamera`). The staff-help corner is hit-tested on the window instead of being an
+  overlaid button.
+- **Checked by** `e2e/tablet-matrix.spec.ts`: whole sessions at 820 × 1180, 1180 × 820,
+  768 × 1024, 1024 × 768, 600 × 960 and 820 × 1060, easy mode at the two iPad Air sizes, rotation,
+  a 700 × 460 scroll fallback, a refused camera, a double tap. At every screen: no sideways
+  overflow, every control on screen or scrollable to and hit by a touch at its centre, no
+  overlaps, no tape or seal on a control, targets ≥ 48 px, 4:3 preview, whole frames, a square
+  fully visible QR.
+- **Not verified**: anything on a real iPad or in Safari/WebKit. `dvh`, safe-area insets,
+  container queries, `@property` and Safari's camera behaviour in the background were only run in
+  Chromium at tablet sizes. Full fidelity needs Safari 16.4 or later; older versions get the
+  viewport-unit fallbacks, which were written but not run.
+- **Left as is**: the idle-warning bar covers the footer while it shows (the first touch
+  dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
+  wide empty paper beside the preview on the frame and consent screens.

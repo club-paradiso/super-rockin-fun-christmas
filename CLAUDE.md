@@ -121,6 +121,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   no ruled lines. Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
   `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button). Of the frames, only the letter frame (`shalom-letter`,
   D82) carries the seal.
+- **The booth has one layout system** (D88): `main.kiosk-root` is the viewport and a size
+  container, `.kiosk-scroll` is the only scroll area, and every size comes from the tokens in
+  `app/globals.css` (`--bw`/`--bh`, `--gap-*`, `--fs-*`, `--btn-*`, `--ctl-*`). Never size a booth
+  element from raw `vh`/`vw` or a fixed pixel height, never add a device-name or user-agent
+  branch, never a second scroll area inside a screen. Compositions switch by shape (wide / tall /
+  short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
@@ -200,7 +206,8 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
 - Keep kiosk rules in `lib/kiosk/machine.ts` (pure reducer) and test them there. Components only
   run effects and dispatch.
 - Anything touching canvas takes a `CanvasFactory` so it is testable with `tests/helpers/fake-canvas.ts`.
-- Kiosk copy: short Korean, large touch targets (`btn-primary`/`btn-secondary` are ≥ 80px tall).
+- Kiosk copy: short Korean, large touch targets: `.booth-btn-primary`/`-secondary` are ≥ 80 px tall
+  (64–80 px only when the booth is under 760 px tall), smaller controls ≥ 52 px (D88).
 - Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
   backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
 - Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`; /admin opens with
