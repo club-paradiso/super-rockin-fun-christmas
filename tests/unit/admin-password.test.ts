@@ -174,6 +174,63 @@ describe("POST /api/admin/auth/password", () => {
     await POST(post("/api/admin/settings", { pauseWall: false }, { cookie: admin }), noParams);
   });
 
+  it("wall pace (D92): saved, audited, strict, and kept when the background changes", async () => {
+    const admin = cookieOf(await login(PASSWORD), ADMIN_COOKIE);
+    const { POST } = await import("@/app/api/admin/settings/route");
+    const { getBackend } = await import("@/lib/storage/server");
+    const { wallFeed } = await import("@/lib/wall/server");
+    const send = (body: unknown) =>
+      POST(post("/api/admin/settings", body, { cookie: admin }), noParams);
+
+    expect((await wallFeed()).pace).toEqual({ visibleMs: 14_000, halfLifeMs: 0 });
+    expect((await send({ wallPace: { showSeconds: 30, halfLifeMinutes: 60 } })).status).toBe(200);
+    expect((await getBackend().settings.get()).wallLook).toMatchObject({
+      showSeconds: 30,
+      halfLifeMinutes: 60,
+    });
+    expect((await wallFeed()).pace).toEqual({ visibleMs: 30_000, halfLifeMs: 3_600_000 });
+    // The anonymous audience is paced the same way.
+    expect((await wallFeed([], 5, "public")).pace).toEqual({
+      visibleMs: 30_000,
+      halfLifeMs: 3_600_000,
+    });
+    const [last] = await getBackend().audit.list({ subjectType: "settings", limit: 1 });
+    expect(last).toMatchObject({ actorId: SHARED_OPERATOR_ID, action: "update_settings" });
+
+    // Saving a background (a form that knows nothing about the pace) keeps the pace.
+    const look = { theme: "bethlehem", rotate: false, rotateMinutes: 15, rotation: [] };
+    expect((await send({ wallLook: look })).status).toBe(200);
+    expect((await getBackend().settings.get()).wallLook).toMatchObject({
+      theme: "bethlehem",
+      showSeconds: 30,
+      halfLifeMinutes: 60,
+    });
+    // And saving the pace keeps the background.
+    expect((await send({ wallPace: { showSeconds: 8, halfLifeMinutes: 0 } })).status).toBe(200);
+    expect((await getBackend().settings.get()).wallLook).toMatchObject({
+      theme: "bethlehem",
+      showSeconds: 8,
+      halfLifeMinutes: 0,
+    });
+
+    for (const bad of [
+      { showSeconds: 4, halfLifeMinutes: 0 },
+      { showSeconds: 121, halfLifeMinutes: 0 },
+      { showSeconds: 14.5, halfLifeMinutes: 0 },
+      { showSeconds: "14", halfLifeMinutes: 0 },
+      { showSeconds: 14, halfLifeMinutes: -1 },
+      { showSeconds: 14, halfLifeMinutes: 1441 },
+      { showSeconds: 14 },
+      null,
+    ])
+      expect((await send({ wallPace: bad })).status).toBe(400);
+    expect((await getBackend().settings.get()).wallLook).toMatchObject({ showSeconds: 8 });
+
+    const { defaultWallLook } = await import("@/config/wall-themes");
+    await send({ wallLook: look });
+    await getBackend().settings.update({ wallLook: defaultWallLook() }, SHARED_OPERATOR_ID);
+  });
+
   it("mutations still need the same origin (CSRF) with a valid session", async () => {
     const admin = cookieOf(await login(PASSWORD), ADMIN_COOKIE);
     const { POST } = await import("@/app/api/admin/settings/route");

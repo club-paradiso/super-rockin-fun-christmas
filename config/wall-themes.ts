@@ -1,6 +1,8 @@
 import { WALL_CONFIG } from "./wall";
 import {
+  HALF_LIFE_MINUTES,
   ROTATE_MINUTES,
+  SHOW_SECONDS,
   recutTheme,
   type WallClip,
   type WallLook,
@@ -380,5 +382,7 @@ export function defaultWallLook(): WallLook {
     rotate: false,
     rotateMinutes: ROTATE_MINUTES.default,
     rotation: [],
+    showSeconds: SHOW_SECONDS.default,
+    halfLifeMinutes: HALF_LIFE_MINUTES.default,
   };
 }

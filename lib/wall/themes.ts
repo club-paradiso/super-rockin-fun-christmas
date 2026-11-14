@@ -175,13 +175,30 @@ export interface WallLook {
   rotateMinutes: number;
   /** The themes staff put in the rotation, in order. */
   rotation: string[];
+  /** Seconds one photo stays fully on the wall before it leaves (D92). */
+  showSeconds: number;
+  /**
+   * Half-life of a photo's share of the wall, in minutes since it was taken (D92): every
+   * half-life, it comes up half as often. 0 = off, every photo gets the same share.
+   */
+  halfLifeMinutes: number;
 }
 
 export const ROTATE_MINUTES = { min: 5, max: 120, default: 15 } as const;
+export const SHOW_SECONDS = { min: 5, max: 120, default: 14 } as const;
+export const HALF_LIFE_MINUTES = { min: 0, max: 1440, default: 0 } as const;
+
+const clampInt = (raw: unknown, r: { min: number; max: number; default: number }) => {
+  const n = Number(raw);
+  return raw === null || raw === undefined || raw === "" || !Number.isFinite(n)
+    ? r.default
+    : Math.min(r.max, Math.max(r.min, Math.round(n)));
+};
 
 /**
  * Anything stored → a look the wall can use: unknown theme ids are dropped, an unknown active
  * theme becomes the default, minutes are clamped, and a rotation of fewer than two themes is off.
+ * A look stored before D92 has no pace: it gets the defaults (14 s, half-life off).
  */
 export function normalizeLook(
   raw: unknown,
@@ -202,7 +219,14 @@ export function normalizeLook(
   const rotateMinutes = Number.isFinite(minutes)
     ? Math.min(ROTATE_MINUTES.max, Math.max(ROTATE_MINUTES.min, Math.round(minutes)))
     : ROTATE_MINUTES.default;
-  return { theme, rotate: r.rotate === true && rotation.length >= 2, rotateMinutes, rotation };
+  return {
+    theme,
+    rotate: r.rotate === true && rotation.length >= 2,
+    rotateMinutes,
+    rotation,
+    showSeconds: clampInt(r.showSeconds, SHOW_SECONDS),
+    halfLifeMinutes: clampInt(r.halfLifeMinutes, HALF_LIFE_MINUTES),
+  };
 }
 
 /**

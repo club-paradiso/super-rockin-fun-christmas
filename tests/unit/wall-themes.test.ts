@@ -253,6 +253,8 @@ describe("wall theme registry", () => {
       rotate: false,
       rotateMinutes: ROTATE_MINUTES.default,
       rotation: [],
+      showSeconds: 14,
+      halfLifeMinutes: 0,
     });
   });
 
@@ -297,6 +299,28 @@ describe("wall look (staff setting)", () => {
       rotate: true,
       rotateMinutes: ROTATE_MINUTES.min,
       rotation: ["bethlehem", "winter-sea"],
+      showSeconds: 14,
+      halfLifeMinutes: 0,
+    });
+  });
+
+  it("pace (D92): keeps whole values in range, clamps the rest, defaults what is missing", () => {
+    expect(norm({ showSeconds: 30, halfLifeMinutes: 60 })).toMatchObject({
+      showSeconds: 30,
+      halfLifeMinutes: 60,
+    });
+    expect(norm({ showSeconds: 1, halfLifeMinutes: -5 })).toMatchObject({
+      showSeconds: 5,
+      halfLifeMinutes: 0,
+    });
+    expect(norm({ showSeconds: 9999, halfLifeMinutes: 99_999 })).toMatchObject({
+      showSeconds: 120,
+      halfLifeMinutes: 1440,
+    });
+    // A look stored before the pace existed, or with rubbish in it.
+    expect(norm({ theme: "bethlehem", showSeconds: "long", halfLifeMinutes: null })).toMatchObject({
+      showSeconds: 14,
+      halfLifeMinutes: 0,
     });
     expect(norm({ theme: "bethlehem", rotateMinutes: 9999 }).rotateMinutes).toBe(
       ROTATE_MINUTES.max,
