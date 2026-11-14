@@ -1328,6 +1328,11 @@ body {
     .pick-tile-label {
       font-size: clamp(14px, 15.5cqw, 20px);
     }
+    /* Latin names ("Shalom 2×2", "Clothesline") are wider per tile than the Korean ones. */
+    :root:lang(en) .pick-tile-label,
+    :root:lang(zh-Hans) .pick-tile-label {
+      font-size: clamp(12px, 11cqw, 20px);
+    }
   }
   .pick-actions {
     grid-area: actions;

@@ -427,6 +427,8 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
 
   // A new screen starts at its top, whatever the last one was scrolled to.
   await page.getByTestId("start-camera").click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await page.getByRole("button", { name: KIOSK_COPY.zh.frame.pickConfirm }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
     0,
