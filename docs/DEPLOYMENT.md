@@ -276,8 +276,9 @@ Do these **in this order**. Each step leaves the site working.
    _old_ address and would stay there.
 8. **A hub** (`CLOUD_BASE_URL`) keeps working with the old address. Change it to the new one when
    convenient and restart the hub.
-9. Later, after the event: apply a follow-up migration that drops the two old function signatures
-   (the 9-argument `ftl_photo_transition` and `ftl_settings_update`).
+9. Later, after the event: apply a follow-up migration that drops the old function signatures
+   (the 9-argument `ftl_photo_transition` and `ftl_settings_update`, and, once the D95 code is
+   live, the 11-argument `ftl_settings_update` that the D95 migration keeps as a wrapper).
 
 What keeps working without doing anything: QR links already handed out (the old address stays
 attached and the token does not contain a host), phone-upload QR pages, staff sessions on the old

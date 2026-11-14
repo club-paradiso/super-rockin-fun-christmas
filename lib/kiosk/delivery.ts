@@ -62,19 +62,28 @@ export async function uploadOnce(
  *
  * `scope` "public" says the consent screen showed the public-wall notice (D86). The server
  * records it only while the public wall is on; it is never sent with a "no".
+ *
+ * `aiNotice` says the consent screen showed the automatic-check notice (D95). Only then may the
+ * server queue the photo for the AI; never sent with a "no".
  */
 export async function sendWallConsent(
   sessionId: string,
   consent: boolean,
   scope?: ConsentScope,
   fetchImpl: typeof fetch = fetch,
+  aiNotice = false,
 ): Promise<ConsentOutcome> {
   try {
     const response = await fetchImpl("/api/photos/consent", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId, consent, ...(consent && scope ? { scope } : {}) }),
+      body: JSON.stringify({
+        sessionId,
+        consent,
+        ...(consent && scope ? { scope } : {}),
+        ...(consent && aiNotice ? { aiNotice: true } : {}),
+      }),
     });
     if (response.ok) return "done";
     if (response.status === 401 || response.status === 429 || response.status >= 500)
@@ -173,4 +182,48 @@ export async function deliverVideo(
     }
     await sleep(delays[attempt]!);
   }
+}
+
+/** What the booth may show a guest about the wall review of their photo (D95). */
+export type ReviewStatus = "checking" | "approved" | "staff" | "none";
+
+/**
+ * Ask how the wall review of this session's photo is going. Null on any error, and while the
+ * server does not know the photo or the answer yet: the caller simply asks again.
+ */
+export async function fetchReviewStatus(
+  sessionId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ReviewStatus | null> {
+  try {
+    const response = await fetchImpl(
+      `/api/photos/review?sessionId=${encodeURIComponent(sessionId)}`,
+      { credentials: "same-origin", cache: "no-store" },
+    );
+    if (response.status !== 200) return null;
+    const { review } = (await response.json()) as { review?: unknown };
+    return review === "checking" || review === "approved" || review === "staff" || review === "none"
+      ? review
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The line under the QR for a guest who said yes while the automatic check was on. */
+export type ReviewLine = "checking" | "delayed" | "approved";
+
+/**
+ * Which line to show, from the server's last answer and how long the guest has been waiting.
+ * Pure: the booth never claims "on the wall" unless the server said `approved`, and a check that
+ * is slow, handed to a person, or unreachable all read the same to the guest: "조금 지연".
+ */
+export function reviewLine(
+  status: ReviewStatus | null,
+  waitedMs: number,
+  delayedAfterMs: number,
+): ReviewLine {
+  if (status === "approved") return "approved";
+  if (status === "staff") return "delayed";
+  return waitedMs >= delayedAfterMs ? "delayed" : "checking";
 }

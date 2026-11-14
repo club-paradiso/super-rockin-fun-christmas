@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AiReviewPanel } from "@/components/admin/ai-review-panel";
 import { BackupButton } from "@/components/admin/backup-button";
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { WALL_CONFIG } from "@/config/wall";
@@ -79,6 +80,7 @@ export default async function OverviewPage() {
         </span>
         <span className="admin-btn admin-btn-primary shrink-0">검수하기</span>
       </Link>
+      <AiReviewPanel ai={o.ai} settings={o.settings} />
       <section className="admin-card divide-y divide-ink/10" aria-label="현황">
         <Row
           label="키오스크"

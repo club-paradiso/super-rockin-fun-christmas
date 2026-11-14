@@ -62,6 +62,11 @@ export interface QueuedConsent {
    * Absent = the venue wall only (also every answer queued before D86).
    */
   scope?: ConsentScope;
+  /**
+   * The consent screen showed the automatic-check notice when the guest answered (D95). Absent =
+   * not shown: the photo is then never sent to the AI, whatever the event's mode is later.
+   */
+  aiNotice?: boolean;
   createdAt: number;
   attempts: number;
   nextAttemptAt: number;

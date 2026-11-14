@@ -345,6 +345,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       expect(await hb.json()).toEqual({
         wallSubmissions: "open",
         wallPublic: false,
+        aiReview: false,
       });
       const { kiosks } = (await (
         await call(routes.kiosks(), "GET", "/api/admin/kiosks", { cookie: staffCookie })
@@ -554,6 +555,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       expect(await hb.json()).toEqual({
         wallSubmissions: "paused",
         wallPublic: false,
+        aiReview: false,
       });
       await call(routes.settings(), "POST", "/api/admin/settings", {
         cookie: staffCookie,

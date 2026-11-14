@@ -10,4 +10,8 @@ export SUPABASE_TEST_SERVICE_ROLE_KEY="$SB_SERVICE_ROLE_KEY"
 export SUPABASE_TEST_ANON_KEY="$SB_ANON_KEY"
 export SUPABASE_TEST_DB_URL="$SB_DB_URL"
 export SUPABASE_TEST_MAILPIT_URL="${SB_MAILPIT_URL:-${SB_INBUCKET_URL:-}}"
-exec npx vitest run tests/integration
+# One file at a time: the files share ONE database, and some tests act on every row in it (the
+# retention contract deletes every PENDING photo captured before a date; the AI review tests
+# switch the event-wide moderation mode; one re-applies a migration). Run in parallel, a test in
+# one file can delete or reconfigure what a test in another file is in the middle of using.
+exec npx vitest run tests/integration --no-file-parallelism

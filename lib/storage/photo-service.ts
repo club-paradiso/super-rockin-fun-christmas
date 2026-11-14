@@ -100,7 +100,7 @@ export interface PurgeResult {
 }
 
 export type ConsentResult =
-  | { ok: true; wallConsent: boolean; moderationStatus: ModerationStatus }
+  | { ok: true; photoId: string; wallConsent: boolean; moderationStatus: ModerationStatus }
   | { ok: false; reason: "not_found" | "paused" };
 
 export interface PutMobileInput {
@@ -382,6 +382,28 @@ export class PhotoService {
     return row ? this.resumeMobile(row, kioskId) : null;
   }
 
+  /**
+   * What the booth may tell the guest who just said yes to the wall (D95). Only the booth that
+   * took the photo may ask, and it learns one word: nothing about what the AI saw.
+   *
+   *   checking  the automatic check is still running
+   *   approved  the photo may be on the wall now
+   *   staff     a person will look at it (also when the AI flagged it or could not answer)
+   *   none      not waiting for the wall (no consent, withdrawn, rejected, hidden)
+   *
+   * Null = no such photo for this booth (unknown, deleted, or somebody else's).
+   */
+  async reviewStatus(
+    sessionId: string,
+    kioskId: string | null,
+  ): Promise<"checking" | "approved" | "staff" | "none" | null> {
+    const row = await this.backend.photos.findBySessionId(sessionId);
+    if (!row || isGone(row) || row.kioskId !== kioskId || isMobilePhoto(row)) return null;
+    if (isWallEligible(row)) return "approved";
+    if (row.moderationStatus !== "PENDING") return "none";
+    return row.ai?.status === "QUEUED" ? "checking" : "staff";
+  }
+
   /** Has the phone sent the photo for this QR yet? Only the QR's own booth may ask. */
   async mobileStatus(sessionId: string, kioskId: string | null): Promise<MobileStatus> {
     const row = await this.backend.photos.findBySessionId(sessionId);
@@ -540,7 +562,7 @@ export class PhotoService {
       !reviewable ||
       (from === to && row.wallConsent === consent && row.wallPublic === wallPublic)
     ) {
-      return { ok: true, wallConsent: row.wallConsent, moderationStatus: from };
+      return { ok: true, photoId: row.id, wallConsent: row.wallConsent, moderationStatus: from };
     }
     const updated = await this.backend.photos.transition({
       photoId: row.id,
@@ -554,11 +576,17 @@ export class PhotoService {
     if (!updated) {
       const current = await this.backend.photos.getById(row.id);
       return current
-        ? { ok: true, wallConsent: current.wallConsent, moderationStatus: current.moderationStatus }
+        ? {
+            ok: true,
+            photoId: current.id,
+            wallConsent: current.wallConsent,
+            moderationStatus: current.moderationStatus,
+          }
         : { ok: false, reason: "not_found" };
     }
     return {
       ok: true,
+      photoId: updated.id,
       wallConsent: updated.wallConsent,
       moderationStatus: updated.moderationStatus,
     };

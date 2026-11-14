@@ -91,3 +91,30 @@ npx supabase stop
 
 The migration is idempotent (`if not exists`, `on conflict do update`), and re-running it is part
 of the integration tests.
+
+## AI review migration and its SQL tests (D95)
+
+`20261114120000_ai_review.sql` adds the AI review columns on `photos`, the `ai_usage` table, the
+`moderation_mode` setting and the `ftl_ai_*` functions. Apply it **before** deploying the code that
+uses it; the previous `ftl_settings_update` signature stays as a wrapper, so the running code keeps
+working in between. It changes no behaviour by itself (mode `manual`, every photo `NONE`).
+
+The functions, the row trigger and the grants are tested on a real database by
+`tests/integration/ai-review-sql.test.ts`. With the local Supabase stack it runs as part of
+`npm run test:supabase`. Without Docker, any Postgres 15+ will do:
+
+```bash
+createdb ftl && psql ftl <<'SQL'
+create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
+create schema auth;    create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+create schema storage; create table storage.buckets (id text primary key, name text, public boolean,
+                                                      file_size_limit bigint, allowed_mime_types text[]);
+grant usage on schema public to anon, authenticated, service_role;
+SQL
+for f in supabase/migrations/*.sql; do psql ftl -v ON_ERROR_STOP=1 -f "$f"; done
+FTL_TEST_PG_URL=postgres://<owner>@localhost/ftl npx vitest run tests/integration/ai-review-sql.test.ts
+```
+
+The URL is the database owner's (the test re-applies the migration); everything the application
+would do runs as `service_role`. The two stub schemas stand in for Supabase's own `auth` and
+`storage`; they exist only so the earlier migrations apply.

@@ -1438,3 +1438,66 @@ multi-photo pick on iOS Safari, and the photo order control with real guests.
 - **Checked by:** `tests/unit/wall-themes.test.ts` (the wordmark is clear of every photo plus its
   clip's real reach; a clip reaches below the strip top and stays inside the picture) and the six
   theme screenshots from `e2e/wall-themes.spec.ts` (`SCREENSHOTS=1`).
+
+## D95 · AI-assisted review: the AI may approve what is clearly fine; everything else is still a person's
+
+**Decided by the user (2026-11-14, the "AI photo moderation" mission brief).** This reverses the
+standing rule "Moderation is human. No AI moderation." (PRD non-goals, CLAUDE.md). The reason given:
+photos should reach the wall shortly after a guest says yes, at a live event with one or two
+volunteers, without anything unsuitable getting there.
+
+What changed, and what did not:
+
+- **The moderation state machine is untouched.** `lib/ops/moderation.ts`, the staff actions, the
+  wall rule (`APPROVED AND wall_consent AND not deleted`), the feed, the image proxy and the
+  emergency switches are exactly as before. The AI's opinion is a second, separate record on the
+  photo (`ai_status`), never a moderation state.
+- **One new way to APPROVED**, and only one: `AiReviewRepository.complete` with outcome SAFE
+  (`ftl_ai_complete` on Supabase). It is a single atomic call that also writes the audit event
+  (`ai_approve`, actor `system`), and it only applies to a row that is still PENDING, has wall
+  consent, is not deleted, holds the caller's claim, while the event is in `auto` mode. There is
+  no API route that accepts a verdict.
+- **Fail closed, everywhere.** Unsafe, unsure, a contradictory or unreadable answer, a timeout, a
+  rate limit, an outage, a spent daily budget, a missing configuration, a storage error, a
+  function killed half-way: the photo stays PENDING and private, and a person decides. The AI
+  never rejects, hides or deletes: a wrongly flagged family photo must not be lost to a machine.
+- **A person always wins.** A queued photo that leaves PENDING is out of the AI's hands (row
+  trigger `photos_guard`; the same rule in the memory backend). A late answer finds no claim. A
+  rejected-then-reopened photo is never auto-approved. A hidden photo can only be restored by a
+  person.
+- **Two modes, no third.** `moderationMode`: `manual` (default) or `auto`. There is no mode without
+  review, and the database refuses any other value. Submissions pause and blackout are the
+  existing switches (`pauseSubmissions`, `pauseWall` / `showHoldingScreen`); no second
+  operating-mode system was added.
+- **Consent covers it or it does not happen.** With `auto` on, the booth consent screen says,
+  before the answer, that the photo is sent to an outside AI service. Only a yes given with that
+  line on screen is queued (`aiNotice: true` on the consent request, kept by the offline consent
+  queue), the same pattern as the public wall (D86).
+- **Phone uploads (D66) are always reviewed by a person.** They can be any picture from a camera
+  roll, not a live capture in a staffed booth, and the phone page carries no AI notice.
+- **Only a small copy leaves the server**: our own re-encoded JPEG (long edge 1024 px, no
+  metadata) and a fixed prompt. No ids, no session, no event name. The provider's free text is
+  never stored or logged; the vocabulary is a fixed list of category codes.
+- **The queue is the photo row** (QUEUED, claimed with a lease, finished with a compare-and-set),
+  so nothing depends on an in-memory queue or an unawaited promise. It is driven by the consent
+  request itself (`after()`), by requests that happen anyway during an event (an enrolled wall's
+  feed poll, booth heartbeats, the booth's status poll, the staff pages), by
+  `/api/cron/ai-review`, and on the hub by a timer.
+- **Provider.** Primary: Cloudflare Workers AI through an OpenAI-style chat adapter (free tier, no
+  card, documented no-training and no-retention), model id set by the operator. Alternative:
+  Gemini API on the **paid** tier only; the free tier may train on submitted content and is
+  refused by configuration. Neither was called from this session (the environment blocks the
+  hosts and has no key), so model quality, latency and quota are unverified. Details and evidence
+  grades: `docs/AI_MODERATION.md` section 2.
+- **A wrong AI setting never stops the booth.** Unlike every other server setting it is not a
+  `ConfigError`: the AI is switched off and the reason is shown on `/admin`.
+
+Not decided here, and blocking activation: the legal basis for sending photos to a provider
+abroad (개인정보 보호법 제28조의8), guardian consent for children under 14 (제22조의2), the
+processor disclosure (제26조), and the final wording of the booth notice (D76). The code ships
+with the mode off and no provider configured.
+
+Why not auto-reject on UNSAFE: the cost of a false "unsafe" is a volunteer's tap; the cost of an
+automatic rejection of an ordinary family photo is a guest told "no" by a machine, with nobody
+having looked. Why not a separate jobs table: the row already has everything a job needs, and a
+second table is a second thing to keep consistent with moderation.

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { getAiReview, sweepAiReviewSoon } from "@/lib/moderation/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
 import { RateLimiter } from "@/lib/server/rate-limit";
@@ -9,6 +10,8 @@ import type { CameraState } from "@/lib/storage/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Room for a small AI review sweep after the response has gone out (D95).
+export const maxDuration = 30;
 
 const limiter = new RateLimiter(12, 60_000);
 const CAMERA: CameraState[] = ["ok", "error", "unknown"];
@@ -66,6 +69,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     });
   }
   const settings = await backend.settings.get();
+  // Photos still waiting for the automatic check get a push from every live device (D95).
+  sweepAiReviewSoon();
   const headers: Record<string, string> = { ...NO_STORE };
   if (auth.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, auth.renewCookie);
   return NextResponse.json(
@@ -73,6 +78,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       wallSubmissions: settings.pauseSubmissions ? "paused" : "open",
       // Public wall (D86): the booth then shows the notice and sends consent with that scope.
       wallPublic: settings.wallPublic,
+      // Automatic check (D95): the booth then shows the notice and says so with the consent.
+      aiReview: await getAiReview().active(),
     },
     { headers },
   );

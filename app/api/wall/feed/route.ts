@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { sweepAiReviewSoon } from "@/lib/moderation/server";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
 import { isUuid } from "@/lib/server/validate";
 import { wallAudience, wallRateOk } from "@/lib/wall/audience";
@@ -7,6 +8,8 @@ import { wallFeed } from "@/lib/wall/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Room for a small AI review sweep after the response has gone out (D95).
+export const maxDuration = 30;
 
 /**
  * Which photos may be on the wall right now. No enrollment is needed to ask (D86):
@@ -25,6 +28,9 @@ export const dynamic = "force-dynamic";
 export const GET = route("wall_feed", async (request: Request) => {
   const who = await wallAudience(request);
   if (!wallRateOk("feed", who)) return jsonError(429, "too many requests");
+  // An enrolled display polls every few seconds for as long as the wall is up: a steady push for
+  // photos waiting on the automatic check (D95). Never for the anonymous audience.
+  if (who.audience === "display") sweepAiReviewSoon();
   const headers: Record<string, string> = { ...NO_STORE };
   if (who.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, who.renewCookie);
   const params = new URL(request.url).searchParams;

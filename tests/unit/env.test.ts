@@ -288,3 +288,119 @@ describe("isPrivateHost", () => {
     expect(isPrivateHost(h)).toBe(false),
   );
 });
+
+describe("AI review provider config (D95)", () => {
+  const ACCOUNT = "0123456789abcdef0123456789abcdef";
+  const CF = {
+    AI_MODERATION_PROVIDER: "cloudflare",
+    AI_MODERATION_API_KEY: "cf-token",
+    AI_MODERATION_ACCOUNT_ID: ACCOUNT,
+    AI_MODERATION_MODEL: "@cf/vendor/vision-model",
+  };
+  const ai = (env: Record<string, string | undefined>, base: Record<string, string> = PROD) => {
+    const c = parseServerConfig({ ...base, ...env });
+    return { config: c.aiModeration, problem: c.aiModerationProblem };
+  };
+
+  it("is off unless a provider is named, and that is not a problem", () => {
+    expect(ai({})).toEqual({ config: null, problem: null });
+    expect(ai({ AI_MODERATION_API_KEY: "left-over-key" })).toEqual({ config: null, problem: null });
+  });
+
+  it("Cloudflare Workers AI: account + token + model, with safe defaults", () => {
+    expect(ai(CF)).toEqual({
+      problem: null,
+      config: {
+        kind: "chat",
+        id: "cloudflare",
+        baseUrl: new URL(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/v1`),
+        apiKey: "cf-token",
+        model: "@cf/vendor/vision-model",
+        dailyLimit: 300,
+        timeoutMs: 8000,
+      },
+    });
+    expect(
+      ai({ ...CF, AI_MODERATION_DAILY_LIMIT: "120", AI_MODERATION_TIMEOUT_MS: "5000" }).config,
+    ).toMatchObject({ dailyLimit: 120, timeoutMs: 5000 });
+  });
+
+  it("any other OpenAI-style endpoint needs an https base URL", () => {
+    const other = {
+      AI_MODERATION_PROVIDER: "openai-compatible",
+      AI_MODERATION_API_KEY: "k",
+      AI_MODERATION_MODEL: "vendor/vision-1",
+      AI_MODERATION_BASE_URL: "https://api.example.com/openai/v1",
+    };
+    expect(ai(other).config).toMatchObject({ kind: "chat", id: "openai-compatible" });
+    for (const bad of [
+      "http://api.example.com/v1",
+      "https://user:pw@api.example.com/v1",
+      "https://api.example.com/v1?key=1",
+      "https://192.168.0.5/v1",
+      "https://localhost/v1",
+      "not a url",
+      "",
+    ])
+      expect(ai({ ...other, AI_MODERATION_BASE_URL: bad }), bad).toMatchObject({
+        config: null,
+        problem: expect.stringMatching(/BASE_URL/),
+      });
+  });
+
+  it("Gemini is refused until the operator confirms the paid tier", () => {
+    const g = { AI_MODERATION_PROVIDER: "gemini", AI_MODERATION_API_KEY: "g-key" };
+    expect(ai(g)).toMatchObject({ config: null, problem: expect.stringMatching(/paid tier only/) });
+    expect(ai({ ...g, AI_MODERATION_PAID_TIER_CONFIRMED: "yes" }).config).toBeNull();
+    expect(ai({ ...g, AI_MODERATION_PAID_TIER_CONFIRMED: "1" })).toEqual({
+      problem: null,
+      config: {
+        kind: "gemini",
+        apiKey: "g-key",
+        model: "gemini-3.5-flash-lite",
+        dailyLimit: 300,
+        timeoutMs: 8000,
+      },
+    });
+  });
+
+  it("the mock provider never runs on a real deployment", () => {
+    expect(ai({ AI_MODERATION_PROVIDER: "mock" })).toMatchObject({
+      config: null,
+      problem: expect.stringMatching(/development and tests only/),
+    });
+    const dev = { ...SECRETS };
+    expect(ai({ AI_MODERATION_PROVIDER: "mock" }, dev).config).toMatchObject({
+      kind: "mock",
+      behaviour: "safe",
+    });
+    expect(
+      ai({ AI_MODERATION_PROVIDER: "mock", AI_MODERATION_MOCK: "unsafe" }, dev).config,
+    ).toMatchObject({
+      behaviour: "unsafe",
+    });
+    expect(
+      ai({ AI_MODERATION_PROVIDER: "mock", AI_MODERATION_MOCK: "approve-all" }, dev).config,
+    ).toBeNull();
+  });
+
+  it.each([
+    [{ AI_MODERATION_PROVIDER: "chatgpt" }, /must be cloudflare/],
+    [{ ...CF, AI_MODERATION_API_KEY: "" }, /API_KEY is missing/],
+    [{ ...CF, AI_MODERATION_MODEL: undefined }, /MODEL is required/],
+    [{ ...CF, AI_MODERATION_MODEL: "model with spaces" }, /MODEL has characters/],
+    [{ ...CF, AI_MODERATION_ACCOUNT_ID: "my-account" }, /ACCOUNT_ID/],
+    [{ ...CF, AI_MODERATION_ACCOUNT_ID: undefined }, /ACCOUNT_ID/],
+    [{ ...CF, AI_MODERATION_DAILY_LIMIT: "0" }, /DAILY_LIMIT/],
+    [{ ...CF, AI_MODERATION_DAILY_LIMIT: "unlimited" }, /DAILY_LIMIT/],
+    [{ ...CF, AI_MODERATION_TIMEOUT_MS: "60000" }, /TIMEOUT_MS/],
+    [{ ...CF, AI_MODERATION_TIMEOUT_MS: "10" }, /TIMEOUT_MS/],
+  ])("a mistake turns the AI off and says why, without stopping the server: %j", (env, why) => {
+    // No ConfigError: the booth, the QR and human review must keep working.
+    const result = ai(env as Record<string, string | undefined>);
+    expect(result.config).toBeNull();
+    expect(result.problem).toMatch(why);
+    // The problem text never repeats the key.
+    expect(result.problem).not.toContain("cf-token");
+  });
+});

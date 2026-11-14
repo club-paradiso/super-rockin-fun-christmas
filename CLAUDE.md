@@ -17,7 +17,22 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Download and wall consent are independent.** Declining the wall must never affect the photo
   link. Consent UI gives both answers equal weight — no dark patterns.
 - **No face recognition, biometrics, or analytics.** Store only what the service needs.
-- **Moderation is human.** No AI moderation.
+- **A person can always decide; the AI may only approve** (D95, a user decision that replaced
+  "no AI moderation"). `moderationMode` is `manual` (default) or `auto`; there is no mode without
+  review. In `auto` the AI looks at a photo only when the guest said yes with the AI notice on
+  screen (`aiNotice`), and the only thing it can do is move PENDING → APPROVED, through
+  `AiReviewRepository.complete` with SAFE (`ftl_ai_complete`): one atomic, audited call. Unsafe,
+  unsure, error, timeout, rate limit, no budget, no configuration → the photo stays PENDING for a
+  person. Never add a path where "could not check" becomes approved, never let the AI reject,
+  hide, delete or restore, and never add a route that accepts a verdict. Phone uploads are always
+  reviewed by a person. The policy is `lib/moderation/policy.ts` + `prompt.ts`, never the
+  provider's own.
+- **Only a prepared copy leaves the server** (D95): `prepareModerationImage` (small JPEG, no
+  metadata) and the fixed prompt. An adapter (`lib/moderation/providers`) receives that image and
+  an abort signal, nothing else: no ids, sessions, tokens or paths. Store and log category and
+  reason codes only, never a provider's text. A new provider is one adapter plus one line in
+  `lib/moderation/server.ts`. A wrong AI setting turns the AI off (`aiModerationProblem`); it must
+  never be a `ConfigError`, because the booth works without it.
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.
@@ -64,7 +79,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   rename/revoke, enrollment codes, settings, staff changes go through ONE backend call (a SQL
   `ftl_*` function on Supabase). Never update those columns directly.
 - **Moderation rules live in `lib/ops/moderation.ts`.** APPROVED requires wall consent; DELETED is
-  terminal and removes the image. No AI moderation, no face anything.
+  terminal and removes the image. The AI's opinion is a separate record (`photo.ai`, D95), never a
+  moderation state, and a queued photo that leaves PENDING is out of the AI's hands (`photos_guard`
+  trigger / `aiAfterLeavingPending`). No face anything.
 - **PAUSE SUBMISSIONS never blocks photography or QR delivery** — only new wall consent.
 - **The wall page needs no enrollment; the feed decides what each viewer gets** (D86). A valid
   kiosk cookie is an enrolled venue display: it receives `wall_eligible_photos` ids, through
@@ -182,6 +199,10 @@ app/api/hub            cloud side of the hub's QR copy: put / reissue / delete /
 app/api/photos/qr      kiosk asks again for a "QR 준비 중" photo (hub with a cloud)
 lib/cloud              hub side: CloudClient (HTTP) + CloudSync (per-photo lock, queue, worker)
                        + HubInbox (phone photos down from the cloud inbox, D66)
+lib/moderation         AI review (D95): policy + prompt, the copy that may leave (image.ts), provider
+                       adapters, the service (queue → verdict, fail closed), server wiring + sweeps
+app/api/photos/review  the booth asks how its photo's review is going (kiosk cookie; one word)
+app/api/cron/ai-review work through the AI review queue (Bearer CRON_SECRET; optional)
 lib/ops                moderation rules, enrollment codes, kiosk health, staff read models,
                        hub retention (D47/D58: rules in hub-retention.ts, timer in -server.ts),
                        USB backup + disk status (D60: backup.ts, backup-server.ts), event close (D64)
@@ -205,6 +226,7 @@ scripts                hub-start.mjs (launcher), hub-restore.mjs, event-check.mj
                        check), staff-add.mjs (plain Node, unit tested)
 ops                    desktop-icon wrappers: start-hub / restore-backup / event-check (.bat/.command),
                        start-wall
+config/moderation.ts   AI review knobs, category codes and their staff Korean (D95)
 config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71),
                        wall themes (wall-themes.ts, D85)
 design/                Figma source link, Figma -> code mapping (README), page previews
@@ -228,6 +250,10 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
   printed in the server console) or on Supabase (`npx supabase start`, codes in Mailpit
   `http://127.0.0.1:54324`). `npm run test:e2e` runs as the hub; `E2E_STORE=supabase` runs the
   cloud admin specs (see docs/ADMIN.md).
+- Any change to AI review must keep `tests/helpers/ai-contract.ts` green on every backend
+  (memory, local, and the SQL functions: `FTL_TEST_PG_URL=… npx vitest run tests/integration/ai-review-sql.test.ts`).
+  Never send a guest's photo to a provider in development; the evaluation set is synthetic or
+  licensed pictures only (`docs/AI_MODERATION.md` 2.3).
 - Before committing: `npm run check`. Before claiming a flow works: `npm run test:e2e`. Touching
   Supabase code or migrations: also `npm run test:supabase`.
 - Never claim the real-phone cellular test passed unless a human did it (see DEPLOYMENT).
