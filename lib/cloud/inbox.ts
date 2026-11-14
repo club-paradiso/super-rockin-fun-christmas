@@ -87,7 +87,7 @@ export class HubInbox {
         data: image.value,
         // The guest uploaded through a QR the hub issued; review still decides.
         submissionsPaused: false,
-        // The frame the guest chose (D92). A frame this hub does not know (a cloud deployed
+        // The frame the guest chose (D93). A frame this hub does not know (a cloud deployed
         // ahead of it) is stored as a plain phone photo: the picture itself already has it.
         frameId: cloudFrameId && isMobileFrameId(cloudFrameId) ? cloudFrameId : MOBILE_FRAME_ID,
       });

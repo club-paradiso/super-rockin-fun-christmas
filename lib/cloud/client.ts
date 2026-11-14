@@ -53,7 +53,7 @@ export interface CloudUploadSession {
 export interface CloudInboxClient {
   createUploadSession(): Promise<CloudResult<CloudUploadSession>>;
   uploadStatus(sessionId: string): Promise<CloudResult<"waiting" | "received" | "closed">>;
-  /** `frameId` is the stored frame id (D92); missing from a cloud older than D92. */
+  /** `frameId` is the stored frame id (D93); missing from a cloud older than D93. */
   inbox(): Promise<CloudResult<{ sessionId: string; createdAt: string; frameId?: string }[]>>;
   inboxImage(sessionId: string): Promise<CloudResult<Uint8Array>>;
   ack(sessionId: string): Promise<CloudResult<null>>;

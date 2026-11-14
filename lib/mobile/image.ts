@@ -56,7 +56,7 @@ export async function normalizeMobilePhoto(
 }
 
 /**
- * A framed phone picture (D92) must have its frame's shape, so the wall hangs it in the right box.
+ * A framed phone picture (D93) must have its frame's shape, so the wall hangs it in the right box.
  * 1 % leeway for rounding at the phone's canvas size.
  */
 export function matchesFrameShape(

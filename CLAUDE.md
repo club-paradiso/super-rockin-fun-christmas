@@ -85,10 +85,15 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   picture cut for another screen shape (D91, the 2.4:1 board), derived with `recutTheme` from the
   theme's own numbers; the wall picks the closest shape with `fitTheme` and never stretches. Every
   variant passes the same theme tests.
+- **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
+  audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
+  `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo
+  comes up (`ageWeight` in `lib/wall/rotation.ts`); it never removes one, and with it off the
+  order is exactly the fair order.
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put 1–6 photos in a current booth
-  frame on the phone (D92: composed there with `composeFrame`, shape checked on the server, hung on
-  the wall like that frame), `phone-photo` for a plain photo from a page older than D92. Test a phone
+  frame on the phone (D93: composed there with `composeFrame`, shape checked on the server, hung on
+  the wall like that frame), `phone-photo` for a plain photo from a page older than D93. Test a phone
   photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
   as PENDING only through `PhotoService.putMobile` with explicit consent. No guest link, no QR

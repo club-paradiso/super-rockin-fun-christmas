@@ -30,7 +30,7 @@ const perQr = new RateLimiter(6, 10 * 60_000);
  *
  * Headers: x-upload-token (from the QR address), x-wall-consent: "yes" (the page cannot submit
  * without it), x-wall-scope: "public" when the page showed the public-wall notice (D86),
- * x-frame-id: the booth frame the guest put their photos in (D92; omitted by a page from before
+ * x-frame-id: the booth frame the guest put their photos in (D93; omitted by a page from before
  * then, which sends a plain photo), content-type image/jpeg | image/png. Body: the image (the page
  * has already composed and shrunk it to a JPEG; the server never trusts that and re-encodes it,
  * dropping EXIF and GPS).
@@ -52,7 +52,7 @@ export const POST = route("mobile_upload", async (request: Request) => {
   if (!perQr.take(sessionId)) return jsonError(429, "too many requests");
   if (request.headers.get("x-wall-consent") !== "yes") return jsonError(400, "consent required");
 
-  // A framed picture (D92): only a current booth frame, stored as phone-<frame id>.
+  // A framed picture (D93): only a current booth frame, stored as phone-<frame id>.
   const frameHeader = request.headers.get("x-frame-id");
   const frame = frameHeader ? mobileBoothFrame(mobileFrameId(frameHeader)) : null;
   if (frameHeader && !frame) return jsonError(400, "frame");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WALL_CONFIG, type WallTimings } from "@/config/wall";
-import { feedSize, rotationOrder, type RotationExposure } from "@/lib/wall/rotation";
+import { ageWeight, feedSize, rotationOrder, type RotationExposure } from "@/lib/wall/rotation";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 
 /**
@@ -60,6 +60,183 @@ describe("rotationOrder", () => {
 
 const T: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 20_000 };
 const onWall = (s: WallSchedule) => s.slots.map((x) => x.photoId);
+
+describe("half-life (D92)", () => {
+  const MIN = 60_000;
+  const at = (min: number) => Date.UTC(2026, 11, 1) + min * MIN;
+
+  it("a photo's share halves every half-life and is 1 when the half-life is off", () => {
+    expect(ageWeight(at(0), at(0), 30 * MIN)).toBe(1);
+    expect(ageWeight(at(0), at(30), 30 * MIN)).toBeCloseTo(0.5);
+    expect(ageWeight(at(0), at(90), 30 * MIN)).toBeCloseTo(0.125);
+    expect(ageWeight(at(0), at(90), 0)).toBe(1);
+    expect(ageWeight(at(0), at(90), undefined)).toBe(1);
+    // A clock that is behind the photo never makes it worth more than a new one.
+    expect(ageWeight(at(10), at(0), 30 * MIN)).toBe(1);
+    // Very old photos keep a share: nothing is ever starved.
+    expect(ageWeight(at(0), at(100_000), 30 * MIN)).toBeGreaterThan(0);
+  });
+
+  const photos = [
+    { id: "old", createdAt: new Date(at(0)).toISOString() },
+    { id: "new", createdAt: new Date(at(60)).toISOString() },
+    { id: "never", createdAt: new Date(at(61)).toISOString() },
+  ];
+  const exposures = new Map([
+    ["old", { shownCount: 2, lastShownAt: new Date(at(50)).toISOString() }],
+    ["new", { shownCount: 3, lastShownAt: new Date(at(62)).toISOString() }],
+  ]);
+
+  it("off: the order is the fair order, whatever the clock says", () => {
+    const fair = rotationOrder({ eligible: photos, exposures, showNow: [] });
+    expect(fair).toEqual(["never", "old", "new"]);
+    expect(
+      rotationOrder({ eligible: photos, exposures, showNow: [], halfLifeMs: 0, nowMs: at(600) }),
+    ).toEqual(fair);
+  });
+
+  it("on: a newer photo is due again before an older one with fewer showings", () => {
+    // old is two half-lives older than new: 2 showings count as 2 / (1/4) = 8 against 3.
+    expect(
+      rotationOrder({
+        eligible: photos,
+        exposures,
+        showNow: [],
+        halfLifeMs: 30 * MIN,
+        nowMs: at(60),
+      }),
+    ).toEqual(["never", "new", "old"]);
+  });
+
+  it("on: show-now and never-shown photos still come first", () => {
+    expect(
+      rotationOrder({
+        eligible: photos,
+        exposures,
+        showNow: ["old"],
+        halfLifeMs: 30 * MIN,
+        nowMs: at(600),
+      }),
+    ).toEqual(["old", "never", "new"]);
+  });
+
+  it("newest ordering: showings follow the shares, and the old photos still come up", () => {
+    // Twelve photos on one slot, so the 10 s rest never decides who is next.
+    const T2: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 10_000 };
+    const share = [1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25];
+    const ids = share.map((_, i) => `p${i}`);
+    const weights = new Map(ids.map((id, i) => [id, share[i]!]));
+    const count = (w?: Map<string, number>) => {
+      const shown = new Map(ids.map((id) => [id, 0]));
+      let s: WallSchedule = emptySchedule(1);
+      for (let now = 0; now <= 8 * 3600_000; now += 1000) {
+        const next = stepSchedule(s, {
+          now,
+          eligible: ids,
+          ready: new Set(ids),
+          timings: T2,
+          ordering: "newest",
+          weights: w,
+        });
+        const id = next.slots[0]!.photoId;
+        if (id && id !== s.slots[0]!.photoId) shown.set(id, shown.get(id)! + 1);
+        s = next;
+      }
+      return ids.map((id) => shown.get(id)!);
+    };
+    const even = count();
+    expect(Math.max(...even) - Math.min(...even)).toBeLessThanOrEqual(1);
+
+    const w = count(weights);
+    const mean = (from: number) => w.slice(from, from + 4).reduce((a, b) => a + b, 0) / 4;
+    expect(Math.min(...w)).toBeGreaterThan(0);
+    expect(mean(0) / mean(4)).toBeGreaterThan(1.9);
+    expect(mean(0) / mean(4)).toBeLessThan(2.1);
+    expect(mean(0) / mean(8)).toBeGreaterThan(3.8);
+    expect(mean(0) / mean(8)).toBeLessThan(4.2);
+    // Photos with the same share are still treated alike.
+    for (const from of [0, 4, 8])
+      expect(
+        Math.max(...w.slice(from, from + 4)) - Math.min(...w.slice(from, from + 4)),
+      ).toBeLessThanOrEqual(1);
+  });
+
+  it("a photo that joins late starts level: no burst of turns to catch up", () => {
+    const T2: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 10_000 };
+    const early = ["a", "b", "c", "d", "e", "f"];
+    let s: WallSchedule = emptySchedule(1);
+    const seen: string[] = [];
+    for (let now = 0; now <= 3600_000; now += 1000) {
+      const eligible = now < 1800_000 ? early : [...early, "late"];
+      const next = stepSchedule(s, {
+        now,
+        eligible,
+        ready: new Set(eligible),
+        timings: T2,
+        ordering: "newest",
+      });
+      const id = next.slots[0]!.photoId;
+      if (id && id !== s.slots[0]!.photoId && now >= 1800_000) seen.push(id);
+      s = next;
+    }
+    const late = seen.filter((id) => id === "late").length;
+    const a = seen.filter((id) => id === "a").length;
+    expect(late).toBeGreaterThan(0);
+    expect(Math.abs(late - a)).toBeLessThanOrEqual(1);
+  });
+
+  it("switching the half-life off, or changing it, forgets the turns counted under it", () => {
+    const T2: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 10_000 };
+    const ids = ["a", "b", "c", "d", "e", "old"];
+    // "old" is ten half-lives behind the others.
+    const weights = new Map(ids.map((id) => [id, id === "old" ? 2 ** -10 : 1]));
+    const after = (second: { weights?: Map<string, number>; sharesKey?: number }) => {
+      let s: WallSchedule = emptySchedule(1);
+      const shown = new Map(ids.map((id) => [id, 0]));
+      for (let now = 0; now <= 62 * 60_000; now += 1000) {
+        const first = now < 2 * 60_000;
+        const next = stepSchedule(s, {
+          now,
+          eligible: ids,
+          ready: new Set(ids),
+          timings: T2,
+          ordering: "newest",
+          ...(first ? { weights, sharesKey: 10 } : second),
+        });
+        const id = next.slots[0]!.photoId;
+        if (!first && id && id !== s.slots[0]!.photoId) shown.set(id, shown.get(id)! + 1);
+        s = next;
+      }
+      return ids.map((id) => shown.get(id)!);
+    };
+    // Off: every photo, the old one included, gets the same number of turns again at once.
+    const off = after({});
+    expect(Math.max(...off) - Math.min(...off)).toBeLessThanOrEqual(1);
+    // A different half-life under which all six are equal: the same.
+    const changed = after({ weights: new Map(ids.map((id) => [id, 1])), sharesKey: 600 });
+    expect(Math.max(...changed) - Math.min(...changed)).toBeLessThanOrEqual(1);
+  });
+
+  it("the time a photo stays up follows the timing it is given", () => {
+    const stay = (visibleMs: number) => {
+      let s: WallSchedule = emptySchedule(1);
+      let from = -1;
+      for (let now = 0; now <= 200_000; now += 1000) {
+        s = stepSchedule(s, {
+          now,
+          eligible: ["a"],
+          ready: new Set(["a"]),
+          timings: { enterMs: 1000, visibleMs, exitMs: 1000, cooldownMs: 0 },
+        });
+        if (s.slots[0]!.phase === "VISIBLE" && from < 0) from = now;
+        if (s.slots[0]!.phase === "EXIT" && from >= 0) return now - from;
+      }
+      return -1;
+    };
+    expect(stay(8000)).toBe(8000);
+    expect(stay(60_000)).toBe(60_000);
+  });
+});
 
 describe("scheduler with fair ordering", () => {
   it("takes the first usable photo in the server's order", () => {

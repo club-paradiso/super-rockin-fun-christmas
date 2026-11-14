@@ -14,8 +14,8 @@ import {
 import { cycleOrder, limitPicked } from "@/lib/mobile/prepare";
 import { matchesFrameShape } from "@/lib/mobile/image";
 
-/** D92: a phone photo can be put in any booth frame; its stored id says which. */
-describe("phone photos in booth frames (D92)", () => {
+/** D93: a phone photo can be put in any booth frame; its stored id says which. */
+describe("phone photos in booth frames (D93)", () => {
   it("no booth frame id could be mistaken for a phone photo", () => {
     for (const id of [...FRAMES.map((f) => f.id), ...RETIRED_FRAME_IDS]) {
       expect(id.startsWith(MOBILE_UPLOAD_CONFIG.frameIdPrefix), id).toBe(false);

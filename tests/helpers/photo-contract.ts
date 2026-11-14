@@ -355,7 +355,7 @@ export function photoServiceContract(
       if (KIOSK !== OTHER) expect(await svc.mobileStatus(SESSION, OTHER)).toBe("waiting");
     });
 
-    // D92: a phone photo the guest put in a booth frame keeps that frame in its id.
+    // D93: a phone photo the guest put in a booth frame keeps that frame in its id.
     it("framed phone photo: stored as phone-<frame>, found by the inbox prefix; anything else refused", async () => {
       await putMobile({ kioskId: null, frameId: "phone-shalom-letter" });
       const row = (await backend.photos.findBySessionId(SESSION))!;

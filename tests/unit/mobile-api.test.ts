@@ -247,7 +247,7 @@ describe("phone upload (D66)", () => {
     );
   });
 
-  // D92: the guest puts their photos in a booth frame on the phone; the stored photo keeps the
+  // D93: the guest puts their photos in a booth frame on the phone; the stored photo keeps the
   // frame's id and its saved size, so the wall hangs it like that booth frame.
   it("a framed picture keeps its frame id and full size; a wrong shape or unknown frame is refused", async () => {
     const plain = async (width: number, height: number) =>

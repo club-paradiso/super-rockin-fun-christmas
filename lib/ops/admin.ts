@@ -271,7 +271,7 @@ export async function listAudit(filter: {
   }));
 }
 
-/** "휴대폰 사진", or "휴대폰 사진 · 편지" for one the guest put in a booth frame (D92). */
+/** "휴대폰 사진", or "휴대폰 사진 · 편지" for one the guest put in a booth frame (D93). */
 function mobileLabel(frameId: string): string | null {
   if (photoSource({ frameId }) !== "mobile") return null;
   const frame = mobileBoothFrame(frameId);

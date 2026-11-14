@@ -34,12 +34,12 @@ export async function wallFeed(
   const backend = getBackend();
   const settings = await backend.settings.get();
   const now = new Date();
+  const look = normalizeLook(settings.wallLook, WALL_THEMES, DEFAULT_WALL_THEME);
+  const pace = { visibleMs: look.showSeconds * 1000, halfLifeMs: look.halfLifeMinutes * 60_000 };
   const base = {
     audience,
-    theme: activeThemeId(
-      normalizeLook(settings.wallLook, WALL_THEMES, DEFAULT_WALL_THEME),
-      now.getTime(),
-    ),
+    theme: activeThemeId(look, now.getTime()),
+    pace,
     ordering: "fair" as const,
     photos: [],
     showNow: [],
@@ -92,6 +92,8 @@ export async function wallFeed(
     eligible,
     exposures: new Map(exposures.map((e) => [e.photoId, e])),
     showNow,
+    halfLifeMs: pace.halfLifeMs,
+    nowMs: now.getTime(),
   });
   return {
     ...base,

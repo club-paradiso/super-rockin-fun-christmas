@@ -535,6 +535,8 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
         rotate: true,
         rotateMinutes: 20,
         rotation: ["bethlehem", "winter-sea"],
+        showSeconds: 30,
+        halfLifeMinutes: 60,
       };
       const s = await backend.settings.update({ wallPublic: true, wallLook: look }, staffId);
       expect(s).toMatchObject({ wallPublic: true, wallLook: look });

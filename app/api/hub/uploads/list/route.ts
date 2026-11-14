@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Hub → cloud: phone photos waiting for the hub, oldest first (D66). Session ids, and the frame
- * the guest chose (D92), so the hub stores the photo with the same frame id.
+ * the guest chose (D93), so the hub stores the photo with the same frame id.
  */
 export const POST = hubRoute("hub_upload_list", async () => {
   const rows = await getPhotoService().mobileInbox(50);

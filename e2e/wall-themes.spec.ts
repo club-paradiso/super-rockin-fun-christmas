@@ -500,6 +500,66 @@ for (const size of [
   });
 }
 
+test("staff set how long a photo stays up and the half-life in 설정 (D92)", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const anon = await cleanWall(browser);
+  const pace = async () =>
+    ((await (await anon.request.get("/api/wall/feed")).json()) as { pace: unknown }).pace;
+  expect(await pace()).toEqual({ visibleMs: 14_000, halfLifeMs: 0 });
+
+  const staff = await (
+    await browser.newContext({ viewport: { width: 820, height: 1180 } })
+  ).newPage();
+  await staff.goto("/admin/login");
+  await staff.getByLabel("비밀번호", { exact: true }).fill(ENROLL_SECRET);
+  await staff.getByRole("button", { name: "관리자 화면 열기" }).click();
+  await expect(staff).toHaveURL(/\/admin$/);
+  await staff.goto("/admin/settings");
+  const form = staff.getByTestId("wall-pace");
+  await expect(form.getByTestId("wall-show-seconds")).toHaveValue("14");
+  await expect(form.getByTestId("wall-half-life")).toHaveValue("0");
+  await expect(form.getByTestId("wall-half-life-note")).toContainText("꺼져 있어요");
+  await expect(form.getByTestId("wall-pace-save")).toBeDisabled();
+
+  await form.getByTestId("wall-show-seconds").selectOption("30");
+  await form.getByTestId("wall-half-life").selectOption("60");
+  // The note says in plain words what the choice does, before saving.
+  await expect(form.getByTestId("wall-half-life-note")).toContainText(
+    "1시간 된 사진은 새 사진의 절반, 2시간 된 사진은 4분의 1",
+  );
+  if (process.env.SCREENSHOTS === "1")
+    await form.screenshot({
+      path: "docs/screenshots/admin-820x1180-07-wall-pace.jpg",
+      type: "jpeg",
+      quality: 80,
+    });
+  await form.getByTestId("wall-pace-save").click();
+  await expect(form.getByTestId("wall-pace-message")).toContainText("저장했어요");
+  expect(await pace()).toEqual({ visibleMs: 30_000, halfLifeMs: 3_600_000 });
+  await staff.reload();
+  await expect(form.getByTestId("wall-show-seconds")).toHaveValue("30");
+  await expect(form.getByTestId("wall-half-life")).toHaveValue("60");
+
+  // Changing the background keeps the pace, and the photos on the wall are the same photos.
+  const lookForm = staff.getByTestId("wall-look");
+  await lookForm.locator('[data-theme="winter-sea"]').getByRole("radio").click();
+  await lookForm.getByTestId("wall-look-save").click();
+  await expect(lookForm.getByTestId("wall-look-message")).toContainText("저장했어요");
+  expect(await pace()).toEqual({ visibleMs: 30_000, halfLifeMs: 3_600_000 });
+  const feed = (await (await anon.request.get("/api/wall/feed")).json()) as {
+    photos: { id: string }[];
+  };
+  for (const id of publicIds) expect(feed.photos.map((p) => p.id)).toContain(id);
+  await lookForm.getByTestId("wall-look-reset").click();
+  await expect(lookForm.getByTestId("wall-look-message")).toContainText("저장했어요");
+
+  await form.getByTestId("wall-pace-reset").click();
+  await expect(form.getByTestId("wall-pace-message")).toContainText("저장했어요");
+  expect(await pace()).toEqual({ visibleMs: 14_000, halfLifeMs: 0 });
+  await staff.context().close();
+  await anon.context().close();
+});
+
 test("an empty public wall says so on a paper note, on any background", async ({ browser }) => {
   await settings({ wallPublic: false });
   await look("bethlehem");

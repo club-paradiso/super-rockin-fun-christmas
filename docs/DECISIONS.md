@@ -1362,7 +1362,36 @@ The user asked for any screen shape to apply by itself.
   shows only a region of it. The wall centres its scene in the window; if the board shows, for
   example, only the top-left 3096 × 1290 of a larger signal, an offset setting is still needed.
 
-## D92 · Phone photos go into the booth's frames
+## D92 · Staff set the wall's pace: how long a photo stays up, and a half-life
+
+The owner asked (2026-11-14) to set, easily and from /admin, how long a photo is shown on the
+media wall and a half-life for photos on it.
+
+- **Two settings in 설정 → 미디어월 사진 속도.** 한 장이 떠 있는 시간 (5–120 s, default 14 s, what
+  `WALL_CONFIG.visibleMs` was) and 반감기 (0–1440 min, default 0 = off). Presets in two selects, a
+  sentence that says what the current choice does, one save button, one reset.
+- **Half-life = share, not expiry.** A photo's share of the wall is `2^(−age / half-life)`, age
+  counted from when it was taken (`ageWeight`, `lib/wall/rotation.ts`): one half-life older, half
+  as many turns. No photo ever leaves the wall because of it; removing a photo stays a staff
+  action (hide, delete) or retention.
+- **Where it acts.** Hub (`ordering: "fair"`): step 3 of `rotationOrder` compares exposures divided
+  by the share; show-now and never-shown photos still come first, in the same order as before.
+  Cloud and the public audience (`ordering: "newest"`): the wall's scheduler counts share-weighted
+  turns per photo and takes the lowest, with the same cooldown as before. A photo that joins
+  late starts level with the least-shown one.
+- **Off is exactly the old behaviour**, so F1–F6 (ARCHITECTURE 1.7) hold as written with the
+  half-life off. With it on, F4 ("counts differ by at most 1") is deliberately given up between
+  photos of different ages and still holds between photos of the same share. With few photos the
+  60 s cooldown and the number of slots decide before the shares do.
+- **Stored inside `event_settings.wall_look`** (`showSeconds`, `halfLifeMinutes`), sent by the
+  feed as `pace`. No migration: the look is already one audited jsonb setting, and a look stored
+  before D92 reads as the defaults. `POST /api/admin/settings {"wallPace": {...}}` changes only the
+  pace; saving a background keeps the pace. Both audiences get the same pace.
+- **Not changed**: which photos may be shown (moderation, consent, `wall_public`), enter and exit
+  animations (1.5 s each), the 60 s cooldown, the 5 s poll.
+- **Not verified**: how any of this feels on the real LED with real numbers of photos.
+
+## D93 · Phone photos go into the booth's frames
 
 User request (2026-11-14): "내 사진으로 참여하기" sent one bare photo, while the booth puts its
 photos in a frame. "내 사진에서 올리는거는 템플릿 적용하는게 없어. 빨랑 고쳐", and both more
@@ -1385,7 +1414,7 @@ maxPhotos`; more are cut to the first six and the page says so), chooses one of 
 - **The server checks it**: `x-frame-id` must be a current booth frame (not retired), and the
   re-encoded picture must have that frame's proportions within 1 %, else `400 frame`. A framed
   picture is kept at up to `framedLongEdge` (3600, the strip at 2×) instead of the plain 2048.
-  No header = a page from before D92: stored as `phone-photo`, exactly as before.
+  No header = a page from before D93: stored as `phone-photo`, exactly as before.
 - **Wall and staff**: a framed phone photo hangs in its frame's box like a booth photo
   (`framedPhotoFrame`); only `phone-photo` keeps the card. Staff see "휴대폰 사진 · <frame name>".
 - **Booth copy**: step 2 of the QR screen now says "열린 화면에서 사진을 1~6장 고르고 틀을 골라요" (English and Chinese to match).

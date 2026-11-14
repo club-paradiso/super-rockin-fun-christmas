@@ -126,7 +126,7 @@ export interface PhotoListFilter {
   kioskless?: boolean;
   /** Only this frame id. */
   frameId?: string;
-  /** Only frame ids starting with this (phone photos, framed or not: "phone-", D66/D92). */
+  /** Only frame ids starting with this (phone photos, framed or not: "phone-", D66/D93). */
   frameIdPrefix?: string;
   sessionShort?: string;
   /** Oldest first instead of newest first. */

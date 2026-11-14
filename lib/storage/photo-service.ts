@@ -115,7 +115,7 @@ export interface PutMobileInput {
   /** The phone page told the guest the wall is also shown at its public address (D86). */
   publicScope?: boolean;
   /**
-   * `phone-<booth frame id>` when the guest put their photos in a booth frame (D92); omitted for a
+   * `phone-<booth frame id>` when the guest put their photos in a booth frame (D93); omitted for a
    * plain phone photo. Anything `isMobileFrameId` refuses is an error, never stored.
    */
   frameId?: string;

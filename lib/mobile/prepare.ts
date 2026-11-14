@@ -124,7 +124,7 @@ export async function decodePhotoFile(file: File): Promise<DecodedPhoto> {
 }
 
 /**
- * The photos a guest picked, in the order the picker gave them, at most `max` (D92: one booth
+ * The photos a guest picked, in the order the picker gave them, at most `max` (D93: one booth
  * frame holds 1 to 6). `dropped` says how many were left out so the page can say so.
  */
 export function limitPicked<T>(files: readonly T[], max: number): { kept: T[]; dropped: number } {

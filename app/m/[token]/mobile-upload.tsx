@@ -62,7 +62,7 @@ type SendOutcome = "ok" | "expired" | keyof typeof ERRORS;
 function send(
   token: string,
   blob: Blob,
-  /** The booth frame the photos are in (D92). */
+  /** The booth frame the photos are in (D93). */
   frameId: string,
   /** The consent text on screen included the public-wall line (D86). */
   publicWall: boolean,
@@ -142,7 +142,7 @@ export function MobileUpload({
     };
   }, [preview]);
 
-  // The frames draw the brand font and their own pictures: load both before composing (D92),
+  // The frames draw the brand font and their own pictures: load both before composing (D93),
   // as the booth does. A font or picture that fails to load never blocks the guest.
   useEffect(() => {
     let cancelled = false;

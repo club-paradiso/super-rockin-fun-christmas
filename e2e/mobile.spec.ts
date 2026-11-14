@@ -99,7 +99,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
   await guest.getByTestId("mobile-file").setInputFiles(await photoFile(1600, 1200));
   await expect(guest.getByTestId("mobile-preview")).toBeVisible();
-  // One photo: the one booth frame that holds one (D92), so no frame choice to make.
+  // One photo: the one booth frame that holds one (D93), so no frame choice to make.
   await expect(guest.getByTestId("mobile-frames")).toHaveCount(0);
   // Nothing goes anywhere without the guest's explicit consent.
   await expect(guest.getByTestId("mobile-submit")).toBeDisabled();
@@ -128,7 +128,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   await card.getByTestId("action-approve").click();
   await expect(card).toHaveCount(0);
 
-  // The wall: an enrolled display, the approved phone photo hangs in its booth frame (D92).
+  // The wall: an enrolled display, the approved phone photo hangs in its booth frame (D93).
   const wall = await newPage(browser);
   await wall.goto("/kiosk/enroll?next=wall");
   await wall.getByLabel("등록 코드").fill(await createEnrollmentCode(staff, "2.0 미디어월"));
