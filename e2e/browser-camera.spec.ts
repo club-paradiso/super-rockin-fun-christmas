@@ -3,13 +3,14 @@ import { enrollKiosk, startSession, openWelcome } from "./helpers";
 
 // Exercises the real BrowserCamera (getUserMedia) against Chromium's built-in fake webcam.
 // This proves the browser code path, not any particular physical camera.
+// launchOptions here replace the ones in playwright.config.ts, so the optional browser path
+// (E2E_CHROMIUM_PATH) has to be carried over or this spec would look for the pinned build.
+const chromiumPath = process.env.E2E_CHROMIUM_PATH;
 test.use({
   permissions: ["camera"],
   launchOptions: {
     args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
-    // This spec replaces the launch options, so it has to carry the optional browser path itself
-    // (playwright.config.ts: E2E_CHROMIUM_PATH).
-    ...(process.env.E2E_CHROMIUM_PATH ? { executablePath: process.env.E2E_CHROMIUM_PATH } : {}),
+    ...(chromiumPath ? { executablePath: chromiumPath } : {}),
   },
 });
 

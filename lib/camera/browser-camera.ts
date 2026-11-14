@@ -31,6 +31,12 @@ export class BrowserCamera implements CameraProvider {
   private stream: MediaStream | null = null;
   private video: HTMLVideoElement | null = null;
   private listeners = new Set<() => void>();
+  /**
+   * Counts start() and stop() calls. getUserMedia can take seconds (a permission prompt); if the
+   * guest left meanwhile, or another start() began, the stream that finally arrives belongs to
+   * nobody: it is stopped at once instead of leaving the camera on behind the attract screen.
+   */
+  private generation = 0;
 
   constructor(
     private readonly createCanvas: CanvasFactory = createDomCanvas,
@@ -41,11 +47,13 @@ export class BrowserCamera implements CameraProvider {
 
   async start(deviceId?: string): Promise<void> {
     this.stop();
+    const generation = this.generation;
     if (!this.mediaDevices?.getUserMedia) {
       throw new CameraError("unsupported", "Camera API unavailable (needs HTTPS or localhost)");
     }
+    let stream: MediaStream;
     try {
-      this.stream = await this.mediaDevices.getUserMedia({
+      stream = await this.mediaDevices.getUserMedia({
         audio: false,
         video: {
           ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" }),
@@ -56,8 +64,17 @@ export class BrowserCamera implements CameraProvider {
     } catch (err) {
       throw toCameraError(err);
     }
-    for (const track of this.stream.getVideoTracks()) {
-      track.addEventListener("ended", () => this.handleEnded());
+    if (generation !== this.generation) {
+      // stop() or a newer start() ran while the browser was asking: this stream is an orphan.
+      stream.getTracks().forEach((t) => t.stop());
+      throw new CameraError("failed", "Camera start was superseded");
+    }
+    this.stream = stream;
+    for (const track of stream.getVideoTracks()) {
+      // Only the stream in use may report a disconnect (a stopped older one must not).
+      track.addEventListener("ended", () => {
+        if (this.stream === stream) this.handleEnded();
+      });
     }
     // A private <video> backs capture() so it works whether or not a preview is mounted.
     const video = document.createElement("video");
@@ -68,12 +85,14 @@ export class BrowserCamera implements CameraProvider {
     try {
       await video.play();
     } catch (err) {
-      this.stop();
+      // An interrupted play() of a stream that was already replaced must not stop its successor.
+      if (this.stream === stream) this.stop();
       throw toCameraError(err);
     }
   }
 
   stop(): void {
+    this.generation++;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     if (this.video) this.video.srcObject = null;
@@ -86,6 +105,16 @@ export class BrowserCamera implements CameraProvider {
 
   getStream(): MediaStream | null {
     return this.stream;
+  }
+
+  /**
+   * Live but sending nothing: the browser has muted the track (iPadOS Safari does this while the
+   * page is in the background or another app holds the camera). A muted track shows a frozen or
+   * black picture and still counts as "live", so isActive() alone cannot tell.
+   */
+  isStalled(): boolean {
+    const tracks = this.stream?.getVideoTracks() ?? [];
+    return tracks.some((t) => t.readyState === "live" && t.muted);
   }
 
   async capture(options: CaptureOptions): Promise<CapturedFrame> {

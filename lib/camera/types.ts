@@ -52,6 +52,8 @@ export interface CameraProvider {
   start(deviceId?: string): Promise<void>;
   stop(): void;
   isActive(): boolean;
+  /** Running, but the browser has muted the feed (page in the background on iPadOS). */
+  isStalled(): boolean;
   /** Live feed for the preview <video>, or null before start(). */
   getStream(): MediaStream | null;
   capture(options: CaptureOptions): Promise<CapturedFrame>;

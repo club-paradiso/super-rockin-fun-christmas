@@ -53,28 +53,170 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Booth screens: sizes shrink with the screen's height or width, whichever is tighter. */
+/* ── Booth layout system ─────────────────────────────────────────────────────────────────────
+   The booth is one box the size of the visible screen (.kiosk-root: 100dvh, so Safari's toolbars
+   are already taken off) with one scroll area inside it (.kiosk-scroll). Every size on a booth
+   screen comes from the tokens below, and every token comes from two units:
+
+     --bw  1 % of the booth's width        --bh  1 % of the booth's height
+
+   They are container units of .kiosk-root (vw / dvh where container queries are missing), and
+   registered as lengths so they are worked out once, on the booth, and stay the same inside the
+   smaller containers some screens use to fit a picture (.shoot-stage, .fit-stage).
+
+   Each token is clamp(floor, fluid, ceiling) of the tighter of width and height, so type and
+   controls keep their proportions on a portrait or a landscape tablet. When the screen is short,
+   gaps shrink first (they follow --bh down to a small floor); type and touch targets stop at
+   their floors, and a screen that still does not fit scrolls inside .kiosk-scroll.
+
+   Compositions change with the screen's shape, not with a device list:
+     wide   (min-aspect-ratio: 5/4)  picture beside the controls
+     tall   (everything else)        one column, picture first
+     short  (max-height: 759px)      the compact control sizes */
+@property --bw {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 8px;
+}
+@property --bh {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 8px;
+}
+.kiosk-root {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  /* Touch: no double-tap zoom delay, no grey flash, no text selection or callout on a long press.
+     Pinch zoom stays available (the viewport meta does not forbid it). */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.kiosk-root > * {
+  --bw: 1vw;
+  --bh: 1vh;
+}
+@supports (height: 1dvh) {
+  .kiosk-root > * {
+    --bh: 1dvh;
+  }
+}
+@supports (container-type: size) {
+  .kiosk-root {
+    container: booth / size;
+  }
+  .kiosk-root > * {
+    --bw: 1cqw;
+    --bh: 1cqh;
+  }
+}
+.kiosk-root > * {
+  /* Space. */
+  --booth-pad: clamp(14px, min(3.2 * var(--bw), 3.4 * var(--bh)), 48px);
+  --sheet-pad-x: clamp(18px, 3.2 * var(--bw), 48px);
+  --sheet-pad-y: clamp(24px, 3.2 * var(--bh), 44px);
+  --gap-xs: clamp(6px, 0.9 * var(--bh), 10px);
+  --gap-s: clamp(8px, 1.5 * var(--bh), 18px);
+  --gap-m: clamp(12px, 2.3 * var(--bh), 30px);
+  --gap-l: clamp(16px, 3.8 * var(--bh), 52px);
+  /* Type. */
+  --fs-title: clamp(26px, min(5 * var(--bh), 5 * var(--bw)), 56px);
+  --fs-lead: clamp(18px, min(2.7 * var(--bh), 2.9 * var(--bw)), 30px);
+  --fs-caption: clamp(15px, min(2 * var(--bh), 2.2 * var(--bw)), 22px);
+  /* Controls. L: the booth's main buttons. M: header, footer, retake, the welcome switches. */
+  --btn-h: clamp(80px, min(9.4 * var(--bh), 11 * var(--bw)), 108px);
+  --btn-fs: clamp(20px, min(3 * var(--bh), 3.4 * var(--bw)), 34px);
+  --btn-pad: clamp(24px, 4 * var(--bw), 56px);
+  --ctl-h: clamp(52px, min(6.4 * var(--bh), 8 * var(--bw)), 72px);
+  --ctl-fs: clamp(17px, min(2.3 * var(--bh), 2.6 * var(--bw)), 24px);
+  --ctl-pad: clamp(16px, 2.2 * var(--bw), 30px);
+  /* Decoration. */
+  --seal: clamp(80px, min(13 * var(--bw), 14 * var(--bh)), 168px);
+  --qr: clamp(190px, min(26 * var(--bh), 40 * var(--bw)), 340px);
+  --rule: clamp(36px, 5.6 * var(--bh), 64px);
+}
+/* Easy mode (D67): larger type and bigger targets from the same tokens; same layouts. */
+.kiosk-easy > * {
+  --fs-title: clamp(32px, min(6.2 * var(--bh), 6 * var(--bw)), 76px);
+  --fs-lead: clamp(22px, min(3.3 * var(--bh), 3.4 * var(--bw)), 38px);
+  --fs-caption: clamp(19px, min(2.5 * var(--bh), 2.6 * var(--bw)), 28px);
+  --btn-h: clamp(88px, min(11.2 * var(--bh), 13 * var(--bw)), 128px);
+  --btn-fs: clamp(24px, min(3.7 * var(--bh), 4 * var(--bw)), 44px);
+  --ctl-h: clamp(64px, min(8.4 * var(--bh), 10 * var(--bw)), 96px);
+  --ctl-fs: clamp(20px, min(3 * var(--bh), 3.3 * var(--bw)), 34px);
+}
+/* Short screens (a landscape tablet with Safari's toolbars showing): the compact control size.
+   Still far above the 48 px touch minimum; the 80 px floor comes back at 760 px of height. */
+/* A wide screen has the QR beside the words: it may use more of the height. */
+@media (min-aspect-ratio: 5/4) {
+  .kiosk-root > * {
+    --qr: clamp(190px, min(34 * var(--bh), 26 * var(--bw)), 340px);
+  }
+}
+/* Easy mode on a tall screen: its larger words take more of the height, the code a little less. */
+@media not all and (min-aspect-ratio: 5/4) {
+  .kiosk-easy > * {
+    --qr: clamp(190px, min(22 * var(--bh), 40 * var(--bw)), 340px);
+  }
+}
+@media (max-height: 759px) {
+  .kiosk-root > * {
+    --btn-h: clamp(64px, 9.6 * var(--bh), 80px);
+  }
+  .kiosk-easy > * {
+    --btn-h: clamp(72px, 11.4 * var(--bh), 92px);
+  }
+}
+
+/* The one scroll area of the booth. Screens fill it and normally fit; a screen that cannot fit
+   (a very short window, very large text) grows and scrolls here, never sideways. */
+.kiosk-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-ink) 40%, transparent) transparent;
+}
+
 .booth-title {
-  font-size: clamp(28px, min(5.2vh, 4.9vw), 56px);
+  font-size: var(--fs-title, clamp(28px, min(5.2vh, 4.9vw), 56px));
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
   color: var(--color-ink);
   word-break: keep-all;
+  text-wrap: balance;
 }
 .booth-lead {
-  font-size: clamp(18px, min(2.6vh, 2.6vw), 28px);
+  font-size: var(--fs-lead, clamp(18px, min(2.6vh, 2.6vw), 28px));
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: -0.01em;
   color: var(--color-ink);
   word-break: keep-all;
+  text-wrap: pretty;
 }
 .booth-caption {
-  font-size: clamp(15px, min(1.85vh, 2vw), 20px);
+  font-size: var(--fs-caption, clamp(15px, min(1.85vh, 2vw), 20px));
   line-height: 1.5;
   color: color-mix(in srgb, var(--color-ink) 75%, transparent);
   word-break: keep-all;
+  text-wrap: pretty;
+}
+.kiosk-easy .booth-title {
+  line-height: 1.25;
+}
+/* Easy mode sets captions in full ink (9.43:1) instead of ink at 75 % (5.26:1). */
+.kiosk-easy .booth-caption {
+  color: var(--color-ink);
 }
 
 /* The media wall keeps its own night scene (D73): these are the old global night values, scoped
@@ -347,34 +489,223 @@ body {
   .admin-login-lockup {
     font-size: clamp(40px, 9vmin, 64px);
   }
-  /* Booth buttons (about 108 px tall at 1080 p: elders and children reach them). */
+  /* Booth buttons. Two sizes, one shape (pill), one behaviour:
+       L  .booth-btn-primary / .booth-btn-secondary   --btn-h (≥ 80 px; 64–80 on short screens)
+       M  .booth-btn-m / .booth-chrome-btn / .booth-seg-btn   --ctl-h (≥ 52 px)
+     A press answers at once (the button sinks and darkens while the finger is down: nothing
+     depends on hover), a disabled button is faded and says so to the cursor, and a label that is
+     too long for a narrow screen wraps inside the pill instead of running off the screen. */
+  .booth-btn-primary,
+  .booth-btn-secondary,
+  .booth-btn-m,
+  .booth-chrome-btn,
+  .booth-seg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    border-radius: 9999px;
+    text-align: center;
+    word-break: keep-all;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    transition:
+      transform 90ms ease-out,
+      background-color 90ms ease-out,
+      border-color 90ms ease-out;
+  }
+  .booth-btn-primary:active:not(:disabled),
+  .booth-btn-secondary:active:not(:disabled),
+  .booth-btn-m:active:not(:disabled),
+  .booth-chrome-btn:active:not(:disabled),
+  .booth-seg-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .booth-btn-primary:disabled,
+  .booth-btn-secondary:disabled,
+  .booth-btn-m:disabled,
+  .booth-chrome-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
   .booth-btn-primary,
   .booth-btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full font-bold whitespace-nowrap transition active:scale-[0.98] disabled:opacity-50;
-    min-height: max(64px, min(10vh, 9.2vw));
-    padding: 0 max(40px, 5.2vh);
-    font-size: clamp(22px, min(3.33vh, 3.4vw), 36px);
-    letter-spacing: -0.01em;
+    min-height: var(--btn-h, 80px);
+    padding: 8px var(--btn-pad, 40px);
+    border: 3px solid var(--color-ink);
+    font-size: var(--btn-fs, 24px);
+    font-weight: 700;
   }
   .booth-btn-primary {
-    @apply bg-button text-button-text;
+    border-color: var(--color-button);
+    background: var(--color-button);
+    color: var(--color-button-text);
+  }
+  .booth-btn-primary:active:not(:disabled) {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
   }
   .booth-btn-secondary {
-    @apply border-[3px] border-ink text-ink active:bg-ink/10;
+    color: var(--color-ink);
   }
-  /* Booth screen chrome (2.0): way home, help, screen mode. ≥ 56 px (WCAG 2.2 target size). */
+  .booth-btn-secondary:active:not(:disabled),
+  .booth-btn-m:active:not(:disabled),
+  .booth-chrome-btn:active:not(:disabled) {
+    background: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  }
+  .kiosk-easy .booth-btn-secondary {
+    border-width: 4px;
+  }
+  .booth-btn-m,
   .booth-chrome-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-ink/60 font-semibold text-ink transition active:scale-[0.98] active:bg-ink/10;
-    min-height: max(56px, 6.4vh);
-    padding: 0 max(20px, 2vw);
-    font-size: clamp(18px, 2.3vh, 26px);
+    min-height: var(--ctl-h, 56px);
+    padding: 6px var(--ctl-pad, 20px);
+    border: 2px solid var(--color-ink);
+    color: var(--color-ink);
+    font-size: var(--ctl-fs, 18px);
+    font-weight: 700;
+  }
+  /* Booth screen chrome (2.0): way back, way home, screen mode. Quieter than the screen's own
+     buttons in the standard view; full ink and heavier in easy mode. */
+  .booth-chrome-btn {
+    flex: none;
+    border-color: color-mix(in srgb, var(--color-ink) 60%, transparent);
+    font-weight: 600;
+    white-space: nowrap;
   }
   .booth-chrome-btn-easy {
-    @apply border-[3px] border-ink font-bold;
-    min-height: max(76px, 9vh);
-    font-size: clamp(24px, 3.2vh, 36px);
+    border: 3px solid var(--color-ink);
+    font-weight: 700;
   }
-  /* Welcome: the two big choices. Equal size; the camera one is the filled primary. */
+  /* A two-way switch (screen mode, language): one pill holding two M buttons. */
+  .booth-seg {
+    display: inline-flex;
+    padding: 4px;
+    border: 2px solid color-mix(in srgb, var(--color-ink) 60%, transparent);
+    border-radius: 9999px;
+  }
+  .booth-seg-btn {
+    min-height: max(48px, calc(var(--ctl-h, 56px) - 4px));
+    padding: 4px var(--ctl-pad, 20px);
+    color: var(--color-ink);
+    font-size: var(--ctl-fs, 18px);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .booth-seg-btn[aria-checked="true"] {
+    background: var(--color-ink);
+    color: var(--color-button-text);
+  }
+  .booth-seg-btn:active:not([aria-checked="true"]) {
+    background: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  }
+
+  /* ── Screen skeleton: header / the letter sheet / footer ───────────────────────────────────
+     The sheet takes whatever height is left; a screen taller than the booth grows (min-height)
+     and .kiosk-scroll scrolls. Safe-area insets are added to the padding, never subtracted from
+     content. */
+  .booth-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 100%;
+    padding: max(var(--booth-pad), env(safe-area-inset-top))
+      max(var(--booth-pad), env(safe-area-inset-right))
+      max(var(--booth-pad), env(safe-area-inset-bottom))
+      max(var(--booth-pad), env(safe-area-inset-left));
+  }
+  .booth-header {
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-m);
+    min-width: 0;
+    min-height: var(--ctl-h);
+    /* Never less than the tape reaches above the sheet (.tape: 4 px up, plus its tilt), so the
+       tape cannot touch "이전" on a short screen. */
+    margin-bottom: max(14px, var(--gap-s));
+  }
+  .booth-header-left {
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2 * var(--bw), 24px);
+    min-width: 0;
+  }
+  .booth-wordmark {
+    min-width: 0;
+    overflow: hidden;
+    font-size: clamp(20px, min(2.8 * var(--bh), 2.6 * var(--bw)), 30px);
+  }
+  /* A narrow screen with "이전" and the step in words has no room left for the name. */
+  @media (max-width: 639px) {
+    .booth-header-easy.booth-header-back .booth-wordmark {
+      display: none;
+    }
+  }
+  .booth-steps {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: clamp(5px, 1.1 * var(--bw), 14px);
+  }
+  .booth-steps-count {
+    margin-right: clamp(2px, 0.6 * var(--bw), 8px);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(15px, min(2.2 * var(--bh), 2.2 * var(--bw)), 20px);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    color: var(--color-ink);
+  }
+  .booth-steps-dot {
+    width: clamp(8px, 1.5 * var(--bw), 16px);
+    height: clamp(8px, 1.5 * var(--bw), 16px);
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-ink) 20%, transparent);
+  }
+  .booth-steps-dot-done {
+    background: var(--color-accent);
+  }
+  .booth-steps-dot-now {
+    background: var(--color-button);
+  }
+  .booth-easy-step {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: clamp(4px, 0.8 * var(--bh), 8px);
+    min-width: 0;
+  }
+  /* Never under 24 px: the step number is accent text (brand rule: accent as text at ≥ 24 px). */
+  .booth-easy-step-label {
+    font-size: clamp(24px, min(3.2 * var(--bh), 3.4 * var(--bw)), 38px);
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: var(--color-ink);
+  }
+  .booth-easy-step-bar {
+    width: min(34 * var(--bw), 320px);
+    height: clamp(8px, 1.2 * var(--bh), 12px);
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-ink) 20%, transparent);
+  }
+  .booth-footer {
+    grid-row: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--gap-s);
+    margin-top: var(--gap-s);
+  }
+  .booth-footer-easy {
+    justify-content: space-between;
+  }
   /* D79: one sheet of letter paper on the backdrop; the seal is pressed on its corner. */
   /* D81: a faded diary page. The paper is drawn by ::before (faded tone 13.5:1 for ink, ink/75
      6.54:1, a fine grain, faint ruled lines) and cut with a torn edge; ::after tones a rough rim
@@ -383,9 +714,20 @@ body {
      still hang over its corner. */
   .letter-sheet {
     @apply relative;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
     isolation: isolate;
-    margin-block: max(8px, 1vh) max(12px, 1.4vh);
-    padding: max(20px, 2.6vh) max(16px, 2.4vw);
+    /* The top padding is always deeper than the tape hangs in (see .tape), so the tape lies on
+       bare paper and never on a title, a picture or a button. */
+    padding: var(--sheet-pad-y, 28px) var(--sheet-pad-x, 24px);
+  }
+  /* A sheet whose content is one centred column (messages, the attract screen). */
+  .sheet-center {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
   }
   .letter-sheet::before,
   .letter-sheet::after {
@@ -407,10 +749,10 @@ body {
     background-image: var(--grain-ink), var(--ruled-lines);
     background-size:
       240px 240px,
-      8px max(40px, 5.6vh);
+      8px var(--rule, 44px);
     background-position:
       0 0,
-      0 max(20px, 2.6vh);
+      0 var(--sheet-pad-y, 28px);
     mask-image:
       var(--paper-solid), var(--torn-top), var(--torn-bottom), var(--torn-left), var(--torn-right);
     mask-size:
@@ -438,8 +780,8 @@ body {
   /* A strip of masking tape (D81): decoration only, torn ends, never over a button. */
   .tape {
     @apply pointer-events-none absolute z-10 select-none;
-    width: clamp(96px, 10vw, 160px);
-    height: clamp(26px, 3.2vh, 38px);
+    width: clamp(72px, 11 * var(--bw, 1vw), 160px);
+    height: clamp(20px, 2.6 * var(--bh, 1vh), 34px);
     background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
     background-image: var(--grain-ink);
     background-size: 240px 240px;
@@ -462,12 +804,12 @@ body {
   }
   .tape-left {
     top: -4px;
-    left: clamp(24px, 5vw, 72px);
+    left: clamp(20px, 5 * var(--bw, 1vw), 72px);
     transform: rotate(-5deg);
   }
   .tape-right {
     top: -4px;
-    right: clamp(24px, 5vw, 72px);
+    right: clamp(20px, 5 * var(--bw, 1vw), 72px);
     transform: rotate(4deg);
   }
   .tape-center {
@@ -478,8 +820,8 @@ body {
   /* Photo corners (D81): the pockets an album uses to hold a print. Decoration only. */
   .photo-corner {
     @apply pointer-events-none absolute z-10;
-    width: clamp(18px, 2.6vh, 32px);
-    height: clamp(18px, 2.6vh, 32px);
+    width: clamp(14px, min(2.6 * var(--bh, 1vh), 3 * var(--bw, 1vw)), 32px);
+    height: clamp(14px, min(2.6 * var(--bh, 1vh), 3 * var(--bw, 1vw)), 32px);
     background: color-mix(in srgb, var(--color-ink) 85%, transparent);
   }
   .photo-corner-tl {
@@ -510,85 +852,927 @@ body {
   }
   .wax-seal {
     @apply pointer-events-none absolute select-none;
-    width: clamp(104px, min(13vw, 14vh), 168px);
+    width: var(--seal, 120px);
     height: auto;
     right: -12px;
     bottom: -12px;
     transform: rotate(-8deg);
   }
+  /* ── Screens ──────────────────────────────────────────────────────────────────────────────
+     Each screen lays out the sheet's content with one of the compositions below. "Wide" rules
+     (min-aspect-ratio: 5/4) put the picture beside the controls; everything else is one column. */
+
+  /* 0 · "화면을 눌러 시작" */
+  .attract {
+    gap: var(--gap-l);
+  }
+  .attract-lockup {
+    font-size: clamp(56px, min(13 * var(--bh), 13.5 * var(--bw)), 150px);
+  }
+  .attract-start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-s);
+  }
+
+  /* 1 · Welcome: the two big choices. Equal size; the camera one is the filled primary. */
+  .welcome {
+    justify-content: center;
+    gap: clamp(16px, 3.2 * var(--bh), 44px);
+    padding-inline: calc(var(--sheet-pad-x) + clamp(4px, 1.6 * var(--bw), 28px));
+  }
+  .welcome-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--gap-s);
+  }
+  .welcome-lockup {
+    margin-bottom: var(--gap-xs);
+    font-size: clamp(44px, min(7.4 * var(--bh), 9.5 * var(--bw)), 104px);
+  }
+  .welcome-choices {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap-m);
+  }
   .welcome-choice {
-    @apply flex flex-col items-start justify-center gap-[max(8px,1.2vh)] rounded-3xl border-[3px] border-ink bg-paper text-left text-ink transition active:scale-[0.99] disabled:border-ink/40 disabled:opacity-60;
-    min-height: max(180px, 30vh);
-    padding: max(24px, 3.4vh) max(24px, 2.6vw);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: clamp(16px, 3.4 * var(--bw), 36px);
+    min-height: clamp(128px, 17 * var(--bh), 230px);
+    padding: var(--gap-s) clamp(20px, 3.6 * var(--bw), 44px);
+    border: 3px solid var(--color-ink);
+    border-radius: 24px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    text-align: left;
     word-break: keep-all;
+    touch-action: manipulation;
+    cursor: pointer;
+    transition:
+      transform 90ms ease-out,
+      background-color 90ms ease-out;
+  }
+  .welcome-choice:active:not(:disabled) {
+    transform: scale(0.985);
+    background: color-mix(in srgb, var(--color-ink) 10%, var(--color-paper));
+  }
+  .welcome-choice:disabled {
+    border-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
+    opacity: 0.6;
+    cursor: not-allowed;
   }
   .welcome-choice-primary {
-    @apply border-button bg-button text-button-text;
+    border-color: var(--color-button);
+    background: var(--color-button);
+    color: var(--color-button-text);
+  }
+  .welcome-choice-primary:active:not(:disabled) {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
   }
   .welcome-choice-icon {
-    font-size: clamp(40px, 7vh, 80px);
+    display: flex;
+    font-size: clamp(40px, min(7 * var(--bh), 8 * var(--bw)), 84px);
     line-height: 1;
   }
+  .welcome-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    min-width: 0;
+  }
   .welcome-choice-title {
-    font-size: clamp(30px, min(5vh, 4.4vw), 56px);
+    font-size: clamp(28px, min(4.6 * var(--bh), 5 * var(--bw)), 56px);
     font-weight: 800;
     letter-spacing: -0.02em;
     line-height: 1.2;
   }
   .welcome-choice-lead {
-    font-size: clamp(18px, min(2.5vh, 2.4vw), 28px);
+    font-size: var(--fs-lead);
     font-weight: 500;
     line-height: 1.4;
+  }
+  .kiosk-easy .welcome-choice {
+    min-height: clamp(150px, 20 * var(--bh), 280px);
+  }
+  .kiosk-easy .welcome-choice-title {
+    font-size: clamp(34px, min(5.8 * var(--bh), 6 * var(--bw)), 68px);
+  }
+  .welcome-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-s) var(--gap-m);
+  }
+
+  /* Messages: camera starting, camera error, sending, queued, phone photo received. */
+  .booth-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-m);
+    max-width: min(100%, 46rem);
+    text-align: center;
+  }
+  .booth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--gap-s);
+  }
+  .booth-meta {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(15px, min(2 * var(--bh), 2.2 * var(--bw)), 18px);
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .booth-check {
+    font-size: clamp(56px, min(12 * var(--bh), 14 * var(--bw)), 120px);
+    line-height: 1;
+    color: var(--color-accent);
+  }
+
+  /* A picture that must keep its shape inside whatever room is left: the stage is the room
+     (a size container), the thing inside sizes itself from the stage's width AND height. */
+  .shoot-stage,
+  .fit-stage {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+  @supports (container-type: size) {
+    .shoot-stage,
+    .fit-stage {
+      container-type: size;
+    }
+  }
+
+  /* 2 · Camera: ready, countdown, capture. The preview is 4:3 (KIOSK_CONFIG.captureAspect, set
+     inline) and as large as the stage allows; never stretched. */
+  .shoot {
+    gap: var(--gap-m);
+  }
+  .shoot-stage {
+    min-height: clamp(160px, 22 * var(--bh), 420px);
+  }
+  .camera-preview {
+    position: relative;
+    overflow: hidden;
+    width: min(100%, calc(54 * var(--bh) * var(--aspect, 1.3333)));
+    border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  @supports (container-type: size) {
+    .camera-preview {
+      width: min(100cqw, calc(100cqh * var(--aspect, 1.3333)));
+      container-type: size;
+    }
+  }
+  .camera-preview-wait {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    font-size: var(--fs-caption);
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .countdown-number {
+    font-size: clamp(96px, 30 * var(--bh), 320px);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-button-text);
+  }
+  @supports (container-type: size) {
+    .camera-preview .countdown-number {
+      font-size: clamp(80px, 56cqh, 360px);
+    }
+  }
+  .pose-guide {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--gap-s) 16px;
+    background: var(--color-paper);
+    text-align: center;
+  }
+  .shoot-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-s);
+    min-width: 0;
+    text-align: center;
+  }
+  .shoot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--gap-s);
+    width: 100%;
+    margin-block: var(--gap-xs);
+  }
+  .shoot-actions > * {
+    flex: 1 1 9.5em;
+    max-width: 26rem;
+  }
+  .shot-strip {
+    display: flex;
+    gap: clamp(6px, 1.2 * var(--bw), 12px);
+    max-width: 100%;
+  }
+  /* Six cells share a narrow panel rather than push the screen wider. */
+  .shot-strip-cell {
+    display: flex;
+    flex: 0 1 clamp(40px, min(6 * var(--bh), 7 * var(--bw)), 64px);
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    aspect-ratio: 4 / 3;
+    border: 1px solid color-mix(in srgb, var(--color-ink) 40%, transparent);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(13px, 1.8 * var(--bh), 16px);
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .shot-strip-cell-now {
+    border: 2px solid var(--color-ink);
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .shot-strip-cell-done {
+    border-color: var(--color-button);
+    background: var(--color-button);
+    color: var(--color-button-text);
+  }
+  .booth-field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-size: max(16px, var(--fs-caption));
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  /* 16 px or more: iOS Safari zooms the page when a smaller field takes focus. */
+  .booth-field select {
+    min-height: 48px;
+    padding: 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-ink) 50%, transparent);
+    border-radius: 8px;
+    background: var(--color-paper);
+    font-size: max(16px, var(--fs-caption));
+    color: var(--color-ink);
+  }
+
+  /* 3 · Review and 5 · Select: six 4:3 prints in a grid that fits the stage. The grid works its
+     own width out from the stage's height (rows, gaps and whatever sits under each print), so
+     the prints are as large as they can be and the buttons stay on screen. */
+  .fit-stage {
+    min-height: var(--fit-min, 240px);
+  }
+  .fit-grid {
+    --cols: 3;
+    --rows: 2;
+    --gap: var(--gap-s);
+    --extra: 0px;
+    --ratio: 1.3333;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: var(--gap);
+    width: 100%;
+  }
+  @supports (container-type: size) {
+    .fit-grid {
+      width: min(
+        100cqw,
+        calc(
+          (((100cqh - (var(--rows) - 1) * var(--gap)) / var(--rows)) - var(--extra)) *
+            var(--ratio) * var(--cols) + (var(--cols) - 1) * var(--gap) - 1px
+        )
+      );
+    }
+  }
+  .review,
+  .select {
+    gap: var(--gap-m);
+  }
+  .review-head,
+  .select-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    text-align: center;
+  }
+  .review .fit-stage {
+    --fit-min: calc(2 * (var(--ctl-h) + var(--gap-xs) + 84px) + var(--gap-s));
+  }
+  .review-grid {
+    --extra: calc(var(--ctl-h) + var(--gap-xs));
+  }
+  .review-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    min-width: 0;
+  }
+  .review-photo {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  .review-photo img,
+  .select-tile img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .review-cell .booth-btn-m {
+    padding-inline: 8px;
+  }
+  .review-actions {
+    display: flex;
+  }
+  .review-actions > * {
+    flex: 1 1 auto;
+  }
+  .select .fit-stage {
+    --fit-min: calc(3 * 96px + 2 * var(--gap-s));
+  }
+  .select-grid {
+    --cols: 2;
+    --rows: 3;
+    --extra: 16px;
+  }
+  /* Two columns of three or three of two: whichever makes the prints larger in the room there
+     is. The break-even is a stage as wide as one print is (4:3). */
+  @container (min-aspect-ratio: 4/3) {
+    .select-grid {
+      --cols: 3;
+      --rows: 2;
+    }
+  }
+  .select-tile {
+    position: relative;
+    min-width: 0;
+    padding: 4px;
+    border: 4px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+    border-radius: 12px;
+    touch-action: manipulation;
+    cursor: pointer;
+    transition:
+      transform 90ms ease-out,
+      border-color 90ms ease-out;
+  }
+  .select-tile:active {
+    transform: scale(0.98);
+  }
+  .select-tile[aria-pressed="true"] {
+    border-color: var(--color-ink);
+    background: var(--color-paper);
+  }
+  .select-tile img {
+    border-radius: 6px;
+  }
+  /* The number on each print: its place in the frame once chosen (filled), its own number
+     before that (paper). */
+  .select-badge {
+    position: absolute;
+    top: clamp(8px, 1.4 * var(--bh), 14px);
+    left: clamp(8px, 1.4 * var(--bh), 14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2em;
+    height: 2em;
+    padding: 0 0.5em;
+    border: 2px solid var(--color-ink);
+    border-radius: 9999px;
+    background: var(--color-paper);
+    font-size: clamp(16px, min(2.2 * var(--bh), 2.4 * var(--bw)), 24px);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-ink);
+  }
+  .select-tile[aria-pressed="true"] .select-badge {
+    border-color: var(--color-button);
+    background: var(--color-button);
+    color: var(--color-button-text);
+  }
+  .select-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-s);
+  }
+  .select-actions > * {
+    flex: 1 1 auto;
+  }
+
+  /* 1b · 4 · Frame choice: the chosen frame large, all frames as small tiles. Nothing is cut
+     off: the tiles share the room they are given, and scroll inside it only if a very short
+     screen leaves them less than a touch target each. */
+  .pick {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1.25fr 1fr auto;
+    grid-template-areas: "head" "preview" "tiles" "actions";
+    gap: var(--gap-m);
+    --tile-cols: 7;
+    --tile-rows: 2;
+  }
+  @media (max-width: 699px) {
+    .pick {
+      grid-template-rows: auto 1fr 1.3fr auto;
+      --tile-cols: 5;
+      --tile-rows: 3;
+    }
+  }
+  .pick-head {
+    grid-area: head;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    text-align: center;
+  }
+  .pick-preview {
+    grid-area: preview;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-s);
+    min-width: 0;
+    min-height: clamp(140px, 20 * var(--bh), 520px);
+  }
+  .frame-art {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+  }
+  /* A frame is drawn whole inside its box (contain): any frame shape, never stretched. */
+  .frame-art > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .frame-art-wait {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    aspect-ratio: 1 / 3;
+    transform: translateX(-50%);
+    background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  .pick-preview-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 2px clamp(8px, 1.6 * var(--bw), 16px);
+    text-align: center;
+  }
+  .pick-preview-name {
+    font-size: clamp(22px, min(3.4 * var(--bh), 3.8 * var(--bw)), 40px);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+  }
+  .pick-tiles {
+    grid-area: tiles;
+    display: grid;
+    grid-template-columns: repeat(var(--tile-cols), minmax(0, 1fr));
+    grid-auto-rows: minmax(72px, 1fr);
+    gap: clamp(6px, 1 * var(--bw), 12px);
+    min-height: calc(
+      var(--tile-rows) * 72px + (var(--tile-rows) - 1) * clamp(6px, 1 * var(--bw), 12px)
+    );
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .pick-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 4px;
+    border: 2px solid color-mix(in srgb, var(--color-ink) 30%, transparent);
+    border-radius: 14px;
+    touch-action: manipulation;
+    cursor: pointer;
+    transition:
+      transform 90ms ease-out,
+      border-color 90ms ease-out,
+      background-color 90ms ease-out;
+  }
+  .pick-tile:active {
+    transform: scale(0.97);
+  }
+  .pick-tile[aria-pressed="true"] {
+    padding: 4px 2px;
+    border: 4px solid var(--color-ink);
+    background: var(--color-paper);
+  }
+  .pick-tile-label {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-ink);
+  }
+  /* The name is sized from its own tile (a container), so the longest one ("대림절 달력") fits on
+     one line whatever the number of columns. */
+  @supports (container-type: inline-size) {
+    .pick-tile {
+      container-type: inline-size;
+    }
+    .pick-tile-label {
+      font-size: clamp(14px, 15.5cqw, 20px);
+    }
+    .kiosk-easy .pick-tile-label {
+      font-size: clamp(14px, 15.5cqw, 24px);
+    }
+  }
+  .pick-actions {
+    grid-area: actions;
+    display: flex;
+  }
+  .pick-actions > * {
+    flex: 1 1 auto;
+  }
+
+  /* 6 · Wall question: the finished frame, the question, two equal answers. */
+  .consent {
+    gap: var(--gap-m);
+  }
+  .consent > .frame-art {
+    min-height: clamp(130px, 22 * var(--bh), 520px);
+  }
+  .kiosk-easy .consent > .frame-art {
+    min-height: clamp(120px, 14 * var(--bh), 520px);
+  }
+  .consent-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-s);
+    min-width: 0;
+    text-align: center;
+  }
+  .consent-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-s);
+    width: min(100%, 34rem);
+  }
+
+  /* 7 · QR, and the phone-photo QR: words, a QR card, what to do next. */
+  .qr-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "card" "more";
+    justify-items: center;
+    gap: var(--gap-m);
+    width: 100%;
+    text-align: center;
+  }
+  /* The seal is pressed on the sheet's bottom right corner: the button stays narrower than the
+     room between the two corners, so the seal never lies on it. */
+  .qr-layout-sealed .qr-more > .booth-btn-secondary {
+    width: min(100% - 2 * var(--seal), 26rem);
+  }
+  .qr-head {
+    grid-area: head;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-s);
+    min-width: 0;
+  }
+  .qr-card {
+    grid-area: card;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-s);
+    padding: clamp(16px, 2.2 * var(--bh), 32px);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 15%, transparent);
+    border-radius: 24px;
+    background: var(--color-paper);
+  }
+  /* White behind the code, whatever the paper: phone cameras need the contrast. */
+  .qr-code {
+    width: var(--qr);
+    padding: clamp(8px, 1.4 * var(--bh), 14px);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .qr-code svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .qr-code-wait {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    font-size: var(--fs-caption);
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .qr-note {
+    font-size: clamp(18px, min(2.5 * var(--bh), 2.8 * var(--bw)), 28px);
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    color: var(--color-ink);
+  }
+  .qr-more {
+    grid-area: more;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-s);
+    width: 100%;
+    min-width: 0;
+  }
+  .qr-more > .booth-btn-secondary {
+    width: min(100%, 26rem);
+  }
+  .mobile-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-s);
+    text-align: left;
+  }
+  .mobile-step {
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2 * var(--bw), 18px);
+  }
+  .mobile-step-num {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: clamp(36px, min(5 * var(--bh), 6 * var(--bw)), 52px);
+    height: clamp(36px, min(5 * var(--bh), 6 * var(--bw)), 52px);
+    border-radius: 9999px;
+    background: var(--color-button);
+    font-weight: 700;
+    color: var(--color-button-text);
+  }
+
+  /* ── Wide: the picture beside the controls ──────────────────────────────────────────────── */
+  @media (min-aspect-ratio: 5/4) {
+    .welcome-choices {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .welcome-choice {
+      grid-template-columns: minmax(0, 1fr);
+      align-content: center;
+      row-gap: var(--gap-s);
+      min-height: clamp(150px, 30 * var(--bh), 340px);
+    }
+    .kiosk-easy .welcome-choice {
+      min-height: clamp(170px, 30 * var(--bh), 400px);
+    }
+    .shoot {
+      flex-direction: row;
+      gap: var(--gap-l);
+    }
+    .shoot-stage {
+      flex: 1.5 1 0;
+      min-height: clamp(200px, 44 * var(--bh), 760px);
+    }
+    /* While shooting the panel only names the shot: the preview takes the room. */
+    .shoot-live .shoot-stage {
+      flex-grow: 1.8;
+    }
+    .shoot-panel {
+      flex: 1 1 0;
+      align-items: flex-start;
+      justify-content: center;
+      text-align: left;
+    }
+    .shoot-actions {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+    }
+    .shoot-actions > * {
+      flex: none;
+    }
+    .review,
+    .select {
+      display: grid;
+      grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas: "stage head" "stage actions";
+      gap: var(--gap-m) var(--gap-l);
+    }
+    /* "이대로 좋아요" needs less room than the two selection buttons: more for the prints. */
+    .review {
+      grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr);
+    }
+    .review .fit-stage,
+    .select .fit-stage {
+      grid-area: stage;
+      --fit-min: calc(2 * 110px + var(--gap-s));
+    }
+    .review-head,
+    .select-head {
+      grid-area: head;
+      align-self: end;
+      text-align: left;
+    }
+    .review-actions,
+    .select-actions {
+      grid-area: actions;
+      align-self: start;
+    }
+    .select-grid {
+      --cols: 3;
+      --rows: 2;
+    }
+    .select-actions {
+      flex-direction: column-reverse;
+      flex-wrap: nowrap;
+    }
+    .review-actions > *,
+    .select-actions > * {
+      padding-inline: var(--gap-m);
+    }
+    .pick {
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+      grid-template-rows: auto 1fr auto;
+      grid-template-areas: "preview head" "preview tiles" "preview actions";
+      gap: var(--gap-m) var(--gap-l);
+      --tile-cols: 5;
+      --tile-rows: 3;
+    }
+    .pick-head {
+      text-align: left;
+    }
+    .consent {
+      flex-direction: row;
+      gap: var(--gap-l);
+    }
+    .consent > .frame-art {
+      flex: 0.8 1 0;
+    }
+    .consent-body {
+      flex: 1 1 0;
+      align-items: flex-start;
+      justify-content: center;
+      text-align: left;
+    }
+    .qr-layout {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "head card" "more card";
+      justify-items: start;
+      gap: var(--gap-m) var(--gap-l);
+      max-width: 72rem;
+      text-align: left;
+    }
+    .qr-layout-sealed {
+      padding-right: calc(var(--seal) * 0.7);
+    }
+    .qr-layout-sealed .qr-more > .booth-btn-secondary {
+      width: auto;
+    }
+    .qr-head {
+      align-self: end;
+    }
+    .qr-card {
+      align-self: center;
+    }
+    .qr-more {
+      align-self: start;
+      align-items: flex-start;
+    }
+    .qr-more > .booth-btn-secondary {
+      width: auto;
+    }
+  }
+
+  /* ── Above the screen: dialog, idle warning, staff badges, the "more below" mark ─────────── */
+  .kiosk-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(var(--booth-pad, 24px), env(safe-area-inset-top))
+      max(var(--booth-pad, 24px), env(safe-area-inset-right))
+      max(var(--booth-pad, 24px), env(safe-area-inset-bottom))
+      max(var(--booth-pad, 24px), env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--color-ink) 70%, transparent);
+  }
+  .kiosk-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-m, 20px);
+    width: min(100%, 48rem);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: clamp(20px, 4 * var(--bh, 1vh), 44px) clamp(20px, 4 * var(--bw, 1vw), 44px);
+    border-radius: 24px;
+    background: var(--color-paper);
+    text-align: left;
+  }
+  .kiosk-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--gap-s, 12px);
+  }
+  @media (max-width: 699px) {
+    .kiosk-dialog-actions > * {
+      flex: 1 1 100%;
+    }
+  }
+  .idle-warning {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-s) var(--gap-m);
+    padding: var(--gap-m) max(var(--booth-pad), env(safe-area-inset-right))
+      max(var(--gap-m), env(safe-area-inset-bottom))
+      max(var(--booth-pad), env(safe-area-inset-left));
+    border-top: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+    background: var(--color-paper);
+    text-align: center;
+  }
+  /* Staff indicators: top centre, in the screen's own margin, clear of the header's controls. */
+  .kiosk-badges {
+    position: fixed;
+    top: max(3px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 30;
+    display: flex;
+    gap: 6px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .kiosk-badge {
+    padding: 4px 10px;
+    border-radius: 9999px;
+    color: var(--color-button-text);
+  }
+  /* Shown only while the screen is taller than the booth and there is more below. */
+  .booth-scroll-hint {
+    position: fixed;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 28px;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: var(--color-ink);
+    color: var(--color-button-text);
+    pointer-events: none;
   }
   .btn-quiet {
     @apply inline-flex min-h-14 items-center justify-center rounded-full px-6 text-lg text-ink/75 underline-offset-4 active:underline;
   }
+  .btn-primary,
+  .btn-secondary,
+  .btn-quiet {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-/* Easy mode (D67): larger type, bigger targets, same layout and the same flow rules. Contrast:
-   titles and leads are ink on backdrop (9.43:1) in both modes; easy mode also sets captions in
-   full ink (9.43:1) instead of ink at 75 % (5.26:1). */
-.kiosk-easy .booth-title {
-  font-size: clamp(34px, min(6.6vh, 6vw), 76px);
-  line-height: 1.25;
-}
-.kiosk-easy .booth-lead {
-  font-size: clamp(22px, min(3.4vh, 3.4vw), 38px);
-}
-.kiosk-easy .booth-caption {
-  font-size: clamp(19px, min(2.6vh, 2.6vw), 28px);
-  color: var(--color-ink);
-}
-.kiosk-easy .booth-btn-primary,
-.kiosk-easy .booth-btn-secondary {
-  min-height: max(80px, min(12vh, 11vw));
-  font-size: clamp(26px, min(4vh, 4vw), 44px);
-}
-.kiosk-easy .booth-btn-secondary {
-  border-width: 4px;
-}
-.kiosk-easy .welcome-choice {
-  min-height: max(220px, 36vh);
-}
-.kiosk-easy .welcome-choice-title {
-  font-size: clamp(36px, min(6.2vh, 5.4vw), 68px);
-}
-.kiosk-easy .welcome-choice-lead {
-  font-size: clamp(22px, min(3.2vh, 3vw), 34px);
-}
-/* Portrait (iPad): the two choices stack, so each is shorter and the welcome sheet fits (D79). */
-@media (orientation: portrait) {
-  .welcome-choice {
-    min-height: max(150px, 15vh);
-    padding-block: max(20px, 2.4vh);
-  }
-  .welcome-choice-icon {
-    font-size: clamp(40px, min(7vh, 7vw), 80px);
-  }
-  .kiosk-easy .welcome-choice {
-    min-height: max(170px, 18vh);
-  }
-}
 /* Keyboard focus is always visible (WCAG 2.4.7 / 2.4.13). */
 main button:focus-visible,
 main a:focus-visible,

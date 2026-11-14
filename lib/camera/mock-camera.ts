@@ -78,6 +78,10 @@ export class MockCamera implements CameraProvider {
     return this.stream;
   }
 
+  isStalled(): boolean {
+    return false;
+  }
+
   async capture(options: CaptureOptions): Promise<CapturedFrame> {
     if (!this.source) throw new CameraError("failed", "Mock camera is not running");
     this.captureCount++;

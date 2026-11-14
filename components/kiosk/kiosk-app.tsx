@@ -39,6 +39,8 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
+import { isStrayTap } from "@/lib/kiosk/tap-guard";
+import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
 import { KIOSK_COPY, KIOSK_LANGS, lines, type KioskCopy } from "@/lib/kiosk/copy";
 import { deliverVideo, requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import {
@@ -56,15 +58,7 @@ import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import type { KioskMode } from "@/lib/storage/types";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import {
-  BoothScreen,
-  BrandLockup,
-  CameraPreview,
-  LetterSheet,
-  LineIcon,
-  PhotoCorners,
-  Tape,
-} from "./ui";
+import { BoothScreen, BrandLockup, CameraPreview, LineIcon, PhotoCorners, Tape } from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -129,6 +123,19 @@ export function KioskApp({
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const online = useOnline();
+
+  // The booth has one scroll area. Every new screen starts at its top (a screen left scrolled
+  // would hide the next one's header); `moreBelow` marks a screen taller than the booth.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}`;
+  // When the screen on show appeared, and what made the last press: finger taps in the first
+  // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
+  const tapRef = useRef({ screenShownAt: 0, pointerType: "" });
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    tapRef.current.screenShownAt = performance.now();
+  }, [screenKey]);
+  const moreBelow = useMoreBelow(scrollRef, screenKey);
 
   const trackUrl = (url: string) => {
     urlsRef.current.add(url);
@@ -252,6 +259,42 @@ export function KioskApp({
     if (!needsCamera(state.phase) && state.phase !== "review") cameraRef.current?.stop();
   }, [state.phase]);
 
+  // Back from the background. A tablet browser stops or mutes the camera while the page is not in
+  // front (iPadOS Safari above all); the guest must not come back to a frozen or black preview.
+  const cameraError = state.cameraError;
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const recover = () => {
+      const camera = cameraRef.current;
+      if (!camera || document.visibilityState !== "visible") return;
+      const action = cameraRecovery({
+        phase: state.phase,
+        cameraError,
+        active: camera.isActive(),
+        stalled: camera.isStalled(),
+      });
+      if (action === "restart") {
+        camera.stop();
+        setStream(null);
+        dispatch({ type: "CAMERA_RESTART" });
+      } else if (action === "retry") {
+        dispatch({ type: "CAMERA_RETRY" });
+      }
+    };
+    const onShown = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === "visible")
+        timer = setTimeout(recover, CAMERA_RESUME_GRACE_MS);
+    };
+    document.addEventListener("visibilitychange", onShown);
+    window.addEventListener("pageshow", onShown);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onShown);
+      window.removeEventListener("pageshow", onShown);
+    };
+  }, [state.phase, cameraError]);
+
   // ── Countdown ────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (state.phase !== "countdown") return;
@@ -267,7 +310,8 @@ export function KioskApp({
     setFlash((n) => n + 1);
     (async () => {
       try {
-        if (!camera.isActive()) {
+        // Gone, or muted by the browser (a black frame): take the camera again before the shot.
+        if (!camera.isActive() || camera.isStalled()) {
           await camera.start(deviceId);
           setStream(camera.getStream());
         }
@@ -729,48 +773,63 @@ export function KioskApp({
   return (
     <KioskChromeContext.Provider value={chrome}>
       <main
-        className={`kiosk-desk relative min-h-dvh select-none overflow-hidden ${state.mode === "easy" ? "kiosk-easy" : ""}`}
+        className={`kiosk-root kiosk-desk ${state.mode === "easy" ? "kiosk-easy" : ""}`}
         data-phase={state.phase}
         data-mode={state.mode}
         data-lang={state.lang}
         data-wall-submissions={wallSubmissions}
       >
-        <Screen
-          state={state}
-          dispatch={dispatch}
-          stream={stream}
-          devices={devices}
-          deviceId={deviceId}
-          onSelectDevice={selectDevice}
-          guestCameraChoice={!staffHelp}
-          thumbs={thumbs}
-          finalImage={finalImage}
-          qrSvg={qrSvg}
-          onRetryDelivery={deliver}
-          onConsent={chooseConsent}
-          onReset={reset}
-          onOpen={() => dispatch({ type: "OPEN" })}
-          onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
-          onStartMobile={() => dispatch({ type: "START_MOBILE" })}
-          mobileQrSvg={
-            mobileQr &&
-            state.mobile.status === "ready" &&
-            mobileQr.sessionId === state.mobile.sessionId
-              ? mobileQr.svg
-              : null
-          }
-          onToggleMode={chrome.toggleMode}
-          onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
-          wallSubmissionsOpen={wallSubmissions === "open"}
-          videoNotice={canRecordVideo}
-        />
+        <div
+          className="kiosk-scroll"
+          data-booth-scroll
+          ref={scrollRef}
+          onPointerDownCapture={(e) => {
+            tapRef.current.pointerType = e.pointerType;
+          }}
+          onClickCapture={(e) => {
+            if (isStrayTap({ now: performance.now(), ...tapRef.current })) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
+          <Screen
+            state={state}
+            dispatch={dispatch}
+            stream={stream}
+            devices={devices}
+            deviceId={deviceId}
+            onSelectDevice={selectDevice}
+            guestCameraChoice={!staffHelp}
+            thumbs={thumbs}
+            finalImage={finalImage}
+            qrSvg={qrSvg}
+            onRetryDelivery={deliver}
+            onConsent={chooseConsent}
+            onReset={reset}
+            onOpen={() => dispatch({ type: "OPEN" })}
+            onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
+            onStartMobile={() => dispatch({ type: "START_MOBILE" })}
+            mobileQrSvg={
+              mobileQr &&
+              state.mobile.status === "ready" &&
+              mobileQr.sessionId === state.mobile.sessionId
+                ? mobileQr.svg
+                : null
+            }
+            onToggleMode={chrome.toggleMode}
+            onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
+            wallSubmissionsOpen={wallSubmissions === "open"}
+            videoNotice={canRecordVideo}
+          />
+        </div>
+        {moreBelow && !idle.warning && (
+          <div className="booth-scroll-hint" aria-hidden data-testid="scroll-hint">
+            <LineIcon name="down" />
+          </div>
+        )}
         {idle.warning && (
-          <div
-            className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center justify-center gap-6 border-t border-ink/20 bg-paper px-6 py-5 text-center"
-            role="status"
-            aria-live="polite"
-            data-testid="idle-warning"
-          >
+          <div className="idle-warning" role="status" aria-live="polite" data-testid="idle-warning">
             <p className="booth-lead">{t.idle.warning(idle.secondsLeft)}</p>
             <button type="button" className="booth-btn-secondary" onClick={idle.bump}>
               {t.idle.stay}
@@ -808,7 +867,7 @@ export function KioskApp({
         {flash > 0 && state.phase === "capturing" && (
           <div
             key={flash}
-            className="capture-flash pointer-events-none fixed inset-0 bg-paper"
+            className="capture-flash pointer-events-none fixed inset-0 z-20 bg-paper"
             aria-hidden
           />
         )}
@@ -885,35 +944,32 @@ function Screen(p: ScreenProps) {
       // "화면을 눌러 시작" (D80): the whole screen is the start button, and the seal is the
       // letter's closure the guest opens. Both languages, because nobody has chosen one yet.
       return (
-        <section
-          data-testid="screen-attract"
-          className="flex min-h-dvh w-full cursor-pointer flex-col px-[max(24px,4.2vw)] py-[max(16px,2vh)]"
+        <BoothScreen
+          testId="screen-attract"
+          header={false}
+          seal
+          className="sheet-center attract"
           onClick={p.onOpen}
         >
-          <LetterSheet
-            seal
-            className="flex flex-1 flex-col items-center justify-center gap-[max(24px,5vh)] text-center"
-          >
-            <BrandLockup className="text-[clamp(64px,min(13vh,12vw),150px)]" />
-            <p className="booth-lead">{KIOSK_COPY.ko.attract.event}</p>
-            <div className="flex flex-col items-center gap-[max(10px,1.6vh)]">
-              <button
-                type="button"
-                className="booth-btn-primary"
-                data-testid="attract-start"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  p.onOpen();
-                }}
-              >
-                {KIOSK_COPY.ko.attract.start}
-              </button>
-              <p lang="en" className="booth-caption">
-                {KIOSK_COPY.en.attract.start}
-              </p>
-            </div>
-          </LetterSheet>
-        </section>
+          <BrandLockup className="attract-lockup" />
+          <p className="booth-lead">{KIOSK_COPY.ko.attract.event}</p>
+          <div className="attract-start">
+            <button
+              type="button"
+              className="booth-btn-primary"
+              data-testid="attract-start"
+              onClick={(e) => {
+                e.stopPropagation();
+                p.onOpen();
+              }}
+            >
+              {KIOSK_COPY.ko.attract.start}
+            </button>
+            <p lang="en" className="booth-caption">
+              {KIOSK_COPY.en.attract.start}
+            </p>
+          </div>
+        </BoothScreen>
       );
 
     case "welcome": {
@@ -921,41 +977,40 @@ function Screen(p: ScreenProps) {
       // screen mode is chosen here too, and can be changed on every screen.
       const easy = state.mode === "easy";
       return (
-        <section
-          data-testid="screen-welcome"
-          className="flex min-h-dvh w-full flex-col px-[max(24px,4.2vw)] py-[max(16px,2vh)]"
-        >
-          <LetterSheet className="flex flex-1 flex-col justify-center gap-[max(20px,4vh)] !px-[max(24px,4.2vw)]">
-            <div className="flex flex-col items-start gap-[max(12px,2vh)]">
-              <BrandLockup className="text-[clamp(52px,min(9vh,9vw),104px)]" />
-              <h1 className="booth-title">{t.welcome.title}</h1>
-              {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
-            </div>
-            <div className="grid w-full grid-cols-2 gap-[max(16px,2vw)] portrait:grid-cols-1">
-              <button
-                type="button"
-                className="welcome-choice welcome-choice-primary"
-                data-testid="start-camera"
-                onClick={p.onStart}
-              >
-                <span className="welcome-choice-icon">
-                  <LineIcon name="camera" />
-                </span>
+        <BoothScreen testId="screen-welcome" header={false} className="welcome">
+          <div className="welcome-head">
+            <BrandLockup className="welcome-lockup" />
+            <h1 className="booth-title">{t.welcome.title}</h1>
+            {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
+          </div>
+          <div className="welcome-choices">
+            <button
+              type="button"
+              className="welcome-choice welcome-choice-primary"
+              data-testid="start-camera"
+              onClick={p.onStart}
+            >
+              <span className="welcome-choice-icon">
+                <LineIcon name="camera" />
+              </span>
+              <span className="welcome-choice-text">
                 <span className="welcome-choice-title">{t.welcome.camera}</span>
                 <span className="welcome-choice-lead">
                   {easy ? t.welcome.cameraLeadEasy : t.welcome.cameraLead}
                 </span>
-              </button>
-              <button
-                type="button"
-                className="welcome-choice"
-                data-testid="start-mobile"
-                disabled={!p.wallSubmissionsOpen}
-                onClick={p.onStartMobile}
-              >
-                <span className="welcome-choice-icon">
-                  <LineIcon name="phone" />
-                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="welcome-choice"
+              data-testid="start-mobile"
+              disabled={!p.wallSubmissionsOpen}
+              onClick={p.onStartMobile}
+            >
+              <span className="welcome-choice-icon">
+                <LineIcon name="phone" />
+              </span>
+              <span className="welcome-choice-text">
                 <span className="welcome-choice-title">{t.welcome.mobile}</span>
                 <span className="welcome-choice-lead">
                   {p.wallSubmissionsOpen
@@ -964,56 +1019,44 @@ function Screen(p: ScreenProps) {
                       : t.welcome.mobileLead
                     : t.welcome.paused}
                 </span>
-              </button>
+              </span>
+            </button>
+          </div>
+          <div className="welcome-options">
+            <div role="radiogroup" aria-label={t.welcome.modeGroup} className="booth-seg">
+              {(["standard", "easy"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={state.mode === m}
+                  data-testid={`mode-${m}`}
+                  onClick={() => state.mode !== m && p.onToggleMode()}
+                  className="booth-seg-btn"
+                >
+                  {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
+                </button>
+              ))}
             </div>
-            <div className="flex flex-wrap items-center gap-4">
-              <div
-                role="radiogroup"
-                aria-label={t.welcome.modeGroup}
-                className="flex rounded-full border-2 border-ink/60 p-1"
-              >
-                {(["standard", "easy"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="radio"
-                    aria-checked={state.mode === m}
-                    data-testid={`mode-${m}`}
-                    onClick={() => state.mode !== m && p.onToggleMode()}
-                    className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
-                      state.mode === m ? "bg-ink text-button-text" : "text-ink"
-                    }`}
-                  >
-                    {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
-                  </button>
-                ))}
-              </div>
-              {/* 한국어 · English (D78): each name in its own language, the same in both. */}
-              <div
-                role="radiogroup"
-                aria-label={t.langGroup}
-                className="flex rounded-full border-2 border-ink/60 p-1"
-              >
-                {KIOSK_LANGS.map((lang) => (
-                  <button
-                    key={lang}
-                    type="button"
-                    role="radio"
-                    lang={lang}
-                    aria-checked={state.lang === lang}
-                    data-testid={`lang-${lang}`}
-                    onClick={() => p.onSetLang(lang)}
-                    className={`min-h-[max(56px,6.4vh)] rounded-full px-[max(20px,2.4vw)] text-[clamp(20px,2.6vh,30px)] font-bold ${
-                      state.lang === lang ? "bg-ink text-button-text" : "text-ink"
-                    }`}
-                  >
-                    {KIOSK_COPY[lang].langName}
-                  </button>
-                ))}
-              </div>
+            {/* 한국어 · English (D78): each name in its own language, the same in both. */}
+            <div role="radiogroup" aria-label={t.langGroup} className="booth-seg">
+              {KIOSK_LANGS.map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  role="radio"
+                  lang={lang}
+                  aria-checked={state.lang === lang}
+                  data-testid={`lang-${lang}`}
+                  onClick={() => p.onSetLang(lang)}
+                  className="booth-seg-btn"
+                >
+                  {KIOSK_COPY[lang].langName}
+                </button>
+              ))}
             </div>
-          </LetterSheet>
-        </section>
+          </div>
+        </BoothScreen>
       );
     }
 
@@ -1024,14 +1067,36 @@ function Screen(p: ScreenProps) {
 
     case "pick":
     case "frame": {
+      // The chosen frame large, every frame as a small tile: all of them on screen at once,
+      // beside the preview on a wide screen and under it on a tall one.
       const pick = state.phase === "pick";
+      const chosen = getFrame(state.frameId);
+      const chosenName = state.lang === "en" ? chosen.labelEn : chosen.label;
       return (
-        <BoothScreen testId={pick ? "screen-pick" : "screen-frame"} progress={progress}>
-          <h1 className="booth-title text-center">
-            {pick ? t.frame.pickTitle : t.frame.againTitle}
-          </h1>
-          {!pick && <p className="booth-lead mt-3 text-center">{t.frame.againLead}</p>}
-          <div className="mt-[3vh] grid max-h-[66dvh] w-full max-w-6xl grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
+        <BoothScreen
+          testId={pick ? "screen-pick" : "screen-frame"}
+          progress={progress}
+          className="pick"
+        >
+          <div className="pick-head">
+            <h1 className="booth-title">{pick ? t.frame.pickTitle : t.frame.againTitle}</h1>
+            {!pick && <p className="booth-lead">{t.frame.againLead}</p>}
+          </div>
+          <div className="pick-preview" data-testid="frame-preview" data-frame={chosen.id}>
+            <div className="frame-art">
+              {p.thumbs[chosen.id] ? (
+                // eslint-disable-next-line @next/next/no-img-element -- generated data URL
+                <img src={p.thumbs[chosen.id]} alt="" data-testid="frame-preview-image" />
+              ) : (
+                <div className="frame-art-wait animate-pulse" />
+              )}
+            </div>
+            <p className="pick-preview-caption" aria-live="polite">
+              <span className="pick-preview-name">{chosenName}</span>
+              <span className="booth-caption">{t.frame.slots(chosen.slots.length)}</span>
+            </p>
+          </div>
+          <div className="pick-tiles" data-testid="frame-options">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -1041,30 +1106,28 @@ function Screen(p: ScreenProps) {
                   data-testid={`frame-option-${frame.id}`}
                   aria-pressed={selected}
                   onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
-                  className={`flex flex-col items-center gap-4 rounded-3xl p-[14px] transition portrait:p-[10px] ${
-                    selected ? "border-[5px] border-ink bg-paper" : "border-2 border-ink/30"
-                  }`}
+                  className="pick-tile"
                 >
-                  <div className="flex h-[min(29vh,330px)] items-center justify-center portrait:h-[min(24vh,50vw)]">
+                  <span className="frame-art">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
-                      <img src={p.thumbs[frame.id]} alt="" className="max-h-full w-auto" />
+                      <img src={p.thumbs[frame.id]} alt="" />
                     ) : (
-                      <div className="aspect-[1/3] h-full animate-pulse bg-ink/10" />
+                      <span className="frame-art-wait animate-pulse" />
                     )}
-                  </div>
-                  <span className="text-[clamp(26px,3.33vh,36px)] font-bold text-ink">
+                  </span>
+                  <span className="pick-tile-label">
                     {state.lang === "en" ? frame.labelEn : frame.label}
                   </span>
-                  <span className="text-lg text-ink/75">{t.frame.slots(frame.slots.length)}</span>
+                  <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
                 </button>
               );
             })}
           </div>
-          <div className="mt-[3vh] flex w-full justify-end portrait:mt-auto">
+          <div className="pick-actions">
             <button
               type="button"
-              className="booth-btn-primary portrait:w-full"
+              className="booth-btn-primary"
               onClick={() =>
                 dispatch(
                   pick
@@ -1082,29 +1145,33 @@ function Screen(p: ScreenProps) {
 
     case "camera":
       return (
-        <BoothScreen testId="screen-camera" progress={progress} className="gap-6 text-center">
-          <h1 className="booth-title">{t.camera.startingTitle}</h1>
-          <p className="booth-lead">{t.camera.startingLead}</p>
+        <BoothScreen testId="screen-camera" progress={progress}>
+          <div className="booth-message">
+            <h1 className="booth-title">{t.camera.startingTitle}</h1>
+            <p className="booth-lead">{t.camera.startingLead}</p>
+          </div>
         </BoothScreen>
       );
 
     case "camera-error": {
       const copy = t.camera.errors[state.cameraError ?? "failed"];
       return (
-        <BoothScreen testId="screen-camera-error" progress={progress} className="gap-6 text-center">
-          <h1 className="booth-title">{copy.title}</h1>
-          <p className="booth-lead">{copy.lead}</p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button
-              type="button"
-              className="booth-btn-primary"
-              onClick={() => dispatch({ type: "CAMERA_RETRY" })}
-            >
-              {t.camera.retry}
-            </button>
-            <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
-              {t.camera.home}
-            </button>
+        <BoothScreen testId="screen-camera-error" progress={progress}>
+          <div className="booth-message">
+            <h1 className="booth-title">{copy.title}</h1>
+            <p className="booth-lead">{copy.lead}</p>
+            <div className="booth-actions">
+              <button
+                type="button"
+                className="booth-btn-primary"
+                onClick={() => dispatch({ type: "CAMERA_RETRY" })}
+              >
+                {t.camera.retry}
+              </button>
+              <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
+                {t.camera.home}
+              </button>
+            </div>
           </div>
         </BoothScreen>
       );
@@ -1122,27 +1189,23 @@ function Screen(p: ScreenProps) {
         <BoothScreen
           testId={shooting ? "screen-shooting" : "screen-ready"}
           progress={progress}
-          className="flex-row items-center gap-[max(24px,2.1vw)] portrait:flex-col portrait:justify-center"
+          className={shooting ? "shoot shoot-live" : "shoot"}
         >
-          <div className="flex-[1.6] portrait:w-full portrait:flex-none">
+          <div className="shoot-stage">
             <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
               <div className="absolute inset-0 flex items-center justify-center">
                 {state.phase === "countdown" ? (
                   <span
                     key={`${state.shotIndex}-${state.remaining}`}
                     data-testid="countdown-number"
-                    className="countdown-number countdown-pop text-[clamp(120px,30vh,320px)] font-bold leading-none text-button-text"
+                    className="countdown-number countdown-pop"
                   >
                     {state.remaining}
                   </span>
                 ) : null}
               </div>
               {pose && (
-                <div
-                  className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-paper px-4 py-[max(12px,2vh)] text-center"
-                  data-testid="pose-guide"
-                  data-pose={pose.id}
-                >
+                <div className="pose-guide" data-testid="pose-guide" data-pose={pose.id}>
                   <span className="booth-caption text-ink">{t.shoot.pose}</span>
                   <span className="booth-title">
                     {state.lang === "en" ? (pose.labelEn ?? pose.label) : pose.label}
@@ -1151,7 +1214,7 @@ function Screen(p: ScreenProps) {
               )}
             </CameraPreview>
           </div>
-          <div className="flex flex-1 flex-col items-start gap-[max(16px,2.4vh)] portrait:flex-none portrait:items-center portrait:text-center">
+          <div className="shoot-panel">
             <p className="booth-title" data-testid="shot-label">
               {state.retakeIndex !== null
                 ? t.shoot.retakeShot(state.shotIndex + 1)
@@ -1164,7 +1227,7 @@ function Screen(p: ScreenProps) {
             {!shooting && (
               <>
                 {/* One filled button only: free poses is the default, the guide is the option. */}
-                <div className="flex flex-wrap gap-[max(12px,1.6vh)] portrait:justify-center">
+                <div className="shoot-actions">
                   <button
                     type="button"
                     className="booth-btn-primary"
@@ -1191,10 +1254,9 @@ function Screen(p: ScreenProps) {
                   </p>
                 )}
                 {p.guestCameraChoice && p.devices.length > 1 && (
-                  <label className="flex items-center gap-3 text-base text-ink/75">
+                  <label className="booth-field">
                     {t.camera.choose}
                     <select
-                      className="rounded-lg border border-ink/50 bg-paper px-3 py-2 text-ink"
                       value={p.deviceId ?? ""}
                       onChange={(e) => p.onSelectDevice(e.target.value)}
                     >
@@ -1215,50 +1277,49 @@ function Screen(p: ScreenProps) {
     }
 
     case "review":
+      // Six prints, three by two, as large as the room allows: under the title on a tall
+      // screen, beside it on a wide one. "다시 찍기" sits under its own print.
       return (
-        <BoothScreen testId="screen-review" progress={progress}>
-          <h1 className="booth-title">{t.review.title}</h1>
-          {/* Six prints in one row on a landscape booth, 3 × 2 on a portrait tablet: with the
-              retake buttons and "이대로 좋아요" the screen fits without scrolling. */}
-          <div
-            className="mt-[3vh] grid w-full grid-cols-6 gap-[max(10px,1vw)] portrait:grid-cols-3"
-            data-testid="review-grid"
-          >
-            {state.shots.map((shot, i) => (
-              <div key={i} className="flex flex-col gap-[1.6vh]">
-                <div
-                  className="relative overflow-hidden rounded-sm bg-ink/10"
-                  style={{ aspectRatio: String(aspect) }}
-                  data-testid={`review-shot-${i}`}
-                >
-                  <PhotoCorners />
-                  {shot && (
-                    // eslint-disable-next-line @next/next/no-img-element -- local object URL
-                    <img
-                      src={shot.url}
-                      alt={t.shoot.shot(i + 1)}
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => dispatch({ type: "RETAKE", index: i })}
-                  className="min-h-[max(56px,7.6vh)] rounded-full border-2 border-ink text-[clamp(20px,2.6vh,28px)] font-bold text-ink active:scale-[0.98] active:bg-ink/10"
-                  aria-label={t.shoot.retakeShot(i + 1)}
-                >
-                  {t.review.retake}
-                </button>
-              </div>
-            ))}
+        <BoothScreen testId="screen-review" progress={progress} className="review">
+          <div className="review-head">
+            <h1 className="booth-title">{t.review.title}</h1>
           </div>
-          <button
-            type="button"
-            className="booth-btn-primary mt-[4vh] portrait:mt-auto portrait:w-full"
-            onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
-          >
-            {t.review.confirm}
-          </button>
+          <div className="fit-stage">
+            <div className="fit-grid review-grid" data-testid="review-grid">
+              {state.shots.map((shot, i) => (
+                <div key={i} className="review-cell">
+                  <div
+                    className="review-photo"
+                    style={{ aspectRatio: String(aspect) }}
+                    data-testid={`review-shot-${i}`}
+                  >
+                    <PhotoCorners />
+                    {shot && (
+                      // eslint-disable-next-line @next/next/no-img-element -- local object URL
+                      <img src={shot.url} alt={t.shoot.shot(i + 1)} />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "RETAKE", index: i })}
+                    className="booth-btn-m"
+                    aria-label={t.shoot.retakeShot(i + 1)}
+                  >
+                    {t.review.retake}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="review-actions">
+            <button
+              type="button"
+              className="booth-btn-primary"
+              onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
+            >
+              {t.review.confirm}
+            </button>
+          </div>
         </BoothScreen>
       );
 
@@ -1266,47 +1327,43 @@ function Screen(p: ScreenProps) {
       const required = getFrame(state.frameId).slots.length;
       const selected = state.selectedShotIndices;
       return (
-        <BoothScreen testId="screen-select" progress={progress}>
-          <h1 className="booth-title text-center">{t.select.title(required, total)}</h1>
-          <p
-            className="booth-lead mt-3 text-center"
-            data-testid="select-required"
-            data-required={required}
-          >
-            {t.select.lead(selected.length, required)}
-          </p>
-          <div className="mt-[3vh] grid w-full max-w-5xl grid-cols-3 gap-3 overflow-y-auto portrait:grid-cols-2">
-            {state.shots.map((shot, index) => {
-              const order = selected.indexOf(index);
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  data-testid={`select-shot-${index}`}
-                  aria-label={
-                    order >= 0 ? t.select.unchoose(index + 1) : t.select.choose(index + 1)
-                  }
-                  aria-pressed={order >= 0}
-                  onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
-                  className={`relative rounded-lg border-4 p-1 transition ${order >= 0 ? "border-ink" : "border-ink/20"}`}
-                >
-                  {shot && (
-                    // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
-                    <img
-                      src={shot.url}
-                      alt=""
-                      className="w-full rounded-lg object-cover"
-                      style={{ aspectRatio: String(aspect) }}
-                    />
-                  )}
-                  <span className="absolute left-2 top-2 rounded-full bg-button px-3 py-1 text-xl font-bold text-button-text">
-                    {order >= 0 ? order + 1 : index + 1}
-                  </span>
-                </button>
-              );
-            })}
+        <BoothScreen testId="screen-select" progress={progress} className="select">
+          <div className="select-head">
+            <h1 className="booth-title">{t.select.title(required, total)}</h1>
+            <p className="booth-lead" data-testid="select-required" data-required={required}>
+              {/* "2 / 4장" stays on one line (no-break spaces): the count is one thing to read. */}
+              {t.select.lead(selected.length, required).replace(" / ", "\u00a0/\u00a0")}
+            </p>
           </div>
-          <div className="mt-5 flex w-full max-w-5xl justify-between gap-4">
+          <div className="fit-stage">
+            <div className="fit-grid select-grid" data-testid="select-grid">
+              {state.shots.map((shot, index) => {
+                const order = selected.indexOf(index);
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    data-testid={`select-shot-${index}`}
+                    aria-label={
+                      order >= 0 ? t.select.unchoose(index + 1) : t.select.choose(index + 1)
+                    }
+                    aria-pressed={order >= 0}
+                    onClick={() => dispatch({ type: "TOGGLE_SHOT_SELECTION", index })}
+                    className="select-tile"
+                  >
+                    <span className="block" style={{ aspectRatio: String(aspect) }}>
+                      {shot && (
+                        // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
+                        <img src={shot.url} alt="" />
+                      )}
+                    </span>
+                    <span className="select-badge">{order >= 0 ? order + 1 : index + 1}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="select-actions">
             <button
               type="button"
               className="booth-btn-secondary"
@@ -1332,13 +1389,9 @@ function Screen(p: ScreenProps) {
 
     case "consent":
       return (
-        <BoothScreen
-          testId="screen-consent"
-          progress={progress}
-          className="flex-row items-center justify-center gap-[max(32px,4vw)] portrait:flex-col portrait:gap-[3vh]"
-        >
+        <BoothScreen testId="screen-consent" progress={progress} className="consent">
           <FinalPreview finalImage={p.finalImage} frameId={state.frameId} t={t} />
-          <div className="flex max-w-[44rem] flex-col items-start gap-[max(14px,2.2vh)] portrait:w-full portrait:max-w-none portrait:items-center portrait:text-center">
+          <div className="consent-body">
             <h1 className="booth-title">
               <Lines text={t.consent.title} />
             </h1>
@@ -1346,7 +1399,7 @@ function Screen(p: ScreenProps) {
               <Lines text={t.consent.lead} />
             </p>
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}
-            <div className="flex w-full max-w-[30rem] flex-col gap-[max(14px,2.6vh)] portrait:max-w-none">
+            <div className="consent-actions">
               <button
                 type="button"
                 className="booth-btn-secondary w-full"
@@ -1364,7 +1417,7 @@ function Screen(p: ScreenProps) {
                 {t.consent.no}
               </button>
             </div>
-            <p className="booth-caption text-[clamp(18px,2.2vh,24px)]">
+            <p className="booth-caption">
               {/* Figma: "행사가 끝나면 지워져요". Not what retention does yet (hub 24 h / event end,
                   cloud PHOTO_RETENTION_DAYS); the church decides the period (docs/STATUS.md). */}
               <Lines text={t.consent.note} />
@@ -1377,60 +1430,52 @@ function Screen(p: ScreenProps) {
       const d = state.delivery;
       if (d.status === "ready" && p.qrSvg) {
         return (
-          <BoothScreen
-            testId="screen-delivery"
-            progress={progress}
-            seal
-            className="flex-row items-center justify-center gap-[max(40px,6.25vw)] portrait:flex-col portrait:gap-[2.4vh] portrait:text-center"
-          >
-            {/* Portrait (iPad): title, lead, QR, button — the column dissolves into the screen's. */}
-            <div
-              className="flex flex-col items-start gap-[max(16px,2.6vh)] portrait:contents"
-              data-testid="delivery-ready"
-            >
-              <h1 className="booth-title portrait:order-1">{t.delivery.title}</h1>
-              <p className="booth-lead portrait:order-2">
-                {t.delivery.lead}
-                {state.consent === "yes" && (
-                  <>
-                    <br />
-                    {t.delivery.onWall}
-                  </>
-                )}
-              </p>
-              <button
-                type="button"
-                className="booth-btn-secondary portrait:order-4 portrait:w-[min(100%,28rem)]"
-                onClick={p.onReset}
-              >
-                {t.delivery.done}
-              </button>
-              <p className="booth-caption portrait:order-5">{t.delivery.resetSoon}</p>
-            </div>
-            <div className="relative flex flex-col items-center gap-5 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)] portrait:order-3 portrait:p-[max(20px,2.6vh)]">
-              <Tape side="center" />
-              <div
-                data-testid="qr-code"
-                data-url={d.url}
-                className="w-[clamp(220px,min(30vh,36vw),320px)] rounded-lg bg-white p-3"
-                // QR markup comes from the qrcode library, generated locally from our own URL.
-                dangerouslySetInnerHTML={{ __html: p.qrSvg }}
-              />
-              <p className="text-center text-[clamp(20px,2.6vh,28px)] font-bold leading-[1.35] text-ink">
-                <Lines text={t.delivery.qrNote} />
-              </p>
-              {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
-              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
-                {t.delivery.session(sessionCode)}
-              </p>
+          <BoothScreen testId="screen-delivery" progress={progress} seal>
+            {/* Tall: title, QR, button. Wide: the words and the button beside the QR. */}
+            <div className="qr-layout qr-layout-sealed" data-testid="delivery-ready">
+              <div className="qr-head">
+                <h1 className="booth-title">{t.delivery.title}</h1>
+                <p className="booth-lead">
+                  {t.delivery.lead}
+                  {state.consent === "yes" && (
+                    <>
+                      <br />
+                      {t.delivery.onWall}
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="qr-card">
+                <Tape side="center" />
+                <div
+                  data-testid="qr-code"
+                  data-url={d.url}
+                  className="qr-code"
+                  // QR markup comes from the qrcode library, generated locally from our own URL.
+                  dangerouslySetInnerHTML={{ __html: p.qrSvg }}
+                />
+                <p className="qr-note">
+                  <Lines text={t.delivery.qrNote} />
+                </p>
+                {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
+                <p className="booth-meta" data-testid="session-code">
+                  {t.delivery.session(sessionCode)}
+                </p>
+              </div>
+              <div className="qr-more">
+                <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
+                  {t.delivery.done}
+                </button>
+                <p className="booth-caption">{t.delivery.resetSoon}</p>
+              </div>
             </div>
           </BoothScreen>
         );
       }
       return (
-        <BoothScreen testId="screen-delivery" progress={progress} className="gap-6 text-center">
+        <BoothScreen testId="screen-delivery" progress={progress}>
           {d.status === "qr-pending" ? (
-            <div data-testid="delivery-qr-pending" className="flex flex-col items-center gap-6">
+            <div data-testid="delivery-qr-pending" className="booth-message">
               <h1 className="booth-title">{t.delivery.pendingTitle}</h1>
               <p className="booth-lead">
                 <Lines text={t.delivery.pendingLead} />
@@ -1444,19 +1489,19 @@ function Screen(p: ScreenProps) {
               >
                 {t.delivery.withoutQr}
               </button>
-              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
+              <p className="booth-meta" data-testid="session-code">
                 {t.delivery.session(sessionCode)}
               </p>
             </div>
           ) : d.status === "queued" ? (
-            <div data-testid="delivery-queued" className="flex flex-col items-center gap-6">
+            <div data-testid="delivery-queued" className="booth-message">
               <h1 className="booth-title">
                 {d.reason === "auth" ? t.delivery.authTitle : t.delivery.queuedTitle}
               </h1>
               <p className="booth-lead">
                 {d.reason === "auth" ? t.delivery.authLead : <Lines text={t.delivery.queuedLead} />}
               </p>
-              <div className="flex flex-wrap justify-center gap-4">
+              <div className="booth-actions">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
                   {t.delivery.retry}
                 </button>
@@ -1470,23 +1515,23 @@ function Screen(p: ScreenProps) {
                   {t.delivery.withoutQr}
                 </button>
               </div>
-              <p className="font-mono text-lg text-ink/75" data-testid="session-code">
+              <p className="booth-meta" data-testid="session-code">
                 {t.delivery.session(sessionCode)}
               </p>
             </div>
           ) : d.status === "failed" ? (
-            <>
+            <div className="booth-message">
               <h1 className="booth-title">{t.delivery.failedTitle}</h1>
               <p className="booth-lead">{t.delivery.failedLead}</p>
               <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
                 {t.delivery.home}
               </button>
-            </>
+            </div>
           ) : (
-            <>
+            <div className="booth-message" role="status">
               <h1 className="booth-title">{t.delivery.sendingTitle}</h1>
               <p className="booth-lead">{t.delivery.sendingLead}</p>
-            </>
+            </div>
           )}
         </BoothScreen>
       );
@@ -1511,9 +1556,9 @@ function MobileScreen({
   const t = KIOSK_COPY[state.lang].mobile;
   if (m.status === "received") {
     return (
-      <BoothScreen testId="screen-mobile" className="gap-6 text-center">
-        <div data-testid="mobile-received" className="flex flex-col items-center gap-6">
-          <p className="text-[clamp(64px,12vh,120px)] leading-none text-accent" aria-hidden>
+      <BoothScreen testId="screen-mobile">
+        <div data-testid="mobile-received" className="booth-message">
+          <p className="booth-check" aria-hidden>
             ✓
           </p>
           <h1 className="booth-title">{t.receivedTitle}</h1>
@@ -1530,15 +1575,11 @@ function MobileScreen({
   if (m.status === "failed") {
     const copy = t.failed[m.reason];
     return (
-      <BoothScreen testId="screen-mobile" className="gap-6 text-center">
-        <div
-          data-testid="mobile-failed"
-          data-reason={m.reason}
-          className="flex flex-col items-center gap-6"
-        >
+      <BoothScreen testId="screen-mobile">
+        <div data-testid="mobile-failed" data-reason={m.reason} className="booth-message">
           <h1 className="booth-title">{copy.title}</h1>
           <p className="booth-lead">{copy.lead}</p>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="booth-actions">
             {m.reason !== "paused" && (
               <button
                 type="button"
@@ -1558,56 +1599,54 @@ function MobileScreen({
   }
   const ready = m.status === "ready" && qrSvg;
   return (
-    <BoothScreen
-      testId="screen-mobile"
-      className="flex-row items-center justify-center gap-[max(40px,6vw)] portrait:flex-col portrait:gap-[3vh]"
-    >
-      <div className="flex max-w-[48rem] flex-col items-start gap-[max(14px,2.4vh)] portrait:items-center portrait:text-center">
-        <h1 className="booth-title">{t.title}</h1>
-        <ol className="flex flex-col gap-[max(10px,1.6vh)]" aria-label={t.stepsLabel}>
-          {t.steps.map((text, i) => (
-            <li key={text} className="booth-lead flex items-center gap-4 text-left">
-              <span className="flex h-[max(40px,5vh)] w-[max(40px,5vh)] shrink-0 items-center justify-center rounded-full bg-button font-bold text-button-text">
-                {i + 1}
-              </span>
-              {text}
-            </li>
-          ))}
-        </ol>
-        {!easy && <p className="booth-caption">{t.note}</p>}
-        {m.status === "ready" && m.via === "lan" && (
-          <p className="booth-caption text-ink" data-testid="mobile-lan-note">
-            {t.lan}
+    <BoothScreen testId="screen-mobile">
+      <div className="qr-layout">
+        <div className="qr-head">
+          <h1 className="booth-title">{t.title}</h1>
+          <ol className="mobile-steps" aria-label={t.stepsLabel}>
+            {t.steps.map((text, i) => (
+              <li key={text} className="booth-lead mobile-step">
+                <span className="mobile-step-num">{i + 1}</span>
+                {text}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="qr-card">
+          <Tape side="center" />
+          {ready ? (
+            <div
+              data-testid="mobile-qr"
+              data-url={m.status === "ready" ? m.url : undefined}
+              className="qr-code"
+              // QR markup comes from the qrcode library, generated locally from our own URL.
+              dangerouslySetInnerHTML={{ __html: qrSvg }}
+            />
+          ) : (
+            <div className="qr-code qr-code-wait" role="status">
+              {t.making}
+            </div>
+          )}
+          <p className="qr-note">
+            <Lines text={t.waiting} />
           </p>
-        )}
-      </div>
-      <div className="relative flex flex-col items-center gap-4 rounded-3xl border border-ink/15 bg-paper p-[max(24px,3.7vh)]">
-        <Tape side="center" />
-        {ready ? (
-          <div
-            data-testid="mobile-qr"
-            data-url={m.status === "ready" ? m.url : undefined}
-            className="w-[clamp(220px,32vh,340px)] rounded-lg bg-white p-3"
-            // QR markup comes from the qrcode library, generated locally from our own URL.
-            dangerouslySetInnerHTML={{ __html: qrSvg }}
-          />
-        ) : (
-          <div
-            className="flex aspect-square w-[clamp(220px,32vh,340px)] items-center justify-center rounded-lg bg-white text-xl text-ink/75"
-            role="status"
-          >
-            {t.making}
+        </div>
+        {(!easy || (m.status === "ready" && m.via === "lan")) && (
+          <div className="qr-more">
+            {!easy && <p className="booth-caption">{t.note}</p>}
+            {m.status === "ready" && m.via === "lan" && (
+              <p className="booth-caption text-ink" data-testid="mobile-lan-note">
+                {t.lan}
+              </p>
+            )}
           </div>
         )}
-        <p className="text-center text-[clamp(18px,2.4vh,26px)] font-bold leading-[1.35] text-ink">
-          <Lines text={t.waiting} />
-        </p>
       </div>
     </BoothScreen>
   );
 }
 
-/** The finished strip, shown beside the wall question. */
+/** The finished frame, shown beside the wall question: whole, whatever its shape. */
 function FinalPreview({
   finalImage,
   frameId,
@@ -1618,7 +1657,7 @@ function FinalPreview({
   t: KioskCopy;
 }) {
   return (
-    <div className="flex h-[min(66vh,720px)] items-center portrait:h-[36vh]">
+    <div className="frame-art">
       {finalImage?.frameId === frameId ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL
         <img
@@ -1627,13 +1666,9 @@ function FinalPreview({
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
-          className="max-h-full w-auto"
         />
       ) : (
-        <div
-          className="aspect-[1/3] h-full animate-pulse bg-ink/10"
-          aria-label={t.consent.making}
-        />
+        <div className="frame-art-wait animate-pulse" aria-label={t.consent.making} />
       )}
     </div>
   );
@@ -1643,18 +1678,14 @@ function FinalPreview({
 function ShotStrip({ state, current }: { state: State; current: number }) {
   return (
     <div
-      className="flex gap-3"
+      className="shot-strip"
       aria-label={KIOSK_COPY[state.lang].shoot.progress(capturedCount(state), state.shotCount)}
     >
       {state.shots.map((shot, i) => (
         <span
           key={i}
-          className={`flex aspect-[4/3] w-[max(56px,5.6vh)] items-center justify-center rounded-md font-mono text-sm ${
-            i === current
-              ? "border-2 border-ink bg-paper text-ink"
-              : shot
-                ? "bg-button text-button-text"
-                : "border border-ink/40 text-ink/75"
+          className={`shot-strip-cell ${
+            i === current ? "shot-strip-cell-now" : shot ? "shot-strip-cell-done" : ""
           }`}
         >
           {shot && i !== current ? "✓" : i + 1}
@@ -1698,45 +1729,29 @@ function StatusBadges({
   queue: { depth: number; authBlocked: boolean; durable: boolean };
 }) {
   return (
-    <div className="pointer-events-none fixed right-4 top-4 flex gap-2 text-sm">
+    <div className="kiosk-badges">
       {cameraMode === "mock" && (
-        <span
-          data-testid="mock-badge"
-          className="rounded-full bg-alert px-3 py-1 font-semibold text-button-text"
-        >
+        <span data-testid="mock-badge" className="kiosk-badge bg-alert">
           MOCK CAMERA
         </span>
       )}
       {!online && (
-        <span
-          data-testid="offline-badge"
-          className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text"
-        >
+        <span data-testid="offline-badge" className="kiosk-badge bg-danger">
           오프라인
         </span>
       )}
       {/* Staff indicators: photos saved on this kiosk that have not reached the server yet. */}
       {queue.depth > 0 && (
-        <span
-          data-testid="queue-badge"
-          className="rounded-full bg-ink px-3 py-1 font-semibold text-button-text"
-        >
+        <span data-testid="queue-badge" className="kiosk-badge bg-ink">
           전송 대기 {queue.depth}건
         </span>
       )}
       {queue.authBlocked && (
-        <span
-          data-testid="auth-badge"
-          className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text"
-        >
+        <span data-testid="auth-badge" className="kiosk-badge bg-danger">
           기기 등록 필요
         </span>
       )}
-      {!queue.durable && (
-        <span className="rounded-full bg-danger px-3 py-1 font-semibold text-button-text">
-          임시 저장소
-        </span>
-      )}
+      {!queue.durable && <span className="kiosk-badge bg-danger">임시 저장소</span>}
     </div>
   );
 }
@@ -1758,6 +1773,36 @@ function useOnline(): boolean {
     () => navigator.onLine,
     () => true,
   );
+}
+
+/**
+ * True while the scroll area holds more than it shows below the fold. Screens are built to fit;
+ * this is for the ones that cannot (a very short window, very large text).
+ */
+function useMoreBelow(ref: React.RefObject<HTMLElement | null>, screenKey: string): boolean {
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let frame = 0;
+    const check = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() =>
+        setMore(el.scrollHeight - el.clientHeight - el.scrollTop > 24),
+      );
+    };
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    observer?.observe(el);
+    if (el.firstElementChild) observer?.observe(el.firstElementChild);
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener("scroll", check);
+      observer?.disconnect();
+    };
+  }, [ref, screenKey]);
+  return more;
 }
 
 /** Seconds before an idle reset when the booth starts warning. */

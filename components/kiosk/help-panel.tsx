@@ -24,9 +24,13 @@ const DENIAL_COPY: Record<HelpDenial, string> = {
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
 
 /**
- * Staff help mode (hub). An invisible corner button opens it after a 3-second hold, so a guest
- * tapping around never lands here; the PIN is checked by the hub (/api/kiosk/help), which issues
- * no staff session. Everything in the menu acts on this booth only.
+ * Staff help mode (hub). Holding the top-left corner for 3 seconds opens it, so a guest tapping
+ * around never lands here; the PIN is checked by the hub (/api/kiosk/help), which issues no staff
+ * session. Everything in the menu acts on this booth only.
+ *
+ * The corner is a place on the screen, not a button laid over it: the hold is watched on the
+ * window, and the marker element takes no touches. A real button there swallowed every tap on
+ * whatever the screen shows in that corner ("이전" on a tablet).
  */
 export function HelpPanel(p: {
   listDevices: () => Promise<CameraDevice[]>;
@@ -37,20 +41,46 @@ export function HelpPanel(p: {
   onReset: () => void;
 }) {
   const [state, dispatch] = useReducer(helpReducer, HELP_CLOSED);
-  const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cornerRef = useRef<HTMLDivElement>(null);
   const open = state.step !== "closed";
 
-  const startHold = () => {
-    if (hold.current) clearTimeout(hold.current);
-    hold.current = setTimeout(
-      () => dispatch({ type: "OPEN" }),
-      KIOSK_CONFIG.helpHoldSeconds * 1000,
-    );
-  };
-  const endHold = () => {
-    if (hold.current) clearTimeout(hold.current);
-    hold.current = null;
-  };
+  useEffect(() => {
+    let hold: ReturnType<typeof setTimeout> | null = null;
+    const inCorner = (e: { clientX: number; clientY: number }) => {
+      const r = cornerRef.current?.getBoundingClientRect();
+      return !!r && e.clientX <= r.right && e.clientY <= r.bottom;
+    };
+    const endHold = () => {
+      if (hold) clearTimeout(hold);
+      hold = null;
+    };
+    const startHold = (e: PointerEvent) => {
+      endHold();
+      if (!inCorner(e)) return;
+      hold = setTimeout(() => dispatch({ type: "OPEN" }), KIOSK_CONFIG.helpHoldSeconds * 1000);
+    };
+    // A finger that slides out of the corner is not holding it.
+    const onMove = (e: PointerEvent) => {
+      if (hold && !inCorner(e)) endHold();
+    };
+    // No long-press menu over the corner while staff hold it.
+    const onMenu = (e: MouseEvent) => {
+      if (inCorner(e)) e.preventDefault();
+    };
+    window.addEventListener("pointerdown", startHold, true);
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", endHold, true);
+    window.addEventListener("pointercancel", endHold, true);
+    window.addEventListener("contextmenu", onMenu, true);
+    return () => {
+      endHold();
+      window.removeEventListener("pointerdown", startHold, true);
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", endHold, true);
+      window.removeEventListener("pointercancel", endHold, true);
+      window.removeEventListener("contextmenu", onMenu, true);
+    };
+  }, []);
 
   // Names to pick from, fetched when the panel opens (never kept in the page).
   const picking = state.step === "pick" && !state.staff && !state.failed;
@@ -109,16 +139,11 @@ export function HelpPanel(p: {
 
   return (
     <>
-      <button
-        type="button"
-        aria-label={`스태프 도움 (${KIOSK_CONFIG.helpHoldSeconds}초 누르기)`}
+      <div
+        ref={cornerRef}
+        aria-hidden
         data-testid="help-corner"
-        className="fixed left-0 top-0 z-40 h-24 w-24 opacity-0"
-        onPointerDown={startHold}
-        onPointerUp={endHold}
-        onPointerLeave={endHold}
-        onPointerCancel={endHold}
-        onContextMenu={(e) => e.preventDefault()}
+        className="pointer-events-none fixed left-0 top-0 z-40 h-24 w-24"
       />
       {open && (
         <div
