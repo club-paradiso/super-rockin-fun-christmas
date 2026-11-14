@@ -224,8 +224,15 @@ were checked, 2026-11-08).
 
 Checked 2026-11-13 from the development session: `studio-shalom.vercel.app` and
 `studio-shalom-wall.vercel.app` both answer `404 DEPLOYMENT_NOT_FOUND` (free to claim);
-`follow-the-lights.vercel.app` and `follow-the-lights-wall.vercel.app` serve production. Nothing
-below has been done yet: `STUDIO_SHALOM_DOMAINS: NOT CONFIGURED` (the session had no access to the
+`follow-the-lights.vercel.app` and `follow-the-lights-wall.vercel.app` serve production.
+
+**Done 2026-11-14: steps 1–3.** The merge (03:57 UTC) came before the migration (03:59 UTC,
+applied to Supabase project `follow-the-lights-preview`), so for about two minutes production
+could not upload, record consent, moderate or change settings; no photo was taken in that time.
+Checked afterwards over HTTP on the old addresses: the password form on `/admin/login`, the wall
+opening without enrollment in the 평화의 벽 background, 401 for cookieless staff and report calls.
+Nobody has signed in or taken a photo on production since the deploy: do that once (step 3).
+**Not done: steps 4–9** (`STUDIO_SHALOM_DOMAINS: NOT CONFIGURED`; the session had no access to the
 Vercel project).
 
 Do these **in this order**. Each step leaves the site working.
