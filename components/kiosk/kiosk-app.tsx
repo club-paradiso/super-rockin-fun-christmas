@@ -91,6 +91,7 @@ function readStoredDevice(): string | undefined {
 export function KioskApp({
   cameraMode,
   initialWallSubmissions = "open",
+  initialWallPublic = false,
   initialMode = "standard",
   staffHelp = false,
 }: {
@@ -99,6 +100,8 @@ export function KioskApp({
   initialMode?: KioskMode;
   /** From event settings at page load; refreshed by heartbeats and upload responses. */
   initialWallSubmissions?: "open" | "paused";
+  /** Staff have the public wall on (D86): the consent screen says so and sends that scope. */
+  initialWallPublic?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
 }) {
@@ -433,6 +436,8 @@ export function KioskApp({
   }, [state.sessionId]);
 
   const [wallSubmissions, setWallSubmissions] = useState(initialWallSubmissions);
+  // Public wall (D86), kept current by the heartbeat like the pause flag.
+  const [wallPublic, setWallPublic] = useState(initialWallPublic);
 
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
     if (result.wallSubmissions) setWallSubmissions(result.wallSubmissions);
@@ -569,11 +574,14 @@ export function KioskApp({
     // Stored once the photo is queued, sent when it is on the server, retried until it lands.
     // Whatever happens here never affects the guest's own download link.
     const sessionId = state.sessionId;
+    // The scope is what THIS consent screen showed: this handler belongs to the render the guest
+    // tapped, so `wallPublic` here is whether the public-wall line was on screen (D86).
+    const publicScope = consent === "yes" && wallPublic ? ("public" as const) : undefined;
     void photoQueued(sessionId)
       .done.then(() => consentRef.current)
       .then(async (c) => {
         if (!c) return;
-        await c.enqueue(sessionId, consent === "yes");
+        await c.enqueue(sessionId, consent === "yes", publicScope);
         await c.processDue(true);
         photoQueuedRef.current.delete(sessionId);
       });
@@ -753,8 +761,10 @@ export function KioskApp({
           const data = (await res.json()) as {
             wallSubmissions?: "open" | "paused";
             kioskDefaultMode?: KioskMode;
+            wallPublic?: boolean;
           };
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
+          if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
           if (data.kioskDefaultMode === "standard" || data.kioskDefaultMode === "easy")
             dispatch({ type: "SET_DEFAULT_MODE", mode: data.kioskDefaultMode });
         }
@@ -820,6 +830,7 @@ export function KioskApp({
             onToggleMode={chrome.toggleMode}
             onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
             wallSubmissionsOpen={wallSubmissions === "open"}
+            wallPublic={wallPublic}
             videoNotice={canRecordVideo}
           />
         </div>
@@ -913,6 +924,7 @@ interface ScreenProps {
   onSetLang: (lang: KioskState<Shot>["lang"]) => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
+  wallPublic: boolean;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
   videoNotice: boolean;
 }
@@ -1398,6 +1410,12 @@ function Screen(p: ScreenProps) {
             <p className="booth-lead">
               <Lines text={t.consent.lead} />
             </p>
+            {/* D86: said before the answer, at the lead's size, never in the small print. */}
+            {p.wallPublic && (
+              <p className="booth-lead" data-testid="consent-public-note">
+                {t.consent.publicNote}
+              </p>
+            )}
             {/* Equal size and weight on purpose: neither answer is the "right" one. */}
             <div className="consent-actions">
               <button

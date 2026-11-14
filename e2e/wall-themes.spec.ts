@@ -4,7 +4,7 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from "@
 import sharp from "sharp";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "../config/wall-themes";
 import { ENROLL_SECRET, PORT, USE_SUPABASE } from "./env";
-import { enrollKiosk } from "./helpers";
+import { answerForQr, enrollKiosk, shootSixWithMock, toConsent } from "./helpers";
 
 /**
  * Media-wall themes (D85) and the wall address without enrollment (D86), end to end:
@@ -357,6 +357,78 @@ for (const theme of WALL_THEMES) {
         quality: 80,
       });
     await page.context().close();
+  });
+}
+
+// The booth end of D86: the public-wall line is on the consent screen only while staff have the
+// public wall on, and a YES given under it is the only way a photo becomes public.
+for (const size of [
+  { width: 820, height: 1180 },
+  { width: 1180, height: 820 },
+]) {
+  test(`booth consent at ${size.width}x${size.height}: the public-wall line decides the scope`, async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const context = await browser.newContext({ viewport: size });
+    const page = await context.newPage();
+    await enrollKiosk(page);
+    const sessionOnScreen = async () => {
+      const short = (await page.getByTestId("session-code").textContent())!
+        .replace("세션", "")
+        .trim();
+      const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
+        photos: { sessionId: string; wallConsent: boolean; wallPublic: boolean }[];
+      };
+      return db.photos.find((p) => p.sessionId.startsWith(short))!;
+    };
+
+    // Public wall on: the line is there, both answers stay on screen at equal size.
+    await settings({ wallPublic: true });
+    await shootSixWithMock(page);
+    await toConsent(page);
+    const note = page.getByTestId("consent-public-note");
+    await expect(note).toHaveText("미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.");
+    const yes = (await page.getByTestId("consent-yes").boundingBox())!;
+    const no = (await page.getByTestId("consent-no").boundingBox())!;
+    expect(yes.width).toBeCloseTo(no.width, 0);
+    expect(yes.height).toBeCloseTo(no.height, 0);
+    for (const box of [yes, no, (await note.boundingBox())!]) {
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(size.width);
+    }
+    // The line is read before the buttons, in the lead's size, not in the small print.
+    expect((await note.boundingBox())!.y).toBeLessThan(yes.y);
+    expect(
+      await note.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+    ).toBeGreaterThanOrEqual(18);
+    if (process.env.SCREENSHOTS === "1")
+      await page.screenshot({
+        path: `docs/screenshots/tablet/${size.width}x${size.height}-07-consent-public.jpg`,
+        type: "jpeg",
+        quality: 70,
+      });
+    await answerForQr(page, "yes");
+    await expect
+      .poll(async () => (await sessionOnScreen()).wallPublic, { timeout: 20_000 })
+      .toBe(true);
+    await page.getByRole("button", { name: "다 받았어요" }).click();
+
+    // Public wall off: no line, and the same YES is for the venue wall only.
+    await settings({ wallPublic: false });
+    await shootSixWithMock(page);
+    await toConsent(page);
+    await expect(page.getByTestId("consent-public-note")).toHaveCount(0);
+    await answerForQr(page, "yes");
+    await expect
+      .poll(async () => (await sessionOnScreen()).wallConsent, { timeout: 20_000 })
+      .toBe(true);
+    expect((await sessionOnScreen()).wallPublic).toBe(false);
+    await page.getByRole("button", { name: "다 받았어요" }).click();
+    await settings({ wallPublic: true });
+    await context.close();
   });
 }
 

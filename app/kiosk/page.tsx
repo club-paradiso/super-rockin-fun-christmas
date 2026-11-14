@@ -72,6 +72,7 @@ export default async function KioskPage({
     <KioskApp
       cameraMode={cameraMode}
       initialWallSubmissions={settings.pauseSubmissions ? "paused" : "open"}
+      initialWallPublic={settings.wallPublic}
       initialMode={settings.kioskDefaultMode}
       staffHelp={getServerConfig().staffAuth?.mode === "pin"}
     />
