@@ -34,12 +34,12 @@ export function PasswordLoginForm() {
     setPassword("");
     setMessage(
       res.status === 429
-        ? "시도가 너무 많아요. 15분 뒤에 다시 해 주세요."
+        ? "시도가 너무 많아요. 15분 뒤에 다시 시도해 주세요."
         : res.status === 401
           ? "비밀번호가 맞지 않아요."
           : res.status === 0
             ? "서버에 연결하지 못했어요. 인터넷을 확인해 주세요."
-            : "로그인하지 못했어요. 잠시 후 다시 해 주세요.",
+            : "로그인하지 못했어요. 잠시 후 다시 시도해 주세요.",
     );
     input.current?.focus();
   }

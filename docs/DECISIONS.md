@@ -1278,6 +1278,34 @@ were in use. Two of the defects were functional: the invisible staff-help corner
   dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
   wide empty paper beside the preview on the frame and consent screens.
 
+## D89 · The easy screen mode is removed; the booth speaks Chinese
+
+User decision (2026-11-14): "간편 모드는 그냥 날리자. 대신 중국어를 추가하자."
+
+- **Removed (D67):** the guest's "기본 화면 / 간편 화면" switch, the staff setting 관리자 → 설정 →
+  부스 시작 화면 and `PATCH kioskDefaultMode`, `mode` / `defaultMode` / `SET_MODE` /
+  `SET_DEFAULT_MODE` / `easyStep` / `EASY_MIN_COUNTDOWN` in `lib/kiosk/machine.ts`, all `.kiosk-easy`
+  and `booth-easy-*` CSS, the easy copy, and the easy E2E specs. The booth has one screen; the idle
+  reset is one length. The footer now holds only "처음으로", and only where it makes sense.
+- **Kept on purpose (expand / contract):** the database column `event_settings.kiosk_default_mode`
+  and the `p_kiosk_default_mode` argument of `ftl_settings_update`. Code still running during a
+  deploy reads and passes them; the new code passes `null`. A later migration drops both once no
+  old code is live. The heartbeat no longer returns `kioskDefaultMode`; the old booth code ignores
+  a missing value.
+- **Chinese (Simplified, 简体中文):** `KioskLang` is `ko | en | zh`. The welcome screen has a third
+  language button "中文"; the attract screen shows the start line in all three languages. Every
+  guest string is in `lib/kiosk/copy.ts` (Claude's translation, **not yet checked by a Chinese
+  speaker**). Frames carry `labelZh`, poses `labelZh`; `localizedLabel` picks the name. The phone
+  page's button "미디어월로 보내기" stays Korean on the phone page and is quoted with its meaning,
+  as in English. The phone page and the guest download page are not translated here (not asked).
+- **Rendering:** `<html lang>` becomes `zh-Hans` (`HTML_LANG`), `@fontsource-variable/noto-sans-sc`
+  is bundled (OFL, loaded per glyph range, so the hub works offline), `:lang(zh-Hans)` puts it
+  first in `--font-sans` and turns off `word-break: keep-all` (it would stop Han text from
+  wrapping). Frame images keep their Korean/English text.
+- **Checked by:** unit (copy shape for all three languages, Han characters in every Chinese
+  string, no Korean left except the quoted phone button, frame and pose labels), E2E whole Chinese
+  session at the two iPad Air sizes in `e2e/tablet-matrix.spec.ts`, and `e2e/shalom-booth.spec.ts`.
+
 ## D90 · The macOS wall opens on the second display by itself and keeps the Mac awake
 
 Context: the media wall will run on the church's iMac, with the LED (or TV) as its second display.

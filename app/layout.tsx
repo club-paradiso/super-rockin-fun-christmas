@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
-// Bundled fonts (all OFL), so the hub works offline. Noto Sans KR: UI and frame text. Cormorant
+// Bundled fonts (all OFL), so the hub works offline. Noto Sans KR: UI and frame text. Noto Sans SC:
+// the Chinese booth screens (D89; its files load only when a Chinese glyph is drawn). Cormorant
 // Garamond (STUDIO, SHALOM) and Nanum Myeongjo (평화의 벽): the on-screen lockup only.
 import "@fontsource-variable/noto-sans-kr";
+import "@fontsource-variable/noto-sans-sc";
 import "@fontsource/cormorant-garamond/latin-500.css";
 import "@fontsource/cormorant-garamond/latin-600.css";
 import "@fontsource/nanum-myeongjo/400.css";

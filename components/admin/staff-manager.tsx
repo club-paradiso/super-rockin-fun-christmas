@@ -37,22 +37,18 @@ export function StaffManager({
 
   return (
     <section className="admin-card flex flex-col gap-4 p-4">
-      <h2 className="text-2xl font-bold">스태프</h2>
+      <h2 className="admin-h2">스태프</h2>
       <ul className="flex flex-col gap-2">
         {staff.map((m) => (
           <li
             key={m.userId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-backdrop p-3"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-backdrop p-3"
             data-testid="staff-item"
           >
             <span>
-              <strong className="text-lg">{m.displayName}</strong>{" "}
+              <strong className="text-base">{m.displayName}</strong>{" "}
               {m.email && <span className="text-ink/75">{m.email}</span>}{" "}
-              {!m.active && (
-                <span className="rounded-full bg-ink/10 px-2 py-0.5 text-sm text-ink/75">
-                  비활성
-                </span>
-              )}
+              {!m.active && <span className="admin-chip bg-ink/10 text-ink/75">비활성</span>}
             </span>
             {mode === "pin" && (
               <button
@@ -81,7 +77,7 @@ export function StaffManager({
         ))}
       </ul>
       <form
-        className="flex flex-wrap gap-2"
+        className="grid grid-cols-2 gap-2 md:flex md:flex-wrap"
         onSubmit={async (e) => {
           e.preventDefault();
           const body = mode === "pin" ? { displayName: name, pin } : { email, displayName: name };
@@ -100,7 +96,7 @@ export function StaffManager({
             placeholder="이메일"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="admin-input min-w-0 flex-1"
+            className="admin-input col-span-2 min-w-0 md:col-span-1 md:flex-1"
           />
         )}
         <input
@@ -110,7 +106,7 @@ export function StaffManager({
           maxLength={64}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="admin-input min-w-0 flex-1"
+          className={`admin-input min-w-0 md:flex-1 ${mode === "email" ? "col-span-2 md:col-span-1" : ""}`}
         />
         {mode === "pin" && (
           <input
@@ -123,14 +119,18 @@ export function StaffManager({
             placeholder="PIN 6자리"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            className="admin-input min-w-0 flex-1 tracking-[0.3em]"
+            className="admin-input min-w-0 tracking-[0.3em] placeholder:tracking-normal md:flex-1"
           />
         )}
-        <button type="submit" className="admin-btn admin-btn-primary" disabled={busy}>
+        <button
+          type="submit"
+          className="admin-btn admin-btn-primary col-span-2 md:col-span-1"
+          disabled={busy}
+        >
           스태프 추가
         </button>
       </form>
-      <p className="text-base text-ink/75">
+      <p className="admin-help">
         {mode === "pin"
           ? "추가된 사람은 로그인 화면에서 이름을 고르고 PIN을 입력해요. PIN은 본인에게 직접 알려 주세요. PIN을 바꾸면 그 사람의 기존 로그인은 바로 끊겨요."
           : "추가된 사람은 이메일로 받은 6자리 코드로 로그인해요. 비밀번호는 없어요."}

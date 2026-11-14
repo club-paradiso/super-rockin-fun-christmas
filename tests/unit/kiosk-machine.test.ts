@@ -7,7 +7,6 @@ import {
   capturedCount,
   createInitialState as attractState,
   currentPose,
-  easyStep,
   kioskReducer,
   progressStep,
   type KioskAction,
@@ -55,20 +54,6 @@ const selectFour = (frame: S, askConsent: boolean) =>
     ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     { type: "CONFIRM_SELECTION", askConsent },
   );
-
-describe("guest-facing screen mode labels", () => {
-  it("uses plain, accurate names for both modes", () => {
-    const ko = KIOSK_COPY.ko;
-    const en = KIOSK_COPY.en;
-    expect(ko.welcome.modeGroup).toBe("화면 방식");
-    expect(ko.welcome.modeStandard).toBe("기본 화면");
-    expect(ko.welcome.modeEasy).toBe("간편 화면");
-    expect(ko.chrome.toEasy).toBe("간편 화면");
-    expect(ko.chrome.toStandard).toBe("기본 화면");
-    expect(en.welcome.modeEasy).toBe("Easy view");
-    expect(en.chrome.toEasy).toBe("Easy view");
-  });
-});
 
 describe("countdown", () => {
   it("counts 3 → 2 → 1 → capturing", () => {
@@ -343,82 +328,6 @@ describe("ordered selection", () => {
   });
 });
 
-describe("easy mode (D67): same machine, fewer choices", () => {
-  const easy = () =>
-    createInitialState<string>({
-      shotCount: 6,
-      countdownSeconds: 3,
-      frameId: "navy-strip",
-      mode: "easy",
-    });
-
-  it("starts in the staff default and counts longer", () => {
-    const s = easy();
-    expect([s.mode, s.defaultMode, s.countdownSeconds]).toEqual(["easy", "easy", 5]);
-    expect(init().mode).toBe("standard");
-  });
-
-  it("goes straight to the camera (frame chosen after shooting)", () => {
-    const s = run(easy(), { type: "START", sessionId: SESSION });
-    expect(s.phase).toBe("camera");
-    expect(s.frameId).toBe("navy-strip");
-  });
-
-  it("the whole flow still needs six shots and the right number of selected photos", () => {
-    let s = run(easy(), { type: "START", sessionId: SESSION }, { type: "CAMERA_READY" });
-    s = run(s, { type: "BEGIN_SHOOTING", guide: false });
-    expect(s.remaining).toBe(5);
-    for (let i = 0; i < 6; i++) s = shoot(s, `e-${i}`);
-    expect(s.phase).toBe("review");
-    s = run(s, { type: "CONFIRM_SHOTS" });
-    expect(s.phase).toBe("frame");
-    s = run(
-      s,
-      { type: "CONFIRM_FRAME", askConsent: true },
-      { type: "CONFIRM_SELECTION", askConsent: true },
-    );
-    expect(s.phase).toBe("select"); // nothing selected: refused
-  });
-
-  it("the guest can switch at any time; a running countdown keeps its number", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false }, { type: "TICK" });
-    expect(s.remaining).toBe(2);
-    s = run(s, { type: "SET_MODE", mode: "easy" });
-    expect([s.mode, s.remaining, s.countdownSeconds]).toEqual(["easy", 2, 5]);
-    s = shoot(s, "a");
-    expect(s.remaining).toBe(5);
-    s = run(s, { type: "SET_MODE", mode: "standard" });
-    expect(s.countdownSeconds).toBe(3);
-  });
-
-  it("RESET returns the next guest to the staff default", () => {
-    let s = run(init(), { type: "SET_MODE", mode: "easy" }, { type: "START", sessionId: SESSION });
-    expect(s.phase).toBe("camera");
-    s = run(s, { type: "RESET" });
-    expect([s.mode, s.countdownSeconds, s.phase]).toEqual(["standard", 3, "attract"]);
-  });
-
-  it("a new staff default applies on the welcome screen at once, otherwise to the next guest", () => {
-    expect(run(init(), { type: "SET_DEFAULT_MODE", mode: "easy" })).toMatchObject({
-      mode: "easy",
-      defaultMode: "easy",
-      countdownSeconds: 5,
-    });
-    let s = run(toReady(), { type: "SET_DEFAULT_MODE", mode: "easy" });
-    expect([s.mode, s.defaultMode]).toEqual(["standard", "easy"]);
-    s = run(s, { type: "RESET" });
-    expect(s.mode).toBe("easy");
-  });
-
-  it("names every step in words", () => {
-    expect(easyStep("welcome", true)).toBeNull();
-    expect(easyStep("camera", true)).toMatchObject({ step: 1, label: "촬영 준비" });
-    expect(easyStep("review", true)).toMatchObject({ step: 2, label: "사진 확인" });
-    expect(easyStep("consent", true)).toMatchObject({ step: 5, total: 6 });
-    expect(easyStep("delivery", false)).toMatchObject({ step: 5, total: 5 });
-  });
-});
-
 describe("내 사진으로 참여하기 (D66) on the booth", () => {
   const READY = {
     type: "MOBILE_READY",
@@ -500,21 +409,9 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(currentPose(run(s, { type: "RETAKE_ALL" }))).toEqual(POSE_SEQUENCE[0]);
   });
 
-  it("the guide changes nothing about the countdown, in either screen mode", () => {
+  it("the guide changes nothing about the countdown", () => {
     expect(begin(true).remaining).toBe(begin(false).remaining);
-    const easy = run(
-      createInitialState<string>({
-        shotCount: 6,
-        countdownSeconds: 10,
-        frameId: "navy-strip",
-        mode: "easy",
-      }),
-      { type: "START", sessionId: SESSION },
-      { type: "CAMERA_READY" },
-    );
-    expect(easy.countdownSeconds).toBe(10); // never shorter than standard
-    const guided = run(easy, { type: "BEGIN_SHOOTING", guide: true });
-    expect([guided.remaining, currentPose(guided)]).toEqual([10, POSE_SEQUENCE[0]]);
+    expect(currentPose(begin(true))).toEqual(POSE_SEQUENCE[0]);
   });
 
   it("the choice is asked again after a camera reconnect, and RESET clears it", () => {
@@ -559,7 +456,7 @@ describe("language (D78): a view, per guest", () => {
     expect({ ...s, lang: "ko" }).toEqual(ko);
   });
 
-  it("every English string exists for every Korean one", () => {
+  it("every English and Chinese string exists for every Korean one", () => {
     const shape = (o: unknown): unknown =>
       typeof o === "function"
         ? `fn${(o as (...a: unknown[]) => unknown).length}`
@@ -569,6 +466,7 @@ describe("language (D78): a view, per guest", () => {
             ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shape(v)]))
             : typeof o;
     expect(shape(KIOSK_COPY.en)).toEqual(shape(KIOSK_COPY.ko));
+    expect(shape(KIOSK_COPY.zh)).toEqual(shape(KIOSK_COPY.ko));
     const hangul = /[\uac00-\ud7a3]/;
     const strings = (o: unknown, path = ""): [string, string][] =>
       typeof o === "string"
@@ -583,6 +481,16 @@ describe("language (D78): a view, per guest", () => {
     const allowed = new Set([".langGroup", ".mobile.steps.2"]);
     for (const [path, text] of strings(KIOSK_COPY.en))
       if (!allowed.has(path)) expect(hangul.test(text), `${path}: ${text}`).toBe(false);
+    // The Chinese screens are Chinese, not English: every string has Han characters, except
+    // where it names something on purpose (the event name, the language picker's label).
+    const han = /\p{Script=Han}/u;
+    const notChinese = new Set([".attract.event", ".langGroup"]);
+    for (const [path, text] of strings(KIOSK_COPY.zh))
+      if (!notChinese.has(path)) {
+        expect(han.test(text), `${path}: ${text}`).toBe(true);
+        // No Korean either, except the phone page's button, quoted with its Chinese meaning.
+        if (path !== ".mobile.steps.2") expect(hangul.test(text), `${path}: ${text}`).toBe(false);
+      }
   });
 });
 
@@ -594,18 +502,10 @@ describe("back (D78): one step, never losing what the guest made", () => {
     expect([back.phase, back.sessionId]).toEqual(["welcome", ""]);
   });
 
-  it("camera before the first shot → frame pick (easy mode: welcome)", () => {
+  it("camera before the first shot → frame pick", () => {
     const s = toReady();
     expect(canGoBack(s)).toBe(true);
     expect(run(s, { type: "BACK" }).phase).toBe("pick");
-    const easy = run(
-      init(),
-      { type: "SET_MODE", mode: "easy" },
-      { type: "START", sessionId: SESSION },
-      { type: "CAMERA_READY" },
-    );
-    expect(easy.phase).toBe("ready");
-    expect(run(easy, { type: "BACK" }).phase).toBe("welcome");
   });
 
   it("not once a shot exists, not while shooting, not after the frame is final", () => {
@@ -661,16 +561,11 @@ describe("attract screen (D80): 화면을 눌러 시작", () => {
   it("has no step, no back and no progress", () => {
     expect(canGoBack(fresh())).toBe(false);
     expect(progressStep("attract", true)).toBeNull();
-    expect(easyStep("attract", true)).toBeNull();
   });
 
-  it("a new staff default applies on the attract screen at once", () => {
-    const s = run(fresh(), { type: "SET_DEFAULT_MODE", mode: "easy" });
-    expect([s.phase, s.mode, s.defaultMode]).toEqual(["attract", "easy", "easy"]);
-  });
-
-  it("the attract copy exists in both languages", () => {
+  it("the attract copy exists in all three languages", () => {
     expect(KIOSK_COPY.ko.attract.start).toBe("화면을 눌러 시작");
     expect(KIOSK_COPY.en.attract.start).not.toMatch(/[가-힣]/);
+    expect(KIOSK_COPY.zh.attract.start).toMatch(/\p{Script=Han}/u);
   });
 });
