@@ -1390,3 +1390,35 @@ media wall and a half-life for photos on it.
 - **Not changed**: which photos may be shown (moderation, consent, `wall_public`), enter and exit
   animations (1.5 s each), the 60 s cooldown, the 5 s poll.
 - **Not verified**: how any of this feels on the real LED with real numbers of photos.
+
+## D93 · Phone photos go into the booth's frames
+
+User request (2026-11-14): "내 사진으로 참여하기" sent one bare photo, while the booth puts its
+photos in a frame. "내 사진에서 올리는거는 템플릿 적용하는게 없어. 빨랑 고쳐", and both more
+photos and a frame are fine.
+
+- **The phone does what the booth does.** The guest picks 1 to 6 photos (`MOBILE_UPLOAD_CONFIG.
+maxPhotos`; more are cut to the first six and the page says so), chooses one of the current booth
+  frames for that many photos (`mobileFramesFor`, picker order; the first is preselected, and with
+  one frame for that count there is nothing to choose), can cycle the photo order, and sees the
+  composed picture before consenting. Composition is `composeFrame` with the same frame data, fonts
+  and pictures, at `KIOSK_CONFIG.outputScale`: preview = result. Every picked photo is shrunk to
+  `sourceLongEdge` as soon as it is decoded so six camera photos never sit in memory at once.
+- **Still one picture per QR.** The upload is the composite, one photo row, the QR's session id.
+  Nothing else about D66 changes: consent, PENDING, human moderation, no guest link, no video.
+- **The frame is in the stored id**: `phone-<booth frame id>` (no schema change; the
+  `^[a-z0-9-]{1,64}$` check holds and no booth frame id starts with `phone-` or is `photo`, a unit
+  test checks both). `isMobilePhoto` is now a prefix test; the hub inbox lists by prefix
+  (`frameIdPrefix`) and the cloud's inbox list carries `frameId` down to the hub. A frame id the hub
+  does not know is taken in as `phone-photo` rather than refused.
+- **The server checks it**: `x-frame-id` must be a current booth frame (not retired), and the
+  re-encoded picture must have that frame's proportions within 1 %, else `400 frame`. A framed
+  picture is kept at up to `framedLongEdge` (3600, the strip at 2×) instead of the plain 2048.
+  No header = a page from before D93: stored as `phone-photo`, exactly as before.
+- **Wall and staff**: a framed phone photo hangs in its frame's box like a booth photo
+  (`framedPhotoFrame`); only `phone-photo` keeps the card. Staff see "휴대폰 사진 · <frame name>".
+- **Booth copy**: step 2 of the QR screen now says "열린 화면에서 사진을 1~6장 고르고 틀을 골라요" (English and Chinese to match).
+  Written by Claude, pending the user's wording (D76), like the new phone-page lines.
+
+Not verified: composing a 1200 × 3600 picture on a real iPhone/Android (memory, time), HEIC from a
+multi-photo pick on iOS Safari, and the photo order control with real guests.

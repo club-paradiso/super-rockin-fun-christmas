@@ -44,15 +44,15 @@ async function phone(browser: Browser) {
   return context.newPage();
 }
 
-async function photoFile(width: number, height: number) {
+async function photoFile(width: number, height: number, name = "IMG_2026.jpg", r = 220) {
   const buffer = await sharp({
-    create: { width, height, channels: 3, background: { r: 220, g: 120, b: 60 } },
+    create: { width, height, channels: 3, background: { r, g: 120, b: 60 } },
   })
     .jpeg({ quality: 88 })
     .withMetadata({ orientation: 1 })
     .withExifMerge({ IFD3: { GPSLatitudeRef: "N", GPSLatitude: "33/1 30/1 0/1" } })
     .toBuffer();
-  return { name: "IMG_2026.jpg", mimeType: "image/jpeg", buffer };
+  return { name, mimeType: "image/jpeg", buffer };
 }
 
 const db = async () =>
@@ -81,7 +81,7 @@ test("welcome: two clear choices and a language switch", async () => {
   await expect(kiosk.getByTestId("lang-ko")).toHaveAttribute("aria-checked", "true");
 });
 
-test("내 사진으로 참여하기: QR → phone → booth sees it → staff approve → wall card", async ({
+test("내 사진으로 참여하기: QR → phone → booth sees it → staff approve → wall hangs its frame", async ({
   browser,
 }) => {
   await openWelcome(kiosk);
@@ -99,9 +99,10 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
   await guest.getByTestId("mobile-file").setInputFiles(await photoFile(1600, 1200));
   await expect(guest.getByTestId("mobile-preview")).toBeVisible();
+  // One photo: the one booth frame that holds one (D93), so no frame choice to make.
+  await expect(guest.getByTestId("mobile-frames")).toHaveCount(0);
   // Nothing goes anywhere without the guest's explicit consent.
   await expect(guest.getByTestId("mobile-submit")).toBeDisabled();
-  await guest.getByRole("button", { name: "정사각형" }).click();
   await guest.getByTestId("mobile-consent").check();
   await guest.getByTestId("mobile-submit").click();
   await expect(guest.getByTestId("mobile-done")).toBeVisible();
@@ -112,7 +113,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
 
   await expect(kiosk.getByTestId("mobile-received")).toBeVisible({ timeout: 15_000 });
   const row = (await db()).photos.find((p) => p.sessionId === sessionId)!;
-  expect(row).toMatchObject({ frameId: "phone-photo", moderationStatus: "PENDING" });
+  expect(row).toMatchObject({ frameId: "phone-shalom-single", moderationStatus: "PENDING" });
 
   // The same QR again: the page knows the photo was sent and offers no second upload.
   await guest.reload();
@@ -123,10 +124,11 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const card = staff.locator(`[data-photo-id="${row.id}"]`);
   await expect(card).toHaveAttribute("data-source", "mobile");
   await expect(card.getByTestId("photo-source")).toHaveText("휴대폰 사진");
+  await expect(card).toContainText("휴대폰 사진 · 한 장");
   await card.getByTestId("action-approve").click();
   await expect(card).toHaveCount(0);
 
-  // The wall: an enrolled display, the approved phone photo hangs as a card.
+  // The wall: an enrolled display, the approved phone photo hangs in its booth frame (D93).
   const wall = await newPage(browser);
   await wall.goto("/kiosk/enroll?next=wall");
   await wall.getByLabel("등록 코드").fill(await createEnrollmentCode(staff, "2.0 미디어월"));
@@ -136,11 +138,12 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
     photos: { id: string; frameId: string }[];
   };
   expect(feed.photos).toContainEqual(
-    expect.objectContaining({ id: row.id, frameId: "phone-photo" }),
+    expect.objectContaining({ id: row.id, frameId: "phone-shalom-single" }),
   );
-  await expect(wall.locator(`[data-photo-id="${row.id}"][data-kind="phone"]`)).toBeVisible({
-    timeout: 45_000,
-  });
+  const hung = wall.locator(`[data-photo-id="${row.id}"]`);
+  await expect(hung).toBeVisible({ timeout: 45_000 });
+  // Not the plain-photo card: it hangs like the booth's 한 장 frame.
+  await expect(hung).not.toHaveAttribute("data-kind", "phone");
 
   // Deleted on the hub: gone from the feed, and the QR cannot bring it back.
   await staff.goto(`/admin/photos?window=1h`);
@@ -157,6 +160,57 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   await expect(reopened.getByTestId("mobile-expired")).toBeVisible();
   await reopened.context().close();
   await wall.context().close();
+});
+
+test("several phone photos go into the frame the guest picks, at the booth's saved size", async ({
+  browser,
+}) => {
+  await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
+  await kiosk.getByTestId("start-mobile").click();
+  const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
+  const sessionId = sessionOf(url);
+
+  const guest = await phone(browser);
+  await guest.goto(url);
+  const files = await Promise.all(
+    [0, 1, 2, 3].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 40 + i * 50)),
+  );
+  await guest.getByTestId("mobile-file").setInputFiles(files);
+  await expect(guest.getByTestId("mobile-preview")).toBeVisible();
+  // Four photos: every booth frame for four, the 2×2 first as on the booth.
+  const frames = guest.getByTestId("mobile-frames").getByRole("radio");
+  await expect(frames.first()).toHaveAttribute("data-frame-id", "shalom-grid");
+  await expect(frames.first()).toHaveAttribute("aria-checked", "true");
+  expect(await frames.count()).toBeGreaterThanOrEqual(2);
+  await guest.locator('[data-frame-id="shalom-letter"]').click();
+  await expect(guest.locator('[data-frame-id="shalom-letter"]')).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  // The preview is the picture that will be sent: the letter strip's 1:3 shape.
+  await expect
+    .poll(
+      async () =>
+        guest.getByTestId("mobile-preview").evaluate((img: HTMLImageElement) => {
+          return img.naturalWidth && img.naturalHeight / img.naturalWidth;
+        }),
+      // Composing a 1200 × 3600 picture takes a moment on a phone.
+      { timeout: 15_000 },
+    )
+    .toBe(3);
+  await guest.getByTestId("mobile-reorder").click();
+  await guest.getByTestId("mobile-consent").check();
+  await guest.getByTestId("mobile-submit").click();
+  await expect(guest.getByTestId("mobile-done")).toBeVisible();
+  await guest.context().close();
+
+  await expect(kiosk.getByTestId("mobile-received")).toBeVisible({ timeout: 15_000 });
+  const row = (await db()).photos.find((p) => p.sessionId === sessionId)!;
+  expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+  const stored = (row as unknown as { objectPath: string }).objectPath;
+  const meta = await sharp(await readFile(`.data-e2e/objects/${stored}`)).metadata();
+  expect([meta.width, meta.height]).toEqual([1200, 3600]);
 });
 
 test("staff pages on a phone: no sideways scrolling, big touch targets", async ({ browser }) => {

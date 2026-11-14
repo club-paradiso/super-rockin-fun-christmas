@@ -193,6 +193,7 @@ export class MemoryPhotoRepository implements PhotoRepository {
           (!f.kioskId || r.kioskId === f.kioskId) &&
           (!f.kioskless || r.kioskId === null) &&
           (!f.frameId || r.frameId === f.frameId) &&
+          (!f.frameIdPrefix || r.frameId.startsWith(f.frameIdPrefix)) &&
           (!f.sessionShort || r.sessionId.startsWith(f.sessionShort.toLowerCase())),
       )
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1) * (f.oldestFirst ? -1 : 1))

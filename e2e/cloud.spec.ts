@@ -263,7 +263,7 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
       },
       { timeout: 30_000 },
     )
-    .toBe("phone-photo/PENDING/true");
+    .toBe("phone-shalom-single/PENDING/true");
   // The cloud keeps nothing once the hub has it.
   await expect
     .poll(async () => (await cloudRow(sessionId))?.moderationStatus, { timeout: 30_000 })
