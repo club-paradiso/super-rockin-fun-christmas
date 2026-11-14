@@ -9,7 +9,7 @@ import { BrandWordmark } from "@/components/brand";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "운영 · STUDIO SHALOM",
+  title: "Admin · STUDIO SHALOM",
   robots: { index: false, follow: false },
   // No per-page "no-referrer": it makes browsers send `Origin: null` on POSTs, and older Safari
   // (no Sec-Fetch-Site) would then fail the CSRF check. The global policy is "same-origin".
@@ -41,11 +41,15 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       )}
       {/* The top bar scrolls away; only the tabs stay (a phone has no height to spare). */}
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 pt-3 pb-1">
-        <Link href="/admin" aria-label="STUDIO SHALOM 운영" className="flex items-baseline gap-2">
-          <BrandWordmark className="text-[16px]" />
-          <span className="text-sm font-semibold text-ink/75">운영</span>
+        <Link
+          href="/admin"
+          aria-label="STUDIO SHALOM Admin"
+          className="flex items-baseline gap-1.5"
+        >
+          <BrandWordmark className="text-[15px]" />
+          <span className="text-[13px] font-semibold text-ink/75">Admin</span>
         </Link>
-        <div className="flex items-center gap-1 text-[13px] text-ink/75">
+        <div className="flex items-center gap-1 text-xs text-ink/75">
           <span data-testid="staff-name">{auth.staff.displayName}</span>
           <form method="post" action="/api/admin/auth/signout">
             <button
