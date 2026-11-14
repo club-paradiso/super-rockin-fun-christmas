@@ -28,6 +28,8 @@ export interface WallSchedule {
    * number is the most overdue; with equal shares this is plain round-robin. Eligible photos only.
    */
   turns?: Record<string, number>;
+  /** The `sharesKey` the turns were counted under. */
+  sharesKey?: string | number;
 }
 
 export function emptySchedule(slotCount: number, now = 0): WallSchedule {
@@ -53,6 +55,11 @@ export interface StepInput {
    * `ageWeight`). A photo with half the share is picked half as often. Absent = all equal.
    */
   weights?: ReadonlyMap<string, number>;
+  /**
+   * Identifies the rule behind `weights` (the half-life). When it changes, the turns counted so
+   * far are dropped: counts made under one half-life must not decide the order under another.
+   */
+  sharesKey?: string | number;
 }
 
 export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedule {
@@ -60,8 +67,11 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
   const allowed = new Set(eligible);
   const lastShown: Record<string, number> = {};
   for (const [id, at] of Object.entries(state.lastShown)) if (allowed.has(id)) lastShown[id] = at;
+  // Turns are only counted while shares are in force, and only under one rule at a time. With
+  // no shares the wall is back to "the one that has rested longest", with no memory of them.
   const turns: Record<string, number> = {};
-  for (const [id, n] of Object.entries(state.turns ?? {})) if (allowed.has(id)) turns[id] = n;
+  if (input.weights && state.sharesKey === input.sharesKey)
+    for (const [id, n] of Object.entries(state.turns ?? {})) if (allowed.has(id)) turns[id] = n;
 
   const empty = (): WallSlot => ({ photoId: null, phase: null, since: now });
   const slots = state.slots.map((slot): WallSlot => {
@@ -84,16 +94,18 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
   const free = slots.findIndex((s) => !s.photoId);
   if (free >= 0) {
     const next = pickNext({ ...input, slots, lastShown, turns });
-    if (next) {
-      slots[free] = { photoId: next, phase: "ENTER", since: now };
+    if (next) slots[free] = { photoId: next, phase: "ENTER", since: now };
+    if (next && input.weights) {
       // A photo new to the count starts level with the least-shown one, not at zero: it must
       // not get a burst of turns to "catch up" with photos that were here all along.
       const floor = Math.min(...Object.values(turns), Infinity);
       const start = Math.max(turns[next] ?? 0, Number.isFinite(floor) ? floor : 0);
-      turns[next] = start + 1 / Math.max(input.weights?.get(next) ?? 1, 1e-12);
+      turns[next] = start + 1 / Math.max(input.weights.get(next) ?? 1, 1e-12);
     }
   }
-  return { slots, lastShown, turns };
+  return input.weights
+    ? { slots, lastShown, turns, sharesKey: input.sharesKey }
+    : { slots, lastShown };
 }
 
 /**
@@ -144,8 +156,12 @@ function pickNext(
   for (const id of candidates) {
     const at = lastShown[id]!;
     if (now - at < timings.cooldownMs) continue;
-    const d = best === null ? -1 : (turns[id] ?? 0) - (turns[best] ?? 0);
-    if (d < -1e-9 || (Math.abs(d) <= 1e-9 && at < lastShown[best!]!)) best = id;
+    if (best === null) {
+      best = id;
+      continue;
+    }
+    const d = input.weights ? (turns[id] ?? 0) - (turns[best] ?? 0) : 0;
+    if (d < -1e-9 || (Math.abs(d) <= 1e-9 && at < lastShown[best]!)) best = id;
   }
   return best;
 }

@@ -337,6 +337,7 @@ export function WallApp({
           timings: { ...WALL_CONFIG, visibleMs: latest.current.visibleMs },
           ordering: latest.current.ordering,
           showNow: latest.current.showNow,
+          sharesKey: latest.current.halfLifeMs,
           weights: latest.current.halfLifeMs
             ? new Map(
                 [...latest.current.taken].map(([id, at]) => [

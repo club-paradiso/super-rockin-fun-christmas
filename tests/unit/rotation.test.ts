@@ -185,6 +185,38 @@ describe("half-life (D89)", () => {
     expect(Math.abs(late - a)).toBeLessThanOrEqual(1);
   });
 
+  it("switching the half-life off, or changing it, forgets the turns counted under it", () => {
+    const T2: WallTimings = { enterMs: 1000, visibleMs: 5000, exitMs: 1000, cooldownMs: 10_000 };
+    const ids = ["a", "b", "c", "d", "e", "old"];
+    // "old" is ten half-lives behind the others.
+    const weights = new Map(ids.map((id) => [id, id === "old" ? 2 ** -10 : 1]));
+    const after = (second: { weights?: Map<string, number>; sharesKey?: number }) => {
+      let s: WallSchedule = emptySchedule(1);
+      const shown = new Map(ids.map((id) => [id, 0]));
+      for (let now = 0; now <= 62 * 60_000; now += 1000) {
+        const first = now < 2 * 60_000;
+        const next = stepSchedule(s, {
+          now,
+          eligible: ids,
+          ready: new Set(ids),
+          timings: T2,
+          ordering: "newest",
+          ...(first ? { weights, sharesKey: 10 } : second),
+        });
+        const id = next.slots[0]!.photoId;
+        if (!first && id && id !== s.slots[0]!.photoId) shown.set(id, shown.get(id)! + 1);
+        s = next;
+      }
+      return ids.map((id) => shown.get(id)!);
+    };
+    // Off: every photo, the old one included, gets the same number of turns again at once.
+    const off = after({});
+    expect(Math.max(...off) - Math.min(...off)).toBeLessThanOrEqual(1);
+    // A different half-life under which all six are equal: the same.
+    const changed = after({ weights: new Map(ids.map((id) => [id, 1])), sharesKey: 600 });
+    expect(Math.max(...changed) - Math.min(...changed)).toBeLessThanOrEqual(1);
+  });
+
   it("the time a photo stays up follows the timing it is given", () => {
     const stay = (visibleMs: number) => {
       let s: WallSchedule = emptySchedule(1);
