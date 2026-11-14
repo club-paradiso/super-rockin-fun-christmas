@@ -36,7 +36,9 @@ const SOURCES = [
   { file: "s04.jpg", id: "bethlehem", top: 100, board: 778 },
   { file: "c01.jpg", id: "sunset-window", top: 0 },
   { file: "c02.jpg", id: "pastel-coast", top: 0 },
-  { file: "c03.jpg", id: "festive-lights", top: 0 },
+  // c03 was replaced (2026-11-14) by a 3:1 repaint (one door knob), 4× upscaled to 8720 × 2884;
+  // saved as c03.jpg it scales to 3840 × 1270 and is cut 100 px from the top.
+  { file: "c03.jpg", id: "festive-lights", top: 100 },
   { file: "c04.jpg", id: "winter-sea", top: 0 },
 ];
 
