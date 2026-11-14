@@ -104,6 +104,8 @@ export interface FrameDefinition {
   label: string;
   /** The same label for the English booth screens. */
   labelEn: string;
+  /** The same label for the Chinese (Simplified) booth screens (D89). */
+  labelZh: string;
   outputWidth: number;
   outputHeight: number;
   background: FrameBackground;

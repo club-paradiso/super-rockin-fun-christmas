@@ -557,22 +557,6 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       });
     });
 
-    it("booth start mode (D67): defaults to standard, stored, audited, left alone otherwise", async () => {
-      const { backend, staffId } = await setup();
-      const before = await backend.settings.get();
-      expect(["standard", "easy"]).toContain(before.kioskDefaultMode);
-      const s = await backend.settings.update({ kioskDefaultMode: "easy" }, staffId);
-      expect(s.kioskDefaultMode).toBe("easy");
-      expect(await backend.settings.update({ pauseWall: false }, staffId)).toMatchObject({
-        kioskDefaultMode: "easy",
-      });
-      const back = await backend.settings.update({ kioskDefaultMode: "standard" }, staffId);
-      expect(back.kioskDefaultMode).toBe("standard");
-      const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
-      expect(JSON.parse(last!.fromState!)).toMatchObject({ kiosk_default_mode: "easy" });
-      expect(JSON.parse(last!.toState!)).toMatchObject({ kiosk_default_mode: "standard" });
-    });
-
     it("staff allowlist add / deactivate / reactivate are audited", async () => {
       const { backend, staffId, newUser } = await setup();
       const u = await newUser();

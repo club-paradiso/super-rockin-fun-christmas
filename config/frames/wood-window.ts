@@ -17,6 +17,7 @@ export const woodWindow: FrameDefinition = {
   name: "Wood Window",
   label: "창틀",
   labelEn: "Window",
+  labelZh: "木窗",
   outputWidth: STRIP.width,
   outputHeight: STRIP.height,
   background: { type: "solid", color: "#a9774a" },

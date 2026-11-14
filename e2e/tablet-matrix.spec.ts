@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { KIOSK_COPY } from "../lib/kiosk/copy";
 import { SHOOT_TIMEOUT, enrollKiosk } from "./helpers";
 
 /**
@@ -213,8 +214,10 @@ async function expectSoundLayout(page: Page, screen: string, { fits = true } = {
 }
 
 /** One whole session, checked at every screen. */
-async function walkSession(page: Page, { easy = false } = {}) {
-  const at = (screen: string) => expectSoundLayout(page, `${easy ? "easy · " : ""}${screen}`);
+async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } = {}) {
+  const copy = KIOSK_COPY[lang];
+  const at = (screen: string) =>
+    expectSoundLayout(page, `${lang === "zh" ? "中文 · " : ""}${screen}`);
 
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("screen-attract")).toBeVisible();
@@ -225,15 +228,12 @@ async function walkSession(page: Page, { easy = false } = {}) {
   await at("welcome");
   await page.getByTestId("lang-en").click();
   await at("welcome (English)");
-  await page.getByTestId("lang-ko").click();
-  if (easy) {
-    await page.getByTestId("mode-easy").click();
-    await at("welcome");
-  }
+  await page.getByTestId("lang-zh").click();
+  await at("welcome (中文)");
+  await page.getByTestId(`lang-${lang}`).click();
 
   await page.getByTestId("start-camera").click();
-  if (!easy) {
-    // Easy mode goes straight to the camera; the frame is chosen after shooting.
+  {
     await expect(page.getByTestId("screen-pick")).toBeVisible();
     // "이전" sits in the top left corner, where staff hold for help: a tap there is still "이전".
     await page.getByTestId("go-back").click();
@@ -244,7 +244,7 @@ async function walkSession(page: Page, { easy = false } = {}) {
     // Every frame is on screen at once: none hidden in a scrolling list.
     for (const tile of await page.getByTestId("frame-options").getByRole("button").all())
       await expect(tile).toBeInViewport({ ratio: 1 });
-    await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+    await page.getByRole("button", { name: copy.frame.pickConfirm }).click();
   }
 
   await expect(page.getByTestId("screen-ready")).toBeVisible();
@@ -264,9 +264,11 @@ async function walkSession(page: Page, { easy = false } = {}) {
   for (let i = 0; i < 6; i++)
     await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
   await at("review");
-  await expect(page.getByRole("button", { name: "이대로 좋아요" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: copy.review.confirm })).toBeInViewport({
+    ratio: 1,
+  });
 
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
+  await page.getByRole("button", { name: copy.review.confirm }).click();
   await expect(page.getByTestId("screen-frame")).toBeVisible();
   await expect(page.getByTestId("frame-preview-image")).toBeVisible();
   await at("frame, with the photos");
@@ -277,7 +279,7 @@ async function walkSession(page: Page, { easy = false } = {}) {
     await at(`frame ${frame}`);
   }
 
-  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await page.getByRole("button", { name: copy.frame.againConfirm }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
   await at("photo selection");
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
@@ -300,9 +302,9 @@ async function walkSession(page: Page, { easy = false } = {}) {
   await expect(page.getByTestId("qr-code").locator("svg")).toBeVisible();
   await at("QR");
   await expect(page.getByTestId("qr-code")).toBeInViewport({ ratio: 1 });
-  await expect(page.getByRole("button", { name: "다 받았어요" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: copy.delivery.done })).toBeInViewport({ ratio: 1 });
 
-  await page.getByRole("button", { name: "다 받았어요" }).click();
+  await page.getByRole("button", { name: copy.delivery.done }).click();
   await expect(page.getByTestId("screen-attract")).toBeVisible();
 }
 
@@ -321,12 +323,10 @@ for (const viewport of MATRIX) {
 }
 
 for (const viewport of [MATRIX[0]!, MATRIX[1]!]) {
-  test(`${viewport.width}×${viewport.height} easy mode: larger type, the same sound layout`, async ({
-    page,
-  }) => {
+  test(`${viewport.width}×${viewport.height} Chinese: the same sound layout`, async ({ page }) => {
     test.setTimeout(150_000);
     await page.setViewportSize(viewport);
-    await walkSession(page, { easy: true });
+    await walkSession(page, { lang: "zh" });
   });
 }
 
@@ -421,9 +421,9 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
   ).toBe(0);
   await expect(page.getByTestId("scroll-hint")).toBeVisible();
   // Playwright scrolls the booth's area to reach the switch at the bottom, as a finger would.
-  await page.getByTestId("mode-easy").click();
-  await expect(page.locator("main")).toHaveAttribute("data-mode", "easy");
-  await expect(page.getByTestId("mode-easy")).toBeInViewport({ ratio: 1 });
+  await page.getByTestId("lang-zh").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByTestId("lang-zh")).toBeInViewport({ ratio: 1 });
 
   // A new screen starts at its top, whatever the last one was scrolled to.
   await page.getByTestId("start-camera").click();

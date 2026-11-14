@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { BrandLockup, BrandWordmark } from "@/components/brand";
-import type { EasyStepKey } from "@/lib/kiosk/copy";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 
 export { BrandLockup, BrandWordmark };
@@ -68,30 +67,6 @@ export function Stepper({ step, total }: { step: number; total: number }) {
   );
 }
 
-/** Easy mode: "2 / 6단계 · 사진 확인" in words, large, with a progress bar. */
-export function EasyStep({
-  step,
-  total,
-  stepKey,
-}: {
-  step: number;
-  total: number;
-  stepKey: EasyStepKey;
-}) {
-  const t = useKioskCopy();
-  return (
-    <div className="booth-easy-step" data-testid="easy-step">
-      <p className="booth-easy-step-label">
-        <span className="text-accent">{t.steps.easy(step)}</span> · {t.steps.labels[stepKey]}
-        <span className="sr-only"> ({t.steps.of(step, total)})</span>
-      </p>
-      <div className="booth-easy-step-bar" aria-hidden>
-        <div className="h-full bg-button" style={{ width: `${(step / total) * 100}%` }} />
-      </div>
-    </div>
-  );
-}
-
 /**
  * One booth screen: header (way back, wordmark, progress), the letter sheet, footer. The sheet
  * takes the height that is left; `className` lays out what is on it (see "Screens" in
@@ -118,9 +93,8 @@ export function BoothScreen({
   onClick?: () => void;
 }) {
   const chrome = useKioskChrome();
-  const easy = chrome?.mode === "easy";
   const back = chrome?.goBack ?? null;
-  const showHeader = header && (progress || back || (easy && chrome?.easyStep));
+  const showHeader = header && (progress || back);
   return (
     <section
       data-testid={testId}
@@ -128,15 +102,13 @@ export function BoothScreen({
       onClick={onClick}
     >
       {showHeader && (
-        <header
-          className={`booth-header ${easy ? "booth-header-easy" : ""} ${back ? "booth-header-back" : ""}`}
-        >
+        <header className={`booth-header ${back ? "booth-header-back" : ""}`}>
           <div className="booth-header-left">
             {/* One step back, where nothing the guest made is lost (D78). */}
             {back && (
               <button
                 type="button"
-                className={`booth-chrome-btn ${easy ? "booth-chrome-btn-easy" : ""}`}
+                className="booth-chrome-btn"
                 onClick={back}
                 data-testid="go-back"
               >
@@ -145,15 +117,7 @@ export function BoothScreen({
             )}
             <BrandWordmark className="booth-wordmark" />
           </div>
-          {easy && chrome?.easyStep ? (
-            <EasyStep
-              step={chrome.easyStep.step}
-              total={chrome.easyStep.total}
-              stepKey={chrome.easyStep.key}
-            />
-          ) : (
-            progress && <Stepper step={progress.step} total={progress.total} />
-          )}
+          {progress && <Stepper step={progress.step} total={progress.total} />}
         </header>
       )}
       <LetterSheet seal={seal} className={className}>

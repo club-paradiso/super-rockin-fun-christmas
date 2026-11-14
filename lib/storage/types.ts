@@ -264,13 +264,6 @@ export interface WallHours {
 /** Staff override of the opening hours: follow them, or keep the wall on / off for now. */
 export type WallForce = "auto" | "on" | "off";
 
-/**
- * How the booth starts for each new guest (D67). "easy" = larger type, higher contrast, fewer
- * choices per screen. Guests can switch either way at any time; this is only the default.
- */
-export const KIOSK_MODES = ["standard", "easy"] as const;
-export type KioskMode = (typeof KIOSK_MODES)[number];
-
 export interface EventSettings {
   pauseSubmissions: boolean;
   pauseWall: boolean;
@@ -278,8 +271,6 @@ export interface EventSettings {
   /** Null = no opening hours: the wall is on whenever it is switched on. */
   wallHours: WallHours | null;
   wallForce: WallForce;
-  /** Booth start mode for each new guest (D67). */
-  kioskDefaultMode: KioskMode;
   /**
    * Public media wall (D86). On: the booth tells guests the wall is also shown at its web
    * address, their consent is recorded with that scope, and anyone opening the wall address
@@ -300,7 +291,6 @@ export type SettingsPatch = Partial<
     | "showHoldingScreen"
     | "wallHours"
     | "wallForce"
-    | "kioskDefaultMode"
     | "wallPublic"
     | "wallLook"
   >

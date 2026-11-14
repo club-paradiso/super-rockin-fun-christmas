@@ -3,12 +3,7 @@ import { NO_STORE, jsonError } from "@/lib/server/http";
 import { logEvent } from "@/lib/server/log";
 import { readJson, staffRoute } from "@/lib/server/staff-route";
 import { getBackend } from "@/lib/storage/server";
-import {
-  KIOSK_MODES,
-  type KioskMode,
-  type SettingsPatch,
-  type WallForce,
-} from "@/lib/storage/types";
+import type { SettingsPatch, WallForce } from "@/lib/storage/types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { isValidHours } from "@/lib/wall/hours";
 import { ROTATE_MINUTES, normalizeLook, type WallLook } from "@/lib/wall/themes";
@@ -25,7 +20,7 @@ export const GET = staffRoute("admin_settings", async () =>
 /**
  * POST any of {"pauseSubmissions","pauseWall","showHoldingScreen"} as booleans,
  * "wallForce": "auto" | "on" | "off", "wallHours": {"start":"HH:MM","end":"HH:MM"} | null,
- * "kioskDefaultMode": "standard" | "easy" (D67), "wallPublic": boolean (D86),
+ * "wallPublic": boolean (D86),
  * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85). Audited.
  * pauseSubmissions stops NEW media-wall submissions only; photography and QR delivery continue.
  */
@@ -42,11 +37,6 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
     if (!FORCES.includes(body.wallForce as WallForce))
       return jsonError(400, "wallForce must be auto, on or off");
     patch.wallForce = body.wallForce as WallForce;
-  }
-  if (body && "kioskDefaultMode" in body) {
-    if (!KIOSK_MODES.includes(body.kioskDefaultMode as KioskMode))
-      return jsonError(400, "kioskDefaultMode must be standard or easy");
-    patch.kioskDefaultMode = body.kioskDefaultMode as KioskMode;
   }
   if (body && "wallHours" in body) {
     if (body.wallHours !== null && !isValidHours(body.wallHours))

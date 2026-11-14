@@ -1,8 +1,7 @@
 import type { CameraErrorKind } from "@/lib/camera/types";
 import { getFrame } from "@/config/frames";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
-import type { KioskMode } from "@/lib/storage/types";
-import type { EasyStepKey, KioskLang } from "@/lib/kiosk/copy";
+import type { KioskLang } from "@/lib/kiosk/copy";
 
 /**
  * Pure kiosk session state machine. No timers, no camera, no DOM: the KioskApp component runs
@@ -20,19 +19,19 @@ import type { EasyStepKey, KioskLang } from "@/lib/kiosk/copy";
  * Release 2.0:
  *  - welcome → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
  *    waits for the photo; no camera, no upload from the booth itself.
- *  - Easy mode (D67) is the same machine with fewer choices: START skips the frame pick before
- *    shooting (the frame is chosen afterwards, with the guest's own photos), and every countdown
- *    is at least EASY_MIN_COUNTDOWN. The mode is per guest: RESET returns to the staff default.
  *  - Pose guide (D71): on the ready screen the guest chooses free poses or recommended ones
  *    (BEGIN_SHOOTING guide). It only changes what is shown during the countdown (currentPose);
- *    the shots, countdown and every later step are the same, in both screen modes.
+ *    the shots, countdown and every later step are the same.
  *
  * STUDIO SHALOM booth flow (D78):
- *  - Language: the guest picks Korean or English on the welcome screen (SET_LANG). A view, like
- *    the screen mode: no rule changes with it. Every new guest starts in Korean (RESET).
+ *  - Language: the guest picks Korean, English or Chinese on the welcome screen (SET_LANG). A
+ *    view: no rule changes with it. Every new guest starts in Korean (RESET).
  *  - Back: one step back where nothing is lost (canGoBack): frame pick → welcome, the camera
- *    before the first shot → frame pick (easy mode: welcome), photo selection → frame. Never once
- *    the frame is final: the upload has already started then.
+ *    before the first shot → frame pick, photo selection → frame. Never once the frame is final:
+ *    the upload has already started then.
+ *
+ * D89: the easy screen mode (D67) is gone. There is one booth screen; the guest's only per-guest
+ * choice besides the language is the pose guide.
  */
 
 export type KioskPhase =
@@ -72,20 +71,12 @@ export type MobileState =
   /** offline: no internet for the cloud QR; paused: staff paused submissions. */
   | { status: "failed"; reason: "offline" | "paused" | "error" };
 
-/**
- * Easy mode never counts fewer seconds than this, and never fewer than the standard countdown
- * (D71: the standard countdown is 10 s, so in production both modes count the same).
- */
-export const EASY_MIN_COUNTDOWN = 5;
-
 export interface KioskState<Shot> {
   phase: KioskPhase;
   sessionId: string;
   shotCount: number;
-  /** Seconds per countdown for this guest (depends on the mode). */
+  /** Seconds per countdown (KIOSK_CONFIG.countdownSeconds). */
   countdownSeconds: number;
-  /** The configured standard-mode countdown, kept so a mode switch can go back to it. */
-  standardCountdown: number;
   shots: (Shot | null)[];
   /** Index of the shot the countdown / capture is for. */
   shotIndex: number;
@@ -100,10 +91,6 @@ export interface KioskState<Shot> {
   captureFailures: number;
   delivery: DeliveryState;
   consent: WallConsent;
-  /** This guest's screen mode (D67). */
-  mode: KioskMode;
-  /** Staff default (settings); every new guest starts in it. */
-  defaultMode: KioskMode;
   mobile: MobileState;
   /** Language of this guest's screens (D78). Per guest: RESET returns to Korean. */
   lang: KioskLang;
@@ -139,10 +126,6 @@ export type KioskAction<Shot> =
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
   | { type: "SET_CONSENT"; consent: Exclude<WallConsent, null> }
-  /** The guest switches between the standard and easy screen. Allowed at any time. */
-  | { type: "SET_MODE"; mode: KioskMode }
-  /** Staff changed the default start mode (settings refresh). */
-  | { type: "SET_DEFAULT_MODE"; mode: KioskMode }
   /** A touch on the attract screen opens the welcome choices (D80). */
   | { type: "OPEN" }
   /** "내 사진으로 참여하기" from the welcome screen. */
@@ -167,29 +150,20 @@ export type KioskAction<Shot> =
 
 export interface KioskInit {
   shotCount: number;
-  /** Standard-mode countdown. Easy mode is never shorter (and at least EASY_MIN_COUNTDOWN). */
   countdownSeconds: number;
   frameId: string;
-  /** Staff default start mode; "standard" when omitted. */
-  mode?: KioskMode;
-}
-
-function countdownFor(mode: KioskMode, standard: number): number {
-  return mode === "easy" ? Math.max(standard, EASY_MIN_COUNTDOWN) : standard;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
 export const MAX_CAPTURE_FAILURES = 3;
 
 export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
-  const mode = init.mode ?? "standard";
   return {
     phase: "attract",
     /** Empty until START; a session only exists once a guest begins. */
     sessionId: "",
     shotCount: init.shotCount,
-    countdownSeconds: countdownFor(mode, init.countdownSeconds),
-    standardCountdown: init.countdownSeconds,
+    countdownSeconds: init.countdownSeconds,
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
     retakeIndex: null,
@@ -201,8 +175,6 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     captureFailures: 0,
     delivery: { status: "idle" },
     consent: null,
-    mode,
-    defaultMode: mode,
     mobile: { status: "idle" },
     lang: "ko",
   };
@@ -220,11 +192,9 @@ export function kioskReducer<Shot>(
     case "RESET":
       return createInitialState<Shot>({
         shotCount: state.shotCount,
-        countdownSeconds: state.standardCountdown,
+        countdownSeconds: state.countdownSeconds,
         // Keep the last frame choice as the next default; nothing personal lives in it.
         frameId: state.frameId,
-        // The next guest starts in the staff default, whatever this guest chose.
-        mode: state.defaultMode,
       });
 
     case "OPEN":
@@ -239,43 +209,18 @@ export function kioskReducer<Shot>(
         case "pick":
           return { ...state, phase: "welcome", sessionId: "" };
         case "ready":
-          // Easy mode skipped the frame pick on the way here (START), so back is the welcome.
-          return state.mode === "easy"
-            ? { ...state, phase: "welcome", sessionId: "", poseGuide: false }
-            : { ...state, phase: "pick", poseGuide: false };
+          return { ...state, phase: "pick", poseGuide: false };
         case "select":
           return { ...state, phase: "frame", selectedShotIndices: [] };
         default:
           return state;
       }
 
-    case "SET_MODE":
-      if (state.mode === action.mode) return state;
-      // A countdown already running keeps its number; the next one uses the new length.
-      return {
-        ...state,
-        mode: action.mode,
-        countdownSeconds: countdownFor(action.mode, state.standardCountdown),
-      };
-
-    case "SET_DEFAULT_MODE":
-      if (state.defaultMode === action.mode) return state;
-      // Nobody is using the booth: show the new default right away.
-      return state.phase === "attract" || state.phase === "welcome"
-        ? {
-            ...state,
-            defaultMode: action.mode,
-            mode: action.mode,
-            countdownSeconds: countdownFor(action.mode, state.standardCountdown),
-          }
-        : { ...state, defaultMode: action.mode };
-
     case "START":
       if (state.phase !== "welcome") return state;
-      // Easy mode: straight to the camera with the current frame; it is chosen after shooting.
       return {
         ...state,
-        phase: state.mode === "easy" ? "camera" : "pick",
+        phase: "pick",
         sessionId: action.sessionId,
         cameraError: null,
       };
@@ -537,41 +482,6 @@ export function progressStep(
       return { step: total, total };
     default:
       return { step: 2, total }; // camera, ready, countdown, capturing, camera-error
-  }
-}
-
-/**
- * Easy mode (D67): the step as words, so the guest always knows where they are. No frame pick
- * before shooting, so one step fewer than the standard dots.
- */
-export function easyStep(
-  phase: KioskPhase,
-  askConsent: boolean,
-): { step: number; total: number; label: string; key: EasyStepKey } | null {
-  const total = askConsent ? 6 : 5;
-  switch (phase) {
-    case "attract":
-    case "welcome":
-    case "mobile":
-      return null;
-    case "pick":
-    case "camera":
-    case "camera-error":
-    case "ready":
-      return { step: 1, total, label: "촬영 준비", key: "ready" };
-    case "countdown":
-    case "capturing":
-      return { step: 1, total, label: "사진 찍기", key: "shoot" };
-    case "review":
-      return { step: 2, total, label: "사진 확인", key: "review" };
-    case "frame":
-      return { step: 3, total, label: "사진 꾸미기", key: "frame" };
-    case "select":
-      return { step: 4, total, label: "사진 고르기", key: "select" };
-    case "consent":
-      return { step: 5, total, label: "미디어월 참여", key: "consent" };
-    case "delivery":
-      return { step: total, total, label: "휴대폰으로 받기", key: "delivery" };
   }
 }
 
