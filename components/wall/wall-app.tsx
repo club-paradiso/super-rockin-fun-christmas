@@ -469,7 +469,7 @@ export function WallApp({
                     <div
                       className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                     >
-                      <Clip theme={theme} dropToStrip={card.y - place.y} />
+                      <Clip theme={theme} />
                       <div
                         className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
                         style={{
@@ -524,7 +524,7 @@ export function WallApp({
                   <div
                     className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                   >
-                    <Clip theme={theme} dropToStrip={box.y - place.y} />
+                    <Clip theme={theme} />
                     {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img

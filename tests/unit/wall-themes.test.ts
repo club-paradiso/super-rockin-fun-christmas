@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import {
   ROTATE_MINUTES,
   activeThemeId,
+  clipReach,
   fitTheme,
   normalizeLook,
   type WallTheme,
@@ -141,8 +142,9 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(size).toBeGreaterThanOrEqual(56); // readable across a room on a 1080-line wall
     layout.slots.forEach((place, i) => {
       for (const b of boxesIn(i)) {
-        // The photo box plus what holds it (the clip reaches 26 px above a strip).
-        const withClip = { ...b, y: place.y - 30, height: b.height + (b.y - place.y) + 30 };
+        // The photo box plus what holds it (the clip reaches above the line, plus a margin).
+        const reach = clipReach(theme.hang) + 4;
+        const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
         expect(overlaps(mark, withClip)).toBe(false);
       }
     });
@@ -160,6 +162,12 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     }
     // A picture with its own pegs draws no clip and hangs the photo right under the peg.
     if (theme.hang.kind === "in-picture") expect(theme.scene.strip.drop).toBe(0);
+    if (theme.hang.kind === "clip") {
+      const { hang } = theme;
+      // The clip grips the photo: its bottom reaches below the strip top, and it stays in the picture.
+      expect(hang.height - hang.lineY).toBeGreaterThan(theme.scene.strip.drop);
+      for (const place of layout.slots) expect(place.y - hang.lineY).toBeGreaterThan(0);
+    }
   });
 });
 

@@ -38,7 +38,7 @@ export interface WallTheme {
    * background picture, or drawn by `rope`). `in-picture`: the picture already has pegs at the
    * slot positions; nothing is drawn and the photo's top edge meets the peg.
    */
-  hang: { kind: "clip"; image: string } | { kind: "in-picture" };
+  hang: WallClip | { kind: "in-picture" };
   /** A twine line drawn by the app along `scene.line`, for pictures that have no line. */
   rope: { x1: number; x2: number; color: string; width: number } | null;
   /**
@@ -147,6 +147,24 @@ export function fitTheme(theme: WallTheme, aspect: number | null | undefined): W
   let best: WallThemeLook = theme;
   for (const v of theme.variants) if (off(v) < off(best)) best = v;
   return best === theme ? theme : { ...theme, ...best };
+}
+
+/**
+ * A clip picture and where it sits: drawn `width` × `height` scene px, centred on the hang point
+ * at `centerX`, with the line `lineY` px below its top (for a peg, through its notch).
+ */
+export interface WallClip {
+  kind: "clip";
+  image: string;
+  width: number;
+  height: number;
+  centerX: number;
+  lineY: number;
+}
+
+/** How far a clip reaches above the line (scene px); 0 for a picture with its own pegs. */
+export function clipReach(hang: WallTheme["hang"]): number {
+  return hang.kind === "clip" ? hang.lineY : 0;
 }
 
 /** Staff setting: which theme, and whether the wall changes background by itself. */
