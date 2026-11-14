@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 const ERRORS: Record<string, string> = {
   "401": "등록 코드 또는 비밀번호가 틀렸거나, 등록 코드가 이미 사용됐거나 만료됐어요.",
   "409": "이 환경에서는 기기 등록이 꺼져 있어요 (개발 모드).",
-  "429": "시도가 너무 많아요. 15분 뒤에 다시 해 주세요.",
+  "429": "시도가 너무 많아요. 15분 뒤에 다시 시도해 주세요.",
 };
 
 /** Enroll this browser using an operator password or a staff-issued one-time code. */
@@ -44,8 +44,8 @@ export default async function EnrollPage({
           </h1>
           <p className="mt-3 text-ink/75">
             {toWall
-              ? "이 브라우저를 미디어월 화면으로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."
-              : "이 브라우저를 촬영 키오스크로 등록합니다. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."}
+              ? "이 브라우저를 미디어월 화면으로 등록해요. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."
+              : "이 브라우저를 촬영 키오스크로 등록해요. 등록은 기기마다 한 번만 하면 되고, 브라우저를 다시 켜도 유지돼요."}
           </p>
         </header>
 

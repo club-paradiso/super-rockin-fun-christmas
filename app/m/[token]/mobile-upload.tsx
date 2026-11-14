@@ -43,7 +43,7 @@ const ERRORS: Record<string, { message: string; retry: boolean }> = {
   too_small: { message: "사진이 너무 작아요. 더 큰 사진을 골라 주세요.", retry: false },
   consent: { message: "동의 확인란을 눌러 주세요.", retry: false },
   paused: {
-    message: "지금은 미디어월 사진 접수를 잠시 멈췄어요. 잠시 뒤 부스에서 다시 시도해 주세요.",
+    message: "지금은 미디어월 게시 신청을 잠시 멈췄어요. 잠시 뒤 부스에서 다시 시도해 주세요.",
     retry: false,
   },
   closed: { message: "이 QR로 보낸 사진은 이미 처리됐어요.", retry: false },
@@ -62,7 +62,7 @@ type SendOutcome = "ok" | "expired" | keyof typeof ERRORS;
 function send(
   token: string,
   blob: Blob,
-  /** The booth frame the photos are in (D89). */
+  /** The booth frame the photos are in (D92). */
   frameId: string,
   /** The consent text on screen included the public-wall line (D86). */
   publicWall: boolean,
@@ -142,7 +142,7 @@ export function MobileUpload({
     };
   }, [preview]);
 
-  // The frames draw the brand font and their own pictures: load both before composing (D89),
+  // The frames draw the brand font and their own pictures: load both before composing (D92),
   // as the booth does. A font or picture that fails to load never blocks the guest.
   useEffect(() => {
     let cancelled = false;

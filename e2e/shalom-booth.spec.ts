@@ -96,6 +96,40 @@ test("English: the whole booth in English, the next guest back in Korean", async
   ).toBeVisible();
 });
 
+test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", async ({
+  page,
+}) => {
+  await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
+  await page.getByTestId("lang-zh").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByRole("heading", { name: "一起留下圣诞的回忆" })).toBeVisible();
+
+  await page.getByRole("button", { name: /在这里拍照/ }).click();
+  await expect(page.getByText("请选择你喜欢的相框")).toBeVisible();
+  await expect(page.getByTestId("frame-option-shalom-grid")).toContainText("Shalom 2×2");
+  await page.getByRole("button", { name: "用这个相框拍照" }).click();
+  await page.getByRole("button", { name: "给我姿势建议" }).click();
+  // The recommended pose is shown in Chinese during the countdown.
+  await expect(page.getByTestId("pose-guide")).toContainText("面对面");
+  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: "就这样吧" }).click();
+  await page.getByRole("button", { name: "就用这个相框" }).click();
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  await selectDefaultPhotos(page);
+  await expect(page.getByTestId("consent-yes")).toHaveText("好的，请放上去");
+  await expect(page.getByTestId("consent-no")).toHaveText("不用，只给我自己看");
+  await answerForQr(page, "no");
+  await expect(page.getByText("请用手机领取照片")).toBeVisible();
+  // No Korean left on the guest's screens (staff badges aside, none are showing here).
+  const text = await page.getByTestId("screen-delivery").innerText();
+  expect(text).not.toMatch(/[가-힣]/);
+
+  await page.getByRole("button", { name: "已经领取了" }).click();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ko");
+});
+
 test("the STUDIO SHALOM 2×2: first in the picker, four photos, 1200 × 1500, delivered by QR", async ({
   page,
 }) => {

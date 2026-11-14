@@ -141,16 +141,6 @@ body {
   --qr: clamp(190px, min(26 * var(--bh), 40 * var(--bw)), 340px);
   --rule: clamp(36px, 5.6 * var(--bh), 64px);
 }
-/* Easy mode (D67): larger type and bigger targets from the same tokens; same layouts. */
-.kiosk-easy > * {
-  --fs-title: clamp(32px, min(6.2 * var(--bh), 6 * var(--bw)), 76px);
-  --fs-lead: clamp(22px, min(3.3 * var(--bh), 3.4 * var(--bw)), 38px);
-  --fs-caption: clamp(19px, min(2.5 * var(--bh), 2.6 * var(--bw)), 28px);
-  --btn-h: clamp(88px, min(11.2 * var(--bh), 13 * var(--bw)), 128px);
-  --btn-fs: clamp(24px, min(3.7 * var(--bh), 4 * var(--bw)), 44px);
-  --ctl-h: clamp(64px, min(8.4 * var(--bh), 10 * var(--bw)), 96px);
-  --ctl-fs: clamp(20px, min(3 * var(--bh), 3.3 * var(--bw)), 34px);
-}
 /* Short screens (a landscape tablet with Safari's toolbars showing): the compact control size.
    Still far above the 48 px touch minimum; the 80 px floor comes back at 760 px of height. */
 /* A wide screen has the QR beside the words: it may use more of the height. */
@@ -159,18 +149,9 @@ body {
     --qr: clamp(190px, min(34 * var(--bh), 26 * var(--bw)), 340px);
   }
 }
-/* Easy mode on a tall screen: its larger words take more of the height, the code a little less. */
-@media not all and (min-aspect-ratio: 5/4) {
-  .kiosk-easy > * {
-    --qr: clamp(190px, min(22 * var(--bh), 40 * var(--bw)), 340px);
-  }
-}
 @media (max-height: 759px) {
   .kiosk-root > * {
     --btn-h: clamp(64px, 9.6 * var(--bh), 80px);
-  }
-  .kiosk-easy > * {
-    --btn-h: clamp(72px, 11.4 * var(--bh), 92px);
   }
 }
 
@@ -210,13 +191,6 @@ body {
   color: color-mix(in srgb, var(--color-ink) 75%, transparent);
   word-break: keep-all;
   text-wrap: pretty;
-}
-.kiosk-easy .booth-title {
-  line-height: 1.25;
-}
-/* Easy mode sets captions in full ink (9.43:1) instead of ink at 75 % (5.26:1). */
-.kiosk-easy .booth-caption {
-  color: var(--color-ink);
 }
 
 /* The media wall keeps its own night scene (D73): these are the old global night values, scoped
@@ -453,9 +427,38 @@ body {
   .btn-secondary {
     @apply inline-flex min-h-20 items-center justify-center rounded-full border-2 border-ink px-10 text-2xl font-semibold text-ink transition active:scale-[0.98] active:bg-ink/10 disabled:opacity-50;
   }
-  /* Staff control panel: big, obvious, touch-friendly (desktop, tablet, phone). */
+  /* Staff control panel, phone first. A logbook, not a poster: hairline borders and no shadows
+     (depth comes from paper on backdrop), three radii (chip 6 / control 10 / card 14, a segmented
+     control's track 12 = its 10 + 2 padding), a 44 px control, and one type scale (22 page title,
+     17 card title, 15-16 body, 14 help, 13 chip). Colours are the tokens above, nothing else.
+     Korean never breaks inside a word: that is what made labels read "촬/영" on a phone. */
+  .admin-root,
+  .admin-login {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .admin-root :where(p, li, dd) {
+    text-wrap: pretty;
+  }
+  .admin-root :where(h1, h2, h3) {
+    text-wrap: balance;
+  }
+  /* The sign-in screen keeps 48 px controls (D84, e2e/admin-password.spec.ts): it is the one staff
+     screen used before anything else is known, and often with one thumb. The rest of /admin is 44. */
+  .admin-login :is(.admin-btn, .admin-input) {
+    min-height: 3rem;
+  }
+  .admin-h1 {
+    @apply text-[22px] leading-tight font-bold tracking-tight md:text-[28px];
+  }
+  .admin-h2 {
+    @apply text-[17px] leading-snug font-bold tracking-tight;
+  }
+  .admin-help {
+    @apply text-sm leading-relaxed text-ink/75;
+  }
   .admin-btn {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-full px-5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 text-base leading-tight font-semibold transition active:scale-[0.98] disabled:opacity-50;
   }
   .admin-btn-primary {
     @apply bg-button text-button-text;
@@ -467,13 +470,60 @@ body {
     @apply bg-danger text-button-text;
   }
   .admin-btn-quiet {
-    @apply border border-ink/60 text-ink active:bg-ink/10;
+    @apply border border-ink/40 text-ink active:bg-ink/10;
   }
   .admin-card {
-    @apply rounded-3xl border border-ink/15 bg-paper;
+    @apply rounded-[14px] border border-ink/15 bg-paper;
   }
   .admin-input {
-    @apply min-h-14 rounded-lg border border-ink/50 bg-paper px-4 text-lg text-ink placeholder:text-ink/70;
+    @apply min-h-11 rounded-[10px] border border-ink/40 bg-paper px-3.5 text-base text-ink placeholder:text-ink/70;
+  }
+  /* A short status word (state, source, count). Square-ish on purpose: pills are for nothing here. */
+  .admin-chip {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-[13px] leading-5 font-semibold;
+  }
+  /* One choice out of a few, in one row of equal columns (never wrapping into uneven pills). The
+     chosen segment is the lighter, raised one; an inset track reads as "pick here". */
+  .admin-seg {
+    @apply grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl bg-ink/10 p-0.5;
+  }
+  .admin-seg-btn {
+    @apply inline-flex min-h-10 items-center justify-center rounded-[10px] px-2 text-center text-[15px] leading-tight font-semibold text-ink/75 transition active:scale-[0.98] disabled:opacity-50;
+  }
+  .admin-seg-btn:where([aria-checked="true"], [aria-current="page"], [aria-pressed="true"]) {
+    @apply bg-paper text-ink ring-1 ring-ink/40;
+  }
+  /* A switch row: text on the left, the toggle and its state word on the right. */
+  .admin-switch-row {
+    @apply flex min-h-16 w-full items-center gap-4 px-4 py-3 text-left transition-colors active:bg-ink/5 disabled:opacity-60;
+  }
+  .admin-switch-track {
+    @apply relative block h-[26px] w-[46px] shrink-0 rounded-full bg-ink/55 transition-colors;
+  }
+  .admin-switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--color-paper);
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .admin-switch-track[data-on="true"] {
+    background: var(--color-danger);
+  }
+  .admin-switch-track[data-on="true"]::after {
+    transform: translateX(20px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .admin-switch-track,
+    .admin-switch-track::after,
+    .admin-btn,
+    .admin-seg-btn {
+      transition: none;
+    }
   }
   /* Administrator login (D84): one centred column on phones, tablets and desktops. The page may
      scroll when a software keyboard or a short window leaves too little room; nothing is clipped. */
@@ -556,9 +606,6 @@ body {
   .booth-chrome-btn:active:not(:disabled) {
     background: color-mix(in srgb, var(--color-ink) 14%, transparent);
   }
-  .kiosk-easy .booth-btn-secondary {
-    border-width: 4px;
-  }
   .booth-btn-m,
   .booth-chrome-btn {
     min-height: var(--ctl-h, 56px);
@@ -568,19 +615,15 @@ body {
     font-size: var(--ctl-fs, 18px);
     font-weight: 700;
   }
-  /* Booth screen chrome (2.0): way back, way home, screen mode. Quieter than the screen's own
-     buttons in the standard view; full ink and heavier in easy mode. */
+  /* Booth screen chrome (2.0): way back and way home. Quieter than the screen's own
+     buttons. */
   .booth-chrome-btn {
     flex: none;
     border-color: color-mix(in srgb, var(--color-ink) 60%, transparent);
     font-weight: 600;
     white-space: nowrap;
   }
-  .booth-chrome-btn-easy {
-    border: 3px solid var(--color-ink);
-    font-weight: 700;
-  }
-  /* A two-way switch (screen mode, language): one pill holding two M buttons. */
+  /* A switch (language): one pill holding the M buttons. */
   .booth-seg {
     display: inline-flex;
     padding: 4px;
@@ -640,12 +683,6 @@ body {
     overflow: hidden;
     font-size: clamp(20px, min(2.8 * var(--bh), 2.6 * var(--bw)), 30px);
   }
-  /* A narrow screen with "이전" and the step in words has no room left for the name. */
-  @media (max-width: 639px) {
-    .booth-header-easy.booth-header-back .booth-wordmark {
-      display: none;
-    }
-  }
   .booth-steps {
     display: flex;
     flex: none;
@@ -672,29 +709,6 @@ body {
   .booth-steps-dot-now {
     background: var(--color-button);
   }
-  .booth-easy-step {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: clamp(4px, 0.8 * var(--bh), 8px);
-    min-width: 0;
-  }
-  /* Never under 24 px: the step number is accent text (brand rule: accent as text at ≥ 24 px). */
-  .booth-easy-step-label {
-    font-size: clamp(24px, min(3.2 * var(--bh), 3.4 * var(--bw)), 38px);
-    font-weight: 700;
-    line-height: 1.2;
-    white-space: nowrap;
-    color: var(--color-ink);
-  }
-  .booth-easy-step-bar {
-    width: min(34 * var(--bw), 320px);
-    height: clamp(8px, 1.2 * var(--bh), 12px);
-    overflow: hidden;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--color-ink) 20%, transparent);
-  }
   .booth-footer {
     grid-row: 3;
     display: flex;
@@ -702,9 +716,6 @@ body {
     align-items: center;
     gap: var(--gap-s);
     margin-top: var(--gap-s);
-  }
-  .booth-footer-easy {
-    justify-content: space-between;
   }
   /* D79: one sheet of letter paper on the backdrop; the seal is pressed on its corner. */
   /* D81: a faded diary page. The paper is drawn by ::before (faded tone 13.5:1 for ink, ink/75
@@ -771,11 +782,6 @@ body {
       520px 28px,
       28px 520px,
       28px 520px;
-  }
-  /* Easy mode keeps the paper and grain but drops the ruled lines: less behind the big type. */
-  .kiosk-easy .letter-sheet::before {
-    background-image: var(--grain-ink);
-    background-size: 240px 240px;
   }
   /* A strip of masking tape (D81): decoration only, torn ends, never over a button. */
   .tape {
@@ -955,12 +961,6 @@ body {
     font-size: var(--fs-lead);
     font-weight: 500;
     line-height: 1.4;
-  }
-  .kiosk-easy .welcome-choice {
-    min-height: clamp(150px, 20 * var(--bh), 280px);
-  }
-  .kiosk-easy .welcome-choice-title {
-    font-size: clamp(34px, min(5.8 * var(--bh), 6 * var(--bw)), 68px);
   }
   .welcome-options {
     display: flex;
@@ -1404,8 +1404,10 @@ body {
     .pick-tile-label {
       font-size: clamp(14px, 15.5cqw, 20px);
     }
-    .kiosk-easy .pick-tile-label {
-      font-size: clamp(14px, 15.5cqw, 24px);
+    /* Latin names ("Shalom 2×2", "Clothesline") are wider per tile than the Korean ones. */
+    :root:lang(en) .pick-tile-label,
+    :root:lang(zh-Hans) .pick-tile-label {
+      font-size: clamp(12px, 11cqw, 20px);
     }
   }
   .pick-actions {
@@ -1422,9 +1424,6 @@ body {
   }
   .consent > .frame-art {
     min-height: clamp(130px, 22 * var(--bh), 520px);
-  }
-  .kiosk-easy .consent > .frame-art {
-    min-height: clamp(120px, 14 * var(--bh), 520px);
   }
   .consent-body {
     display: flex;
@@ -1548,9 +1547,6 @@ body {
       align-content: center;
       row-gap: var(--gap-s);
       min-height: clamp(150px, 30 * var(--bh), 340px);
-    }
-    .kiosk-easy .welcome-choice {
-      min-height: clamp(170px, 30 * var(--bh), 400px);
     }
     .shoot {
       flex-direction: row;
@@ -1782,6 +1778,15 @@ main input:focus-visible,
   outline-offset: 3px;
 }
 
+/* Staff screens are denser than the booth: 2 px with a 2 px gap (still the WCAG 2.4.13 minimum).
+   This sits outside @layer on purpose: an unlayered rule beats a layered one whatever its
+   specificity, so it has to be unlayered, after the rule above, to replace it. */
+.admin-root :is(button, a, input, select, textarea, summary):focus-visible,
+.admin-login :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
 @keyframes flash {
   from {
     opacity: 0.95;
@@ -1818,4 +1823,16 @@ main input:focus-visible,
   .capture-flash {
     animation: none;
   }
+}
+
+/* Chinese booth screens (D89). Simplified glyph shapes need the Simplified font first, and
+   "keep-all" (right for Korean) would stop Han characters from ever wrapping. */
+:root:lang(zh-Hans) {
+  --font-sans:
+    "Noto Sans SC Variable", "Noto Sans KR Variable", "PingFang SC", "Microsoft YaHei", system-ui,
+    sans-serif;
+}
+:root:lang(zh-Hans) .kiosk-root * {
+  word-break: normal;
+  line-break: strict;
 }

@@ -209,6 +209,12 @@ describe("frame definitions", () => {
       expect(frame.labelEn).not.toMatch(/[\uac00-\ud7a3]/);
     });
 
+    it("has a Chinese label for the Chinese booth screens (D89)", () => {
+      if (frame.labelZh === "Shalom 2×2") return; // a name, kept as it is in every language
+      expect(frame.labelZh).toMatch(/\p{Script=Han}/u);
+      expect(frame.labelZh).not.toMatch(/[\uac00-\ud7a3]/);
+    });
+
     // D77: the O of SHALOM carries the four-pointed star, in the letters' own colour.
     it("draws the star in the O of the lockup", () => {
       const logo = frame.decorations.find((d) => d.type === "image" && d.brand);

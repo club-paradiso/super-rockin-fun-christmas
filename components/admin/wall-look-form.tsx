@@ -71,7 +71,7 @@ export function WallLookForm({
   return (
     <section className="admin-card flex flex-col gap-4 p-4" data-testid="wall-look">
       <div>
-        <h2 className="text-2xl font-bold">미디어월 배경</h2>
+        <h2 className="admin-h2">미디어월 배경</h2>
         <p className="mt-1 text-base text-ink/75">
           배경을 바꿔도 사진·검수·부스는 그대로예요. 지금 화면:{" "}
           <strong className="text-ink" data-testid="wall-look-active">
@@ -80,14 +80,18 @@ export function WallLookForm({
         </p>
       </div>
 
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="배경">
+      <ul
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        role="radiogroup"
+        aria-label="배경"
+      >
         {themes.map((t) => {
           const selected = theme === t.id;
           return (
             <li
               key={t.id}
-              className={`flex flex-col overflow-hidden rounded-2xl border-2 bg-backdrop ${
-                selected ? "border-ink" : "border-ink/15"
+              className={`flex flex-col overflow-hidden rounded-xl border bg-backdrop ${
+                selected ? "border-ink ring-1 ring-ink" : "border-ink/15"
               }`}
               data-testid="wall-theme"
               data-theme={t.id}
@@ -109,20 +113,22 @@ export function WallLookForm({
                   loading="lazy"
                   className="aspect-[32/9] w-full object-cover"
                 />
-                <span className="flex flex-col gap-1 p-3">
-                  <span className="text-lg leading-snug font-bold">
+                <span className="flex flex-col gap-1 p-2.5">
+                  <span className="text-[15px] leading-snug font-bold">
                     {selected && <span aria-hidden>✓ </span>}
                     {t.name}
                   </span>
-                  <span className="text-sm text-ink/75">{t.note}</span>
-                  <span className="text-sm text-ink/75">
-                    {t.id === defaultTheme && "기본 배경"}
-                    {t.status === "legacy" && "이전 디자인"}
-                  </span>
+                  <span className="admin-help">{t.note}</span>
+                  {(t.id === defaultTheme || t.status === "legacy") && (
+                    <span className="admin-chip w-fit bg-ink/10 text-ink/75">
+                      {t.id === defaultTheme && "기본 배경"}
+                      {t.status === "legacy" && "이전 디자인"}
+                    </span>
+                  )}
                 </span>
               </button>
               {rotate && (
-                <label className="flex min-h-12 items-center gap-3 border-t border-ink/15 px-3 text-base">
+                <label className="flex min-h-11 items-center gap-2 border-t border-ink/15 px-2.5 text-sm">
                   <input
                     type="checkbox"
                     className="h-6 w-6"
@@ -138,8 +144,8 @@ export function WallLookForm({
         })}
       </ul>
 
-      <div className="flex flex-col gap-3 rounded-2xl bg-backdrop p-3">
-        <label className="flex min-h-12 items-center gap-3 text-lg">
+      <div className="flex flex-col gap-3 rounded-xl bg-backdrop p-3">
+        <label className="flex min-h-12 items-center gap-3 text-base">
           <input
             type="checkbox"
             className="h-6 w-6"
@@ -155,7 +161,7 @@ export function WallLookForm({
         </label>
         {rotate && (
           <>
-            <label className="flex flex-wrap items-center gap-3 text-lg">
+            <label className="flex flex-wrap items-center gap-3 text-base">
               바꾸는 간격
               <select
                 value={minutes}
@@ -178,7 +184,7 @@ export function WallLookForm({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           className="admin-btn admin-btn-primary"

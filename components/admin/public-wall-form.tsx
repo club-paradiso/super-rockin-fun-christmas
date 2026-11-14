@@ -47,17 +47,17 @@ export function PublicWallForm({
 
   return (
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="public-wall">
-      <h2 className="text-2xl font-bold">공개 미디어월</h2>
-      <p className="text-base text-ink/75">
+      <h2 className="admin-h2">공개 미디어월</h2>
+      <p className="admin-help">
         미디어월 주소{wallUrl ? <> ({wallUrl})</> : ""}는 기기 등록 없이 누구나 열 수 있어요. 이
         스위치는 그렇게 들어온 화면에 <strong className="text-ink">사진을 보여 줄지</strong>를
         정해요.
       </p>
-      <p className="text-lg" data-testid="public-wall-state">
+      <p className="text-base" data-testid="public-wall-state">
         지금:{" "}
         <strong>{enabled ? "켜짐 · 주소로 들어오면 사진이 보여요" : "꺼짐 · 배경만 보여요"}</strong>
       </p>
-      <ul className="list-disc pl-5 text-base text-ink/75">
+      <ul className="admin-help flex list-disc flex-col gap-1 pl-5">
         <li>
           켜면 부스 동의 화면에 &ldquo;온라인 주소에서도 보여요&rdquo; 안내가 붙고, 그 안내를 보고
           동의한 사진만 공개 화면에 나와요.

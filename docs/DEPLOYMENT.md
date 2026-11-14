@@ -214,7 +214,7 @@ checked afterwards: column default `standard`, both settings functions present, 
 by anon or authenticated.
 
 Schema: migration `20261108090000_v2_kiosk_mode.sql` (easy-mode default only; phone photos need no
-schema change). Apply it **before** deploying this code. It adds the 9-argument settings function
+schema change; the easy mode itself was removed in D89, the column stays until a later migration drops it). Apply it **before** deploying this code. It adds the 9-argument settings function
 and keeps the 8-argument one, so the code still running keeps working (emergency switches
 included) until the new code is live. After the 2.0 deploy, `20261109090000_v2_drop_old_settings_fn.sql`
 drops the 8-argument function (written only after #29/#30 were live and the deployed addresses
@@ -222,11 +222,28 @@ were checked, 2026-11-08).
 
 ## 10. STUDIO SHALOM addresses (D87) and this release (D84–D86)
 
-Checked 2026-11-13 from the development session: `studio-shalom.vercel.app` and
-`studio-shalom-wall.vercel.app` both answer `404 DEPLOYMENT_NOT_FOUND` (free to claim);
-`follow-the-lights.vercel.app` and `follow-the-lights-wall.vercel.app` serve production. Nothing
-below has been done yet: `STUDIO_SHALOM_DOMAINS: NOT CONFIGURED` (the session had no access to the
-Vercel project).
+Since 2026-11-14 `studio-shalom.vercel.app` (booth, admin) and `studio-shalom-wall.vercel.app`
+(wall) serve production; `follow-the-lights.vercel.app` and `follow-the-lights-wall.vercel.app`
+stay attached and keep working.
+
+**Done 2026-11-14: steps 1–3.** The merge (03:57 UTC) came before the migration (03:59 UTC,
+applied to Supabase project `follow-the-lights-preview`), so for about two minutes production
+could not upload, record consent, moderate or change settings; no photo was taken in that time.
+Checked afterwards over HTTP on the old addresses: the password form on `/admin/login`, the wall
+opening without enrollment in the 평화의 벽 background, 401 for cookieless staff and report calls.
+**Done 2026-11-14 04:07–04:17 UTC: most of step 3's check**, by the development session on the old
+addresses with a mock camera: enroll (one-time code) → six shots → consent → real QR → guest page,
+image and video → approve → the photo on the public wall and on the enrolled display → delete →
+every link 404 (`docs/STATUS.md`, "운영 점검"). 공개 미디어월 was switched **on** in that check and
+left on. Still for a person: sign in at `/admin` with the real password once and press the
+moderation and background buttons there (the session does not know the password and used the
+audited database functions instead).
+**Done 2026-11-14: steps 4–6.** The owner attached both names, changed the two variables and
+redeployed; the session then checked both new addresses, the redirects from the wall address, a
+booth run whose QR starts with `https://studio-shalom.vercel.app/p/`, the same token on the old
+address, and that both old addresses still work (`docs/STATUS.md`, "새 주소 점검").
+**Not done: steps 7–9** (re-enroll each booth tablet on the new address, the hub's
+`CLOUD_BASE_URL`, the follow-up migration).
 
 Do these **in this order**. Each step leaves the site working.
 

@@ -407,7 +407,6 @@ export class MemorySettingsRepository implements SettingsRepository {
     showHoldingScreen: false,
     wallHours: null,
     wallForce: "auto",
-    kioskDefaultMode: "standard",
     wallPublic: false,
     wallLook: defaultWallLook(),
     updatedAt: now(),
@@ -427,7 +426,6 @@ export class MemorySettingsRepository implements SettingsRepository {
         show_holding_screen: s.showHoldingScreen,
         wall_hours: s.wallHours ? `${s.wallHours.start}-${s.wallHours.end}` : null,
         wall_force: s.wallForce,
-        kiosk_default_mode: s.kioskDefaultMode,
         wall_public: s.wallPublic,
         wall_look: s.wallLook,
       });
@@ -440,7 +438,6 @@ export class MemorySettingsRepository implements SettingsRepository {
           ? before.wallHours
           : patch.wallHours && { ...patch.wallHours },
       wallForce: patch.wallForce ?? before.wallForce,
-      kioskDefaultMode: patch.kioskDefaultMode ?? before.kioskDefaultMode,
       wallPublic: patch.wallPublic ?? before.wallPublic,
       wallLook: patch.wallLook
         ? { ...patch.wallLook, rotation: [...patch.wallLook.rotation] }

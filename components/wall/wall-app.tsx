@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
+import { fitTheme } from "@/lib/wall/themes";
 import { framedPhotoFrame, MOBILE_FRAME_ID } from "@/config/mobile";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
@@ -55,8 +56,12 @@ export function WallApp({
     return () => window.removeEventListener("resize", measure);
   }, []);
   const [feed, setFeed] = useState<WallFeed | null>(null);
-  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them.
-  const theme = getWallTheme(feed?.theme ?? initialTheme);
+  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them. A theme cut
+  // for another screen shape (D91: a 2.4:1 board) is used when it fits this screen better.
+  const themeId = feed?.theme ?? initialTheme;
+  const shape = canvas ?? viewport;
+  const aspect = shape ? shape.width / shape.height : null;
+  const theme = useMemo(() => fitTheme(getWallTheme(themeId), aspect), [themeId, aspect]);
   const layout = useMemo(
     () => wallLayout(theme.scene, lite ? theme.liteSlots : undefined),
     [theme, lite],
@@ -135,7 +140,7 @@ export function WallApp({
     [fresh, feed],
   );
   const allowed = useMemo(() => new Set(eligible), [eligible]);
-  // Plain phone photos (D66, no frame) hang as a card instead of a strip; framed ones (D89) do not.
+  // Plain phone photos (D66, no frame) hang as a card instead of a strip; framed ones (D92) do not.
   const phonePhotos = useMemo(
     () =>
       new Set(
@@ -373,6 +378,7 @@ export function WallApp({
         >
           <WallScene
             theme={theme}
+            aspect={aspect}
             layout={layout}
             lite={lite}
             overlay={
@@ -473,7 +479,7 @@ export function WallApp({
                   </figure>
                 );
               }
-              // A phone photo put in a booth frame (D89) hangs exactly like that booth frame.
+              // A phone photo put in a booth frame (D92) hangs exactly like that booth frame.
               const frame = framedPhotoFrame(photoFrames.get(slot.photoId) ?? "");
               const box =
                 framedPhotoBox(

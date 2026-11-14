@@ -111,7 +111,6 @@ const toSettings = (r: Row): EventSettings => ({
       ? { start: r.wall_hours_start as string, end: r.wall_hours_end as string }
       : null,
   wallForce: (r.wall_force as EventSettings["wallForce"]) ?? "auto",
-  kioskDefaultMode: (r.kiosk_default_mode as EventSettings["kioskDefaultMode"]) ?? "standard",
   wallPublic: (r.wall_public as boolean | null) ?? false,
   wallLook: normalizeLook(r.wall_look, WALL_THEMES, DEFAULT_WALL_THEME),
   updatedAt: iso(r.updated_at)!,
@@ -497,7 +496,9 @@ class SupabaseSettingsRepository implements SettingsRepository {
       p_set_wall_hours: patch.wallHours !== undefined,
       p_wall_hours_start: patch.wallHours?.start ?? null,
       p_wall_hours_end: patch.wallHours?.end ?? null,
-      p_kiosk_default_mode: patch.kioskDefaultMode ?? null,
+      // D89: the easy screen mode is gone. The column and this parameter stay until a later
+      // migration drops them (old code may still be running against the same database).
+      p_kiosk_default_mode: null,
       p_wall_public: patch.wallPublic ?? null,
       p_wall_look: patch.wallLook ?? null,
       p_actor_id: staffUserId,

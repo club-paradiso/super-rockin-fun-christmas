@@ -34,6 +34,7 @@ export const shalomGrid: FrameDefinition = {
   name: "STUDIO SHALOM 2×2",
   label: "샬롬 2×2",
   labelEn: "Shalom 2×2",
+  labelZh: "Shalom 2×2",
   outputWidth: SIZE.width,
   outputHeight: SIZE.height,
   background: { type: "solid", color: COLORS.backdrop },

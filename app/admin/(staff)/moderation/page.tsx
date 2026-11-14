@@ -29,10 +29,13 @@ export default async function ModerationPage({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-3xl font-bold">검수 대기 {queue.length}건</h1>
+        <h1 className="admin-h1">검수 대기 {queue.length}건</h1>
         <p className="text-base text-ink/75">미디어월 동의 + 검수 대기 · 오래된 순</p>
       </div>
-      <nav className="flex flex-wrap gap-2" aria-label="사진 출처">
+      <nav
+        className="admin-seg md:w-fit md:grid-flow-col md:auto-cols-[8rem]"
+        aria-label="사진 출처"
+      >
         {FILTERS.map((f) => {
           const active = (filter ?? "all") === f.key;
           return (
@@ -41,7 +44,7 @@ export default async function ModerationPage({
               href={f.key === "all" ? "/admin/moderation" : `/admin/moderation?source=${f.key}`}
               aria-current={active ? "page" : undefined}
               data-testid={`queue-filter-${f.key}`}
-              className={`admin-btn min-h-12 ${active ? "admin-btn-primary" : "admin-btn-quiet"}`}
+              className="admin-seg-btn"
             >
               {f.label}
             </Link>
@@ -49,7 +52,7 @@ export default async function ModerationPage({
         })}
       </nav>
       {queue.length === 0 ? (
-        <p className="admin-card p-8 text-center text-xl text-ink/75" data-testid="queue-empty">
+        <p className="admin-card p-8 text-center text-base text-ink/75" data-testid="queue-empty">
           검수할 사진이 없어요.
         </p>
       ) : (

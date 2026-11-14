@@ -27,8 +27,8 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
 
   return (
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="wall-hours">
-      <h2 className="text-2xl font-bold">미디어월 운영 시간</h2>
-      <label className="flex items-center gap-3 text-lg">
+      <h2 className="admin-h2">미디어월 운영 시간</h2>
+      <label className="flex items-center gap-3 text-base">
         <input
           type="checkbox"
           className="h-6 w-6"
@@ -36,17 +36,17 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
           onChange={(e) => setEnabled(e.target.checked)}
           data-testid="wall-hours-enabled"
         />
-        운영 시간을 정해요 (끄면 언제나 켜져 있어요)
+        운영 시간 정하기
       </label>
       {enabled && (
-        <div className="flex flex-wrap items-center gap-3 text-lg">
+        <div className="flex flex-wrap items-center gap-3 text-base">
           <label className="flex items-center gap-2">
             시작
             <input
               type="time"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className="rounded-lg bg-backdrop px-3 py-2 text-ink"
+              className="admin-input"
               data-testid="wall-hours-start"
             />
           </label>
@@ -56,20 +56,21 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
               type="time"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className="rounded-lg bg-backdrop px-3 py-2 text-ink"
+              className="admin-input"
               data-testid="wall-hours-end"
             />
           </label>
         </div>
       )}
-      <p className="text-base text-ink/75">
-        시간대: {timeZone}. 끝이 시작보다 이르면 자정을 넘겨요(예: 18:00~01:00). 관리자 첫 화면의
-        &ldquo;계속 켜기&rdquo;/&ldquo;끄기&rdquo;가 이 시간보다 먼저예요.
+      <p className="admin-help">
+        체크를 끄면 하루 종일 켜져 있어요. 시간대: {timeZone}. 끝이 시작보다 이르면 자정을
+        넘겨요(예: 18:00~01:00). 긴급 제어의 &ldquo;계속 켜기&rdquo;/&ldquo;끄기&rdquo;가 이
+        시간보다 먼저예요.
       </p>
       <div>
         <button
           type="button"
-          className="admin-btn-primary"
+          className="admin-btn admin-btn-primary"
           disabled={busy}
           onClick={save}
           data-testid="wall-hours-save"

@@ -9,6 +9,8 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { DEFAULT_WALL_THEME, getWallTheme } from "../config/wall-themes";
+import { fitTheme } from "../lib/wall/themes";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
 import { SHOOT_TIMEOUT } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
@@ -28,12 +30,18 @@ test.describe.configure({ mode: "serial" });
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const PIN = "482913";
+// The default theme cut for each shape (D91): 16:9 is closer to its 2.4:1 board picture (4 photos,
+// smaller bands) than to the 32:9 one (5 photos).
 const SHAPES = [
-  { width: 1920, height: 1080, slots: 5 },
-  { width: 3840, height: 1080, slots: 5 },
-  { width: 3840, height: 2160, slots: 5 },
-  { width: 4000, height: 1000, slots: 5 },
-];
+  { width: 1920, height: 1080 },
+  { width: 3840, height: 1080 },
+  { width: 3840, height: 2160 },
+  { width: 4000, height: 1000 },
+  { width: 3096, height: 1290 },
+].map((s) => {
+  const { scene } = fitTheme(getWallTheme(DEFAULT_WALL_THEME), s.width / s.height);
+  return { ...s, slots: scene.slots.length, picture: scene.width / scene.height };
+});
 let staff: Page;
 let kiosk: Page;
 let wallCtx: BrowserContext;
@@ -175,9 +183,9 @@ for (const shape of SHAPES) {
     const scene = page.getByTestId("wall-scene");
     await expect(scene).toHaveAttribute("data-slots", String(shape.slots));
     await expect(page.getByTestId("wall-background")).toBeVisible();
-    // Fitted, never stretched: the 32:9 picture keeps its shape and stays on screen.
+    // Fitted, never stretched: the picture keeps its shape and stays on screen.
     const box = (await page.getByTestId("wall-background").boundingBox())!;
-    expect(box.width / box.height).toBeCloseTo(3840 / 1080, 2);
+    expect(box.width / box.height).toBeCloseTo(shape.picture, 2);
     expect(box.width).toBeLessThanOrEqual(shape.width + 1);
     expect(box.height).toBeLessThanOrEqual(shape.height + 1);
     const expected = Math.min(shape.slots, approved);

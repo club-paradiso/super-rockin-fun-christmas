@@ -97,8 +97,6 @@ class FileDb {
         ...db.settings,
         wallHours: db.settings.wallHours ?? null,
         wallForce: db.settings.wallForce ?? "auto",
-        // Files written before D67 have no start mode.
-        kioskDefaultMode: db.settings.kioskDefaultMode ?? "standard",
         // Files written before D85/D86: the default background, and a wall that is not public.
         wallPublic: db.settings.wallPublic ?? false,
         wallLook: db.settings.wallLook ?? defaultWallLook(),

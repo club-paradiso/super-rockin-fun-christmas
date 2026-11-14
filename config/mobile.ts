@@ -2,13 +2,13 @@ import { FRAMES, getFrame } from "@/config/frames";
 import type { FrameDefinition } from "@/lib/compositor/types";
 
 /**
- * "내 사진으로 참여하기" (D66, D89): a guest scans a QR on the booth, picks one to six photos on
+ * "내 사진으로 참여하기" (D66, D92): a guest scans a QR on the booth, picks one to six photos on
  * their own phone, puts them in one of the booth's frames and sends that one picture to the
  * media-wall review queue. Change limits here, not inside routes or components.
  */
 export const MOBILE_UPLOAD_CONFIG = {
   /**
-   * A plain phone photo with no frame (before D89, and a page cached from then). It is not a booth
+   * A plain phone photo with no frame (before D92, and a page cached from then). It is not a booth
    * frame; the wall hangs these as a card, and staff see "휴대폰 사진". A framed phone photo is
    * stored as `phone-<booth frame id>` instead (`mobileFrameId`). Both match the database rule
    * `frame_id ~ '^[a-z0-9-]{1,64}$'`.
@@ -62,7 +62,7 @@ export function isMobilePhoto(row: { frameId: string }): boolean {
   return row.frameId.startsWith(PREFIX);
 }
 
-/** The stored frame id of a phone photo composed in this booth frame (D89). */
+/** The stored frame id of a phone photo composed in this booth frame (D92). */
 export function mobileFrameId(boothFrameId: string): string {
   return `${PREFIX}${boothFrameId}`;
 }

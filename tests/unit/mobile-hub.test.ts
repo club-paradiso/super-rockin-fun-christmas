@@ -128,7 +128,7 @@ describe("cloud side: /api/hub/uploads/*", () => {
 /** A scripted cloud inbox holding phone photos by session id. */
 class FakeInboxCloud implements CloudInboxClient {
   items = new Map<string, Uint8Array>();
-  /** Frame ids the cloud reports per session (D89); none = a cloud from before D89. */
+  /** Frame ids the cloud reports per session (D92); none = a cloud from before D92. */
   frames = new Map<string, string>();
   online = true;
   acks: string[] = [];
@@ -238,7 +238,7 @@ describe("hub side: HubInbox", () => {
     expect(cloud.items.has(a)).toBe(false);
   });
 
-  it("keeps the frame the guest chose (D89); an unknown one is taken in as a plain phone photo", async () => {
+  it("keeps the frame the guest chose (D92); an unknown one is taken in as a plain phone photo", async () => {
     const framed = uuid();
     const unknown = uuid();
     const old = uuid();
