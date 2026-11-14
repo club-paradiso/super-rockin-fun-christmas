@@ -10,7 +10,7 @@ import { HEALTH_LABEL, HEALTH_TONE, ago, formatTime } from "./labels";
 export function KioskManager({ kiosks }: { kiosks: StaffKioskView[] }) {
   if (!kiosks.length)
     return (
-      <p className="text-lg text-ink/75">
+      <p className="text-base text-ink/75">
         등록된 키오스크가 없어요. 아래에서 등록 코드를 만드세요.
       </p>
     );
@@ -48,8 +48,8 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
       data-health={kiosk.health}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xl font-bold">{kiosk.label}</h3>
-        <span className={`rounded-full px-3 py-1 text-sm font-bold ${HEALTH_TONE[kiosk.health]}`}>
+        <h3 className="admin-h2">{kiosk.label}</h3>
+        <span className={`admin-chip ${HEALTH_TONE[kiosk.health]}`}>
           {HEALTH_LABEL[kiosk.health]}
         </span>
       </div>
@@ -97,11 +97,11 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
             value={label}
             maxLength={40}
             onChange={(e) => setLabel(e.target.value)}
-            className="admin-input min-w-0 flex-1"
+            className="admin-input min-w-0 basis-full"
           />
           <button
             type="button"
-            className="admin-btn admin-btn-quiet"
+            className="admin-btn admin-btn-quiet flex-1"
             disabled={busy || !label.trim() || label === kiosk.label}
             onClick={() => send({ action: "rename", label })}
           >
@@ -109,7 +109,7 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
           </button>
           <button
             type="button"
-            className="admin-btn admin-btn-danger"
+            className="admin-btn admin-btn-danger flex-1"
             disabled={busy}
             onClick={() => setConfirmRevoke(true)}
             data-testid="kiosk-revoke"
@@ -165,7 +165,7 @@ export function EnrollmentCodeCreator() {
 
   return (
     <section className="admin-card flex flex-col gap-4 p-4">
-      <h2 className="text-2xl font-bold">새 키오스크 등록</h2>
+      <h2 className="admin-h2">새 키오스크 등록</h2>
       <form onSubmit={create} className="flex flex-wrap gap-2">
         <input
           aria-label="새 키오스크 이름"

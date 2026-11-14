@@ -40,7 +40,7 @@ const ERRORS: Record<string, { message: string; retry: boolean }> = {
   too_small: { message: "사진이 너무 작아요. 더 큰 사진을 골라 주세요.", retry: false },
   consent: { message: "동의 확인란을 눌러 주세요.", retry: false },
   paused: {
-    message: "지금은 미디어월 사진 접수를 잠시 멈췄어요. 잠시 뒤 부스에서 다시 시도해 주세요.",
+    message: "지금은 미디어월 게시 신청을 잠시 멈췄어요. 잠시 뒤 부스에서 다시 시도해 주세요.",
     retry: false,
   },
   closed: { message: "이 QR로 보낸 사진은 이미 처리됐어요.", retry: false },
