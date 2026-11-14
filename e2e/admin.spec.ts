@@ -75,7 +75,15 @@ test("one-time code enrolls a fresh kiosk, and cannot be reused", async ({ brows
   );
 });
 
-async function findInQueue(session: string) {
+/**
+ * The wall answer travels from the booth through its durable queue, a moment after the QR is on
+ * screen, and the staff page is rendered once per load. So first wait until the answer is stored
+ * (as kiosk.spec does), then open the queue: it must show the photo on that first load.
+ */
+async function findInQueue(session: string, url: string) {
+  await expect
+    .poll(async () => (await photoForToken(tokenFromUrl(url)))?.moderationStatus)
+    .toBe("PENDING");
   await staff.goto("/admin/moderation");
   const card = staff.getByTestId("photo-card").filter({ hasText: session });
   await expect(card).toBeVisible();
@@ -85,7 +93,7 @@ async function findInQueue(session: string) {
 
 test("moderation: consent YES → PENDING → staff approves → APPROVED + audit event", async () => {
   const { url, session } = await kioskPhotoToQr(kiosk, "yes");
-  const card = await findInQueue(session);
+  const card = await findInQueue(session, url);
   await card.getByTestId("action-approve").click();
   await expect(staff.getByTestId("photo-card").filter({ hasText: session })).toHaveCount(0);
   await expect
@@ -99,7 +107,7 @@ test("moderation: consent YES → PENDING → staff approves → APPROVED + audi
 
 test("reject: guest can still download, photo is not wall-eligible", async () => {
   const { url, session } = await kioskPhotoToQr(kiosk, "yes");
-  const card = await findInQueue(session);
+  const card = await findInQueue(session, url);
   await card.getByTestId("action-reject").click();
   await expect
     .poll(async () => (await photoForToken(tokenFromUrl(url)))?.moderationStatus)
@@ -173,7 +181,7 @@ test("media wall: approved photo appears; hide and PAUSE WALL take it off at onc
   await expect(wall.getByTestId("wall")).toHaveAttribute("data-wall-mode", "live");
 
   const { url, session } = await kioskPhotoToQr(kiosk, "yes");
-  const card = await findInQueue(session);
+  const card = await findInQueue(session, url);
   await card.getByTestId("action-approve").click();
   const id = await photoIdForToken(tokenFromUrl(url));
   const photo = wall.locator(`[data-testid="wall-photo"][data-photo-id="${id}"]`);
