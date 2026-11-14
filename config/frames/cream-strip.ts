@@ -7,6 +7,7 @@ export const creamStrip: FrameDefinition = {
   name: "Cream Strip",
   label: "크림",
   labelEn: "Cream",
+  labelZh: "奶油",
   outputWidth: STRIP.width,
   outputHeight: STRIP.height,
   background: { type: "solid", color: "#fff7e6" },

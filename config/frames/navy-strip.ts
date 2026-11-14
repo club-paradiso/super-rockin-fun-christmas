@@ -8,6 +8,7 @@ export const navyStrip: FrameDefinition = {
   name: "Navy Strip",
   label: "남색",
   labelEn: "Navy",
+  labelZh: "藏青",
   outputWidth: STRIP.width,
   outputHeight: STRIP.height,
   background: { type: "solid", color: "#f7f1e3" },

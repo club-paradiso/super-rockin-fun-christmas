@@ -344,7 +344,6 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       expect(hb.status).toBe(200);
       expect(await hb.json()).toEqual({
         wallSubmissions: "open",
-        kioskDefaultMode: "standard",
         wallPublic: false,
       });
       const { kiosks } = (await (
@@ -554,7 +553,6 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       });
       expect(await hb.json()).toEqual({
         wallSubmissions: "paused",
-        kioskDefaultMode: "standard",
         wallPublic: false,
       });
       await call(routes.settings(), "POST", "/api/admin/settings", {

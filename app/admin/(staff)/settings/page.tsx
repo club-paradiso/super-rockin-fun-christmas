@@ -1,6 +1,5 @@
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
-import { KioskModeForm } from "@/components/admin/kiosk-mode-form";
 import { PublicWallForm } from "@/components/admin/public-wall-form";
 import { WallLookForm } from "@/components/admin/wall-look-form";
 import { WALL_CONFIG } from "@/config/wall";
@@ -65,7 +64,6 @@ export default async function SettingsPage() {
         publicCount={onPublicWall.length}
         venueOnlyCount={onWall.length - onPublicWall.length}
       />
-      <KioskModeForm mode={settings.kioskDefaultMode} />
       <p className="text-base text-ink/75">
         마지막 변경: {formatTime(settings.updatedAt)}
         {updater ? ` · ${updater.displayName}` : ""}

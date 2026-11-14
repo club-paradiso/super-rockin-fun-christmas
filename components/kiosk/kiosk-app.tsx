@@ -30,7 +30,6 @@ import {
   capturedCount,
   createInitialState,
   currentPose,
-  easyStep,
   isShooting,
   kioskReducer,
   needsCamera,
@@ -41,7 +40,14 @@ import {
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
 import { isStrayTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
-import { KIOSK_COPY, KIOSK_LANGS, lines, type KioskCopy } from "@/lib/kiosk/copy";
+import {
+  HTML_LANG,
+  KIOSK_COPY,
+  KIOSK_LANGS,
+  lines,
+  localizedLabel,
+  type KioskCopy,
+} from "@/lib/kiosk/copy";
 import { deliverVideo, requestQr, sendWallConsent, uploadOnce } from "@/lib/kiosk/delivery";
 import {
   SessionRecorder,
@@ -55,7 +61,6 @@ import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
-import type { KioskMode } from "@/lib/storage/types";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { BoothScreen, BrandLockup, CameraPreview, LineIcon, PhotoCorners, Tape } from "./ui";
@@ -92,12 +97,9 @@ export function KioskApp({
   cameraMode,
   initialWallSubmissions = "open",
   initialWallPublic = false,
-  initialMode = "standard",
   staffHelp = false,
 }: {
   cameraMode: CameraMode;
-  /** Staff default start mode (settings, D67); refreshed by heartbeats. */
-  initialMode?: KioskMode;
   /** From event settings at page load; refreshed by heartbeats and upload responses. */
   initialWallSubmissions?: "open" | "paused";
   /** Staff have the public wall on (D86): the consent screen says so and sends that scope. */
@@ -110,7 +112,6 @@ export function KioskApp({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       frameId: DEFAULT_FRAME_ID,
-      mode: initialMode,
     }),
   );
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
@@ -590,13 +591,11 @@ export function KioskApp({
 
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
-  // Easy mode leaves twice as long before giving up on an unattended screen.
-  const idleSeconds = KIOSK_CONFIG.idleResetSeconds * (state.mode === "easy" ? 2 : 1);
   const idle = useIdleReset(
-    // The welcome choices go back to the attract screen too, so a half-chosen language or
-    // screen mode never waits for the next guest (D80).
+    // The welcome choices go back to the attract screen too, so a half-chosen language never
+    // waits for the next guest (D80).
     state.phase !== "attract" && !isShooting(state.phase),
-    idleSeconds,
+    KIOSK_CONFIG.idleResetSeconds,
     reset,
   );
 
@@ -703,7 +702,7 @@ export function KioskApp({
     };
   }, [mobileWaiting, mobileSession, mobileExpires]);
 
-  // ── Shared screen chrome: mode, way home, help ───────────────────────────────────────────
+  // ── Shared screen chrome: language, way home, help ───────────────────────────────────────────
   // These screens carry their own way home ("처음으로", "다 받았어요"): no second one in the footer.
   const ownHomeButton =
     state.phase === "camera-error" ||
@@ -720,22 +719,18 @@ export function KioskApp({
   const backAllowed = canGoBack(state);
   const chrome: KioskChrome = useMemo(
     () => ({
-      mode: state.mode,
       lang: state.lang,
       t,
-      easyStep: easyStep(state.phase, wallSubmissions === "open"),
       goBack: backAllowed ? () => dispatch({ type: "BACK" }) : null,
-      toggleMode: () =>
-        dispatch({ type: "SET_MODE", mode: state.mode === "easy" ? "standard" : "easy" }),
       goHome: midSession ? requestHome : null,
       quiet: isShooting(state.phase),
     }),
-    [state.mode, state.lang, t, backAllowed, state.phase, wallSubmissions, midSession, requestHome],
+    [state.lang, t, backAllowed, state.phase, midSession, requestHome],
   );
 
   // The page language follows the guest's choice (screen readers, hyphenation).
   useEffect(() => {
-    document.documentElement.lang = state.lang;
+    document.documentElement.lang = HTML_LANG[state.lang];
   }, [state.lang]);
 
   // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
@@ -760,13 +755,10 @@ export function KioskApp({
         if (!stopped && res.ok) {
           const data = (await res.json()) as {
             wallSubmissions?: "open" | "paused";
-            kioskDefaultMode?: KioskMode;
             wallPublic?: boolean;
           };
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
-          if (data.kioskDefaultMode === "standard" || data.kioskDefaultMode === "easy")
-            dispatch({ type: "SET_DEFAULT_MODE", mode: data.kioskDefaultMode });
         }
       } catch {
         // Offline: the queue badge already tells staff; the next beat will retry.
@@ -783,9 +775,8 @@ export function KioskApp({
   return (
     <KioskChromeContext.Provider value={chrome}>
       <main
-        className={`kiosk-root kiosk-desk ${state.mode === "easy" ? "kiosk-easy" : ""}`}
+        className="kiosk-root kiosk-desk"
         data-phase={state.phase}
-        data-mode={state.mode}
         data-lang={state.lang}
         data-wall-submissions={wallSubmissions}
       >
@@ -827,7 +818,6 @@ export function KioskApp({
                 ? mobileQr.svg
                 : null
             }
-            onToggleMode={chrome.toggleMode}
             onSetLang={(lang) => dispatch({ type: "SET_LANG", lang })}
             wallSubmissionsOpen={wallSubmissions === "open"}
             wallPublic={wallPublic}
@@ -919,7 +909,6 @@ interface ScreenProps {
   onStart: () => void;
   onStartMobile: () => void;
   mobileQrSvg: string | null;
-  onToggleMode: () => void;
   /** The guest's language choice on the welcome screen (D78). */
   onSetLang: (lang: KioskState<Shot>["lang"]) => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
@@ -977,23 +966,24 @@ function Screen(p: ScreenProps) {
             >
               {KIOSK_COPY.ko.attract.start}
             </button>
-            <p lang="en" className="booth-caption">
-              {KIOSK_COPY.en.attract.start}
-            </p>
+            {(["en", "zh"] as const).map((lang) => (
+              <p key={lang} lang={HTML_LANG[lang]} className="booth-caption">
+                {KIOSK_COPY[lang].attract.start}
+              </p>
+            ))}
           </div>
         </BoothScreen>
       );
 
     case "welcome": {
       // Two clear choices (2.0): take photos here, or send a photo from your own phone. The
-      // screen mode is chosen here too, and can be changed on every screen.
-      const easy = state.mode === "easy";
+      // language is chosen here too.
       return (
         <BoothScreen testId="screen-welcome" header={false} className="welcome">
           <div className="welcome-head">
             <BrandLockup className="welcome-lockup" />
             <h1 className="booth-title">{t.welcome.title}</h1>
-            {!easy && <p className="booth-lead">{t.welcome.lead}</p>}
+            <p className="booth-lead">{t.welcome.lead}</p>
           </div>
           <div className="welcome-choices">
             <button
@@ -1007,9 +997,7 @@ function Screen(p: ScreenProps) {
               </span>
               <span className="welcome-choice-text">
                 <span className="welcome-choice-title">{t.welcome.camera}</span>
-                <span className="welcome-choice-lead">
-                  {easy ? t.welcome.cameraLeadEasy : t.welcome.cameraLead}
-                </span>
+                <span className="welcome-choice-lead">{t.welcome.cameraLead}</span>
               </span>
             </button>
             <button
@@ -1025,39 +1013,20 @@ function Screen(p: ScreenProps) {
               <span className="welcome-choice-text">
                 <span className="welcome-choice-title">{t.welcome.mobile}</span>
                 <span className="welcome-choice-lead">
-                  {p.wallSubmissionsOpen
-                    ? easy
-                      ? t.welcome.mobileLeadEasy
-                      : t.welcome.mobileLead
-                    : t.welcome.paused}
+                  {p.wallSubmissionsOpen ? t.welcome.mobileLead : t.welcome.paused}
                 </span>
               </span>
             </button>
           </div>
           <div className="welcome-options">
-            <div role="radiogroup" aria-label={t.welcome.modeGroup} className="booth-seg">
-              {(["standard", "easy"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={state.mode === m}
-                  data-testid={`mode-${m}`}
-                  onClick={() => state.mode !== m && p.onToggleMode()}
-                  className="booth-seg-btn"
-                >
-                  {m === "standard" ? t.welcome.modeStandard : t.welcome.modeEasy}
-                </button>
-              ))}
-            </div>
-            {/* 한국어 · English (D78): each name in its own language, the same in both. */}
+            {/* 한국어 · English · 中文 (D78, D89): each name in its own language, the same in all. */}
             <div role="radiogroup" aria-label={t.langGroup} className="booth-seg">
               {KIOSK_LANGS.map((lang) => (
                 <button
                   key={lang}
                   type="button"
                   role="radio"
-                  lang={lang}
+                  lang={HTML_LANG[lang]}
                   aria-checked={state.lang === lang}
                   data-testid={`lang-${lang}`}
                   onClick={() => p.onSetLang(lang)}
@@ -1083,7 +1052,7 @@ function Screen(p: ScreenProps) {
       // beside the preview on a wide screen and under it on a tall one.
       const pick = state.phase === "pick";
       const chosen = getFrame(state.frameId);
-      const chosenName = state.lang === "en" ? chosen.labelEn : chosen.label;
+      const chosenName = localizedLabel(chosen, state.lang);
       return (
         <BoothScreen
           testId={pick ? "screen-pick" : "screen-frame"}
@@ -1128,9 +1097,7 @@ function Screen(p: ScreenProps) {
                       <span className="frame-art-wait animate-pulse" />
                     )}
                   </span>
-                  <span className="pick-tile-label">
-                    {state.lang === "en" ? frame.labelEn : frame.label}
-                  </span>
+                  <span className="pick-tile-label">{localizedLabel(frame, state.lang)}</span>
                   <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
                 </button>
               );
@@ -1194,9 +1161,6 @@ function Screen(p: ScreenProps) {
     case "capturing": {
       const shooting = state.phase !== "ready";
       const pose = currentPose(state);
-      // Easy mode's large type and the two start buttons need the room: before shooting, the
-      // empty shot strip steps aside (it is back during the countdown).
-      const compactReady = !shooting && state.mode === "easy";
       return (
         <BoothScreen
           testId={shooting ? "screen-shooting" : "screen-ready"}
@@ -1219,9 +1183,7 @@ function Screen(p: ScreenProps) {
               {pose && (
                 <div className="pose-guide" data-testid="pose-guide" data-pose={pose.id}>
                   <span className="booth-caption text-ink">{t.shoot.pose}</span>
-                  <span className="booth-title">
-                    {state.lang === "en" ? (pose.labelEn ?? pose.label) : pose.label}
-                  </span>
+                  <span className="booth-title">{localizedLabel(pose, state.lang)}</span>
                 </div>
               )}
             </CameraPreview>
@@ -1232,7 +1194,7 @@ function Screen(p: ScreenProps) {
                 ? t.shoot.retakeShot(state.shotIndex + 1)
                 : t.shoot.shot(state.shotIndex + 1)}
             </p>
-            {!compactReady && <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />}
+            <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
             <p className="booth-lead">
               <Lines text={t.shoot.lead} />
             </p>
@@ -1570,7 +1532,6 @@ function MobileScreen({
   dispatch: React.Dispatch<Action>;
 }) {
   const m = state.mobile;
-  const easy = state.mode === "easy";
   const t = KIOSK_COPY[state.lang].mobile;
   if (m.status === "received") {
     return (
@@ -1649,16 +1610,14 @@ function MobileScreen({
             <Lines text={t.waiting} />
           </p>
         </div>
-        {(!easy || (m.status === "ready" && m.via === "lan")) && (
-          <div className="qr-more">
-            {!easy && <p className="booth-caption">{t.note}</p>}
-            {m.status === "ready" && m.via === "lan" && (
-              <p className="booth-caption text-ink" data-testid="mobile-lan-note">
-                {t.lan}
-              </p>
-            )}
-          </div>
-        )}
+        <div className="qr-more">
+          <p className="booth-caption">{t.note}</p>
+          {m.status === "ready" && m.via === "lan" && (
+            <p className="booth-caption text-ink" data-testid="mobile-lan-note">
+              {t.lan}
+            </p>
+          )}
+        </div>
       </div>
     </BoothScreen>
   );

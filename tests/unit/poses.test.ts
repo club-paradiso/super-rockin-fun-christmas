@@ -18,6 +18,14 @@ describe("pose guide data (D71)", () => {
     expect([...counts.values()].every((n) => n === 2)).toBe(true);
   });
 
+  it("every pose has an English and a Chinese label (D78, D89)", () => {
+    for (const pose of POSE_SEQUENCE) {
+      expect(pose.labelEn).toBeTruthy();
+      expect(pose.labelEn).not.toMatch(/[\uac00-\ud7a3]/);
+      expect(pose.labelZh).toMatch(/\p{Script=Han}/u);
+    }
+  });
+
   it("the standard countdown is 10 s unless the test-only override is set", () => {
     expect(KIOSK_CONFIG.countdownSeconds).toBe(10);
   });

@@ -103,22 +103,24 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `/api/hub/*` only touches copies with `kioskId` null; a copy deleted there is final (410).
 - **The dedicated wall address is a hostname, not a second app** (D68): `WALL_HOSTS` +
   `lib/wall/host.ts` in `next.config.ts`. No second database, no wall-only backend.
-- **Easy mode is a view, not a fork** (D67): `mode` lives in `lib/kiosk/machine.ts`; never duplicate
-  the shooting, selection, consent or upload rules for it.
+- **There is one booth screen** (D89 removed easy mode, D67). No second "easy" or "large" variant:
+  a new per-guest option is a view in `lib/kiosk/machine.ts`, never a copy of the shooting,
+  selection, consent or upload rules.
 - **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
   decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, text only; no
-  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (10 s); easy mode is never
-  shorter. `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
-- **The booth language is a view too** (D78): `lang` in `lib/kiosk/machine.ts` (every guest
-  starts in Korean). Every guest string lives in `lib/kiosk/copy.ts` in both languages; never
-  hard-code booth copy in a component. Korean copy is the user's wording (D76). "이전" exists only
+  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (10 s).
+  `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
+- **The booth language is a view too** (D78, D89): `lang` in `lib/kiosk/machine.ts` (Korean,
+  English or Simplified Chinese; every guest starts in Korean). Every guest string lives in
+  `lib/kiosk/copy.ts` in all three languages; never hard-code booth copy in a component. A frame
+  or pose carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
+  `:lang(zh-Hans)` (own font, no `word-break: keep-all`): keep `<html lang>` on `HTML_LANG`. Korean copy is the user's wording (D76). "이전" exists only
   where `canGoBack` allows it: never once a shot exists or the frame is final.
 - **The booth is a letter** (D79): booth content sits on one `LetterSheet` (paper on the backdrop).
   The wax seal (`public/brand/wax-seal.webp`) is decoration only (`alt=""`, no pointer events,
   never over a button, never causing scroll) and is pressed on two screens only: the attract screen and
   the QR once it is real. The sheet is a faded diary page (D81): paper with 18 % backdrop, ink grain
-  and accent ruled lines as SVG data URIs in `app/globals.css` (never CSS gradients); easy mode has
-  no ruled lines. Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
+  and accent ruled lines as SVG data URIs in `app/globals.css` (never CSS gradients). Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
   `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button). Of the frames, only the letter frame (`shalom-letter`,
   D82) carries the seal.
 - **The booth has one layout system** (D88): `main.kiosk-root` is the viewport and a size

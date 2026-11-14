@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, answerForQr, toConsent, openWelcome } from "./helpers";
+import { openWelcome } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
  * FOLLOW THE LIGHTS 2.0 on the hub (no cloud): "내 사진으로 참여하기" end to end (booth QR →
- * phone page → upload → booth sees it → staff approve → the wall hangs it as a card), easy mode,
- * the booth default set by staff, and the staff pages on a phone-sized screen.
+ * phone page → upload → booth sees it → staff approve → the wall hangs it as a card),
+ * and the staff pages on a phone-sized screen.
  */
 test.skip(USE_SUPABASE, "hub flow runs on the local store (FTL_ROLE=hub)");
 test.describe.configure({ mode: "serial" });
@@ -69,14 +69,16 @@ test("setup: staff session and an enrolled booth", async ({ browser }) => {
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 });
 
-test("welcome: two clear choices and a screen-size switch", async () => {
+test("welcome: two clear choices and a language switch", async () => {
   await kiosk.goto("/kiosk?camera=mock");
   await openWelcome(kiosk);
   for (const id of ["start-camera", "start-mobile"]) {
     const box = (await kiosk.getByTestId(id).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(150);
   }
-  await expect(kiosk.getByTestId("mode-standard")).toHaveAttribute("aria-checked", "true");
+  for (const lang of ["ko", "en", "zh"])
+    await expect(kiosk.getByTestId(`lang-${lang}`)).toBeVisible();
+  await expect(kiosk.getByTestId("lang-ko")).toHaveAttribute("aria-checked", "true");
 });
 
 test("내 사진으로 참여하기: QR → phone → booth sees it → staff approve → wall card", async ({
@@ -157,58 +159,6 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   await wall.context().close();
 });
 
-test("easy mode: large screen, no frame pick, steps in words, home asks first, help opens", async () => {
-  await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByTestId("mode-easy").click();
-  await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "easy");
-  await kiosk.getByTestId("start-camera").click();
-  // No frame pick before shooting in easy mode.
-  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
-  await expect(kiosk.getByTestId("easy-step")).toContainText("촬영 준비");
-  const start = kiosk.getByRole("button", { name: "자유 포즈로 찍기" });
-  expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(60);
-  for (const id of ["go-home", "toggle-mode"])
-    expect((await kiosk.getByTestId(id).boundingBox())!.height).toBeGreaterThanOrEqual(60);
-  // No guest help on the booth (D74): staff are on site.
-  await expect(kiosk.getByTestId("open-help")).toHaveCount(0);
-
-  await start.click();
-  await expect(kiosk.getByTestId("countdown-number")).toHaveText("5");
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
-  await expect(kiosk.getByTestId("easy-step")).toContainText("사진 확인");
-
-  // "처음으로" mid-session asks first; "계속 찍을게요" keeps everything.
-  await kiosk.getByTestId("go-home").click();
-  await expect(kiosk.getByTestId("confirm-home")).toBeVisible();
-  await kiosk.getByRole("button", { name: "계속 찍을게요" }).click();
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible();
-
-  await toConsent(kiosk);
-  await expect(kiosk.getByTestId("easy-step")).toContainText("미디어월 참여");
-  await answerForQr(kiosk, "no");
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
-  // The next guest starts in the staff default again.
-  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
-  await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "standard");
-});
-
-test("staff choose the booth's start mode; the booth greets the next guest with it", async () => {
-  await staff.goto("/admin/settings");
-  await staff.getByTestId("kiosk-mode-easy").click();
-  await expect(staff.getByTestId("kiosk-mode-easy")).toHaveAttribute("aria-checked", "true");
-  try {
-    await kiosk.goto("/kiosk?camera=mock");
-    await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "easy");
-  } finally {
-    // Later specs use the standard flow.
-    await staff.getByTestId("kiosk-mode-standard").click();
-    await expect(staff.getByTestId("kiosk-mode-standard")).toHaveAttribute("aria-checked", "true");
-  }
-  await kiosk.goto("/kiosk?camera=mock");
-  await expect(kiosk.locator("main")).toHaveAttribute("data-mode", "standard");
-});
-
 test("staff pages on a phone: no sideways scrolling, big touch targets", async ({ browser }) => {
   const context = await browser.newContext({ ...devices["Pixel 7"] });
   const page = await context.newPage();
@@ -221,7 +171,7 @@ test("staff pages on a phone: no sideways scrolling, big touch targets", async (
     expect(overflow, `${path} scrolls sideways`).toBeLessThanOrEqual(1);
   }
   await page.goto("/admin/settings");
-  const toggle = (await page.getByTestId("kiosk-mode-easy").boundingBox())!;
+  const toggle = (await page.getByTestId("public-wall-toggle").boundingBox())!;
   expect(toggle.height).toBeGreaterThanOrEqual(44);
   await context.close();
 });

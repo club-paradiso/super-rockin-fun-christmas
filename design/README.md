@@ -92,7 +92,7 @@ Noto Sans KR 그대로이고, 카운트다운 숫자도 Noto Sans KR 이다(Corm
 주제 성구는 `MT 5:9`로 표기한다. 2026-11-13 확정한 영문 본문은 다음과 같다:
 `Blessed are the peacemakers,` / `for they will be called children of God.`
 Figma 네컷 프레임의 ‘구절 있음’ 버전과 코드 `config/frames/shalom-grid.ts`에 반영한다.
-‘구절 없음’ 편집용 버전은 그대로 둔다. 키오스크는 `기본 화면 / 간편 화면`으로 명칭을 통일하고 ‘가+’ 표기는 사용하지 않는다.
+‘구절 없음’ 편집용 버전은 그대로 둔다. 키오스크의 `기본 화면 / 간편 화면` 구분은 D89에서 없어졌다(화면은 하나, 언어는 한국어·English·中文).
 
 미디어월은 밤 장면을 그대로 두므로 자기 색을 따로 가진다: `app/globals.css` 의 `.wall-stage`
 (`--wall-*`). 다른 화면에서 쓰지 않는다.

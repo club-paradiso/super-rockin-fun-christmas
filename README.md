@@ -30,7 +30,7 @@ app has not been deployed or tried on real devices, and it is not production-rea
 | Emergency switches (pause submissions / wall / holding screen)                 | ✅ Phase 3 + 4      |
 | `/wall` media wall: approved + consented only, enrolled display, offline cache | ✅ Phase 4          |
 | 2.0: "내 사진으로 참여하기" phone upload → same review queue (D66)             | ✅ 2.0 (software)   |
-| 2.0: easy mode (large type, fewer choices) + staff default (D67)               | ✅ 2.0 (software)   |
+| 2.0: easy mode (large type, fewer choices) + staff default (D67)               | ❌ removed (D89)    |
 | 2.0: dedicated wall hostname (`WALL_HOSTS`, D68)                               | ✅ old name live    |
 | /admin opens with the kiosk enrollment password (D84)                          | ✅ software         |
 | Media-wall themes from Figma SS 03, chosen in /admin (D85)                     | ✅ software         |
