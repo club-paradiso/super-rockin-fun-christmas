@@ -10,14 +10,19 @@ import { randomBytes } from "node:crypto";
 import { getServerConfig, secureCookies, type ServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { staffPinLimits } from "@/lib/server/rate-limit";
-import { clientIp } from "@/lib/server/request";
+import { clientIp, safeEqual } from "@/lib/server/request";
 import { readCookie } from "@/lib/kiosk-auth/server";
 import { getBackend } from "@/lib/storage/server";
 import type { StaffMember, StaffPin } from "@/lib/storage/types";
 import { STAFF_COOKIE, pinSetAtMs, signStaffSession, verifyPin, verifyStaffSession } from "./pin";
+import { ADMIN_COOKIE, SHARED_OPERATOR, signAdminSession, verifyAdminSession } from "./shared";
 
 /**
- * Staff authentication has two modes (ServerConfig.staffAuth):
+ * /admin opens with the shared administrator password first (ServerConfig.sharedAdmin, D84:
+ * ./shared.ts, cookie `ftl_admin`, acting as the fixed SHARED_OPERATOR identity). When that
+ * cookie is absent or invalid, the personal staff login below still applies as a fallback.
+ *
+ * Personal staff authentication has two modes (ServerConfig.staffAuth):
  *
  * - `supabase` (cloud): Supabase Auth email OTP for IDENTITY + the staff_members allowlist for
  *   AUTHORIZATION. A valid Supabase session alone grants nothing. The auth client runs only on the
@@ -28,6 +33,8 @@ import { STAFF_COOKIE, pinSetAtMs, signStaffSession, verifyPin, verifyStaffSessi
  * Either way every request re-checks an active staff row, and staff sessions never stand in for
  * kiosk sessions (different cookies, different keys).
  */
+
+const nowSec = () => Math.floor(Date.now() / 1000);
 
 export interface PendingCookie {
   name: string;
@@ -110,9 +117,11 @@ export async function authorizeStaff(client: SupabaseClient | null): Promise<Sta
 
 export async function getStaffForPage(): Promise<StaffAuth> {
   const config = getServerConfig();
+  const { cookies } = await import("next/headers");
+  const store = await cookies();
+  if (sharedAdminSession(config, store.get(ADMIN_COOKIE)?.value ?? null)) return SHARED_AUTH;
   if (config.staffAuth?.mode === "pin") {
-    const { cookies } = await import("next/headers");
-    return authorizePinSession(config, (await cookies()).get(STAFF_COOKIE)?.value ?? null);
+    return authorizePinSession(config, store.get(STAFF_COOKIE)?.value ?? null);
   }
   return authorizeStaff(await staffAuthClientForPage());
 }
@@ -125,6 +134,8 @@ export async function authorizeStaffRequest(
   request: Request,
 ): Promise<{ auth: StaffAuth; pending: PendingCookie[] }> {
   const config = getServerConfig();
+  if (sharedAdminSession(config, readCookie(request, ADMIN_COOKIE)))
+    return { auth: SHARED_AUTH, pending: [] };
   if (config.staffAuth?.mode === "pin") {
     return {
       auth: await authorizePinSession(config, readCookie(request, STAFF_COOKIE)),
@@ -135,9 +146,53 @@ export async function authorizeStaffRequest(
   return { auth: await authorizeStaff(client?.client ?? null), pending: client?.pending ?? [] };
 }
 
-// ── hub PIN mode ──────────────────────────────────────────────────────────────────────────────
+// ── shared administrator password (D84) ───────────────────────────────────────────────────────
 
-const nowSec = () => Math.floor(Date.now() / 1000);
+const SHARED_AUTH: StaffAuth = { ok: true, staff: SHARED_OPERATOR, email: "" };
+
+/** The two secrets a shared session is bound to, or null when the login is off. */
+function sharedAdminKeys(config: ServerConfig): { sessionSecret: string; password: string } | null {
+  if (!config.sharedAdmin || config.kioskAuth.mode !== "required") return null;
+  const password = config.kioskAuth.enrollSecret;
+  return password ? { sessionSecret: config.kioskAuth.sessionSecret, password } : null;
+}
+
+function sharedAdminSession(config: ServerConfig, value: string | null): boolean {
+  const keys = sharedAdminKeys(config);
+  return !!keys && !!verifyAdminSession(keys.sessionSecret, keys.password, value, nowSec());
+}
+
+/** Constant-time check of a typed password against the kiosk enrollment password. */
+export function checkAdminPassword(input: string): boolean {
+  const keys = sharedAdminKeys(getServerConfig());
+  return !!keys && safeEqual(input, keys.password);
+}
+
+/** Set-Cookie value for a shared administrator session (a clearing cookie when `open` is false). */
+export function adminCookieHeader(request: Request, open: boolean): string {
+  const config = getServerConfig();
+  const keys = open ? sharedAdminKeys(config) : null;
+  let value = "";
+  let maxAge = 0;
+  if (keys && config.sharedAdmin) {
+    const iat = nowSec();
+    maxAge = Math.round(config.sharedAdmin.sessionHours * 3600);
+    value = signAdminSession(keys.sessionSecret, keys.password, {
+      issuedAt: iat,
+      expiresAt: iat + maxAge,
+    });
+  }
+  return [
+    `${ADMIN_COOKIE}=${value}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAge}`,
+    ...(secureCookies(config, request) ? ["Secure"] : []),
+  ].join("; ");
+}
+
+// ── hub PIN mode ──────────────────────────────────────────────────────────────────────────────
 
 /**
  * Staff cookies are signed with a key derived from KIOSK_SESSION_SECRET (./pin.ts adds a

@@ -1,4 +1,5 @@
 import "server-only";
+import { MIN_ADMIN_PASSWORD_LENGTH } from "@/lib/staff-auth/shared";
 
 /**
  * All server configuration in one place, validated once. Secrets live only in server-side env
@@ -27,8 +28,15 @@ export interface ServerConfig {
   publicBaseUrl: URL | null;
   store: StoreBackend;
   supabase: { url: string; serviceRoleKey: string; bucket: string } | null;
-  /** How staff sign in. Null = /admin unavailable. */
+  /** How staff sign in (the fallback when sharedAdmin is on). Null = no staff login configured. */
   staffAuth: StaffAuthConfig | null;
+  /**
+   * Shared-password /admin login (D84): the password is the kiosk enrollment password
+   * (kioskAuth.enrollSecret). Null = off: no enrollment password, or it is too short
+   * (`sharedAdminProblem` says which, for the login page).
+   */
+  sharedAdmin: { sessionHours: number } | null;
+  sharedAdminProblem: "no_password" | "password_too_short" | "auth_disabled" | null;
   /** Build identifier reported by kiosk heartbeats. */
   appBuild: string;
   localDataDir: string;
@@ -233,6 +241,19 @@ export function parseServerConfig(env: Env): ServerConfig {
     problems.push("SUPABASE_ANON_KEY is required for staff login (/admin) in production");
   }
 
+  // /admin opens with the kiosk enrollment password (D84). There is deliberately no separate
+  // ADMIN_PASSWORD: the user decided on one shared credential. A short password is refused for
+  // /admin only (it still enrolls booths), so a weak value can never be the key to moderation.
+  let sharedAdmin: ServerConfig["sharedAdmin"] = null;
+  let sharedAdminProblem: ServerConfig["sharedAdminProblem"] = null;
+  if (kioskAuth.mode !== "required") sharedAdminProblem = "auth_disabled";
+  else if (!kioskAuth.enrollSecret) sharedAdminProblem = "no_password";
+  else if (kioskAuth.enrollSecret.length < MIN_ADMIN_PASSWORD_LENGTH)
+    sharedAdminProblem = "password_too_short";
+  else sharedAdmin = { sessionHours: positiveNumber(env, "ADMIN_SESSION_HOURS", 12, problems) };
+  if (sharedAdmin && sharedAdmin.sessionHours > 24 * 7)
+    problems.push("ADMIN_SESSION_HOURS must be 168 (one week) or less");
+
   const cronSecret = env.CRON_SECRET?.trim() || null;
   if (cronSecret && cronSecret.length < 32)
     problems.push("CRON_SECRET must be at least 32 characters");
@@ -324,6 +345,8 @@ export function parseServerConfig(env: Env): ServerConfig {
     retentionDays,
     kioskAuth,
     staffAuth,
+    sharedAdmin,
+    sharedAdminProblem,
     appBuild: (env.VERCEL_GIT_COMMIT_SHA || env.FTL_APP_BUILD || "dev").slice(0, 12),
     cronSecret,
     // Vercel functions accept at most 4.5 MB request bodies; a final four-cut JPEG is ~0.3–1.5 MB.

@@ -51,7 +51,7 @@ export async function latestLoginCode(email: string, after: number): Promise<str
 
 /** Staff login through the real UI: email → code from Mailpit → /admin. */
 export async function staffLogin(page: Page, email: string) {
-  await page.goto("/admin/login");
+  await page.goto("/admin/login?staff=1");
   await page.getByLabel("스태프 이메일").fill(email);
   const sentAt = Date.now();
   await page.getByRole("button", { name: "로그인 코드 받기" }).click();

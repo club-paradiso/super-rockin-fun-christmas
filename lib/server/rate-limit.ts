@@ -55,6 +55,24 @@ export function staffPinLimits() {
   });
 }
 
+/**
+ * Shared administrator password limits (D84). Only wrong passwords count toward the lock, so
+ * several volunteers behind one venue address can all sign in. There is no global lock on
+ * purpose: one would let anyone on the internet lock the real operators out by guessing. The
+ * password's own length (≥ 12 characters, lib/staff-auth/shared.ts) is what makes guessing
+ * hopeless; this only stops a single client from hammering the server. On globalThis for the same
+ * reason as staffPinLimits.
+ */
+export function adminPasswordLimits() {
+  const g = globalThis as {
+    __ftlAdminLimits?: { perIp: RateLimiter; failuresPerIp: RateLimiter };
+  };
+  return (g.__ftlAdminLimits ??= {
+    perIp: new RateLimiter(30, 15 * 60_000),
+    failuresPerIp: new RateLimiter(8, 15 * 60_000),
+  });
+}
+
 export const limiters = {
   /** Enrollment attempts per client IP. */
   enroll: new RateLimiter(10, 15 * 60_000),

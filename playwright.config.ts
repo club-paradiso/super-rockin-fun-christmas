@@ -9,6 +9,12 @@ import {
   USE_SUPABASE,
 } from "./e2e/env";
 
+/**
+ * Optional: a Chromium binary to use instead of the build this Playwright version pins (for
+ * machines that ship their own browser, e.g. `E2E_CHROMIUM_PATH=/opt/pw-browsers/chromium`).
+ */
+const chromiumPath = process.env.E2E_CHROMIUM_PATH;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
@@ -19,6 +25,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
+    ...(chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {}),
   },
   projects: [
     {

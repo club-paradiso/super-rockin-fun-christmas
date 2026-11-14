@@ -149,7 +149,11 @@ describe("PIN login", () => {
     const { POST } = await routes.signout();
     const res = await POST(json("/api/admin/auth/signout", {}, adminCookie));
     expect(res.status).toBe(303);
-    expect(res.headers.get("set-cookie")).toMatch(/^ftl_staff=;.*Max-Age=0/);
+    // Both kinds of staff session are cleared: the shared administrator one and the PIN one.
+    expect(res.headers.getSetCookie()).toEqual([
+      expect.stringMatching(/^ftl_admin=;.*Max-Age=0/),
+      expect.stringMatching(/^ftl_staff=;.*Max-Age=0/),
+    ]);
   });
 });
 

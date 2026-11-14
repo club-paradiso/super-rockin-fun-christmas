@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { KioskApp } from "@/components/kiosk/kiosk-app";
 import { StaffNotice } from "@/components/staff-notice";
@@ -14,6 +14,18 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "STUDIO SHALOM · Photo Booth",
   robots: { index: false, follow: false },
+};
+
+/**
+ * The booth draws to the edges of the screen (a tablet in a stand, or added to the home screen)
+ * and pads itself with the safe-area insets (.booth-screen in app/globals.css). Zoom is left on:
+ * a guest who needs it can still pinch.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ddbda1",
 };
 
 export default async function KioskPage({
@@ -60,6 +72,7 @@ export default async function KioskPage({
     <KioskApp
       cameraMode={cameraMode}
       initialWallSubmissions={settings.pauseSubmissions ? "paused" : "open"}
+      initialWallPublic={settings.wallPublic}
       initialMode={settings.kioskDefaultMode}
       staffHelp={getServerConfig().staffAuth?.mode === "pin"}
     />

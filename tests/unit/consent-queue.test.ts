@@ -40,7 +40,7 @@ describe("ConsentQueue", () => {
 
     await uploads.delete(s); // the upload queue removes an entry once the server has it
     await q.processDue(true);
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, true);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined);
     expect(await q.pending()).toBe(0);
   });
 
@@ -51,7 +51,29 @@ describe("ConsentQueue", () => {
     await q.enqueue(s, true);
     await q.enqueue(s, false);
     await q.processDue();
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, false);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, false, undefined);
+  });
+
+  // D86: the scope is what the consent screen showed when the guest answered. It is kept with
+  // the answer across retries, replaced by a later answer, and never kept with a "no".
+  it("keeps the public scope with a yes and drops it with a later answer", async () => {
+    const send = vi.fn<ConsentSender>(async () => "done");
+    const q = new ConsentQueue(new MemoryConsentStore(), new MemoryQueueStore(), send);
+    const a = uuid();
+    await q.enqueue(a, true, "public");
+    await q.processDue();
+    expect(send).toHaveBeenLastCalledWith(a, true, "public");
+
+    const b = uuid();
+    await q.enqueue(b, true, "public");
+    await q.enqueue(b, true); // answered again after staff switched the public wall off
+    await q.processDue();
+    expect(send).toHaveBeenLastCalledWith(b, true, undefined);
+
+    const c = uuid();
+    await q.enqueue(c, false, "public");
+    await q.processDue();
+    expect(send).toHaveBeenLastCalledWith(c, false, undefined);
   });
 
   it("retries with backoff on retry and on a thrown sender, and forgets on done", async () => {
@@ -117,7 +139,7 @@ describe("ConsentQueue", () => {
       send,
     );
     await after.processDue(true);
-    expect(send).toHaveBeenCalledExactlyOnceWith(s, true);
+    expect(send).toHaveBeenCalledExactlyOnceWith(s, true, undefined);
   });
 
   it("upgrading the version-1 database keeps photos that were waiting to upload", async () => {

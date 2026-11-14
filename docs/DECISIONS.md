@@ -1078,3 +1078,202 @@ User request (2026-11-13): pretty landscape frames too ("가로 프레임도 이
 - New frame words: "ADMIT ONE", "No. {date}", "DEC 01"–"DEC 25", "MERRY CHRISTMAS". Written here, not
   by the user: they need the user's check, like any guest copy.
 - Figma: not drawn yet (SS 02 has the D82 row only).
+
+## D84 · /admin opens with the kiosk enrollment password; the session is its own
+
+User decision (2026-11-13, non-negotiable): the administrator password is the **same** value as
+booth enrollment, `KIOSK_ENROLL_SECRET`. No `ADMIN_PASSWORD`, no email step, no second PIN in the
+main flow: open `/admin`, type the password, press 관리자 화면 열기.
+
+- **One credential, separate sessions.** `POST /api/admin/auth/password` issues an HttpOnly,
+  SameSite=Lax cookie `ftl_admin` (`lib/staff-auth/shared.ts`): `a1.<issuedAt>.<expiresAt>.<hmac>`,
+  12 hours (`ADMIN_SESSION_HOURS`). Its MAC key is derived from `KIOSK_SESSION_SECRET` with an
+  admin-only label **and the password itself**, so (a) a kiosk cookie or a hub PIN cookie can never
+  verify as an administrator, and the other way round, and (b) changing either secret ends every
+  administrator session at once. Kiosk routes never read `ftl_admin`; staff routes never read
+  `ftl_kiosk`. Enrolling a booth sets no administrator cookie; logging in enrolls nothing.
+- **Who it acts as.** Everyone who knows the password is the same fixed identity,
+  `SHARED_OPERATOR` (id `5ca1ab1e-0000-4000-8000-000000000001`, shown as 공용 관리자). It is not a
+  row in the staff list (nothing to deactivate, no PIN, nobody to impersonate); the audit log
+  stores that id for every action taken through a shared session.
+- **Checks.** Constant-time comparison (`safeEqual`), same-origin + JSON only, the password is
+  never logged, echoed or stored in the browser (the field is cleared after every attempt). Limits
+  per client address: 30 attempts and 8 wrong passwords per 15 minutes. There is deliberately no
+  global lock: it would let anyone on the internet lock the operators out by guessing.
+- **A short password is refused for /admin** (< 12 characters, `sharedAdminProblem`): it still
+  enrolls booths, the login page says why, and the personal login is all that is offered.
+- **The personal staff login stays as a fallback**, one link from the login page
+  (`/admin/login?staff=1`): email code on the cloud, name + PIN on the hub. It is still needed for
+  booth help mode on the hub (D59 checks a staff PIN) and it is the only way in when no usable
+  password is configured.
+- **Accepted trade-offs (the user's).** Anyone who can enroll a booth can now moderate, delete and
+  change settings. The audit log says _that_ the shared operator did something, not _which
+  person_. Sign-out clears the cookie in that browser; a copied cookie stays valid until it
+  expires (≤ 12 h) or a secret is rotated, because the session is stateless. Rotate
+  `KIOSK_ENROLL_SECRET` if the password leaks: that also means re-typing it for new booth
+  enrollments, while already-enrolled booths keep working (their cookie does not depend on it).
+
+## D85 · The media wall has themes; a theme is data
+
+The wall was still the FOLLOW THE LIGHTS night picture with a new wordmark. The current Figma
+(`SS 03 · 미디어월 시안 — The Wall of Peace`) holds eight STUDIO SHALOM backgrounds and an empty
+"최종 확인용 캔버스": nothing had been chosen, and nothing was in code.
+
+- **A theme is one entry in `config/wall-themes.ts`** (`WallTheme`, `lib/wall/themes.ts`): id,
+  staff name, Figma source frame, a bundled 3840 × 1080 picture and 640 × 180 preview, a fallback
+  colour, the hang line (`y = y0 − curve·(x − midX)²`), the strip box, the slots, how a photo is
+  held (a drawn wooden peg, or pegs already in the picture), an optional drawn twine, the widest
+  box for non-strip photos, where the wordmark goes, low-spec slots. The renderer
+  (`components/wall`) never knows a theme by name.
+- **Nine themes.** Eight from Figma — S01 눈 덮인 예배당, S02 성탄의 별, S03 평화의 벽, S04
+  베들레헴 (3:1, cut to 32:9 by `scripts/wall-backgrounds.mjs`), C01–C04 해안 창가 (32:9) — plus
+  the old night scene as `night-window`, marked `legacy`: selectable, never the default.
+- **Slots are measured in each picture** and keep clear of what the picture is about (the chapel,
+  Bethlehem and the manger, the setting sun, the cross) and of the lantern and candles. S02/S04
+  have eight pegs painted in; photos hang from every other peg so a wide photo never touches its
+  neighbour. C03's photos hang from its painted string of lights. C01/C02/C04 have nothing to hang
+  from, so the app draws a twine across the window.
+- **Every format keeps its proportions**: 1:3 strips in the strip box; 2×2, single, landscape
+  ticket/card/calendar in a box up to the theme's `wideMax` (`framedPhotoBox`); phone photos on
+  their card. `object-fit: contain` everywhere; nothing is stretched or cropped.
+  `tests/unit/wall-themes.test.ts` checks every theme × every frame: inside the picture, ≥ 30 px
+  between neighbours, the wordmark never behind a photo.
+- **The wordmark is real text** (`STUDIO SHALOM | 평화의 벽`) placed per theme where no photo
+  reaches; on a picture with no calm spot it sits on a small paper tag.
+- **Staff choose in /admin → 설정 → 미디어월 배경**: preview cards, the active theme, optional
+  rotation between ticked themes every 5–120 minutes, one-tap reset. Stored as
+  `event_settings.wall_look` (jsonb), one audited settings call. The feed names the theme, so every
+  wall follows within one poll (≤ 5 s) with a cross-fade, and rotation is a function of the clock
+  alone (`activeThemeId`): all displays agree, a reload changes nothing. Changing the look never
+  touches photos, moderation or the booth.
+- **Default: `peace-wall` (S03). Chosen by Claude, not by the user**: the plain plaster wall is
+  named after the brand line 평화의 벽 and is the calmest backdrop for photos. The user confirms or
+  changes it in 설정.
+- **No ambient animation.** A still picture is the design; photos swing in and out as before,
+  fades only in low-spec mode (`?lite=1`) and with `prefers-reduced-motion`.
+- **Known limit: the originals are about 2048 px wide.** On a 3840-px LED they are enlarged 1.9×
+  (Lanczos resampling, no added detail). A sharper original replaces the file without touching the
+  numbers if the composition is the same.
+
+## D86 · The wall address needs no enrollment; what it may show is decided per photo
+
+User requirement: `https://studio-shalom-wall.vercel.app` opens the wall at once: no code, no
+device password, no enrollment form. But an address on the internet is not the screen at the
+venue, and "이 사진을 미디어월에 띄워도 될까요?" was only ever asked about that screen.
+
+- **The page is open; the feed decides.** `/wall` renders for anyone. `/api/wall/feed` and the
+  image proxy classify each request (`lib/wall/audience.ts`): a valid kiosk cookie is an enrolled
+  venue **display** and gets what it always got; anything else (no cookie, forged, expired,
+  revoked) is the **public** audience. Being public is not an error and grants nothing else.
+- **Public audience = public-scope consent only.** `photos.wall_public` (default false) is set
+  only by the consent transition, only together with a YES, and only when (a) the booth or phone
+  page showed the public-wall line and said so (`scope: "public"` / `x-wall-scope: public`) and
+  (b) staff have the public wall switched on at that moment. A NO always clears it. Staff actions
+  never touch it. The anonymous feed reads `wall_public_photos` (the wall rule AND `wall_public`);
+  the image route re-checks the row on every request.
+- **Default off, and old photos stay venue-only.** `event_settings.wall_public` starts false: an
+  anonymous viewer then gets the scene and no photo ids at all. Every photo taken before this
+  change, or while the switch was off, has `wall_public = false` for good: nothing can widen a
+  consent after the fact. They still appear on an enrolled display.
+- **The switch is a staff decision with a confirmation** (/admin → 설정 → 공개 미디어월). Turning
+  it on makes the booth add one line to the consent screen, "미디어월은 행사장 화면과 온라인
+  주소에서 함께 보여요." (written by Claude, pending the user's wording, D76), within one
+  heartbeat (≤ 1 min); the phone page shows the same line. Turning it off stops sending photos to
+  anonymous viewers at once and keeps the consent records.
+- **Anonymous viewers only read.** `/api/wall/shown` (exposure log, show-now) and the heartbeat
+  still need a kiosk session (401 otherwise); the public feed is always newest-first and ignores
+  `?on=`, so nothing an anonymous browser sends can change the rotation, exposure counts or
+  anything staff see. An enrolled display keeps the fair rotation (D46).
+- **Everything else is unchanged for both audiences**: moderation, PAUSE WALL, the holding screen
+  and opening hours apply on the server; hides and deletes leave within one poll; ids and frame
+  ids only, `no-store`, no storage paths, tokens or kiosk ids; rate limits per display / per
+  address.
+- **Hub mode.** Consent and moderation never go to the cloud (D40), so with a hub the cloud wall
+  address shows the scene with no photos; the venue wall is the hub's `/wall`. Phone photos the
+  hub imports from the cloud inbox are venue scope.
+- **Cost to know about.** Each open wall polls every 5 s and is not cached (a hide must leave in
+  one poll). Many people keeping the public address open means that many function calls a minute.
+- This replaces "the wall display is an enrolled device" (D36) for _viewing_. Enrollment remains,
+  for the screen that should show every approved photo and report what it showed.
+
+## D87 · STUDIO SHALOM addresses: add the new names, keep the old ones working
+
+Wanted: `https://studio-shalom.vercel.app` (booth, staff, guest links) and
+`https://studio-shalom-wall.vercel.app` (wall), on the same Vercel project, database and code.
+
+- **Checked 2026-11-13:** both new names answer `404 DEPLOYMENT_NOT_FOUND` (not attached to any
+  deployment, so they are free to claim); `follow-the-lights.vercel.app` and
+  `follow-the-lights-wall.vercel.app` serve the current production.
+- **Not done here: attaching the names and changing the variables.** The Vercel connection of this
+  session cannot see the `follow-the-lights` project and the stored API token is rejected, so the
+  steps are written out in `docs/DEPLOYMENT.md` "10".
+- **No code change is needed to serve two booth names or two wall names.** `WALL_HOSTS` is already
+  a list; CSRF checks accept the request's own host; guest tokens, phone-upload tokens and session
+  cookies do not contain a host. So the migration is additive:
+  `PUBLIC_BASE_URL=https://studio-shalom.vercel.app` (new QR codes),
+  `WALL_HOSTS=studio-shalom-wall.vercel.app,follow-the-lights-wall.vercel.app`.
+- **The old names are kept, not redirected.** A QR printed on a phone screen yesterday points at
+  the old booth name and must keep opening for its 72 hours; a booth enrolled on the old name has
+  a host-only cookie and would have to be enrolled again on the new one. Redirecting the old booth
+  name would break both, for a cosmetic gain. Old _wall_ name: its `/admin`, `/kiosk`, `/p/…`,
+  `/m/…` go to the new booth name as before (D68), and `/` stays the wall.
+- **No loops:** a wall host never redirects to itself (`wallHostRedirects` skips the booth host),
+  and the booth host has no redirects at all (`tests/unit/wall-host.test.ts`).
+- **Internal names stay** (`FTL_*`, `ftl_*`, IndexedDB `follow-the-lights`, the Vercel project
+  name, the Supabase `project_id`): renaming them loses queued uploads or breaks deployed hubs.
+
+## D88 · The booth has one layout system, sized from the booth's own box
+
+The owner ran the booth on an iPad Air 4 (Safari, 820 × 1180 and 1180 × 820) and found it broken:
+proportions off, buttons of several sizes, cramped or empty screens. A baseline capture of 11
+viewports × 29 screens showed why: screens were sized from `vh`/`vw` with fixed minimums, so most
+of them were taller than a tablet and the page scrolled (frame choice by up to 265 px, with the
+footer off screen and the main button drawn over the cards), and five different button formulas
+were in use. Two of the defects were functional: the invisible staff-help corner lay on top of
+"이전" on portrait tablets, and a scrolled screen carried its scroll position into the next one.
+
+- **One box, one scroll area.** `main.kiosk-root` is exactly the viewport (`100dvh`, `100vh`
+  fallback), never scrolls, and is a size container. `.kiosk-scroll` inside it is the only scroll
+  area; every new screen starts at its top.
+- **Two units, a handful of tokens.** `--bw` / `--bh` are 1 % of the booth's width and height
+  (container units, viewport units as fallback). Space (`--booth-pad`, `--sheet-pad-*`,
+  `--gap-*`), type (`--fs-title`, `--fs-lead`, `--fs-caption`), controls (`--btn-*`, `--ctl-*`)
+  and decoration (`--seal`, `--qr`) are all `clamp(floor, min(k·--bh, k·--bw), ceiling)`. Easy
+  mode overrides the same tokens; it has no layout of its own (D67).
+- **Three compositions, chosen by shape, not by device name**: wide
+  (`min-aspect-ratio: 5/4`: the picture beside the controls), tall (one column), short
+  (`max-height: 759px`: compact buttons). No user-agent sniffing.
+- **Pictures take the room that is left**: the camera preview is `min(100cqw, 100cqh × 4/3)` of
+  its stage, the six-print grid computes its width from the stage height, frames are shown whole
+  with `object-fit: contain`. Preview = result still holds (4:3, mirrored).
+- **Two button sizes, one shape.** L (`.booth-btn-primary` / `-secondary`): at least 80 px tall,
+  or 64–80 px when the booth is under 760 px tall. M (`.booth-btn-m`, chrome, segmented): at least
+  52 px. Pills, an `:active` state that sinks and darkens, `touch-action: manipulation`, labels
+  that wrap instead of clipping. Nothing depends on hover.
+- **When the screen is too short** (a software keyboard, Safari toolbars, 1024 × 560): gaps shrink
+  first, type and targets stop at their floors, then the screen grows and scrolls inside the booth
+  with a hint. An action is never clipped.
+- **Safe areas**: padding is `max(token, env(safe-area-inset-*))`; `/kiosk` sets
+  `viewport-fit=cover`. Zoom is not disabled.
+- **Two screens changed composition** (Figma and D81b said otherwise): frame choice is one large
+  preview plus small tiles for every frame (no inner scrolling list); photo review on a wide
+  screen is 3 × 2 beside the title and button, not six in one row.
+- **Around the layout**: a finger tap in the first 350 ms of a new screen is ignored
+  (`lib/kiosk/tap-guard.ts`: a double tap no longer presses the button that appears under the
+  finger; touch and pen only). The camera is taken again when the page returns from the background
+  (`lib/kiosk/camera-recovery.ts`), and a stream that arrives after the guest has left is stopped
+  (`BrowserCamera`). The staff-help corner is hit-tested on the window instead of being an
+  overlaid button.
+- **Checked by** `e2e/tablet-matrix.spec.ts`: whole sessions at 820 × 1180, 1180 × 820,
+  768 × 1024, 1024 × 768, 600 × 960 and 820 × 1060, easy mode at the two iPad Air sizes, rotation,
+  a 700 × 460 scroll fallback, a refused camera, a double tap. At every screen: no sideways
+  overflow, every control on screen or scrollable to and hit by a touch at its centre, no
+  overlaps, no tape or seal on a control, targets ≥ 48 px, 4:3 preview, whole frames, a square
+  fully visible QR.
+- **Not verified**: anything on a real iPad or in Safari/WebKit. `dvh`, safe-area insets,
+  container queries, `@property` and Safari's camera behaviour in the background were only run in
+  Chromium at tablet sizes. Full fidelity needs Safari 16.4 or later; older versions get the
+  viewport-unit fallbacks, which were written but not run.
+- **Left as is**: the idle-warning bar covers the footer while it shows (the first touch
+  dismisses it); the staff help panel and `/kiosk/enroll` were not restyled; strip frames leave
+  wide empty paper beside the preview on the frame and consent screens.

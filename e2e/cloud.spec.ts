@@ -85,7 +85,7 @@ async function typePin(page: Page, pin: string) {
 
 test("setup: staff and an enrolled booth on the hub", async ({ browser }) => {
   staff = await newPage(browser);
-  await staff.goto("/admin/login");
+  await staff.goto("/admin/login?staff=1");
   await staff.getByLabel("설정 코드").fill(HUB_SETUP_CODE);
   await staff.getByLabel("이름").fill("현장 책임자");
   await typePin(staff, PIN);

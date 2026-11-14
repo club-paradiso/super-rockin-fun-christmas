@@ -46,7 +46,10 @@ export default async function AuditPage() {
             data-action={e.action}
           >
             <span className="font-mono text-ink/75">{formatTime(e.occurredAt)}</span>
-            <strong className="text-lg">{ACTION[e.action] ?? e.action}</strong>
+            <strong className="text-lg">
+              {ACTION[e.action] ?? e.action}
+              {e.details?.wall_public === true && " (공개 미디어월 포함)"}
+            </strong>
             <span className="text-ink/75">{e.actorLabel}</span>
             {e.fromState && e.toState && e.subjectType === "photo" && (
               <span>

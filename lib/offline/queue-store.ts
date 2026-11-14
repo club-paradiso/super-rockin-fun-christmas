@@ -51,9 +51,17 @@ const DB_VERSION = 2;
  * The guest's media-wall answer for a session, kept until the hub has it (AUDIT R1/R2: it used to
  * be sent once, and only if the QR was already showing).
  */
+/** What a wall consent covers beyond the venue screen. Only one wider scope exists. */
+export type ConsentScope = "public";
+
 export interface QueuedConsent {
   sessionId: string;
   consent: boolean;
+  /**
+   * "public": the consent screen showed the public-wall notice when the guest answered (D86).
+   * Absent = the venue wall only (also every answer queued before D86).
+   */
+  scope?: ConsentScope;
   createdAt: number;
   attempts: number;
   nextAttemptAt: number;

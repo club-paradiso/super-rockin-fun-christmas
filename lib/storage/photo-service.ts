@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import { isMobilePhoto, MOBILE_FRAME_ID } from "@/config/mobile";
 import { VIDEO_MIMES, hasVideoSignature, videoExt, type VideoMime } from "@/lib/video/format";
-import { isWallEligible, planModeration, type ModerationAction } from "@/lib/ops/moderation";
+import {
+  isPublicWallEligible,
+  isWallEligible,
+  planModeration,
+  type ModerationAction,
+} from "@/lib/ops/moderation";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
   Actor,
@@ -102,6 +107,18 @@ export interface PutMobileInput {
   data: Uint8Array;
   /** PAUSE SUBMISSIONS: a new phone photo is refused; a retry of one already stored is not. */
   submissionsPaused: boolean;
+  /** The phone page told the guest the wall is also shown at its public address (D86). */
+  publicScope?: boolean;
+}
+
+/** What the consent routes pass along with a guest's answer. */
+export interface ConsentOptions {
+  submissionsPaused: boolean;
+  /**
+   * True only when the guest was shown the public-wall notice AND the public wall is switched on
+   * (the route checks both). Recorded with a YES; a NO always clears it (D86).
+   */
+  publicScope?: boolean;
 }
 
 export type PutMobileResult =
@@ -217,6 +234,7 @@ export class PhotoService {
         created.getTime() + this.opts.retentionDays * 86_400_000,
       ).toISOString(),
       wallConsent: false,
+      wallPublic: false,
       moderationStatus: "NONE",
       deletedAt: null,
       objectDeletedAt: null,
@@ -294,6 +312,7 @@ export class PhotoService {
         created.getTime() + this.opts.retentionDays * 86_400_000,
       ).toISOString(),
       wallConsent: false,
+      wallPublic: false,
       moderationStatus: "NONE",
       deletedAt: null,
       objectDeletedAt: null,
@@ -309,14 +328,15 @@ export class PhotoService {
       if (!winner) throw new Error("Session conflict but no row found");
       return this.resumeMobile(winner, input.kioskId);
     }
-    return this.consentMobile(row, input.kioskId, false);
+    return this.consentMobile(row, input.kioskId, false, input.publicScope === true);
   }
 
   /** The same QR again (a lost response, or a hub import retried). Never a second photo. */
   private async resumeMobile(row: PhotoRow, kioskId: string | null): Promise<PutMobileResult> {
     if (isGone(row) || !isMobilePhoto(row)) return { ok: false, reason: "closed" };
+    // A retry finishing the consent step: venue scope only, since nothing says what the page showed.
     if (row.moderationStatus === "NONE" && !row.wallConsent)
-      return this.consentMobile(row, kioskId, true);
+      return this.consentMobile(row, kioskId, true, false);
     return { ok: true, photoId: row.id, moderationStatus: row.moderationStatus, duplicate: true };
   }
 
@@ -324,12 +344,14 @@ export class PhotoService {
     row: PhotoRow,
     kioskId: string | null,
     duplicate: boolean,
+    publicScope: boolean,
   ): Promise<PutMobileResult> {
     const updated = await this.backend.photos.transition({
       photoId: row.id,
       from: "NONE",
       to: "PENDING",
       wallConsent: true,
+      wallPublic: publicScope,
       actor: kioskId ? { type: "kiosk", id: kioskId } : { type: "system", id: null },
       action: "mobile_upload_consent",
     });
@@ -467,7 +489,7 @@ export class PhotoService {
     token: string,
     consent: boolean,
     kioskId: string | null,
-    opts: { submissionsPaused: boolean } = { submissionsPaused: false },
+    opts: ConsentOptions = { submissionsPaused: false },
   ): Promise<ConsentResult> {
     const found = await this.resolve(token);
     if (!found.ok || found.row.kioskId !== kioskId) return { ok: false, reason: "not_found" };
@@ -484,7 +506,7 @@ export class PhotoService {
     sessionId: string,
     consent: boolean,
     kioskId: string | null,
-    opts: { submissionsPaused: boolean } = { submissionsPaused: false },
+    opts: ConsentOptions = { submissionsPaused: false },
   ): Promise<ConsentResult> {
     const row = await this.backend.photos.findBySessionId(sessionId);
     if (!row || isGone(row) || row.kioskId !== kioskId) return { ok: false, reason: "not_found" };
@@ -495,13 +517,17 @@ export class PhotoService {
     row: PhotoRow,
     consent: boolean,
     kioskId: string | null,
-    opts: { submissionsPaused: boolean },
+    opts: ConsentOptions,
   ): Promise<ConsentResult> {
     if (consent && opts.submissionsPaused) return { ok: false, reason: "paused" };
     const from = row.moderationStatus;
     const reviewable = from === "NONE" || from === "PENDING";
     const to: ModerationStatus = consent ? "PENDING" : "NONE";
-    if (!reviewable || (from === to && row.wallConsent === consent)) {
+    const wallPublic = consent && opts.publicScope === true;
+    if (
+      !reviewable ||
+      (from === to && row.wallConsent === consent && row.wallPublic === wallPublic)
+    ) {
       return { ok: true, wallConsent: row.wallConsent, moderationStatus: from };
     }
     const updated = await this.backend.photos.transition({
@@ -509,6 +535,7 @@ export class PhotoService {
       from,
       to,
       wallConsent: consent,
+      wallPublic,
       actor: { type: "kiosk", id: kioskId },
       action: consent ? "guest_consent_yes" : "guest_consent_no",
     });
@@ -713,9 +740,13 @@ export class PhotoService {
     return { ok: true };
   }
 
-  /** Photos the wall may show right now, newest first. Ids and frames only — no paths. */
-  async wallPhotos(limit: number): Promise<WallPhoto[]> {
-    const rows = await this.backend.photos.listWallEligible(limit);
+  /**
+   * Photos the wall may show right now, newest first. Ids and frames only — no paths.
+   * `publicOnly` (an anonymous viewer of the wall address, D86): only photos whose consent
+   * covers the public address.
+   */
+  async wallPhotos(limit: number, publicOnly = false): Promise<WallPhoto[]> {
+    const rows = await this.backend.photos.listWallEligible(limit, publicOnly);
     return rows.map(({ id, frameId, createdAt }) => ({ id, frameId, createdAt }));
   }
 
@@ -728,9 +759,13 @@ export class PhotoService {
    * next to it (deleted with it). Never the 640 px staff thumbnail, which is too small to read on
    * the LED (docs/ARCHITECTURE.md 1.8).
    */
-  async wallImage(photoId: string): Promise<{ data: Uint8Array; mime: PhotoMime } | null> {
+  async wallImage(
+    photoId: string,
+    publicOnly = false,
+  ): Promise<{ data: Uint8Array; mime: PhotoMime } | null> {
     const row = await this.backend.photos.getById(photoId);
     if (!row || isGone(row) || !isWallEligible(row)) return null;
+    if (publicOnly && !isPublicWallEligible(row)) return null;
     const path = derivedPath(row.objectPath, "wall");
     const cached = await this.backend.objects.get(path);
     if (cached) return { data: cached, mime: "image/jpeg" };
@@ -747,7 +782,12 @@ export class PhotoService {
     await this.backend.objects.put(path, made, "image/jpeg").catch(() => undefined);
     // Deleted or withdrawn while we were resizing: do not leave the copy behind.
     const after = await this.backend.photos.getById(photoId);
-    if (!after || isGone(after) || !isWallEligible(after)) {
+    if (
+      !after ||
+      isGone(after) ||
+      !isWallEligible(after) ||
+      (publicOnly && !isPublicWallEligible(after))
+    ) {
       await this.backend.objects.remove(path).catch(() => undefined);
       return null;
     }

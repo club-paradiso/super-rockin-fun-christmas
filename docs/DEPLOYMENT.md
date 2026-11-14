@@ -36,19 +36,21 @@ Next.js server is the only thing that talks to Supabase.
 2. Environment variables (Production, and Preview if you test previews). Use
    `openssl rand -base64 48` for the secrets:
 
-| name                        | value                                                                               |
-| --------------------------- | ----------------------------------------------------------------------------------- |
-| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open   |
-| `PHOTO_STORE`               | `supabase`                                                                          |
-| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                         |
-| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                    |
-| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                   |
-| `KIOSK_ENROLL_SECRET`       | operator-chosen nonblank password, different from session secret (**Sensitive**)    |
-| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically               |
-| `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub |
-| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                     |
-| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                     |
-| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                           |
+| name                        | value                                                                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open                                                              |
+| `PHOTO_STORE`               | `supabase`                                                                                                                                     |
+| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                                                                               |
+| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                                                                              |
+| `KIOSK_ENROLL_SECRET`       | the one shared password: enrolls booths **and opens /admin** (D84). ≥ 12 chars (use 20+ random), different from session secret (**Sensitive**) |
+| `ADMIN_SESSION_HOURS`       | `12` (optional): how long an /admin password session lasts                                                                                     |
+| `WALL_HOSTS`                | the wall address(es), comma-separated, read at build time (section 8 / 10)                                                                     |
+| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically                                                                          |
+| `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub                                                            |
+| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                                                                                |
+| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                                                                                |
+| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                                                                                      |
 
 Preview deployments get a different URL per deploy. Set `PUBLIC_BASE_URL` (Preview scope) to
 the preview URL you are testing, or use a stable preview alias. Production refuses to start
@@ -150,7 +152,12 @@ Before the event, a person must do this on the actual staff phone or tablet:
 
 Until then: `REAL_STAFF_DEVICE_TEST: NOT VERIFIED`.
 
-## 6. Enroll the wall display
+## 6. The wall display
+
+Opening the wall address is enough to show the wall (D86): no code, no enrollment. Whether that
+screen is sent photos is the **공개 미디어월** switch in `/admin → 설정` (off by default; see
+docs/ADMIN.md). Enroll the venue screen as below when it should show **every** approved photo
+(including photos agreed to for the venue only) and report its status to staff:
 
 1. In `/admin → 키오스크`, create a one-time code labelled e.g. `미디어월`.
 2. On the wall PC or TV browser, open `https://<PUBLIC_BASE_URL>/kiosk/enroll?next=wall` and type
@@ -162,7 +169,12 @@ Until then: `REAL_STAFF_DEVICE_TEST: NOT VERIFIED`.
 
 Before the event, a person must do this on the actual wall screen at the venue:
 
-- with nothing approved, the wall shows the empty village;
+- open the wall address in a browser that was never enrolled: the wall appears at once, in the
+  background chosen in 설정 → 미디어월 배경, with the wordmark readable from where guests stand;
+- change the background in 설정: the screen follows within about 5 s;
+- with 공개 미디어월 off, that browser shows no photos; turn it on, take a photo, answer **네** on
+  the consent screen that now carries the public-wall line, approve it: it appears;
+- with nothing approved, the wall shows the empty scene with its paper note;
 - take a photo, answer **네**, approve it in /admin: it appears within about 20 s;
 - hide it: it leaves within 10 s; unhide: it comes back; delete another: it never appears again;
 - toggle PAUSE WALL (photos leave, village stays) and SHOW HOLDING SCREEN (holding message);
@@ -187,8 +199,9 @@ address serves the current app unchanged. Step 4 is not verified yet.
 2. Environment Variables → `WALL_HOSTS=follow-the-lights-wall.vercel.app` (Production and Preview).
    `PUBLIC_BASE_URL` stays the booth address: wall-host pages for staff and guests redirect there.
 3. Redeploy (`WALL_HOSTS` is read at build time).
-4. Check: `/` on the wall address shows the wall enrollment notice; `/admin` there redirects to the
-   booth address. Enroll the wall display at `https://<wall address>/kiosk/enroll?next=wall`.
+4. Check: `/` on the wall address shows the wall itself (no enrollment, D86); `/admin` there
+   redirects to the booth address. A venue screen that should show every approved photo is
+   enrolled at `https://<wall address>/kiosk/enroll?next=wall`.
 
 Rollback: remove `WALL_HOSTS` and redeploy (the domain can stay; it then serves the normal app).
 
@@ -206,6 +219,52 @@ and keeps the 8-argument one, so the code still running keeps working (emergency
 included) until the new code is live. After the 2.0 deploy, `20261109090000_v2_drop_old_settings_fn.sql`
 drops the 8-argument function (written only after #29/#30 were live and the deployed addresses
 were checked, 2026-11-08).
+
+## 10. STUDIO SHALOM addresses (D87) and this release (D84–D86)
+
+Checked 2026-11-13 from the development session: `studio-shalom.vercel.app` and
+`studio-shalom-wall.vercel.app` both answer `404 DEPLOYMENT_NOT_FOUND` (free to claim);
+`follow-the-lights.vercel.app` and `follow-the-lights-wall.vercel.app` serve production. Nothing
+below has been done yet: `STUDIO_SHALOM_DOMAINS: NOT CONFIGURED` (the session had no access to the
+Vercel project).
+
+Do these **in this order**. Each step leaves the site working.
+
+1. **Database first.** Apply `supabase/migrations/20261113120000_public_wall_and_themes.sql` to
+   the production Supabase project (`npx supabase db push`, or paste it in the SQL editor). The
+   code that is running today keeps working afterwards (the old function signatures stay as
+   wrappers). The new code does **not** work without it: consent, moderation and settings would
+   fail.
+2. **Check the password.** `KIOSK_ENROLL_SECRET` must be set and at least 12 characters, or the
+   /admin password login is off (the login page then says so and offers the email code).
+3. **Merge and let production deploy.** Then check, on the _old_ addresses:
+   `/admin` → 관리자 로그인 → the enrollment password opens the panel as 공용 관리자;
+   `https://follow-the-lights-wall.vercel.app/` → the wall, in the 평화의 벽 background, with no
+   enrollment notice and no photos (공개 미디어월 is off).
+4. **Add the names.** Vercel → project `follow-the-lights` → Settings → Domains → add
+   `studio-shalom.vercel.app` and `studio-shalom-wall.vercel.app` (both to Production). Keep the
+   two old names attached.
+5. **Point the app at them.** Environment Variables (Production):
+   `PUBLIC_BASE_URL=https://studio-shalom.vercel.app` and
+   `WALL_HOSTS=studio-shalom-wall.vercel.app,follow-the-lights-wall.vercel.app`. Redeploy
+   (`WALL_HOSTS` is read at build time).
+6. **Check the new addresses**: `https://studio-shalom.vercel.app/` → the booth (enrollment page
+   on a new device); `/admin` → login; `https://studio-shalom-wall.vercel.app/` → the wall;
+   `https://studio-shalom-wall.vercel.app/admin` → redirects to the booth address. On the booth, a
+   new QR now starts with `https://studio-shalom.vercel.app/p/`.
+7. **Booth devices.** A session cookie belongs to one address. A tablet enrolled on
+   `follow-the-lights.vercel.app` keeps working there; to use the new address, open
+   `https://studio-shalom.vercel.app/kiosk/enroll` on it once and enroll again (same password).
+   Do this between guests: photos still waiting to upload live in that browser's storage for the
+   _old_ address and would stay there.
+8. **A hub** (`CLOUD_BASE_URL`) keeps working with the old address. Change it to the new one when
+   convenient and restart the hub.
+9. Later, after the event: apply a follow-up migration that drops the two old function signatures
+   (the 9-argument `ftl_photo_transition` and `ftl_settings_update`).
+
+What keeps working without doing anything: QR links already handed out (the old address stays
+attached and the token does not contain a host), phone-upload QR pages, staff sessions on the old
+address. Rollback of steps 4–5: set the two variables back and redeploy; the domains can stay.
 
 ## Preview deployment (2026-10-14)
 

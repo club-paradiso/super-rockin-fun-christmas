@@ -176,10 +176,15 @@ test("the review screen fits without scrolling, landscape and portrait", async (
     for (let i = 0; i < 6; i++) {
       await expect(page.getByTestId(`review-shot-${i}`)).toBeInViewport({ ratio: 1 });
     }
-    const overflow = await page.evaluate(() => ({
-      y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
-      x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    }));
+    // Neither the page nor the booth's own scroll area (.kiosk-scroll) has anything to scroll.
+    const overflow = await page.evaluate(() => {
+      const page = document.documentElement;
+      const booth = document.querySelector("[data-booth-scroll]")!;
+      return {
+        y: Math.max(page.scrollHeight - page.clientHeight, booth.scrollHeight - booth.clientHeight),
+        x: Math.max(page.scrollWidth - page.clientWidth, booth.scrollWidth - booth.clientWidth),
+      };
+    });
     expect(overflow, `${size.width}×${size.height}`).toEqual({ y: 0, x: 0 });
   }
 });

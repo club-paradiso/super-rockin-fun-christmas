@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { defaultWallLook } from "@/config/wall-themes";
 import { createMemoryBackend, type MemoryBackend } from "./memory-backend";
 import type {
   AuditEvent,
@@ -73,6 +74,8 @@ class FileDb {
         // Files written before D72 have no session video.
         videoMime: p.videoMime ?? null,
         videoBytes: p.videoBytes ?? null,
+        // Files written before D86: consent then meant the venue wall only.
+        wallPublic: p.wallPublic ?? false,
       });
     }
     for (const k of db.kiosks ?? []) {
@@ -96,6 +99,9 @@ class FileDb {
         wallForce: db.settings.wallForce ?? "auto",
         // Files written before D67 have no start mode.
         kioskDefaultMode: db.settings.kioskDefaultMode ?? "standard",
+        // Files written before D85/D86: the default background, and a wall that is not public.
+        wallPublic: db.settings.wallPublic ?? false,
+        wallLook: db.settings.wallLook ?? defaultWallLook(),
       };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);

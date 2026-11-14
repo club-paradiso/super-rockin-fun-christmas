@@ -36,3 +36,6 @@ supabase/.temp
 
 # vercel cli project link (vercel link)
 .vercel/
+
+# agent worktrees (whole copies of the repository)
+.claude/worktrees/

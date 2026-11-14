@@ -1,4 +1,5 @@
 import type { VideoMime } from "@/lib/video/format";
+import type { WallLook } from "@/lib/wall/themes";
 
 /**
  * Storage ports. Services (photo-service.ts, lib/ops/*) hold every rule; backends only implement
@@ -49,6 +50,13 @@ export interface PhotoRow {
   /** Image object is deleted after this (retention cleanup). */
   retentionExpiresAt: string;
   wallConsent: boolean;
+  /**
+   * The guest agreed while the booth told them the wall can also be seen at its public web
+   * address (D86). Only ever true together with wallConsent, and only set by the consent
+   * transition. A photo without it is shown on enrolled venue displays only, never to an
+   * anonymous viewer of the wall address.
+   */
+  wallPublic: boolean;
   moderationStatus: ModerationStatus;
   deletedAt: string | null;
   /** When the stored object(s) were actually removed. */
@@ -94,6 +102,12 @@ export interface PhotoTransition {
   to: ModerationStatus;
   /** Set wall_consent too (guest choice); null/undefined leaves it unchanged. */
   wallConsent?: boolean | null;
+  /**
+   * With wallConsent only: whether that consent covers the public wall address (D86). Stored as
+   * `wallConsent && wallPublic`; withdrawing consent always clears it. Ignored when wallConsent
+   * is not being set.
+   */
+  wallPublic?: boolean | null;
   /** Set deleted_at (only when moving to DELETED). */
   deletedAt?: string | null;
   actor: Actor;
@@ -158,8 +172,11 @@ export interface PhotoRepository {
   listObjectCleanupDue(limit: number): Promise<PhotoRow[]>;
   /** Newest first. */
   list(filter: PhotoListFilter): Promise<PhotoRow[]>;
-  /** Wall candidates (APPROVED AND wall_consent AND not deleted), newest first. */
-  listWallEligible(limit: number): Promise<WallEligibleRow[]>;
+  /**
+   * Wall candidates (APPROVED AND wall_consent AND not deleted), newest first. `publicOnly`
+   * (D86): only those whose consent also covers the public wall address (`wall_public_photos`).
+   */
+  listWallEligible(limit: number, publicOnly?: boolean): Promise<WallEligibleRow[]>;
   /** Hub only. Unaudited bookkeeping of the cloud copy (not a decision by anyone). */
   setCloud(id: string, cloud: CloudCopy): Promise<void>;
   /** Hub only. Rows whose cloud upload, video upload or delete is due, oldest first. */
@@ -263,6 +280,14 @@ export interface EventSettings {
   wallForce: WallForce;
   /** Booth start mode for each new guest (D67). */
   kioskDefaultMode: KioskMode;
+  /**
+   * Public media wall (D86). On: the booth tells guests the wall is also shown at its web
+   * address, their consent is recorded with that scope, and anyone opening the wall address
+   * sees those photos. Off (default): an anonymous viewer is sent no photos at all.
+   */
+  wallPublic: boolean;
+  /** Which background the wall shows (D85). Stored as given; read through `normalizeLook`. */
+  wallLook: WallLook;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -276,6 +301,8 @@ export type SettingsPatch = Partial<
     | "wallHours"
     | "wallForce"
     | "kioskDefaultMode"
+    | "wallPublic"
+    | "wallLook"
   >
 >;
 

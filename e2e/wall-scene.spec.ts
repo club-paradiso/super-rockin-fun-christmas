@@ -45,7 +45,7 @@ async function typePin(page: Page, pin: string) {
 
 /** Staff on the hub: first staff on a fresh hub, else the PIN login hub.spec.ts set up. */
 async function staffSession(page: Page) {
-  await page.goto("/admin/login");
+  await page.goto("/admin/login?staff=1");
   if (await page.getByTestId("hub-setup-form").isVisible()) {
     await page.getByLabel("설정 코드").fill(HUB_SETUP_CODE);
     await page.getByLabel("이름").fill("현장 책임자");

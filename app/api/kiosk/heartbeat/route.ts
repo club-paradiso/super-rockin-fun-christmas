@@ -73,6 +73,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       wallSubmissions: settings.pauseSubmissions ? "paused" : "open",
       // Staff default start mode (D67); the booth applies it to the next guest.
       kioskDefaultMode: settings.kioskDefaultMode,
+      // Public wall (D86): the booth then shows the notice and sends consent with that scope.
+      wallPublic: settings.wallPublic,
     },
     { headers },
   );

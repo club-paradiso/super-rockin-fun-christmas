@@ -35,11 +35,20 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # The suite is run twice: on the local file store (the hub, where staff specs for the cloud skip)
+  # and on a local Supabase stack. They are separate jobs, and the hub run is split into shards:
+  # one job doing both in sequence no longer fits its time limit (2026-11-14: cancelled at 35
+  # minutes, 76 tests in, none failed). Every shard builds its own app and starts from an empty
+  # store, so no spec may depend on another file having run first.
   e2e:
-    name: Playwright E2E (local store + local Supabase)
+    name: Playwright E2E (local store, shard ${{ matrix.shard }}/3)
     # Playwright 1.56's Chromium installer does not support Ubuntu 26.04 yet.
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,10 +74,46 @@ jobs:
       - name: Report OS dependency mirror failure
         if: steps.pw-deps.outcome == 'failure'
         run: echo "::warning::Playwright OS dependency installation failed; E2E must verify Chromium runs successfully."
-      - name: E2E — local file store (staff specs skip)
-        run: npm run test:e2e
+      - name: E2E — local file store (staff specs for the cloud skip)
+        run: npx playwright test --shard=${{ matrix.shard }}/3
         env:
           CI: "true"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-local-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+
+  e2e-supabase:
+    name: Playwright E2E (local Supabase)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      # Keep the Chromium download separate from apt. GitHub-hosted runners
+      # sometimes cannot resolve the Ubuntu mirror even with a browser cache hit.
+      # E2E remains the hard gate: missing shared libraries will fail browser launch.
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Install Chromium OS dependencies
+        id: pw-deps
+        continue-on-error: true
+        run: timeout 120s npx playwright install-deps chromium
+      - name: Report OS dependency mirror failure
+        if: steps.pw-deps.outcome == 'failure'
+        run: echo "::warning::Playwright OS dependency installation failed; E2E must verify Chromium runs successfully."
       - uses: supabase/setup-cli@v1
         with:
           # Pinned: "latest" asks the GitHub API which release is newest, and that
@@ -88,7 +133,7 @@ jobs:
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
+          name: playwright-results-supabase
           path: test-results/
           retention-days: 7
 

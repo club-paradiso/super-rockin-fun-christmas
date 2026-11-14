@@ -1,7 +1,12 @@
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
 import { KioskModeForm } from "@/components/admin/kiosk-mode-form";
+import { PublicWallForm } from "@/components/admin/public-wall-form";
+import { WallLookForm } from "@/components/admin/wall-look-form";
 import { WALL_CONFIG } from "@/config/wall";
+import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
+import { parseWallHosts } from "@/lib/wall/host";
+import { activeThemeId, normalizeLook } from "@/lib/wall/themes";
 import { wallOpen } from "@/lib/wall/hours";
 import { formatTime } from "@/components/admin/labels";
 import { StaffManager } from "@/components/admin/staff-manager";
@@ -9,6 +14,7 @@ import { WallHoursForm } from "@/components/admin/wall-hours-form";
 import { eventCloseAllowed } from "@/lib/ops/event-close";
 import { getServerConfig } from "@/lib/server/env";
 import { requireStaff } from "@/lib/staff-auth/page";
+import { SHARED_OPERATOR, isSharedOperator } from "@/lib/staff-auth/shared";
 import { getBackend } from "@/lib/storage/server";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +22,18 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const me = await requireStaff();
   const backend = getBackend();
-  const [settings, staff, stats] = await Promise.all([
+  const [settings, staff, stats, onWall, onPublicWall] = await Promise.all([
     backend.settings.get(),
     backend.staff.list(),
     backend.photos.stats(),
+    backend.photos.listWallEligible(20_000),
+    backend.photos.listWallEligible(20_000, true),
   ]);
-  const updater = staff.find((s) => s.userId === settings.updatedBy);
+  const look = normalizeLook(settings.wallLook, WALL_THEMES, DEFAULT_WALL_THEME);
+  const wallHost = parseWallHosts(process.env.WALL_HOSTS)[0] ?? null;
+  const updater = isSharedOperator(settings.updatedBy)
+    ? SHARED_OPERATOR
+    : staff.find((s) => s.userId === settings.updatedBy);
   const config = getServerConfig();
   const eventEnd = config.hubRetention?.eventEnd ?? null;
   const photosLeft = (Object.entries(stats.byStatus) as [string, number][])
@@ -35,6 +47,24 @@ export default async function SettingsPage() {
         wallStatus={wallOpen(settings, new Date(), WALL_CONFIG.timeZone)}
       />
       <WallHoursForm hours={settings.wallHours} timeZone={WALL_CONFIG.timeZone} />
+      <WallLookForm
+        look={look}
+        themes={WALL_THEMES.map(({ id, name, note, preview, status }) => ({
+          id,
+          name,
+          note,
+          preview,
+          status,
+        }))}
+        defaultTheme={DEFAULT_WALL_THEME}
+        activeTheme={currentTheme(look)}
+      />
+      <PublicWallForm
+        enabled={settings.wallPublic}
+        wallUrl={wallHost ? `https://${wallHost}` : null}
+        publicCount={onPublicWall.length}
+        venueOnlyCount={onWall.length - onPublicWall.length}
+      />
       <KioskModeForm mode={settings.kioskDefaultMode} />
       <p className="text-base text-ink/75">
         마지막 변경: {formatTime(settings.updatedAt)}
@@ -54,4 +84,9 @@ export default async function SettingsPage() {
       )}
     </div>
   );
+}
+
+/** Outside the component: reading the clock is not allowed while rendering. */
+function currentTheme(look: ReturnType<typeof normalizeLook>) {
+  return activeThemeId(look, Date.now());
 }

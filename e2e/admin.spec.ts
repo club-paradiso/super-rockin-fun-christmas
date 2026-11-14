@@ -39,6 +39,8 @@ test("a non-staff email never gets in", async ({ browser }) => {
   const page = await newPage(browser);
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/login/);
+  // The shared password is the first way in (D84); the email code is one link away.
+  await page.getByTestId("login-switch").click();
   await page.getByLabel("스태프 이메일").fill(`stranger-${Date.now()}@example.org`);
   await page.getByRole("button", { name: "로그인 코드 받기" }).click();
   // Same screen as for staff (no account enumeration) — but no code was ever sent.

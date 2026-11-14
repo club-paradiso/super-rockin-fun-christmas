@@ -34,8 +34,18 @@ export function wallScreenState(input: {
  */
 export type WallFeedMode = "live" | "paused" | "holding" | "closed";
 
+/**
+ * Who is asking (D86). `display`: an enrolled venue screen; it reports what it shows and is sent
+ * every eligible photo. `public`: anyone who opened the wall address; it is sent only photos
+ * whose consent covers the public address, and it never reports anything back.
+ */
+export type WallAudience = "display" | "public";
+
 export interface WallFeed {
   mode: WallFeedMode;
+  audience: WallAudience;
+  /** The background on the wall right now (config/wall-themes.ts), in every mode (D85). */
+  theme: string;
   /**
    * `fair`: photos are in rotation order (lib/wall/rotation.ts); the wall takes the first usable
    * one. `newest`: newest first, no server-side exposure history (cloud fallback, D52).

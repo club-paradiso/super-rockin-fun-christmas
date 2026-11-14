@@ -219,17 +219,84 @@ describe.skipIf(!enabled)("Supabase backend (integration)", () => {
       },
     );
 
-    it("there is exactly one settings function: the 2.0 one, closed to anon and authenticated", async () => {
-      const { rows } = await client.query(
-        "select pg_get_function_identity_arguments(p.oid) as args, " +
-          "has_function_privilege('anon', p.oid, 'execute') as anon, " +
-          "has_function_privilege('authenticated', p.oid, 'execute') as authed " +
-          "from pg_proc p join pg_namespace n on n.oid = p.pronamespace " +
-          "where n.nspname = 'public' and p.proname = 'ftl_settings_update'",
-      );
-      expect(rows).toHaveLength(1);
-      expect(rows[0].args).toMatch(/p_kiosk_default_mode text/);
-      expect([rows[0].anon, rows[0].authed]).toEqual([false, false]);
+    // D85/D86 rollout: the migration is applied before the new code is deployed, so the
+    // signature the running code calls is kept, as a plain SQL wrapper around the new function.
+    // One implementation of each rule; both signatures closed to anon and authenticated. A
+    // follow-up migration drops the wrappers once the new code is live (docs/DEPLOYMENT.md 10).
+    it.each([
+      ["ftl_settings_update", /p_wall_public boolean, p_wall_look jsonb/],
+      ["ftl_photo_transition", /p_wall_consent boolean, p_wall_public boolean/],
+    ])(
+      "%s: one implementation plus the legacy wrapper, both closed to anon and authenticated",
+      async (name, newArgs) => {
+        const { rows } = await client.query(
+          "select pg_get_function_identity_arguments(p.oid) as args, l.lanname as lang, " +
+            "p.prosrc as src, " +
+            "has_function_privilege('anon', p.oid, 'execute') as anon, " +
+            "has_function_privilege('authenticated', p.oid, 'execute') as authed, " +
+            "has_function_privilege('service_role', p.oid, 'execute') as service " +
+            "from pg_proc p join pg_namespace n on n.oid = p.pronamespace " +
+            "join pg_language l on l.oid = p.prolang " +
+            "where n.nspname = 'public' and p.proname = $1",
+          [name],
+        );
+        expect(rows).toHaveLength(2);
+        for (const r of rows) expect([r.anon, r.authed, r.service]).toEqual([false, false, true]);
+        const current = rows.filter((r) => newArgs.test(r.args));
+        const legacy = rows.filter((r) => !newArgs.test(r.args));
+        expect(current).toHaveLength(1);
+        expect(legacy).toHaveLength(1);
+        // The rule lives in exactly one place: the wrapper only forwards.
+        expect(current[0].lang).toBe("plpgsql");
+        expect(legacy[0].lang).toBe("sql");
+        expect(legacy[0].src).toContain(`public.${name}(`);
+        expect(legacy[0].src).not.toMatch(/\b(update|insert|delete)\b/i);
+      },
+    );
+
+    it("anon and authenticated cannot call the new signatures either", async () => {
+      for (const role of ["anon", "authenticated"]) {
+        await client.query("begin");
+        try {
+          await client.query(`set local role ${role}`);
+          await expect(
+            client.query(
+              "select public.ftl_settings_update(true, null, null, null, false, null, null, null, true, null, gen_random_uuid())",
+            ),
+          ).rejects.toThrow(/permission denied/);
+        } finally {
+          await client.query("rollback");
+        }
+        await client.query("begin");
+        try {
+          await client.query(`set local role ${role}`);
+          await expect(
+            client.query(
+              "select public.ftl_photo_transition(gen_random_uuid(), 'NONE', 'PENDING', true, true, null, 'kiosk', null, 'guest_consent_yes', null)",
+            ),
+          ).rejects.toThrow(/permission denied/);
+          await expect(client.query("select id from public.wall_public_photos")).rejects.toThrow();
+        } finally {
+          await client.query("rollback");
+        }
+      }
+    });
+
+    it("a photo cannot be public without wall consent (database constraint)", async () => {
+      await client.query("begin");
+      try {
+        await expect(
+          client.query(
+            "insert into public.photos (id, session_id, frame_id, mime, bytes, object_path, token_hash, " +
+              "token_expires_at, retention_expires_at, wall_consent, wall_public) values " +
+              "(gen_random_uuid(), gen_random_uuid(), 'navy-strip', 'image/jpeg', 10, " +
+              "'2026-11/' || gen_random_uuid() || '.jpg', repeat('c', 64), now() + interval '1 day', " +
+              "now() + interval '30 days', false, true)",
+          ),
+        ).rejects.toThrow(/photos_wall_public_needs_consent/);
+      } finally {
+        await client.query("rollback");
+      }
     });
 
     it("audit_events is append-only, even for the database owner", async () => {

@@ -1,6 +1,7 @@
 /**
- * The wall scene as numbers: the Figma background (window, line, wordmark) and the five places a
- * strip hangs (config/wall.ts `scene`). Pure, so tests can check every slot against the picture.
+ * A wall scene as numbers: where the line runs in the background picture and the places a strip
+ * hangs (one per theme, config/wall-themes.ts). Pure, so tests can check every slot of every
+ * theme against its picture.
  */
 export interface Rect {
   x: number;
@@ -86,11 +87,28 @@ export const PHONE_CARD = { width: 340, photoHeight: 380, margin: 16, caption: 4
 export function framedPhotoBox(
   place: SlotPlace,
   frame: { width: number; height: number },
+  /** The theme's widest box for such a photo (config/wall-themes.ts `wideMax`). */
+  wideMax: number = PHONE_CARD.width,
 ): Rect | null {
   const aspect = frame.width / frame.height;
   if (Math.abs(aspect - place.box.width / place.box.height) < 0.05) return null;
-  const width = Math.min(PHONE_CARD.width, place.box.height * aspect);
+  const width = Math.min(wideMax, place.box.height * aspect);
   return { x: place.x - width / 2, y: place.box.y, width, height: width / aspect };
+}
+
+/**
+ * The drawn twine of a theme whose picture has no line: an SVG path along the same curve the
+ * slots use (a parabola is exactly one quadratic Bézier: the control point is where the end
+ * tangents meet).
+ */
+export function ropePath(line: WallSceneConfig["line"], x1: number, x2: number): string {
+  const slope = (x: number) => -2 * line.curve * (x - line.midX);
+  const y1 = lineYAt(line, x1);
+  const y2 = lineYAt(line, x2);
+  const cx = (x1 + x2) / 2;
+  const cy = y1 + slope(x1) * (cx - x1);
+  const n = (v: number) => Math.round(v * 10) / 10;
+  return `M${n(x1)} ${n(y1)} Q${n(cx)} ${n(cy)} ${n(x2)} ${n(y2)}`;
 }
 
 export function phoneCardBox(place: SlotPlace): Rect {
