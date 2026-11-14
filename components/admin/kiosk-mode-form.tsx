@@ -6,7 +6,7 @@ import type { KioskMode } from "@/lib/storage/types";
 import { errorText, postJson } from "./api";
 
 const OPTIONS: { mode: KioskMode; label: string; hint: string }[] = [
-  { mode: "standard", label: "기본 화면", hint: "Figma 디자인 그대로" },
+  { mode: "standard", label: "기본 화면", hint: "기본 글씨 · 기본 버튼 · 모든 단계" },
   { mode: "easy", label: "간편 화면", hint: "큰 글씨 · 큰 버튼 · 선택 단계 줄임" },
 ];
 

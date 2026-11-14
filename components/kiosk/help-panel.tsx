@@ -18,8 +18,8 @@ export interface HelpQueueView {
 
 const DENIAL_COPY: Record<HelpDenial, string> = {
   wrong: "PIN이 맞지 않아요.",
-  locked: "잘못된 PIN이 많아 잠시 잠겼어요. 15분 뒤 다시 해 주세요.",
-  offline: "허브에 연결할 수 없어요. 잠시 뒤 다시 해 주세요.",
+  locked: "잘못된 PIN이 많아 잠시 잠겼어요. 15분 뒤 다시 시도해 주세요.",
+  offline: "허브에 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.",
 };
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
 

@@ -31,9 +31,9 @@ export function EventClose({
     <section className="admin-card flex flex-col gap-3 p-4" data-testid="event-close">
       <h2 className="text-xl font-bold">행사 종료 처리</h2>
       <p className="text-base text-ink/75">
-        행사가 끝난 뒤 한 번만 누릅니다. 이 노트북의 사진 <b className="text-ink">{photosLeft}장</b>
-        을 모두 지우고, 미디어월 참여와 미디어월을 멈추고, QR 서버(클라우드)의 사본도 지우라고
-        보냅니다. 되돌릴 수 없습니다. 감사 기록에는 누가 지웠는지 남습니다.
+        행사가 끝난 뒤 한 번만 누르세요. 이 노트북의 사진 <b className="text-ink">{photosLeft}장</b>
+        을 모두 지우고, 미디어월 게시 신청과 미디어월을 멈추고, QR 서버(클라우드)의 사본도 지워
+        달라고 요청해요. 되돌릴 수 없어요. 기록에는 누가 지웠는지 남아요.
       </p>
       <p className="text-base text-ink/75">
         {eventEnd
@@ -41,7 +41,7 @@ export function EventClose({
           : "행사 종료 시각(EVENT_END_AT)이 설정되지 않았어요. 기술 담당에게 확인한 뒤 누르세요."}
       </p>
       <label className="flex flex-col gap-1 text-base">
-        확인을 위해 <b>{PHRASE}</b> 라고 적어 주세요
+        확인을 위해 <b>{PHRASE}</b>라고 적어 주세요
         <input
           className="admin-input"
           value={typed}
@@ -101,8 +101,8 @@ export function EventClose({
         }}
       >
         <p className="text-base">
-          이 노트북의 사진 {photosLeft}장과 QR 링크가 모두 사라집니다. 손님 휴대폰에 이미 저장된
-          사진은 그대로입니다.
+          이 노트북의 사진 {photosLeft}장과 QR 링크가 모두 사라져요. 손님 휴대폰에 이미 저장된
+          사진은 그대로예요.
         </p>
       </ConfirmDialog>
     </section>

@@ -122,7 +122,7 @@ export function PhotoCard({
             <span className="rounded-full bg-ink/15 px-3 py-1 text-sm">미디어월 동의</span>
           )}
           {photo.wallEligible && (
-            <span className="rounded-full bg-approve/15 px-3 py-1 text-sm">월 게시 가능</span>
+            <span className="rounded-full bg-approve/15 px-3 py-1 text-sm">미디어월 게시 가능</span>
           )}
         </div>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-base text-ink/75">

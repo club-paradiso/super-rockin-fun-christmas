@@ -101,7 +101,7 @@ export default async function OverviewPage() {
           <h2 className="mb-2 text-xl font-bold">휴대폰 사진 받기 (인터넷)</h2>
           {o.inbox.lastError ? (
             <p className="text-lg">
-              <span className="text-danger">인터넷 너머 사진함에 연결하지 못했어요.</span>
+              <span className="text-danger">인터넷 사진함에 연결하지 못했어요.</span>
               <br />
               <span className="text-base text-ink/75">
                 방문객이 보낸 사진은 사진함에서 기다려요. 연결되면 자동으로 가져와요. 마지막 오류:{" "}

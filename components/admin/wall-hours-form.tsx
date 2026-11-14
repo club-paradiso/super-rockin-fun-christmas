@@ -36,7 +36,7 @@ export function WallHoursForm({ hours, timeZone }: { hours: WallHours | null; ti
           onChange={(e) => setEnabled(e.target.checked)}
           data-testid="wall-hours-enabled"
         />
-        운영 시간을 정해요 (끄면 언제나 켜져 있어요)
+        운영 시간 정하기 (체크를 끄면 하루 종일 켜져 있어요)
       </label>
       {enabled && (
         <div className="flex flex-wrap items-center gap-3 text-lg">

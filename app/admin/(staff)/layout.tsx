@@ -23,7 +23,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     );
   const settings = await getBackend().settings.get();
   const active = [
-    settings.pauseSubmissions && "미디어월 참여 중지",
+    settings.pauseSubmissions && "미디어월 게시 신청 중지",
     settings.pauseWall && "미디어월 일시정지",
     settings.showHoldingScreen && "대기 화면 표시",
   ].filter(Boolean) as string[];

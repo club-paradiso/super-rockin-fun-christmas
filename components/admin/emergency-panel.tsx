@@ -9,8 +9,8 @@ import { errorText, postJson } from "./api";
 const SWITCHES = [
   {
     key: "pauseSubmissions",
-    title: "미디어월 참여 중지",
-    help: "새 사진의 미디어월 신청만 막아요. 촬영과 QR 저장은 그대로 돼요.",
+    title: "미디어월 게시 신청 중지",
+    help: "새 사진의 미디어월 게시 신청만 막아요. 촬영과 QR 저장은 그대로 돼요.",
   },
   {
     key: "pauseWall",
