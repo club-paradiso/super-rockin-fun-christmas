@@ -2,6 +2,7 @@ import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
 import { PublicWallForm } from "@/components/admin/public-wall-form";
 import { WallLookForm } from "@/components/admin/wall-look-form";
+import { WallPaceForm } from "@/components/admin/wall-pace-form";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { parseWallHosts } from "@/lib/wall/host";
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
         defaultTheme={DEFAULT_WALL_THEME}
         activeTheme={currentTheme(look)}
       />
+      <WallPaceForm showSeconds={look.showSeconds} halfLifeMinutes={look.halfLifeMinutes} />
       <PublicWallForm
         enabled={settings.wallPublic}
         wallUrl={wallHost ? `https://${wallHost}` : null}

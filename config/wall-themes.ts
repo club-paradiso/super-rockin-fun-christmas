@@ -1,5 +1,12 @@
 import { WALL_CONFIG } from "./wall";
-import { ROTATE_MINUTES, recutTheme, type WallLook, type WallTheme } from "@/lib/wall/themes";
+import {
+  HALF_LIFE_MINUTES,
+  ROTATE_MINUTES,
+  SHOW_SECONDS,
+  recutTheme,
+  type WallLook,
+  type WallTheme,
+} from "@/lib/wall/themes";
 
 /**
  * The media-wall themes (D85). Every `current` theme is a background from Figma
@@ -350,5 +357,7 @@ export function defaultWallLook(): WallLook {
     rotate: false,
     rotateMinutes: ROTATE_MINUTES.default,
     rotation: [],
+    showSeconds: SHOW_SECONDS.default,
+    halfLifeMinutes: HALF_LIFE_MINUTES.default,
   };
 }

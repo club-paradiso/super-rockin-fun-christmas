@@ -7,6 +7,7 @@ import { fitTheme } from "@/lib/wall/themes";
 import { MOBILE_FRAME_ID } from "@/config/mobile";
 import { getFrame } from "@/config/frames";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
+import { ageWeight } from "@/lib/wall/rotation";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
@@ -316,9 +317,17 @@ export function WallApp({
   }, [eligible, allowed]);
 
   // Scheduler tick.
-  const latest = useRef({ eligible, images, showNow, ordering: feed?.ordering ?? "fair" });
+  // Staff pace (D92). An older server that sends none keeps the built-in timing.
+  const visibleMs = feed?.pace?.visibleMs ?? WALL_CONFIG.visibleMs;
+  const halfLifeMs = feed?.pace?.halfLifeMs ?? 0;
+  const taken = useMemo(
+    () => new Map((feed?.photos ?? []).map((p) => [p.id, Date.parse(p.createdAt)])),
+    [feed],
+  );
+  const pace = { eligible, images, showNow, ordering: feed?.ordering ?? "fair" } as const;
+  const latest = useRef({ ...pace, visibleMs, halfLifeMs, taken });
   useEffect(() => {
-    latest.current = { eligible, images, showNow, ordering: feed?.ordering ?? "fair" };
+    latest.current = { ...pace, visibleMs, halfLifeMs, taken };
   });
   useEffect(() => {
     const id = setInterval(() => {
@@ -330,9 +339,18 @@ export function WallApp({
           now: t,
           eligible: latest.current.eligible,
           ready: new Set(latest.current.images.keys()),
-          timings: WALL_CONFIG,
+          timings: { ...WALL_CONFIG, visibleMs: latest.current.visibleMs },
           ordering: latest.current.ordering,
           showNow: latest.current.showNow,
+          sharesKey: latest.current.halfLifeMs,
+          weights: latest.current.halfLifeMs
+            ? new Map(
+                [...latest.current.taken].map(([id, at]) => [
+                  id,
+                  ageWeight(at, t, latest.current.halfLifeMs),
+                ]),
+              )
+            : undefined,
         });
       });
     }, WALL_CONFIG.tickMs);
