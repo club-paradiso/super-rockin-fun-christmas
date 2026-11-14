@@ -299,6 +299,8 @@ class SupabasePhotoRepository implements PhotoRepository {
     if (f.kioskId) q = q.eq("kiosk_id", f.kioskId);
     if (f.kioskless) q = q.is("kiosk_id", null);
     if (f.frameId) q = q.eq("frame_id", f.frameId);
+    // Frame ids are [a-z0-9-] only (database check), so the prefix holds no LIKE wildcard.
+    if (f.frameIdPrefix) q = q.like("frame_id", `${f.frameIdPrefix}%`);
     if (f.sessionShort) q = q.like("session_short", `${f.sessionShort.toLowerCase()}%`);
     const { data, error } = await q
       .order("created_at", { ascending: !!f.oldestFirst })

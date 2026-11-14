@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
-import { normalizeMobilePhoto, UnreadableImageError } from "@/lib/mobile/image";
+import { MOBILE_UPLOAD_CONFIG, mobileBoothFrame, mobileFrameId } from "@/config/mobile";
+import { matchesFrameShape, normalizeMobilePhoto, UnreadableImageError } from "@/lib/mobile/image";
 import { readUploadToken } from "@/lib/mobile/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
@@ -29,12 +29,15 @@ const perQr = new RateLimiter(6, 10 * 60_000);
  * token is the only key, and it allows one photo for 15 minutes.
  *
  * Headers: x-upload-token (from the QR address), x-wall-consent: "yes" (the page cannot submit
- * without it), x-wall-scope: "public" when the page showed the public-wall notice (D86), content-type image/jpeg | image/png. Body: the image (the page has already shrunk
- * it to a JPEG; the server never trusts that and re-encodes it, dropping EXIF and GPS).
+ * without it), x-wall-scope: "public" when the page showed the public-wall notice (D86),
+ * x-frame-id: the booth frame the guest put their photos in (D89; omitted by a page from before
+ * then, which sends a plain photo), content-type image/jpeg | image/png. Body: the image (the page
+ * has already composed and shrunk it to a JPEG; the server never trusts that and re-encodes it,
+ * dropping EXIF and GPS).
  *
  * 201 new / 200 the same photo again → {status:"received", review:"pending"}. "received" is not
  * "approved": nothing appears on the wall until a person approves it.
- * Errors: 400 consent/unreadable/too_small, 410 expired or unknown QR (same answer),
+ * Errors: 400 consent/unreadable/too_small/frame, 410 expired or unknown QR (same answer),
  * 409 paused | closed (this QR's photo was deleted), 413, 415, 429.
  */
 export const POST = route("mobile_upload", async (request: Request) => {
@@ -49,6 +52,11 @@ export const POST = route("mobile_upload", async (request: Request) => {
   if (!perQr.take(sessionId)) return jsonError(429, "too many requests");
   if (request.headers.get("x-wall-consent") !== "yes") return jsonError(400, "consent required");
 
+  // A framed picture (D89): only a current booth frame, stored as phone-<frame id>.
+  const frameHeader = request.headers.get("x-frame-id");
+  const frame = frameHeader ? mobileBoothFrame(mobileFrameId(frameHeader)) : null;
+  if (frameHeader && !frame) return jsonError(400, "frame");
+
   const mime = request.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
   if (!ALLOWED_MIME.has(mime)) return jsonError(415, "unsupported image type");
   let raw: Uint8Array;
@@ -62,12 +70,18 @@ export const POST = route("mobile_upload", async (request: Request) => {
 
   let normalized;
   try {
-    normalized = await normalizeMobilePhoto(raw);
+    normalized = await normalizeMobilePhoto(
+      raw,
+      frame ? MOBILE_UPLOAD_CONFIG.framedLongEdge : MOBILE_UPLOAD_CONFIG.longEdge,
+    );
   } catch (err) {
     if (err instanceof UnreadableImageError)
       return jsonError(400, err.reason === "too_small" ? "too_small" : "unreadable");
     throw err;
   }
+
+  // The picture must have its frame's shape, or the wall would hang it in the wrong box.
+  if (frame && !matchesFrameShape(normalized, frame)) return jsonError(400, "frame");
 
   const settings = await getBackend().settings.get();
   const paused = settings.pauseSubmissions;
@@ -80,6 +94,7 @@ export const POST = route("mobile_upload", async (request: Request) => {
       submissionsPaused: paused,
       // The phone page showed the public-wall notice, and the public wall is on right now (D86).
       publicScope: request.headers.get("x-wall-scope") === "public" && settings.wallPublic,
+      ...(frame ? { frameId: mobileFrameId(frame.id) } : {}),
     });
   } catch (err) {
     logEvent(
@@ -98,6 +113,7 @@ export const POST = route("mobile_upload", async (request: Request) => {
     width: normalized.width,
     height: normalized.height,
     duplicate: result.duplicate,
+    frameId: frame?.id ?? null,
   });
   return NextResponse.json(
     { status: "received", review: result.moderationStatus === "PENDING" ? "pending" : "done" },

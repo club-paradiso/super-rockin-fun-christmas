@@ -122,3 +122,16 @@ export async function decodePhotoFile(file: File): Promise<DecodedPhoto> {
     URL.revokeObjectURL(url);
   }
 }
+
+/**
+ * The photos a guest picked, in the order the picker gave them, at most `max` (D89: one booth
+ * frame holds 1 to 6). `dropped` says how many were left out so the page can say so.
+ */
+export function limitPicked<T>(files: readonly T[], max: number): { kept: T[]; dropped: number } {
+  return { kept: files.slice(0, max), dropped: Math.max(0, files.length - max) };
+}
+
+/** "순서 바꾸기": the first photo moves to the last slot, every other one moves up one. */
+export function cycleOrder<T>(list: readonly T[]): T[] {
+  return list.length < 2 ? [...list] : [...list.slice(1), list[0]!];
+}

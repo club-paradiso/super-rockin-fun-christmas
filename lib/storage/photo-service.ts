@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { KIOSK_CONFIG } from "@/config/kiosk";
-import { isMobilePhoto, MOBILE_FRAME_ID } from "@/config/mobile";
+import {
+  isMobileFrameId,
+  isMobilePhoto,
+  MOBILE_FRAME_ID,
+  MOBILE_UPLOAD_CONFIG,
+} from "@/config/mobile";
 import { VIDEO_MIMES, hasVideoSignature, videoExt, type VideoMime } from "@/lib/video/format";
 import {
   isPublicWallEligible,
@@ -109,6 +114,11 @@ export interface PutMobileInput {
   submissionsPaused: boolean;
   /** The phone page told the guest the wall is also shown at its public address (D86). */
   publicScope?: boolean;
+  /**
+   * `phone-<booth frame id>` when the guest put their photos in a booth frame (D89); omitted for a
+   * plain phone photo. Anything `isMobileFrameId` refuses is an error, never stored.
+   */
+  frameId?: string;
 }
 
 /** What the consent routes pass along with a guest's answer. */
@@ -279,6 +289,8 @@ export class PhotoService {
     const existing = await this.backend.photos.findBySessionId(input.sessionId);
     if (existing) return this.resumeMobile(existing, input.kioskId);
     if (input.submissionsPaused) return { ok: false, reason: "paused" };
+    const frameId = input.frameId ?? MOBILE_FRAME_ID;
+    if (!isMobileFrameId(frameId)) throw new Error(`Not a phone photo frame: ${frameId}`);
 
     const created = this.now();
     const id = randomUUID();
@@ -300,7 +312,7 @@ export class PhotoService {
       id,
       sessionId: input.sessionId,
       kioskId: input.kioskId,
-      frameId: MOBILE_FRAME_ID,
+      frameId,
       mime: "image/jpeg",
       bytes: input.data.byteLength,
       objectPath,
@@ -387,7 +399,7 @@ export class PhotoService {
     // (kioskless, NONE), and a phone photo must never be crowded out of the inbox by them.
     const rows = await this.backend.photos.list({
       statuses: ["NONE", "PENDING"],
-      frameId: MOBILE_FRAME_ID,
+      frameIdPrefix: MOBILE_UPLOAD_CONFIG.frameIdPrefix,
       kioskless: true,
       oldestFirst: true,
       limit,

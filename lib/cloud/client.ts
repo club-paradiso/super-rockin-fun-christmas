@@ -53,7 +53,8 @@ export interface CloudUploadSession {
 export interface CloudInboxClient {
   createUploadSession(): Promise<CloudResult<CloudUploadSession>>;
   uploadStatus(sessionId: string): Promise<CloudResult<"waiting" | "received" | "closed">>;
-  inbox(): Promise<CloudResult<{ sessionId: string; createdAt: string }[]>>;
+  /** `frameId` is the stored frame id (D89); missing from a cloud older than D89. */
+  inbox(): Promise<CloudResult<{ sessionId: string; createdAt: string; frameId?: string }[]>>;
   inboxImage(sessionId: string): Promise<CloudResult<Uint8Array>>;
   ack(sessionId: string): Promise<CloudResult<null>>;
 }
@@ -158,10 +159,14 @@ export class HttpCloudClient implements CloudClient, CloudInboxClient {
       if (!Array.isArray(items)) throw new Error("unexpected cloud response");
       return items
         .filter(
-          (i): i is { sessionId: string; createdAt: string } =>
+          (i): i is { sessionId: string; createdAt: string; frameId?: unknown } =>
             typeof i?.sessionId === "string" && typeof i?.createdAt === "string",
         )
-        .map(({ sessionId, createdAt }) => ({ sessionId, createdAt }));
+        .map(({ sessionId, createdAt, frameId }) => ({
+          sessionId,
+          createdAt,
+          ...(typeof frameId === "string" ? { frameId } : {}),
+        }));
     });
   }
 

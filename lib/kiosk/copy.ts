@@ -169,7 +169,7 @@ const ko = {
     stepsLabel: "순서",
     steps: [
       "휴대폰 카메라로 QR을 찍어요",
-      "열린 화면에서 사진 한 장을 골라요",
+      "열린 화면에서 사진을 1~6장 고르고 틀을 골라요",
       "안내를 읽고 ‘미디어월로 보내기’를 눌러요",
     ],
     note: "운영팀이 확인한 사진만 미디어월에 걸려요. 회원가입이나 앱 설치는 필요 없어요.",
@@ -344,7 +344,7 @@ const en: KioskCopy = {
     stepsLabel: "Steps",
     steps: [
       "Scan the QR code with your phone’s camera",
-      "Choose one photo on the page that opens",
+      "On the page that opens, choose 1 to 6 photos and a frame",
       "Read the note, then tap “미디어월로 보내기” (Send to the media wall)",
     ],
     note: "Only photos our team has checked go on the wall. No sign-up or app needed.",

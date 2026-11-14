@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
-import { MOBILE_FRAME_ID } from "@/config/mobile";
-import { getFrame } from "@/config/frames";
+import { framedPhotoFrame, MOBILE_FRAME_ID } from "@/config/mobile";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
@@ -136,7 +135,7 @@ export function WallApp({
     [fresh, feed],
   );
   const allowed = useMemo(() => new Set(eligible), [eligible]);
-  // Which photos came from a guest's phone (D66): they hang as a card instead of a strip.
+  // Plain phone photos (D66, no frame) hang as a card instead of a strip; framed ones (D89) do not.
   const phonePhotos = useMemo(
     () =>
       new Set(
@@ -474,7 +473,8 @@ export function WallApp({
                   </figure>
                 );
               }
-              const frame = getFrame(photoFrames.get(slot.photoId));
+              // A phone photo put in a booth frame (D89) hangs exactly like that booth frame.
+              const frame = framedPhotoFrame(photoFrames.get(slot.photoId) ?? "");
               const box =
                 framedPhotoBox(
                   place,

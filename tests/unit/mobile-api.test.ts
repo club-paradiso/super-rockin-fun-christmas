@@ -247,6 +247,44 @@ describe("phone upload (D66)", () => {
     );
   });
 
+  // D89: the guest puts their photos in a booth frame on the phone; the stored photo keeps the
+  // frame's id and its saved size, so the wall hangs it like that booth frame.
+  it("a framed picture keeps its frame id and full size; a wrong shape or unknown frame is refused", async () => {
+    const plain = async (width: number, height: number) =>
+      new Uint8Array(
+        await sharp({ create: { width, height, channels: 3, background: "#7a440e" } })
+          .jpeg({ quality: 80 })
+          .toBuffer(),
+      );
+    const qr = async () =>
+      (await (await newQr(cookie)).json()) as { url: string; sessionId: string };
+    const { getBackend } = await routes.storage();
+
+    const letter = await qr();
+    const res = await upload(tokenOf(letter.url), await plain(1200, 3600), {
+      "x-frame-id": "shalom-letter",
+    });
+    expect(res.status).toBe(201);
+    const row = (await getBackend().photos.findBySessionId(letter.sessionId))!;
+    expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+    const meta = await sharp((await getBackend().objects.get(row.objectPath))!).metadata();
+    // Not shrunk to the plain-photo bound (2048): the strip keeps the booth's saved size.
+    expect([meta.width, meta.height]).toEqual([1200, 3600]);
+
+    const refused = async (frame: string, width: number, height: number) => {
+      const { url, sessionId } = await qr();
+      const r = await upload(tokenOf(url), await plain(width, height), { "x-frame-id": frame });
+      expect(await getBackend().photos.findBySessionId(sessionId)).toBeNull();
+      return [r.status, ((await r.json()) as { error: string }).error];
+    };
+    // A photo that is not the frame's shape would hang in the wrong box.
+    expect(await refused("shalom-letter", 1200, 900)).toEqual([400, "frame"]);
+    // Only current booth frames: not a retired one, not the plain id, not a made-up one.
+    expect(await refused("six-lights", 1200, 3600)).toEqual([400, "frame"]);
+    expect(await refused("photo", 1200, 900)).toEqual([400, "frame"]);
+    expect(await refused("nope", 1200, 900)).toEqual([400, "frame"]);
+  });
+
   it("a QR can be retried only a few times (rate limit per QR)", async () => {
     const { url } = (await (await newQr(cookie)).json()) as { url: string };
     const bad = new Uint8Array([0xff, 0xd8, 0xff, 1, 0xff, 0xd9]);

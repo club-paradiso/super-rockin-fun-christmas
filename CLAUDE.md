@@ -82,8 +82,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   apart, wordmark never behind a photo). The active theme comes from the feed
   (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
   FOLLOW THE LIGHTS scene: selectable, never the default.
-- **Phone uploads (D66) are ordinary photos** with `frame_id = 'phone-photo'` (`config/mobile.ts`):
-  one per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
+- **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
+  (`config/mobile.ts`): `phone-<booth frame id>` when the guest put 1–6 photos in a current booth
+  frame on the phone (D89: composed there with `composeFrame`, shape checked on the server, hung on
+  the wall like that frame), `phone-photo` for a plain photo from a page older than D89. Test a phone
+  photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
   as PENDING only through `PhotoService.putMobile` with explicit consent. No guest link, no QR
   reissue. Never add a path that makes one APPROVED or wall-visible outside `lib/ops/moderation.ts`.

@@ -124,8 +124,10 @@ export interface PhotoListFilter {
   kioskId?: string;
   /** Only rows with no kiosk (hub copies and hub-issued phone photos on the cloud). */
   kioskless?: boolean;
-  /** Only this frame id (e.g. phone photos, D66). */
+  /** Only this frame id. */
   frameId?: string;
+  /** Only frame ids starting with this (phone photos, framed or not: "phone-", D66/D89). */
+  frameIdPrefix?: string;
   sessionShort?: string;
   /** Oldest first instead of newest first. */
   oldestFirst?: boolean;

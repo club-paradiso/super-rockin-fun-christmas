@@ -355,6 +355,28 @@ export function photoServiceContract(
       if (KIOSK !== OTHER) expect(await svc.mobileStatus(SESSION, OTHER)).toBe("waiting");
     });
 
+    // D89: a phone photo the guest put in a booth frame keeps that frame in its id.
+    it("framed phone photo: stored as phone-<frame>, found by the inbox prefix; anything else refused", async () => {
+      await putMobile({ kioskId: null, frameId: "phone-shalom-letter" });
+      const row = (await backend.photos.findBySessionId(SESSION))!;
+      expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+      expect(isWallEligible(row)).toBe(false);
+      const plain = uuid();
+      await putMobile({ sessionId: plain, kioskId: null });
+      await put({ sessionId: uuid(), kioskId: null });
+      const byPrefix = await backend.photos.list({
+        frameIdPrefix: "phone-",
+        kioskless: true,
+        limit: 500,
+      });
+      expect(byPrefix.map((r) => r.sessionId).sort()).toEqual([SESSION, plain].sort());
+      expect((await svc.mobileInbox()).map((r) => r.sessionId).sort()).toEqual(
+        [SESSION, plain].sort(),
+      );
+      for (const frameId of ["shalom-letter", "phone-six-lights", "phone-nope", "starlight-strip"])
+        await expect(putMobile({ sessionId: uuid(), frameId })).rejects.toThrow();
+    });
+
     it("list filters: frame id, kioskless, oldest first — applied before the limit", async () => {
       const phone = SESSION;
       await putMobile({ kioskId: null });
