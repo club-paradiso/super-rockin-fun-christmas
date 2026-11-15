@@ -301,6 +301,38 @@ interface ModerationProvider {
 들어 있는 어댑터: `chat-vision.ts`(OpenAI 형식 `chat/completions`. Cloudflare Workers AI와 호환 서비스),
 `gemini.ts`(유료 등급 전용), `mock.ts`(시험용. 실제 배포에서는 설정이 거부).
 
+### 4.5 보조 공급자 (D98)
+
+1차 공급자가 사진을 받을 수 없을 때만 2차(보조) 공급자가 같은 사진을 본다. 예: 1차 Cloudflare 무료
+한도, 2차 맥북의 Ollama를 Cloudflare Tunnel(https)로 연결.
+
+| 상황                                                                  | 처리                                                                                                                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1차의 하루 한도(`AI_MODERATION_DAILY_LIMIT`)가 이 서버 기준으로 다 참 | 1차를 부르지 않고 보조로. 보조 호출은 이 한도를 쓰지 않는다                                                                                                                    |
+| 1차가 HTTP 429(사용량 제한·할당량 소진)                               | 같은 사진을 바로 보조로. `Retry-After`가 5분 이하면 그만큼, 없거나 길면 **다음 00:00 UTC까지** 1차를 건너뛴다(프로세스 메모리. 재시작하면 1차를 한 번 더 부르고 다시 넘어간다) |
+| 1차가 한 컷이라도 UNSAFE로 봄(다른 컷이 429여도)                      | 그것이 판정이다. 보조에게 다시 묻지 않는다                                                                                                                                     |
+| 1차의 시간 초과·5xx·네트워크·인증 오류                                | 기존대로(재시도·정지). 보조로 넘기지 않는다                                                                                                                                    |
+| 보조가 꺼짐·시간 초과·오류·unsure·설정 없음·설정 오류                 | 사진은 PENDING. 재시도 3회 상한, 그 뒤 FAILED → 사람. 연속 3회 실패하면 1분 정지                                                                                               |
+
+- **한 공급자가 사진 한 장 전체를 책임진다.** 보조로 넘어가면 모든 컷을 보조가 다시 본다. 판정 기록·감사
+  기록의 `provider`/`model`은 실제로 답한 쪽이다(예: `openai-compatible` · `qwen2.5vl:3b`). 로그의
+  `ai_review` 이벤트에 `route`(`primary`/`fallback`)와 `switchedBecause`(`daily_limit`/`rate_limited`)가 남는다.
+- **승인 경로는 그대로 하나다**: `AiReviewRepository.complete` + SAFE(`ftl_ai_complete`). 보조도 같은
+  프롬프트, 같은 컷별 사본, 같은 정책 파서를 쓴다. 마이그레이션 없음.
+- **시간 상한**: 보조의 컷 하나는 `AI_MODERATION_FALLBACK_TIMEOUT_MS`(기본 20초), 사진 한 장 전체는
+  리뷰 시작부터 `fallbackPhotoBudgetMs` 22초(`config/moderation.ts`). 30초 함수(`maxDuration`)와 45초 임대
+  안에 끝나게 하려는 값이다. 넘기면 남은 컷은 보내지 않고 `timeout` → 나중에 재시도. cron 라우트는 한 번에
+  한 장씩, 32초 이후로는 새 사진을 집지 않는다.
+- **순차 모드**(`AI_MODERATION_FALLBACK_SEQUENTIAL=1`): 컷을 하나씩 보내고, 처음 UNSAFE나 오류에서 멈춘다
+  (어차피 SAFE가 될 수 없다). 팬리스 맥북 에어의 발열·스로틀링 완화용.
+- **보조 모델도 승인할 수 있다.** 3B급 로컬 모델은 2.3에서 평가한 Llama 4 Scout보다 약할 가능성이 크다.
+  **켜기 전에 같은 평가(2.3)를 보조 모델로 돌린다**(1차 변수 자리에 `openai-compatible`·터널 주소·모델을
+  넣고 실행). 잘못 승인이 나오면 보조를 켜지 않는다. **이 저장소에서 Ollama 모델은 평가하지 않았다(미검증).**
+- **개인정보**: 보조 경로에서는 사진 컷 사본이 Cloudflare 네트워크를 거쳐 운영자의 노트북으로 간다.
+  노트북이 수탁 처리 장소가 된다(5절에 추가로 적을 것). Ollama의 `OLLAMA_DEBUG`를 켜지 않는다(요청이
+  로그에 남을 수 있음). 터널 주소는 Cloudflare Access 서비스 토큰으로 막기를 권한다
+  (`AI_MODERATION_FALLBACK_ACCESS_CLIENT_ID`/`_SECRET`).
+
 ### 4.4 Vercel에서 대기열을 누가 돌리나
 
 대기열은 DB에 있다(메모리 큐·버려지는 Promise에 기대지 않는다). 돌리는 쪽은 여러 겹이다.
@@ -399,6 +431,7 @@ interface ModerationProvider {
 **무료 한도를 넘기면** Cloudflare는 HTTP 429와 오류 코드 4006("you have used up your daily free
 allocation of 10,000 neurons")을 준다. `Retry-After`는 없다(2026-11-15, 평가로 한도를 다 쓴 뒤 확인).
 이 서버는 그것을 `rate_limited`로 보고 호출을 1분씩 멈추며, 사진은 세 번 시도한 뒤 사람에게 간다.
+보조 공급자가 설정되어 있으면(D98, 4.5절) 대신 그 사진부터 보조로 넘기고 00:00 UTC까지 1차를 건너뛴다.
 한도는 00:00 UTC(한국 시간 09:00)에 초기화된다 [S]. 첫날 대시보드의 사용량과 Cloudflare 콘솔을 비교한다.
 
 ---
@@ -455,12 +488,27 @@ Vercel 호환성: Node 런타임, 추가 의존성 없음(`sharp`는 이미 있�
 | `AI_MODERATION_TIMEOUT_MS`          | 호출 제한 시간. 기본 8000                                                                                  |
 | `AI_MODERATION_PAID_TIER_CONFIRMED` | Gemini 전용. 결제를 켠 프로젝트의 키임을 확인했으면 `1`                                                    |
 
+보조 공급자(선택, D98, 4.5절). 틀리면 **보조만** 꺼지고 관리자 화면 "보조 AI" 줄에 이유가 나온다.
+
+| 이름                                                | 값                                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `AI_MODERATION_FALLBACK_PROVIDER`                   | `openai-compatible` \| `cloudflare` \| `gemini`. 비우면 보조 없음. 1차가 있어야 한다 |
+| `AI_MODERATION_FALLBACK_BASE_URL`                   | `openai-compatible`일 때 `https://…/v1`. 사설·로컬 주소 거부                         |
+| `AI_MODERATION_FALLBACK_API_KEY`                    | `openai-compatible`은 선택(비우면 Authorization 헤더 없음). 나머지는 필수            |
+| `AI_MODERATION_FALLBACK_MODEL`                      | 모델 id. 예 `qwen2.5vl:3b`                                                           |
+| `AI_MODERATION_FALLBACK_TIMEOUT_MS`                 | 컷 하나 제한 시간. 1000~25000, 기본 20000                                            |
+| `AI_MODERATION_FALLBACK_SEQUENTIAL`                 | `1`이면 컷을 하나씩                                                                  |
+| `AI_MODERATION_FALLBACK_ACCOUNT_ID`                 | `cloudflare`일 때 계정 id                                                            |
+| `AI_MODERATION_FALLBACK_PAID_TIER_CONFIRMED`        | `gemini`일 때 `1`                                                                    |
+| `AI_MODERATION_FALLBACK_ACCESS_CLIENT_ID`/`_SECRET` | `openai-compatible` 전용, 둘 다 또는 둘 다 비움. Cloudflare Access 서비스 토큰       |
+
 ## 9. 되돌리기
 
 가장 빠른 순서대로. 어느 것도 사진을 잃지 않는다.
 
 1. **관리자 화면**: 검수 → "사람이 모두 확인하기로 바꾸기". 즉시. 대기 중이던 사진은 검수 대기로 온다.
-2. **환경 변수**: `AI_MODERATION_PROVIDER`를 지우고 재배포. 외부 호출이 불가능해진다.
+2. **환경 변수**: `AI_MODERATION_PROVIDER`를 지우고 재배포. 외부 호출이 불가능해진다. 보조만 끄려면
+   `AI_MODERATION_FALLBACK_PROVIDER`를 지우거나 노트북의 터널을 끈다(사진은 사람에게 간다).
 3. **코드**: PR을 되돌린다. 마이그레이션은 그대로 두어도 된다(추가된 열·함수는 옛 코드에 영향이 없고,
    옛 `ftl_settings_update` 서명이 남아 있다).
 4. AI가 승인한 사진을 다시 보려면: 검수 → "AI 승인" 구역에서 하나씩 숨기거나, 급하면 "미디어월 일시정지".

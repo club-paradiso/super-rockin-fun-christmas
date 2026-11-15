@@ -38,6 +38,13 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   reason codes only, never a provider's text. A new provider is one adapter plus one line in
   `lib/moderation/server.ts`. A wrong AI setting turns the AI off (`aiModerationProblem`); it must
   never be a `ConfigError`, because the booth works without it.
+- **A fallback provider only stands in for the primary** (D98, a user request): `AI_MODERATION_FALLBACK_*`
+  is asked only when the primary's daily limit is used up or it answered `rate_limited`, and it never
+  draws on that limit. A flag from the primary is never re-asked; one provider answers for a whole
+  photo and is the one recorded. Same prompt, same shots, same single approval path; off, slow or
+  unsure means PENDING for a person. A whole photo on the fallback finishes within
+  `fallbackPhotoBudgetMs`. A wrong fallback setting turns only the fallback off
+  (`aiModerationFallbackProblem`), never a `ConfigError`.
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.

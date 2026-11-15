@@ -404,3 +404,144 @@ describe("AI review provider config (D95)", () => {
     expect(result.problem).not.toContain("cf-token");
   });
 });
+
+describe("AI review fallback provider config (D98)", () => {
+  const ACCOUNT = "0123456789abcdef0123456789abcdef";
+  const CF = {
+    AI_MODERATION_PROVIDER: "cloudflare",
+    AI_MODERATION_API_KEY: "cf-token",
+    AI_MODERATION_ACCOUNT_ID: ACCOUNT,
+    AI_MODERATION_MODEL: "@cf/vendor/vision-model",
+    AI_MODERATION_DAILY_LIMIT: "280",
+  };
+  const OLLAMA = {
+    AI_MODERATION_FALLBACK_PROVIDER: "openai-compatible",
+    AI_MODERATION_FALLBACK_BASE_URL: "https://ollama.example.org/v1",
+    AI_MODERATION_FALLBACK_MODEL: "qwen2.5vl:3b",
+  };
+  const fb = (env: Record<string, string | undefined>, base: Record<string, string> = PROD) => {
+    const c = parseServerConfig({ ...base, ...CF, ...env });
+    return {
+      primary: c.aiModeration,
+      problem: c.aiModerationProblem,
+      config: c.aiModerationFallback,
+      fallbackProblem: c.aiModerationFallbackProblem,
+    };
+  };
+
+  it("is off unless named, and the primary is untouched", () => {
+    const r = fb({});
+    expect(r).toMatchObject({ config: null, fallbackProblem: null, problem: null });
+    expect(r.primary).toMatchObject({ id: "cloudflare", dailyLimit: 280 });
+  });
+
+  it("Ollama behind a tunnel: no key needed, slow defaults, sequential on request", () => {
+    expect(fb(OLLAMA)).toMatchObject({
+      fallbackProblem: null,
+      config: {
+        kind: "chat",
+        id: "openai-compatible",
+        baseUrl: new URL("https://ollama.example.org/v1"),
+        apiKey: null,
+        model: "qwen2.5vl:3b",
+        timeoutMs: 20_000,
+        sequential: false,
+      },
+    });
+    expect(
+      fb({
+        ...OLLAMA,
+        AI_MODERATION_FALLBACK_API_KEY: "ollama",
+        AI_MODERATION_FALLBACK_TIMEOUT_MS: "15000",
+        AI_MODERATION_FALLBACK_SEQUENTIAL: "1",
+      }).config,
+    ).toMatchObject({ apiKey: "ollama", timeoutMs: 15_000, sequential: true });
+    // The fallback has no daily limit of its own and never changes the primary's.
+    expect(fb(OLLAMA).config).not.toHaveProperty("dailyLimit");
+    expect(fb(OLLAMA).primary).toMatchObject({ dailyLimit: 280 });
+  });
+
+  it("a Cloudflare Access service token becomes two request headers", () => {
+    const r = fb({
+      ...OLLAMA,
+      AI_MODERATION_FALLBACK_ACCESS_CLIENT_ID: "abc123.access",
+      AI_MODERATION_FALLBACK_ACCESS_CLIENT_SECRET: "s3cr3t-value",
+    });
+    expect(r.config).toMatchObject({
+      headers: {
+        "cf-access-client-id": "abc123.access",
+        "cf-access-client-secret": "s3cr3t-value",
+      },
+    });
+  });
+
+  it("a second Cloudflare account or a paid Gemini key works too, with their own rules", () => {
+    expect(
+      fb({
+        AI_MODERATION_FALLBACK_PROVIDER: "cloudflare",
+        AI_MODERATION_FALLBACK_API_KEY: "cf2",
+        AI_MODERATION_FALLBACK_ACCOUNT_ID: "f".repeat(32),
+        AI_MODERATION_FALLBACK_MODEL: "@cf/vendor/vision-model",
+      }).config,
+    ).toMatchObject({ kind: "chat", id: "cloudflare", apiKey: "cf2" });
+    expect(
+      fb({ AI_MODERATION_FALLBACK_PROVIDER: "gemini", AI_MODERATION_FALLBACK_API_KEY: "g" }),
+    ).toMatchObject({ config: null, fallbackProblem: expect.stringMatching(/FALLBACK_PAID_TIER/) });
+    expect(
+      fb({
+        AI_MODERATION_FALLBACK_PROVIDER: "gemini",
+        AI_MODERATION_FALLBACK_API_KEY: "g",
+        AI_MODERATION_FALLBACK_PAID_TIER_CONFIRMED: "1",
+      }).config,
+    ).toMatchObject({ kind: "gemini", model: "gemini-3.5-flash-lite", timeoutMs: 20_000 });
+  });
+
+  it("needs a working primary", () => {
+    const c = parseServerConfig({ ...PROD, ...OLLAMA });
+    expect(c.aiModerationFallback).toBeNull();
+    expect(c.aiModerationFallbackProblem).toMatch(/needs a working AI_MODERATION_PROVIDER/);
+    const broken = parseServerConfig({ ...PROD, ...CF, AI_MODERATION_API_KEY: "", ...OLLAMA });
+    expect(broken.aiModeration).toBeNull();
+    expect(broken.aiModerationFallback).toBeNull();
+  });
+
+  it.each([
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_PROVIDER: "mock" }, /must be openai-compatible/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_PROVIDER: "ollama" }, /must be openai-compatible/],
+    [
+      { ...OLLAMA, AI_MODERATION_FALLBACK_BASE_URL: "http://ollama.example.org/v1" },
+      /FALLBACK_BASE_URL must be a plain https/,
+    ],
+    [
+      { ...OLLAMA, AI_MODERATION_FALLBACK_BASE_URL: "https://localhost:11434/v1" },
+      /private\/local host/,
+    ],
+    [
+      { ...OLLAMA, AI_MODERATION_FALLBACK_BASE_URL: "https://192.168.0.10/v1" },
+      /private\/local host/,
+    ],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_BASE_URL: "" }, /FALLBACK_BASE_URL is not a valid URL/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_MODEL: "" }, /FALLBACK_MODEL is required/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_MODEL: "qwen 2.5" }, /FALLBACK_MODEL has characters/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_TIMEOUT_MS: "60000" }, /FALLBACK_TIMEOUT_MS/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_TIMEOUT_MS: "999" }, /FALLBACK_TIMEOUT_MS/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_SEQUENTIAL: "yes" }, /FALLBACK_SEQUENTIAL/],
+    [{ ...OLLAMA, AI_MODERATION_FALLBACK_ACCESS_CLIENT_ID: "only-id" }, /set together/],
+    [
+      {
+        AI_MODERATION_FALLBACK_PROVIDER: "cloudflare",
+        AI_MODERATION_FALLBACK_MODEL: "@cf/x/y",
+        AI_MODERATION_FALLBACK_ACCOUNT_ID: ACCOUNT,
+      },
+      /FALLBACK_API_KEY is missing/,
+    ],
+  ])("a mistake turns only the fallback off, without a ConfigError: %j", (env, why) => {
+    const r = fb(env as Record<string, string | undefined>);
+    expect(r.config).toBeNull();
+    expect(r.fallbackProblem).toMatch(why);
+    // The primary keeps working.
+    expect(r.primary).toMatchObject({ id: "cloudflare" });
+    expect(r.problem).toBeNull();
+    expect(r.fallbackProblem).not.toContain("cf-token");
+  });
+});

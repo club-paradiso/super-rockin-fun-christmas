@@ -124,8 +124,36 @@ export function AiReviewPanel({
             <dt className="text-ink/75">오늘 사용량</dt>
             <dd className={usedUp || nearLimit ? "text-danger" : undefined} data-testid="ai-usage">
               {ai.usage.requests} / {ai.dailyLimit}회 (이 서버가 센 추정치)
-              {usedUp && " · 한도를 다 써서 남은 사진은 사람이 확인해요"}
+              {usedUp &&
+                (ai.fallback
+                  ? " · 한도를 다 써서 남은 사진은 보조 AI가 확인해요"
+                  : " · 한도를 다 써서 남은 사진은 사람이 확인해요")}
               {nearLimit && " · 한도에 가까워요"}
+            </dd>
+            <dt className="text-ink/75">보조 AI</dt>
+            <dd data-testid="ai-fallback">
+              {ai.fallback ? (
+                ai.primaryOffUntil ? (
+                  <>
+                    사용 중 · 기본 AI가 사용량 제한에 걸려 {formatTime(ai.primaryOffUntil)}까지 보조
+                    AI가 확인해요
+                  </>
+                ) : usedUp ? (
+                  "사용 중 · 오늘 기본 AI 한도를 다 써서 보조 AI가 확인해요"
+                ) : (
+                  "대기 중 · 기본 AI 한도가 다 차거나 사용량 제한에 걸리면 넘겨받아요"
+                )
+              ) : (
+                "없음 · 기본 AI가 막히면 사람이 확인해요"
+              )}
+              {ai.fallbackProblem && (
+                <>
+                  <br />
+                  <span className="text-danger" data-testid="ai-fallback-problem">
+                    보조 AI 설정 오류 (기술 담당에게 전달): {ai.fallbackProblem}
+                  </span>
+                </>
+              )}
             </dd>
             <dt className="text-ink/75">오늘 결과</dt>
             <dd>
@@ -138,6 +166,13 @@ export function AiReviewPanel({
           </dl>
           <p className="admin-help">
             {ai.provider} · {ai.model}
+            {ai.fallback && (
+              <>
+                {" "}
+                → 보조 {ai.fallback.provider} · {ai.fallback.model}
+                {ai.fallback.sequential ? " (한 컷씩)" : ""}
+              </>
+            )}
           </p>
           <div>
             <button

@@ -14,6 +14,14 @@ export const MODERATION_CONFIG = {
   /** Wait before attempt 2, 3, … (a provider's own Retry-After, if longer, wins up to the cap). */
   retryBackoffMs: [5_000, 30_000],
   retryAfterCapMs: 5 * 60_000,
+  /**
+   * The fallback provider (D98) must be done with a whole photo this long after the review began
+   * (claim, image, cutting, the primary's refusal and every fallback shot included). Each fallback
+   * shot gets at most what is left of it. It keeps one photo inside the 30 s functions that run
+   * reviews and well inside `leaseMs`; a photo that does not make it is retried later and, after
+   * `maxAttempts`, waits for a person.
+   */
+  fallbackPhotoBudgetMs: 22_000,
   /** Photos one sweep takes, and the pause between sweeps started by ordinary requests. */
   sweepBatch: 4,
   sweepEveryMs: 5_000,

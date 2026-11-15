@@ -231,6 +231,8 @@ export async function moderationSection(
 export interface AiOverview extends AiStatus {
   /** Why the AI settings on this server were refused, or null. For the technical contact. */
   problem: string | null;
+  /** Why the fallback AI settings were refused (D98), or null. Only the fallback is off then. */
+  fallbackProblem: string | null;
 }
 
 /**
@@ -241,7 +243,11 @@ export interface AiOverview extends AiStatus {
 export async function getAiOverview(): Promise<AiOverview> {
   const config = getServerConfig();
   try {
-    return { ...(await getAiReview().status()), problem: config.aiModerationProblem };
+    return {
+      ...(await getAiReview().status()),
+      problem: config.aiModerationProblem,
+      fallbackProblem: config.aiModerationFallbackProblem,
+    };
   } catch (err) {
     logEvent("ai_status_failed", { message: (err as Error).message.slice(0, 200) }, "warn");
     const zero = { NONE: 0, QUEUED: 0, SAFE: 0, UNSAFE: 0, UNCERTAIN: 0, FAILED: 0, SKIPPED: 0 };
@@ -265,6 +271,9 @@ export async function getAiOverview(): Promise<AiOverview> {
         lastFailureReason: null,
       },
       pending: zero,
+      fallback: null,
+      primaryOffUntil: null,
+      fallbackProblem: config.aiModerationFallbackProblem,
       problem:
         config.aiModerationProblem ??
         "AI review status could not be read (is migration 20261114120000_ai_review.sql applied?)",

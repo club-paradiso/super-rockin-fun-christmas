@@ -8,8 +8,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Stop starting new photos after this long, so the function ends well inside maxDuration. */
-const BUDGET_MS = 40_000;
+/**
+ * Stop starting new photos after this long, so the function ends well inside maxDuration. One
+ * photo at a time: a photo on the fallback provider (D98) may take up to
+ * MODERATION_CONFIG.fallbackPhotoBudgetMs (22 s), and 32 + 22 s still ends before 60 s.
+ */
+const BUDGET_MS = 32_000;
 
 /**
  * Work through the AI review queue (D95). `Authorization: Bearer $CRON_SECRET`, like the
@@ -26,7 +30,7 @@ async function handle(request: Request) {
   const started = Date.now();
   let handled = 0;
   while (Date.now() - started < BUDGET_MS) {
-    const n = await service.processDue(2);
+    const n = await service.processDue(1);
     handled += n;
     if (n === 0) break;
   }

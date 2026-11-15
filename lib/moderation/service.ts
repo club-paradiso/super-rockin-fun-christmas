@@ -38,10 +38,24 @@ export interface AiReviewOptions {
   dailyLimit: number;
   /** One provider request may take this long. */
   timeoutMs: number;
+  /**
+   * A second provider (D98), used only while the primary cannot take a photo: its daily limit is
+   * used up, or it answered "rate limited / out of quota". It never draws on `dailyLimit`. Null =
+   * none: those photos wait for a person, as before.
+   */
+  fallback?: FallbackOptions | null;
   /** The usage day rolls over at midnight here. */
   timeZone: string;
   now?: () => Date;
   log?: (event: string, fields: LogFields, level?: LogLevel) => void;
+}
+
+export interface FallbackOptions {
+  provider: ModerationProvider;
+  /** One shot may take this long, and never past the photo's budget (`fallbackPhotoBudgetMs`). */
+  timeoutMs: number;
+  /** One shot at a time instead of all at once, stopping at the first flag or error. */
+  sequential: boolean;
 }
 
 export interface AiStatus {
@@ -57,6 +71,22 @@ export interface AiStatus {
   pausedUntil: string | null;
   usage: AiReviewStatusView["usage"];
   pending: AiReviewStatusView["pending"];
+  /** The fallback provider (D98), or null when none is configured. */
+  fallback: { provider: string; model: string; sequential: boolean; timeoutMs: number } | null;
+  /**
+   * The primary answered "rate limited / out of quota" and is skipped until then (fallback
+   * configured only); null = it is asked first as usual.
+   */
+  primaryOffUntil: string | null;
+}
+
+type Route = "primary" | "fallback";
+
+/** What the shots of one photo came back with, from one provider. */
+interface ShotResults {
+  decisions: ReturnType<typeof decide>[];
+  errors: ProviderError[];
+  latencyMs: number;
 }
 
 /** Consecutive failures before the service stops calling for a while. */
@@ -89,6 +119,8 @@ export class AiReviewService {
   private readonly log: NonNullable<AiReviewOptions["log"]>;
   private consecutiveFailures = 0;
   private pausedUntilMs = 0;
+  /** D98: while in the future, photos go straight to the fallback. Only set with one configured. */
+  private primaryOffUntilMs = 0;
   private sweeping: Promise<number> | null = null;
 
   constructor(
@@ -111,6 +143,32 @@ export class AiReviewService {
 
   private paused(): boolean {
     return this.pausedUntilMs > this.now().getTime();
+  }
+
+  private primaryOff(): boolean {
+    return this.primaryOffUntilMs > this.now().getTime();
+  }
+
+  /**
+   * The primary said "rate limited / out of quota". A short Retry-After (a per-minute limit) is
+   * honoured as given; without one, or with a long one, it is a daily quota, and free quotas such
+   * as Cloudflare's reset at 00:00 UTC: skip the primary until then. A process restart forgets
+   * this, which costs one more refused request, nothing else.
+   */
+  private switchPrimaryOff(e: ProviderError) {
+    const nowMs = this.now().getTime();
+    const midnightUtc = new Date(nowMs);
+    midnightUtc.setUTCHours(24, 0, 0, 0);
+    const until =
+      e.retryAfterMs !== null && e.retryAfterMs <= MODERATION_CONFIG.retryAfterCapMs
+        ? nowMs + Math.max(e.retryAfterMs, 1000)
+        : midnightUtc.getTime();
+    this.primaryOffUntilMs = Math.max(this.primaryOffUntilMs, until);
+    this.log(
+      "ai_review_primary_off",
+      { reason: e.kind, until: new Date(this.primaryOffUntilMs).toISOString() },
+      "warn",
+    );
   }
 
   /**
@@ -185,7 +243,12 @@ export class AiReviewService {
   /** One claimed photo, start to finish. Always ends in exactly one `complete` attempt. */
   private async review({ photo, claim }: AiClaim): Promise<void> {
     const started = this.now();
-    const provider = this.opts.provider;
+    const primary = this.opts.provider;
+    const fallback = this.opts.fallback ?? null;
+    // Who answers for this photo: recorded with the verdict and in the audit trail.
+    let decider: ModerationProvider | null = primary;
+    let route: Route = "primary";
+    let switchedBecause: string | null = null;
     const finish = async (
       outcome: AiCompletion["outcome"],
       reason: string | null,
@@ -201,8 +264,8 @@ export class AiReviewService {
           outcome,
           reason,
           categories: extra.categories ?? [],
-          provider: provider?.id ?? null,
-          model: provider?.model ?? null,
+          provider: decider?.id ?? null,
+          model: decider?.model ?? null,
           latencyMs: extra.latencyMs ?? null,
           nextAttemptAt: extra.nextAttemptAt ?? null,
           called: extra.called ?? false,
@@ -215,6 +278,8 @@ export class AiReviewService {
             photoId: photo.id,
             outcome,
             reason,
+            route,
+            switchedBecause,
             attempt: photo.ai?.attempts ?? null,
             applied: result.applied,
             approved: result.approved,
@@ -239,7 +304,7 @@ export class AiReviewService {
     };
 
     try {
-      if (!provider) return await finish("SKIPPED", "not_configured");
+      if (!primary) return await finish("SKIPPED", "not_configured");
       const settings = await this.backend.settings.get();
       if (settings.moderationMode !== "auto") return await finish("SKIPPED", "manual_mode");
 
@@ -248,79 +313,49 @@ export class AiReviewService {
       const shots = await this.opts.prepare(original, photo.mime, photo.frameId);
       if (!shots?.length) return await finish("FAILED", "unsupported_image");
 
-      // One request per shot, all paid for before the first is sent: a photo is never half checked
-      // because the day's budget ran out in the middle of it.
-      const day = this.day(this.now());
-      for (let i = 0; i < shots.length; i++) {
-        const budget = await this.backend.aiReviews.takeBudget(day, this.opts.dailyLimit);
-        if (!budget.allowed) return await finish("SKIPPED", "daily_limit");
-      }
+      const toFallback = (why: string) => {
+        decider = fallback!.provider;
+        route = "fallback";
+        switchedBecause = why;
+      };
 
-      const callStarted = this.now().getTime();
-      const answers = await Promise.allSettled(
-        shots.map((shot) => this.callWithTimeout(provider, shot)),
-      );
-      const latencyMs = this.now().getTime() - callStarted;
-      const decisions = answers.flatMap((a) => (a.status === "fulfilled" ? [decide(a.value)] : []));
-      const errors = answers.flatMap((a) =>
-        a.status === "rejected"
-          ? [
-              a.reason instanceof ProviderError
-                ? a.reason
-                : new ProviderError("bad_response", messageOf(a.reason)),
-            ]
-          : [],
-      );
-
-      // A shot the provider flagged settles it, whatever happened to the others: the photo is not
-      // going to be approved, and staff should see why.
-      const flagged = decisions.filter((d) => d.outcome === "UNSAFE");
-      if (flagged.length > 0) {
-        if (errors.length === 0) this.consecutiveFailures = 0;
-        return await finish("UNSAFE", "flagged", {
-          called: true,
-          latencyMs,
-          categories: [...new Set(flagged.flatMap((d) => d.categories))],
-        });
-      }
-
-      if (errors.length > 0) {
-        // The error that says most about the provider's state decides the pause and the retry.
-        const e =
-          errors.find((x) => x.kind === "auth") ??
-          errors.find((x) => x.kind === "rate_limited") ??
-          errors.find((x) => RETRYABLE.has(x.kind)) ??
-          errors[0]!;
-        this.noteFailure(e);
-        const attempts = photo.ai?.attempts ?? MODERATION_CONFIG.maxAttempts;
-        if (RETRYABLE.has(e.kind) && attempts < MODERATION_CONFIG.maxAttempts) {
-          const backoff =
-            MODERATION_CONFIG.retryBackoffMs[
-              Math.min(attempts - 1, MODERATION_CONFIG.retryBackoffMs.length - 1)
-            ] ?? 30_000;
-          const wait = Math.min(
-            Math.max(backoff, e.retryAfterMs ?? 0),
-            MODERATION_CONFIG.retryAfterCapMs,
-          );
-          return await finish("RETRY", e.kind, {
-            called: true,
-            latencyMs,
-            nextAttemptAt: new Date(this.now().getTime() + wait).toISOString(),
-          });
+      if (fallback && this.primaryOff()) {
+        toFallback("rate_limited");
+      } else {
+        // One request per shot, all paid for before the first is sent: a photo is never half
+        // checked because the day's budget ran out in the middle of it.
+        const day = this.day(this.now());
+        for (let i = 0; i < shots.length; i++) {
+          const budget = await this.backend.aiReviews.takeBudget(day, this.opts.dailyLimit);
+          if (budget.allowed) continue;
+          if (!fallback) return await finish("SKIPPED", "daily_limit");
+          toFallback("daily_limit");
+          break;
         }
-        return await finish("FAILED", e.kind, { called: true, latencyMs });
       }
 
-      this.consecutiveFailures = 0;
-      // Every shot answered and none was flagged. SAFE only if every single one is.
-      const held = decisions.find((d) => d.outcome !== "SAFE");
-      if (held)
-        return await finish(held.outcome, held.reason, {
-          called: true,
-          latencyMs,
-          categories: [...new Set(decisions.flatMap((d) => d.categories))],
-        });
-      return await finish("SAFE", null, { called: true, latencyMs });
+      if (route === "primary") {
+        const r = await this.runShots(primary, shots, this.opts.timeoutMs, false, null);
+        // Only "slow down / out of quota" moves a photo to the fallback, and only when the primary
+        // flagged nothing: a flag is a verdict, and the fallback is never asked for a second opinion.
+        const limited =
+          fallback !== null &&
+          !r.decisions.some((d) => d.outcome === "UNSAFE") &&
+          r.errors.find((e) => e.kind === "rate_limited");
+        if (!limited) return await this.settle(photo, r, finish);
+        this.switchPrimaryOff(limited);
+        toFallback("rate_limited");
+      }
+
+      // The fallback looks at every shot again: one provider answers for the whole photo.
+      const r = await this.runShots(
+        fallback!.provider,
+        shots,
+        fallback!.timeoutMs,
+        fallback!.sequential,
+        started.getTime() + MODERATION_CONFIG.fallbackPhotoBudgetMs,
+      );
+      return await this.settle(photo, r, finish);
     } catch (err) {
       // Storage failed somewhere above (settings, the image, the budget counter).
       this.log("ai_review_error", { photoId: photo.id, message: messageOf(err) }, "warn");
@@ -328,9 +363,117 @@ export class AiReviewService {
     }
   }
 
+  /**
+   * Ask one provider about every shot. In parallel by default; `sequential` asks one at a time and
+   * stops at the first flag or error, since either already decides that the photo is not SAFE.
+   * `deadlineMs` (epoch ms) caps every shot's timeout and stops shots that would start after it.
+   */
+  private async runShots(
+    provider: ModerationProvider,
+    shots: ModerationImage[],
+    timeoutMs: number,
+    sequential: boolean,
+    deadlineMs: number | null,
+  ): Promise<ShotResults> {
+    const callStarted = this.now().getTime();
+    const decisions: ShotResults["decisions"] = [];
+    const errors: ProviderError[] = [];
+    const ask = (shot: ModerationImage) => {
+      const left = deadlineMs === null ? timeoutMs : deadlineMs - this.now().getTime();
+      if (left <= 0) return Promise.reject(new ProviderError("timeout", "photo budget used up"));
+      return this.callWithTimeout(provider, shot, Math.min(timeoutMs, left));
+    };
+    const asError = (reason: unknown) =>
+      reason instanceof ProviderError
+        ? reason
+        : new ProviderError("bad_response", messageOf(reason));
+
+    if (sequential) {
+      for (const shot of shots) {
+        try {
+          const d = decide(await ask(shot));
+          decisions.push(d);
+          if (d.outcome === "UNSAFE") break;
+        } catch (err) {
+          errors.push(asError(err));
+          break;
+        }
+      }
+    } else {
+      const answers = await Promise.allSettled(shots.map(ask));
+      for (const a of answers) {
+        if (a.status === "fulfilled") decisions.push(decide(a.value));
+        else errors.push(asError(a.reason));
+      }
+    }
+    return { decisions, errors, latencyMs: this.now().getTime() - callStarted };
+  }
+
+  /** Turn one provider's answers for every shot into the photo's outcome. */
+  private async settle(
+    photo: AiClaim["photo"],
+    { decisions, errors, latencyMs }: ShotResults,
+    finish: (
+      outcome: AiCompletion["outcome"],
+      reason: string | null,
+      extra?: Partial<Pick<AiCompletion, "categories" | "latencyMs" | "nextAttemptAt" | "called">>,
+    ) => Promise<void>,
+  ): Promise<void> {
+    // A shot the provider flagged settles it, whatever happened to the others: the photo is not
+    // going to be approved, and staff should see why.
+    const flagged = decisions.filter((d) => d.outcome === "UNSAFE");
+    if (flagged.length > 0) {
+      if (errors.length === 0) this.consecutiveFailures = 0;
+      return finish("UNSAFE", "flagged", {
+        called: true,
+        latencyMs,
+        categories: [...new Set(flagged.flatMap((d) => d.categories))],
+      });
+    }
+
+    if (errors.length > 0) {
+      // The error that says most about the provider's state decides the pause and the retry.
+      const e =
+        errors.find((x) => x.kind === "auth") ??
+        errors.find((x) => x.kind === "rate_limited") ??
+        errors.find((x) => RETRYABLE.has(x.kind)) ??
+        errors[0]!;
+      this.noteFailure(e);
+      const attempts = photo.ai?.attempts ?? MODERATION_CONFIG.maxAttempts;
+      if (RETRYABLE.has(e.kind) && attempts < MODERATION_CONFIG.maxAttempts) {
+        const backoff =
+          MODERATION_CONFIG.retryBackoffMs[
+            Math.min(attempts - 1, MODERATION_CONFIG.retryBackoffMs.length - 1)
+          ] ?? 30_000;
+        const wait = Math.min(
+          Math.max(backoff, e.retryAfterMs ?? 0),
+          MODERATION_CONFIG.retryAfterCapMs,
+        );
+        return finish("RETRY", e.kind, {
+          called: true,
+          latencyMs,
+          nextAttemptAt: new Date(this.now().getTime() + wait).toISOString(),
+        });
+      }
+      return finish("FAILED", e.kind, { called: true, latencyMs });
+    }
+
+    this.consecutiveFailures = 0;
+    // Every shot answered and none was flagged. SAFE only if every single one is.
+    const held = decisions.find((d) => d.outcome !== "SAFE");
+    if (held)
+      return finish(held.outcome, held.reason, {
+        called: true,
+        latencyMs,
+        categories: [...new Set(decisions.flatMap((d) => d.categories))],
+      });
+    return finish("SAFE", null, { called: true, latencyMs });
+  }
+
   private async callWithTimeout(
     provider: ModerationProvider,
     image: ModerationImage,
+    timeoutMs: number,
   ): Promise<ProviderAssessment> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -340,7 +483,7 @@ export class AiReviewService {
       timer = setTimeout(() => {
         controller.abort();
         reject(new ProviderError("timeout", "request timed out"));
-      }, this.opts.timeoutMs);
+      }, timeoutMs);
     });
     try {
       return await Promise.race([provider.analyze(image, controller.signal), timeout]);
@@ -380,6 +523,18 @@ export class AiReviewService {
       pausedUntil: this.paused() ? new Date(this.pausedUntilMs).toISOString() : null,
       usage: view.usage,
       pending: view.pending,
+      fallback: this.opts.fallback
+        ? {
+            provider: this.opts.fallback.provider.id,
+            model: this.opts.fallback.provider.model,
+            sequential: this.opts.fallback.sequential,
+            timeoutMs: this.opts.fallback.timeoutMs,
+          }
+        : null,
+      primaryOffUntil:
+        this.opts.fallback && this.primaryOff()
+          ? new Date(this.primaryOffUntilMs).toISOString()
+          : null,
     };
   }
 }

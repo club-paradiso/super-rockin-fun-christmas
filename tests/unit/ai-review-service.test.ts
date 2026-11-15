@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { MODERATION_CONFIG } from "@/config/moderation";
-import { AiReviewService } from "@/lib/moderation/service";
+import { AiReviewService, type FallbackOptions } from "@/lib/moderation/service";
 import {
   ProviderError,
   type ModerationImage,
@@ -52,7 +52,13 @@ const STAFF = uuid();
 
 function world(
   provider: ModerationProvider | null,
-  opts: { dailyLimit?: number; timeoutMs?: number; mode?: "auto" | "manual"; shots?: number } = {},
+  opts: {
+    dailyLimit?: number;
+    timeoutMs?: number;
+    mode?: "auto" | "manual";
+    shots?: number;
+    fallback?: FallbackOptions | null;
+  } = {},
 ) {
   const backend = createMemoryBackend();
   backend.settings.value.moderationMode = opts.mode ?? "auto";
@@ -74,6 +80,7 @@ function world(
         })),
       dailyLimit: opts.dailyLimit ?? 100,
       timeoutMs: opts.timeoutMs ?? 50,
+      fallback: opts.fallback ?? null,
       timeZone: "Asia/Seoul",
       now,
       log: (event, fields) => logs.push({ event, fields }),
@@ -914,5 +921,277 @@ describe("AI review: every shot is checked on its own (D97)", () => {
       ai: { status: "FAILED", reason: "unsupported_image" },
     });
     expect(seen).toHaveLength(0);
+  });
+});
+
+describe("AI review: the fallback provider takes over when the primary cannot (D98)", () => {
+  /** A scripted provider under another name, so the record shows who answered. */
+  const named = (id: string, ...steps: Step[]) => {
+    const s = scripted(...steps);
+    return { provider: { ...s.provider, id, model: `${id}-model` }, seen: s.seen };
+  };
+  const laptop = (
+    p: ModerationProvider,
+    o: Partial<Omit<FallbackOptions, "provider">> = {},
+  ): FallbackOptions => ({ provider: p, timeoutMs: o.timeoutMs ?? 50, sequential: !!o.sequential });
+
+  it("past the primary's daily limit the fallback answers, without using the primary's budget", async () => {
+    const primary = named("cloudflare", SAFE);
+    const fb = named("openai-compatible", SAFE);
+    const w = world(primary.provider, { dailyLimit: 2, fallback: laptop(fb.provider) });
+    const ids = [];
+    for (let i = 0; i < 4; i++) {
+      const p = await w.shoot();
+      await w.ai.request(p.id);
+      ids.push(p.id);
+    }
+    await w.ai.processDue(10);
+    const rows = await Promise.all(ids.map(w.row));
+    expect(rows.map((r) => r.moderationStatus)).toEqual([
+      "APPROVED",
+      "APPROVED",
+      "APPROVED",
+      "APPROVED",
+    ]);
+    expect(rows.map((r) => r.ai?.provider)).toEqual([
+      "cloudflare",
+      "cloudflare",
+      "openai-compatible",
+      "openai-compatible",
+    ]);
+    expect(primary.seen).toHaveLength(2);
+    expect(fb.seen).toHaveLength(2);
+    // The day's counter is the primary's: the fallback never draws on it.
+    expect(await w.usage()).toMatchObject({ requests: 2, approved: 4 });
+    // The audit trail says which provider approved.
+    const audit = await w.backend.audit.list({
+      subjectType: "photo",
+      subjectId: ids[3]!,
+      limit: 5,
+    });
+    expect(audit.find((e) => e.action === "ai_approve")?.details).toMatchObject({
+      provider: "openai-compatible",
+      model: "openai-compatible-model",
+    });
+    expect(w.logs.filter((l) => l.event === "ai_review").map((l) => l.fields.route)).toEqual([
+      "primary",
+      "primary",
+      "fallback",
+      "fallback",
+    ]);
+  });
+
+  it("a primary 429 sends the same photo to the fallback, and skips the primary until 00:00 UTC", async () => {
+    const primary = named("cloudflare", new ProviderError("rate_limited", "HTTP 429"), SAFE);
+    const fb = named("openai-compatible", SAFE);
+    const w = world(primary.provider, { fallback: laptop(fb.provider) });
+    const a = await w.shoot();
+    await w.ai.request(a.id);
+    await w.ai.processOne(a.id);
+    expect(await w.row(a.id)).toMatchObject({
+      moderationStatus: "APPROVED",
+      ai: { status: "SAFE", provider: "openai-compatible", attempts: 1 },
+    });
+    expect(primary.seen).toHaveLength(1);
+    const status = await w.ai.status();
+    // The world's clock is 2026-12-05 03:00 UTC.
+    expect(status.primaryOffUntil).toBe("2026-12-06T00:00:00.000Z");
+    // A primary 429 with a fallback is not an outage: nothing is paused.
+    expect(status.pausedUntil).toBeNull();
+    expect(status.fallback).toMatchObject({ provider: "openai-compatible", sequential: false });
+
+    const b = await w.shoot();
+    await w.ai.request(b.id);
+    await w.ai.processOne(b.id);
+    expect((await w.row(b.id)).ai?.provider).toBe("openai-compatible");
+    expect(primary.seen).toHaveLength(1);
+
+    // After midnight UTC the primary is asked first again.
+    w.advance(21 * 60 * 60_000 + 1);
+    expect((await w.ai.status()).primaryOffUntil).toBeNull();
+    const c = await w.shoot();
+    await w.ai.request(c.id);
+    await w.ai.processOne(c.id);
+    expect((await w.row(c.id)).ai?.provider).toBe("cloudflare");
+    expect(primary.seen).toHaveLength(2);
+  });
+
+  it("a short Retry-After (a per-minute limit) skips the primary only that long", async () => {
+    const primary = named(
+      "cloudflare",
+      new ProviderError("rate_limited", "HTTP 429", 30_000),
+      SAFE,
+    );
+    const w = world(primary.provider, { fallback: laptop(named("laptop", SAFE).provider) });
+    const a = await w.shoot();
+    await w.ai.request(a.id);
+    await w.ai.processOne(a.id);
+    expect((await w.ai.status()).primaryOffUntil).toBe("2026-12-05T03:00:30.000Z");
+    w.advance(30_001);
+    const b = await w.shoot();
+    await w.ai.request(b.id);
+    await w.ai.processOne(b.id);
+    expect((await w.row(b.id)).ai?.provider).toBe("cloudflare");
+  });
+
+  it("a shot the primary flagged is a verdict: a 429 on another shot does not ask the fallback", async () => {
+    let i = 0;
+    const steps = [SAFE, UNSAFE, new ProviderError("rate_limited", "HTTP 429"), SAFE];
+    const primary: ModerationProvider = {
+      id: "cloudflare",
+      model: "m",
+      async analyze() {
+        const s = steps[i++]!;
+        if (s instanceof ProviderError) throw s;
+        return s;
+      },
+    };
+    const fb = named("laptop", SAFE);
+    const w = world(primary, { shots: 4, fallback: laptop(fb.provider) });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "UNSAFE", provider: "cloudflare", categories: ["gesture"] },
+    });
+    expect(fb.seen).toHaveLength(0);
+    expect((await w.ai.status()).primaryOffUntil).toBeNull();
+  });
+
+  it("other primary failures (an outage, a timeout) are retried as before, not sent to the fallback", async () => {
+    const primary = named("cloudflare", new ProviderError("unavailable", "HTTP 503"));
+    const fb = named("laptop", SAFE);
+    const w = world(primary.provider, { fallback: laptop(fb.provider) });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "QUEUED", reason: null },
+    });
+    expect(fb.seen).toHaveLength(0);
+  });
+
+  it("the laptop is off: the photo stays PENDING, is retried a bounded number of times, then waits for a person", async () => {
+    const primary = named("cloudflare", SAFE);
+    const fb = named("laptop", new ProviderError("network", "TypeError"));
+    const w = world(primary.provider, { dailyLimit: 1, fallback: laptop(fb.provider) });
+    const first = await w.shoot();
+    await w.ai.request(first.id);
+    await w.ai.processOne(first.id);
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    for (let i = 0; i < 10; i++) {
+      await w.ai.processDue();
+      expect((await w.row(p.id)).moderationStatus).toBe("PENDING");
+      w.advance(10 * 60_000);
+    }
+    expect(fb.seen).toHaveLength(MODERATION_CONFIG.maxAttempts);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "FAILED", reason: "network", provider: "laptop" },
+    });
+    expect(isWallEligible(await w.row(p.id))).toBe(false);
+    expect(await w.photos.wallImage(p.id)).toBeNull();
+  });
+
+  it("a fallback that hangs is cut off at its own timeout, and the photo stays private", async () => {
+    const primary = named("cloudflare", new ProviderError("rate_limited", "HTTP 429"));
+    const w = world(primary.provider, {
+      fallback: laptop(named("laptop", "hang").provider, { timeoutMs: 20 }),
+    });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "QUEUED", claim: null, attempts: 1 },
+    });
+    expect(await w.usage()).toMatchObject({ failed: 1, lastFailureReason: "timeout" });
+  });
+
+  it("an unsure fallback approves nothing", async () => {
+    const primary = named("cloudflare", new ProviderError("rate_limited", "HTTP 429"));
+    const w = world(primary.provider, { fallback: laptop(named("laptop", UNSURE).provider) });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "UNCERTAIN", provider: "laptop" },
+    });
+  });
+
+  it("sequential: one shot at a time, stopping at the first flag", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const answers = [SAFE, UNSAFE, SAFE, SAFE];
+    const seen: number[] = [];
+    const fb: ModerationProvider = {
+      id: "laptop",
+      model: "m",
+      async analyze() {
+        inFlight++;
+        most = Math.max(most, inFlight);
+        await new Promise((r) => setTimeout(r, 2));
+        inFlight--;
+        seen.push(seen.length);
+        return answers[seen.length - 1]!;
+      },
+    };
+    const primary = named("cloudflare", new ProviderError("rate_limited", "HTTP 429"));
+    const w = world(primary.provider, { shots: 4, fallback: laptop(fb, { sequential: true }) });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(most).toBe(1);
+    expect(seen).toHaveLength(2);
+    expect((await w.row(p.id)).ai).toMatchObject({ status: "UNSAFE", provider: "laptop" });
+  });
+
+  it("sequential shots never run past the photo's budget: a slow laptop leaves the photo for later", async () => {
+    // The provider moves the world's clock, and the world needs the provider: a late binding.
+    const clock = { advance: (_ms: number): unknown => undefined };
+    const seen: number[] = [];
+    const fb: ModerationProvider = {
+      id: "laptop",
+      model: "m",
+      async analyze() {
+        seen.push(1);
+        clock.advance(10_000); // each shot takes 10 s on the (fake) clock
+        return SAFE;
+      },
+    };
+    const primary = named("cloudflare", new ProviderError("rate_limited", "HTTP 429"));
+    const w = world(primary.provider, {
+      shots: 4,
+      fallback: laptop(fb, { sequential: true, timeoutMs: 20_000 }),
+    });
+    clock.advance = w.advance;
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    // 22 s budget: shots 1–3 start in time, shot 4 would start at 30 s and is never sent.
+    expect(MODERATION_CONFIG.fallbackPhotoBudgetMs).toBe(22_000);
+    expect(seen).toHaveLength(3);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "QUEUED", claim: null },
+    });
+    expect(await w.usage()).toMatchObject({ lastFailureReason: "timeout" });
+  });
+
+  it("without a fallback nothing changes: past the limit photos go to a person", async () => {
+    const w = world(named("cloudflare", SAFE).provider, { dailyLimit: 1 });
+    const a = await w.shoot();
+    const b = await w.shoot();
+    await w.ai.request(a.id);
+    await w.ai.request(b.id);
+    await w.ai.processDue(5);
+    expect((await w.row(b.id)).ai).toMatchObject({ status: "SKIPPED", reason: "daily_limit" });
+    const status = await w.ai.status();
+    expect(status.fallback).toBeNull();
+    expect(status.primaryOffUntil).toBeNull();
   });
 });

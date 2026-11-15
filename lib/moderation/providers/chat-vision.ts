@@ -13,8 +13,11 @@ export interface ChatVisionOptions {
   id: string;
   /** The API root that has `/chat/completions` under it. */
   baseUrl: URL;
-  apiKey: string;
+  /** Null = no Authorization header (an endpoint such as Ollama that takes no key). */
+  apiKey: string | null;
   model: string;
+  /** Fixed extra headers from the server config (a Cloudflare Access service token). */
+  headers?: Record<string, string>;
   fetchImpl?: typeof fetch;
 }
 
@@ -22,7 +25,8 @@ export interface ChatVisionOptions {
  * A vision model behind an OpenAI-style `chat/completions` endpoint: the picture goes in as a
  * base64 data URL in the same request, never as a link (nothing of ours is fetchable from
  * outside). This one adapter serves every provider that speaks that format: Cloudflare Workers AI
- * (the primary, D95), and others such as Groq, by base URL and model name alone.
+ * (the primary, D95), a laptop running Ollama as the fallback (D98), and others such as Groq, by
+ * base URL and model name alone.
  *
  * The answer must be the one JSON object the prompt asks for. `response_format: json_object` is
  * requested because most such endpoints honour it, but nothing relies on it: the text is parsed
@@ -31,13 +35,15 @@ export interface ChatVisionOptions {
 export function createChatVisionProvider(opts: ChatVisionOptions): ModerationProvider {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const url = `${opts.baseUrl.href.replace(/\/+$/, "")}/chat/completions`;
+  const headers: Record<string, string> = { ...opts.headers };
+  if (opts.apiKey) headers.authorization = `Bearer ${opts.apiKey}`;
   return {
     id: opts.id,
     model: opts.model,
     async analyze(image: ModerationImage, signal: AbortSignal): Promise<ProviderAssessment> {
       const { json } = await postJson(
         url,
-        { authorization: `Bearer ${opts.apiKey}` },
+        headers,
         {
           model: opts.model,
           temperature: 0,

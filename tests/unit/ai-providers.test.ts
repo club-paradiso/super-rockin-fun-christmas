@@ -272,3 +272,24 @@ describe("mock provider", () => {
     await expect(slow).rejects.toMatchObject({ kind: "timeout" });
   });
 });
+
+describe("chat-completions adapter as a keyless fallback (D98: Ollama behind a tunnel)", () => {
+  it("sends no Authorization header without a key, and the Access headers when configured", async () => {
+    const { impl, calls } = fakeFetch(() => chatAnswer(JSON.stringify(SAFE)));
+    const provider = createChatVisionProvider({
+      id: "openai-compatible",
+      baseUrl: new URL("https://ollama.example.test/v1"),
+      apiKey: null,
+      model: "qwen2.5vl:3b",
+      headers: { "cf-access-client-id": "id.access", "cf-access-client-secret": "sec" },
+      fetchImpl: impl,
+    });
+    expect(await provider.analyze(IMAGE, signal())).toMatchObject({ verdict: "safe" });
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers).not.toHaveProperty("authorization");
+    expect(headers["cf-access-client-id"]).toBe("id.access");
+    expect(calls[0]!.url).toBe("https://ollama.example.test/v1/chat/completions");
+    // The same request as for the primary: prompt and picture only.
+    expect(JSON.stringify(calls[0]!.body)).toContain(B64);
+  });
+});
