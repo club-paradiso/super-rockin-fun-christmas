@@ -28,8 +28,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   hide, delete or restore, and never add a route that accepts a verdict. Phone uploads are always
   reviewed by a person. The policy is `lib/moderation/policy.ts` + `prompt.ts`, never the
   provider's own.
-- **Only a prepared copy leaves the server** (D95): `prepareModerationImage` (small JPEG, no
-  metadata) and the fixed prompt. An adapter (`lib/moderation/providers`) receives that image and
+- **Only prepared copies leave the server, one per shot** (D95, D97): `prepareModerationShots` cuts
+  a composed photo into its shots with the frame's slot data (small JPEGs, no metadata), and each
+  goes out in its own request with the fixed prompt. Never send the whole strip instead: measured
+  against a real provider, that approved a raised middle finger in one shot of four. The photo is
+  SAFE only when every shot is; a photo that cannot be cut up (unknown frame, wrong shape) waits
+  for a person. An adapter (`lib/moderation/providers`) receives one such image and
   an abort signal, nothing else: no ids, sessions, tokens or paths. Store and log category and
   reason codes only, never a provider's text. A new provider is one adapter plus one line in
   `lib/moderation/server.ts`. A wrong AI setting turns the AI off (`aiModerationProblem`); it must

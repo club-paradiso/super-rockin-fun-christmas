@@ -1525,3 +1525,32 @@ second table is a second thing to keep consistent with moderation.
   제26조) are unchanged and now rest entirely on what the church publishes or decides elsewhere.
   The AI is still off (mode `manual`, no provider configured), so nothing is sent until a person
   switches it on.
+
+## D97 · The AI looks at every shot on its own, never at the whole strip
+
+**Found by the first real evaluation (2026-11-15, Cloudflare Workers AI, Llama 4 Scout; synthetic
+cards and openly licensed pictures only).** Sent whole, scaled to 1024 px on the long edge, a
+strip of four leaves each shot about 300 px wide. The provider approved 3 of 7 composed photos
+with one bad shot: a raised middle finger in a strip, stage blood in a strip, a middle finger in a
+2×2. The same shots sent alone were flagged every time, at 448 px and at 640 px. Telling the model
+in the prompt to look at each shot fixed one of the three.
+
+- **Now:** `prepareModerationShots` cuts a composed photo into its shots with the frame's own slot
+  data (a turned slot: the upright box around it), prepares each like before (our own JPEG, no
+  metadata; 640 px for a frame with several shots, 1024 px for a frame with one), and the service
+  sends each in its own request, all at once. The printed frame is ours and is not sent.
+- **SAFE needs every shot.** One flagged shot flags the photo (its categories are shown together);
+  one shot with no answer means a retry or FAILED; one "unsure" means UNCERTAIN. The single path
+  to APPROVED, the claim, the audit and everything else in D95 are unchanged.
+- **A photo that cannot be cut up is not sent**: a retired or unknown frame id, or a picture whose
+  shape is not the frame's. It waits for a person. There is no fallback to the whole photo, because
+  that is the mode that was measured to miss things.
+- **The daily limit counts requests, so shots.** The budget for all shots is taken before the first
+  is sent; a photo is never half checked. Measured cost: about 97–130 neurons for four shots.
+- **Measured after the change:** 20 photos composed with real frame geometry (six frames; 1, 2, 4
+  and 6 shots), 0 of 14 bad ones approved, 0 of 6 good ones held, median 2.2 s per photo.
+- **Still true:** a few dozen pictures is not proof. Small things inside one shot, slang and
+  context can be missed. Staff watch the wall in `auto` mode.
+- **The model is chosen by measurement, not by this file**: Mistral Small 3.1 was faster and
+  approved a Korean profanity card and a written threat; Qwen 3.8 and Gemma 4 spend the answer's
+  token budget on thinking. Details: `docs/AI_MODERATION.md` 2.2–2.3.

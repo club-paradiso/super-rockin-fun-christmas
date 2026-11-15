@@ -2,7 +2,8 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { MODERATION_CONFIG } from "@/config/moderation";
-import { prepareModerationImage } from "@/lib/moderation/image";
+import { FRAMES } from "@/config/frames";
+import { prepareModerationImage, prepareModerationShots } from "@/lib/moderation/image";
 import { JPEG } from "../helpers/images";
 
 /** A synthetic picture: flat colours only. No photograph of anyone is used in these tests. */
@@ -81,5 +82,108 @@ describe("the copy that may leave the server", () => {
     const huge = new Uint8Array(await picture(8000, 6000).jpeg({ quality: 30 }).toBuffer());
     expect(huge.byteLength).toBeLessThan(4 * 1024 * 1024);
     expect(await prepareModerationImage(huge, "image/jpeg")).toBeNull();
+  });
+});
+
+describe("the shots that may leave the server (D97)", () => {
+  /** A frame-shaped picture with each slot painted its own flat colour on a white frame. */
+  const COLOURS = [
+    { r: 220, g: 40, b: 40 },
+    { r: 40, g: 180, b: 60 },
+    { r: 40, g: 80, b: 220 },
+    { r: 230, g: 200, b: 40 },
+    { r: 160, g: 60, b: 200 },
+    { r: 40, g: 200, b: 200 },
+  ];
+  const composed = async (frame: (typeof FRAMES)[number], scale = 1) => {
+    const base = sharp({
+      create: {
+        width: Math.round(frame.outputWidth * scale),
+        height: Math.round(frame.outputHeight * scale),
+        channels: 3,
+        background: "#ffffff",
+      },
+    });
+    const patches = frame.slots.map((slot, i) => ({
+      input: {
+        create: {
+          width: Math.max(1, Math.round(slot.width * scale)),
+          height: Math.max(1, Math.round(slot.height * scale)),
+          channels: 3 as const,
+          background: COLOURS[i % COLOURS.length]!,
+        },
+      },
+      left: Math.round(slot.x * scale),
+      top: Math.round(slot.y * scale),
+    }));
+    return new Uint8Array(await base.composite(patches).jpeg({ quality: 95 }).toBuffer());
+  };
+  const centre = async (image: { data: Uint8Array; width: number; height: number }) => {
+    const { data } = await sharp(image.data)
+      .extract({
+        left: Math.floor(image.width / 2) - 2,
+        top: Math.floor(image.height / 2) - 2,
+        width: 4,
+        height: 4,
+      })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { r: data[0]!, g: data[1]!, b: data[2]! };
+  };
+  const near = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) =>
+    Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b) < 40;
+
+  it("every current frame gives one small copy per shot, each showing its own shot", async () => {
+    for (const frame of FRAMES) {
+      const shots = (await prepareModerationShots(await composed(frame), "image/jpeg", frame))!;
+      expect(shots, frame.id).toHaveLength(frame.slots.length);
+      const limit =
+        frame.slots.length === 1 ? MODERATION_CONFIG.imageLongEdge : MODERATION_CONFIG.shotLongEdge;
+      for (const [i, shot] of shots.entries()) {
+        expect(shot.mime).toBe("image/jpeg");
+        expect(Math.max(shot.width, shot.height), frame.id).toBeLessThanOrEqual(limit);
+        // Unturned slots are painted exactly; a turned one is checked by the clothesline case.
+        if (!frame.slots[i]!.rotation)
+          expect(near(await centre(shot), COLOURS[i % COLOURS.length]!), `${frame.id} #${i}`).toBe(
+            true,
+          );
+        const meta = await sharp(shot.data).metadata();
+        expect(meta.exif).toBeUndefined();
+        expect(meta.icc).toBeUndefined();
+      }
+    }
+  });
+
+  it("a turned slot is cut as the upright box around it, so no corner of the shot is lost", async () => {
+    const frame = FRAMES.find((f) => f.slots.some((s) => s.rotation?.deg))!;
+    const shots = (await prepareModerationShots(await composed(frame), "image/jpeg", frame))!;
+    frame.slots.forEach((slot, i) => {
+      if (!slot.rotation?.deg) return;
+      const plain = slot.width / slot.height;
+      const cut = shots[i]!.width / shots[i]!.height;
+      // The box around a turned rectangle is never the rectangle's own shape.
+      expect(cut).not.toBeCloseTo(plain, 3);
+    });
+  });
+
+  it("a scaled copy of the frame is cut in the same places", async () => {
+    const frame = FRAMES.find((f) => f.id === "navy-strip")!;
+    const shots = (await prepareModerationShots(await composed(frame, 0.5), "image/jpeg", frame))!;
+    expect(shots).toHaveLength(frame.slots.length);
+    for (const [i, shot] of shots.entries())
+      expect(near(await centre(shot), COLOURS[i % COLOURS.length]!)).toBe(true);
+  });
+
+  it("refuses a photo it cannot cut up: no frame, another shape, bytes that are not a picture", async () => {
+    const frame = FRAMES.find((f) => f.id === "navy-strip")!;
+    const good = await composed(frame);
+    expect(await prepareModerationShots(good, "image/jpeg", null)).toBeNull();
+    const square = new Uint8Array(await picture(1000, 1000).jpeg().toBuffer());
+    expect(await prepareModerationShots(square, "image/jpeg", frame)).toBeNull();
+    expect(await prepareModerationShots(good, "image/png", frame)).toBeNull();
+    expect(
+      await prepareModerationShots(new Uint8Array([1, 2, 3, 4]), "image/jpeg", frame),
+    ).toBeNull();
+    expect(await prepareModerationShots(good, "image/jpeg", { ...frame, slots: [] })).toBeNull();
   });
 });

@@ -1,11 +1,12 @@
 import "server-only";
 import { after } from "next/server";
+import { FRAMES } from "@/config/frames";
 import { MODERATION_CONFIG } from "@/config/moderation";
 import { WALL_CONFIG } from "@/config/wall";
 import { getServerConfig, type AiModerationConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { getBackend } from "@/lib/storage/server";
-import { prepareModerationImage } from "./image";
+import { prepareModerationShots } from "./image";
 import { createChatVisionProvider } from "./providers/chat-vision";
 import { createGeminiProvider } from "./providers/gemini";
 import { createMockProvider } from "./providers/mock";
@@ -44,7 +45,10 @@ export function getAiReview(): AiReviewService {
   const ai = config.aiModeration;
   g.__ftlAiReview = new AiReviewService(getBackend(), {
     provider: createProvider(ai),
-    prepare: prepareModerationImage,
+    // Only a current frame has slot data to cut the shots out with. `getFrame` falls back to a
+    // default frame, which would cut the wrong places: look the id up exactly.
+    prepare: (data, mime, frameId) =>
+      prepareModerationShots(data, mime, FRAMES.find((f) => f.id === frameId) ?? null),
     dailyLimit: ai?.dailyLimit ?? 0,
     timeoutMs: ai?.timeoutMs ?? 8000,
     timeZone: WALL_CONFIG.timeZone,

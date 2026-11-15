@@ -22,9 +22,19 @@ type LogFields = Record<string, string | number | boolean | null | undefined>;
 export interface AiReviewOptions {
   /** Null = no provider configured: nothing is ever sent anywhere. */
   provider: ModerationProvider | null;
-  /** Makes the copy that may leave the server (lib/moderation/image.ts). */
-  prepare: (data: Uint8Array, mime: PhotoMime) => Promise<ModerationImage | null>;
-  /** Provider requests per day, counted here. The fallback past it is a person, never "approve". */
+  /**
+   * Makes the copies that may leave the server, one per shot of the photo's frame
+   * (lib/moderation/image.ts, D97). Null or none = this photo cannot be checked.
+   */
+  prepare: (
+    data: Uint8Array,
+    mime: PhotoMime,
+    frameId: string,
+  ) => Promise<ModerationImage[] | null>;
+  /**
+   * Provider requests per day, counted here: one per shot, so a strip of four takes four. The
+   * fallback past it is a person, never "approve".
+   */
   dailyLimit: number;
   /** One provider request may take this long. */
   timeoutMs: number;
@@ -60,6 +70,10 @@ const BREAKER_PAUSE_MS = 60_000;
  * screen, and report an outcome through `AiReviewRepository.complete`. For a SAFE outcome that
  * one storage call may also approve the photo, if it is still PENDING with consent, not deleted,
  * and the event is still in "auto" mode.
+ *
+ * Every shot of the photo is looked at on its own (D97), and the photo is only SAFE when every
+ * shot is: one flagged shot flags the photo, one shot the provider could not answer for leaves it
+ * unanswered.
  *
  * What it cannot do: reject, hide, delete, restore, or touch a photo a person has decided on.
  * Every path that is not a clean SAFE ends with the photo still PENDING and private: provider
@@ -231,23 +245,52 @@ export class AiReviewService {
 
       const original = await this.backend.objects.get(photo.objectPath);
       if (!original) return await finish("FAILED", "image_missing");
-      const image = await this.opts.prepare(original, photo.mime);
-      if (!image) return await finish("FAILED", "unsupported_image");
+      const shots = await this.opts.prepare(original, photo.mime, photo.frameId);
+      if (!shots?.length) return await finish("FAILED", "unsupported_image");
 
-      const budget = await this.backend.aiReviews.takeBudget(
-        this.day(this.now()),
-        this.opts.dailyLimit,
-      );
-      if (!budget.allowed) return await finish("SKIPPED", "daily_limit");
+      // One request per shot, all paid for before the first is sent: a photo is never half checked
+      // because the day's budget ran out in the middle of it.
+      const day = this.day(this.now());
+      for (let i = 0; i < shots.length; i++) {
+        const budget = await this.backend.aiReviews.takeBudget(day, this.opts.dailyLimit);
+        if (!budget.allowed) return await finish("SKIPPED", "daily_limit");
+      }
 
       const callStarted = this.now().getTime();
-      let assessment: ProviderAssessment;
-      try {
-        assessment = await this.callWithTimeout(provider, image);
-      } catch (err) {
-        const latencyMs = this.now().getTime() - callStarted;
+      const answers = await Promise.allSettled(
+        shots.map((shot) => this.callWithTimeout(provider, shot)),
+      );
+      const latencyMs = this.now().getTime() - callStarted;
+      const decisions = answers.flatMap((a) => (a.status === "fulfilled" ? [decide(a.value)] : []));
+      const errors = answers.flatMap((a) =>
+        a.status === "rejected"
+          ? [
+              a.reason instanceof ProviderError
+                ? a.reason
+                : new ProviderError("bad_response", messageOf(a.reason)),
+            ]
+          : [],
+      );
+
+      // A shot the provider flagged settles it, whatever happened to the others: the photo is not
+      // going to be approved, and staff should see why.
+      const flagged = decisions.filter((d) => d.outcome === "UNSAFE");
+      if (flagged.length > 0) {
+        if (errors.length === 0) this.consecutiveFailures = 0;
+        return await finish("UNSAFE", "flagged", {
+          called: true,
+          latencyMs,
+          categories: [...new Set(flagged.flatMap((d) => d.categories))],
+        });
+      }
+
+      if (errors.length > 0) {
+        // The error that says most about the provider's state decides the pause and the retry.
         const e =
-          err instanceof ProviderError ? err : new ProviderError("bad_response", messageOf(err));
+          errors.find((x) => x.kind === "auth") ??
+          errors.find((x) => x.kind === "rate_limited") ??
+          errors.find((x) => RETRYABLE.has(x.kind)) ??
+          errors[0]!;
         this.noteFailure(e);
         const attempts = photo.ai?.attempts ?? MODERATION_CONFIG.maxAttempts;
         if (RETRYABLE.has(e.kind) && attempts < MODERATION_CONFIG.maxAttempts) {
@@ -267,14 +310,17 @@ export class AiReviewService {
         }
         return await finish("FAILED", e.kind, { called: true, latencyMs });
       }
-      const latencyMs = this.now().getTime() - callStarted;
+
       this.consecutiveFailures = 0;
-      const decision = decide(assessment);
-      return await finish(decision.outcome, decision.reason, {
-        called: true,
-        latencyMs,
-        categories: decision.categories,
-      });
+      // Every shot answered and none was flagged. SAFE only if every single one is.
+      const held = decisions.find((d) => d.outcome !== "SAFE");
+      if (held)
+        return await finish(held.outcome, held.reason, {
+          called: true,
+          latencyMs,
+          categories: [...new Set(decisions.flatMap((d) => d.categories))],
+        });
+      return await finish("SAFE", null, { called: true, latencyMs });
     } catch (err) {
       // Storage failed somewhere above (settings, the image, the budget counter).
       this.log("ai_review_error", { photoId: photo.id, message: messageOf(err) }, "warn");
