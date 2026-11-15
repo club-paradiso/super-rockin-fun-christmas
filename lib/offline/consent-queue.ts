@@ -19,8 +19,6 @@ export type ConsentSender = (
   consent: boolean,
   /** What the guest was told the consent covers when they answered (D86). */
   scope: ConsentScope | undefined,
-  /** The guest was shown the automatic-check notice when they answered (D95). */
-  aiNotice?: boolean,
 ) => Promise<ConsentOutcome>;
 
 const DEFAULT_BACKOFF = [2_000, 5_000, 15_000, 30_000, 60_000];
@@ -40,13 +38,11 @@ export class ConsentQueue {
    * Record (or change) the answer for a session. The latest answer wins, scope included: the
    * scope is what the consent screen showed at that moment, and a "no" never carries one.
    */
-  async enqueue(sessionId: string, consent: boolean, scope?: ConsentScope, aiNotice = false) {
+  async enqueue(sessionId: string, consent: boolean, scope?: ConsentScope) {
     await this.store.put({
       sessionId,
       consent,
       ...(consent && scope ? { scope } : {}),
-      // Like the scope: what the screen showed, and never with a "no" (D95).
-      ...(consent && aiNotice ? { aiNotice: true } : {}),
       createdAt: this.now(),
       attempts: 0,
       nextAttemptAt: this.now(),
@@ -67,12 +63,7 @@ export class ConsentQueue {
           if (await this.uploads.get(entry.sessionId)) continue;
           let outcome: ConsentOutcome;
           try {
-            outcome = await this.send(
-              entry.sessionId,
-              entry.consent,
-              entry.scope,
-              entry.aiNotice === true,
-            );
+            outcome = await this.send(entry.sessionId, entry.consent, entry.scope);
           } catch {
             outcome = "retry";
           }

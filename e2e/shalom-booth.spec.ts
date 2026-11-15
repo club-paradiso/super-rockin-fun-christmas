@@ -198,6 +198,9 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
 });
 
 test("the review screen fits without scrolling, landscape and portrait", async ({ page }) => {
+  // Three whole booth sessions, about 20 s each: 59.4–59.6 s in every run measured, against the
+  // default 60 s. Like the other multi-session specs, it needs its own limit.
+  test.setTimeout(120_000);
   for (const size of [
     { width: 1280, height: 800 },
     { width: 1920, height: 1080 },

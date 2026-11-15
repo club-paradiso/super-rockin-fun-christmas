@@ -216,7 +216,7 @@ describe("switching the mode", () => {
     expect((await settings({ moderationMode: "manual" })).status).toBe(200);
   });
 
-  it("the booth learns whether to show the notice from its heartbeat", async () => {
+  it("the booth learns from its heartbeat whether a check is running", async () => {
     const { POST } = await import("@/app/api/kiosk/heartbeat/route");
     const beat = async () =>
       (await (await POST(json("/api/kiosk/heartbeat", { queueDepth: 0 }, kiosk))).json()) as {
@@ -232,13 +232,13 @@ describe("switching the mode", () => {
 });
 
 describe("consent → automatic check → wall", () => {
-  it("yes with the notice: checked, approved, on the feed and served as an image", async () => {
+  it("a yes in auto mode: checked, approved, on the feed and served as an image", async () => {
     const p = await shoot(kiosk);
     // Before any answer the photo is nowhere near the wall.
     expect((await wallImage(p.id, wall)).status).toBe(404);
     expect((await review(kiosk, p.sessionId)).body.review).toBe("none");
 
-    const answer = await consent(kiosk, p.sessionId, { aiNotice: true });
+    const answer = await consent(kiosk, p.sessionId);
     expect(answer).toMatchObject({
       status: 200,
       body: { moderationStatus: "PENDING", review: "ai" },
@@ -256,34 +256,21 @@ describe("consent → automatic check → wall", () => {
     expect((await wallImage(p.id)).status).toBe(404);
   });
 
-  it("yes WITHOUT the notice is never sent to the AI, even in auto mode", async () => {
+  it("every yes in auto mode is checked: the booth sends no flag and shows no notice (D96)", async () => {
     const p = await shoot(kiosk);
-    const answer = await consent(kiosk, p.sessionId);
-    expect(answer.body).toMatchObject({ moderationStatus: "PENDING", review: "staff" });
+    // Exactly what the booth sends: a session and an answer.
+    expect((await consent(kiosk, p.sessionId)).body).toMatchObject({
+      moderationStatus: "PENDING",
+      review: "ai",
+    });
     await settle();
-    const { getAiReview } = await import("@/lib/moderation/server");
-    await getAiReview().processDue(10);
-    const stored = await row(p.id);
-    expect(stored.moderationStatus).toBe("PENDING");
-    expect(stored.ai).toBeUndefined();
-    expect((await review(kiosk, p.sessionId)).body.review).toBe("staff");
-    expect((await feed(wall)).photos.map((x) => x.id)).not.toContain(p.id);
-    expect((await wallImage(p.id, wall)).status).toBe(404);
+    expect(await row(p.id)).toMatchObject({ moderationStatus: "APPROVED", ai: { status: "SAFE" } });
   });
 
-  it("a notice flag that is not exactly true counts as not shown", async () => {
-    for (const aiNotice of ["true", 1, "yes", {}, null]) {
-      const p = await shoot(kiosk);
-      expect((await consent(kiosk, p.sessionId, { aiNotice })).body.review).toBe("staff");
-      await settle();
-      expect((await row(p.id)).ai).toBeUndefined();
-    }
-  });
-
-  it("in manual mode the notice flag changes nothing: a person approves", async () => {
+  it("in manual mode nothing is sent: a person approves", async () => {
     await settings({ moderationMode: "manual" });
     const p = await shoot(kiosk);
-    expect((await consent(kiosk, p.sessionId, { aiNotice: true })).body.review).toBe("staff");
+    expect((await consent(kiosk, p.sessionId)).body.review).toBe("staff");
     await settle();
     expect((await row(p.id)).moderationStatus).toBe("PENDING");
     expect((await wallImage(p.id, wall)).status).toBe(404);
@@ -295,11 +282,7 @@ describe("consent → automatic check → wall", () => {
     const p = await shoot(kiosk);
     const { POST } = await import("@/app/api/photos/consent/route");
     const res = await POST(
-      json(
-        "/api/photos/consent",
-        { sessionId: p.sessionId, consent: false, aiNotice: true },
-        kiosk,
-      ),
+      json("/api/photos/consent", { sessionId: p.sessionId, consent: false }, kiosk),
     );
     expect(await res.json()).toMatchObject({ moderationStatus: "NONE", review: "staff" });
     await settle();
@@ -314,7 +297,7 @@ describe("consent → automatic check → wall", () => {
     async (behaviour, status) => {
       await provider(behaviour);
       const p = await shoot(kiosk);
-      expect((await consent(kiosk, p.sessionId, { aiNotice: true })).body.review).toBe("ai");
+      expect((await consent(kiosk, p.sessionId)).body.review).toBe("ai");
       await settle();
       expect(await row(p.id)).toMatchObject({ moderationStatus: "PENDING", ai: { status } });
       expect((await feed(wall)).photos.map((x) => x.id)).not.toContain(p.id);
@@ -327,7 +310,7 @@ describe("consent → automatic check → wall", () => {
   it("provider down: the photo waits, the booth keeps working, a person can approve", async () => {
     await provider("fail");
     const p = await shoot(kiosk);
-    expect((await consent(kiosk, p.sessionId, { aiNotice: true })).status).toBe(200);
+    expect((await consent(kiosk, p.sessionId)).status).toBe(200);
     await settle();
     expect(await row(p.id)).toMatchObject({
       moderationStatus: "PENDING",
@@ -337,7 +320,7 @@ describe("consent → automatic check → wall", () => {
     expect((await wallImage(p.id, wall)).status).toBe(404);
     // The next guest is not held up by the first one's review.
     const next = await shoot(kiosk);
-    expect((await consent(kiosk, next.sessionId, { aiNotice: true })).status).toBe(200);
+    expect((await consent(kiosk, next.sessionId)).status).toBe(200);
     await settle();
     expect((await moderate(p.id, "approve")).status).toBe(200);
     expect(await row(p.id)).toMatchObject({
@@ -351,7 +334,7 @@ describe("consent → automatic check → wall", () => {
 describe("the wall never shows more than the rules allow", () => {
   it("emergency blackout: an AI-approved photo leaves the feed and the image route at once", async () => {
     const p = await shoot(kiosk);
-    await consent(kiosk, p.sessionId, { aiNotice: true });
+    await consent(kiosk, p.sessionId);
     await settle();
     expect((await wallImage(p.id, wall)).status).toBe(200);
 
@@ -364,7 +347,7 @@ describe("the wall never shows more than the rules allow", () => {
       expect((await wallImage(p.id, wall)).status).toBe(404);
       // Photos approved by the AI during the blackout stay off the wall as well.
       const during = await shoot(kiosk);
-      await consent(kiosk, during.sessionId, { aiNotice: true });
+      await consent(kiosk, during.sessionId);
       await settle();
       expect((await row(during.id)).moderationStatus).toBe("APPROVED");
       expect((await wallImage(during.id, wall)).status).toBe(404);
@@ -376,7 +359,7 @@ describe("the wall never shows more than the rules allow", () => {
   it("paused submissions: no new yes is taken, so nothing new reaches the AI", async () => {
     await settings({ pauseSubmissions: true });
     const p = await shoot(kiosk);
-    expect((await consent(kiosk, p.sessionId, { aiNotice: true })).status).toBe(409);
+    expect((await consent(kiosk, p.sessionId)).status).toBe(409);
     await settle();
     expect(await row(p.id)).toMatchObject({ moderationStatus: "NONE", wallConsent: false });
     expect((await row(p.id)).ai).toBeUndefined();
@@ -385,7 +368,7 @@ describe("the wall never shows more than the rules allow", () => {
   it("staff hide or delete an AI-approved photo: gone from the wall, and it stays gone", async () => {
     const hidden = await shoot(kiosk);
     const deleted = await shoot(kiosk);
-    for (const p of [hidden, deleted]) await consent(kiosk, p.sessionId, { aiNotice: true });
+    for (const p of [hidden, deleted]) await consent(kiosk, p.sessionId);
     await settle();
     expect((await moderate(hidden.id, "hide")).status).toBe(200);
     expect((await moderate(deleted.id, "delete")).status).toBe(200);
@@ -405,7 +388,7 @@ describe("the wall never shows more than the rules allow", () => {
   it("nothing about the AI reaches the wall or the guest", async () => {
     await provider("unsafe");
     const p = await shoot(kiosk);
-    await consent(kiosk, p.sessionId, { aiNotice: true });
+    await consent(kiosk, p.sessionId);
     await settle();
     await moderate(p.id, "approve");
     const text = JSON.stringify(await feed(wall));
@@ -422,7 +405,7 @@ describe("the wall never shows more than the rules allow", () => {
 describe("who may ask what", () => {
   it("review status: only the booth that took the photo, one word, nothing else", async () => {
     const p = await shoot(kiosk);
-    await consent(kiosk, p.sessionId, { aiNotice: true });
+    await consent(kiosk, p.sessionId);
     await settle();
     expect((await review(null, p.sessionId)).status).toBe(401);
     expect((await review("ftl_kiosk=v1.forged.1.2.sig", p.sessionId)).status).toBe(401);
@@ -451,7 +434,7 @@ describe("who may ask what", () => {
 
     await provider("fail");
     const p = await shoot(kiosk);
-    await consent(kiosk, p.sessionId, { aiNotice: true });
+    await consent(kiosk, p.sessionId);
     await settle();
     await provider("safe");
     // Still queued for its retry; the endpoint works through what is due and says how many.
@@ -484,7 +467,7 @@ describe("who may ask what", () => {
 
   it("the staff overview reports the mode, the provider and today's count", async () => {
     const p = await shoot(kiosk);
-    await consent(kiosk, p.sessionId, { aiNotice: true });
+    await consent(kiosk, p.sessionId);
     await settle();
     const { GET } = await import("@/app/api/admin/overview/route");
     const res = await GET(

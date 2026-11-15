@@ -101,15 +101,12 @@ const ko = {
     lead: "미디어월에 다른 분들 사진과 함께 돌아가며 보여요.\n아니요를 눌러도 사진은 받을 수 있어요.",
     yes: "네, 띄워주세요",
     no: "아니요, 저만 볼게요",
-    note: "사진은 정해진 기간이 지나면 지워져요.\n띄운 뒤에도 안내 봉사자에게 말하면 바로 내려드려요.",
+    // The third line (D96) was written by Claude (2026-11-14) on the user's instruction to tell
+    // guests that staff can hide a photo; the first two are the user's wording (D76).
+    note: "사진은 정해진 기간이 지나면 지워져요.\n띄운 뒤에도 안내 봉사자에게 말하면 바로 내려드려요.\n화면에 어울리지 않는 사진은 운영팀이 숨길 수 있어요.",
     // D86, shown only while staff have the public wall on. Written by Claude (2026-11-13), not
     // yet the user's wording (D76): it has to say plainly that the wall is also on the internet.
     publicNote: "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.",
-    // D95, shown only while staff have the automatic check on. Written by Claude (2026-11-14),
-    // not yet the user's wording (D76). It has to say plainly that the photo goes to an outside
-    // service before the guest answers: a "yes" given without this line is never sent there.
-    // One line on a tablet: a second line pushed the answers down (measured, docs/STATUS.md D95).
-    aiNote: "사진은 띄우기 전에 외부 AI 서비스로 보내 확인해요.",
     finished: "완성된 사진",
     making: "사진을 만들고 있어요",
   },
@@ -269,9 +266,8 @@ const en: KioskCopy = {
     lead: "It will take turns on the wall with other guests’ photos.\nYou still get your photo if you say no.",
     yes: "Yes, show it",
     no: "No, just for me",
-    note: "Photos are deleted after a set period.\nIf you change your mind later, tell a volunteer and we’ll take it down right away.",
+    note: "Photos are deleted after a set period.\nIf you change your mind later, tell a volunteer and we’ll take it down right away.\nOur team may hide a photo that does not suit the screen.",
     publicNote: "The media wall is shown on the screen here and at its web address.",
-    aiNote: "Before it goes up, the photo is sent to an outside AI service to be checked.",
     finished: "Your finished photo",
     making: "Making your photo",
   },
@@ -428,9 +424,8 @@ const zh: KioskCopy = {
     lead: "照片会和其他人的照片一起轮流显示在媒体墙上。\n选“不用”也一样可以领取照片。",
     yes: "好的，请放上去",
     no: "不用，只给我自己看",
-    note: "照片会在规定期限后删除。\n放上去之后，只要告诉引导志愿者，我们会马上撤下。",
+    note: "照片会在规定期限后删除。\n放上去之后，只要告诉引导志愿者，我们会马上撤下。\n不适合在大屏幕上展示的照片，运营团队可能会隐藏。",
     publicNote: "媒体墙会同时显示在活动现场的屏幕和网络地址上。",
-    aiNote: "上墙之前，照片会发送到外部 AI 服务进行检查。",
     finished: "完成的照片",
     making: "正在制作照片",
   },

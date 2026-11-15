@@ -190,27 +190,7 @@ describe("session video delivery (D72): best-effort, never queued", () => {
   });
 });
 
-describe("automatic check (D95): what the booth sends and says", () => {
-  it("sends aiNotice only with a yes given while the notice was on screen", async () => {
-    const bodies: unknown[] = [];
-    const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init!.body)));
-      return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
-    await sendWallConsent("s-1", true, undefined, fetchImpl, true);
-    await sendWallConsent("s-2", true, "public", fetchImpl, true);
-    await sendWallConsent("s-3", true, undefined, fetchImpl, false);
-    await sendWallConsent("s-4", true, undefined, fetchImpl);
-    await sendWallConsent("s-5", false, undefined, fetchImpl, true);
-    expect(bodies).toEqual([
-      { sessionId: "s-1", consent: true, aiNotice: true },
-      { sessionId: "s-2", consent: true, scope: "public", aiNotice: true },
-      { sessionId: "s-3", consent: true },
-      { sessionId: "s-4", consent: true },
-      { sessionId: "s-5", consent: false },
-    ]);
-  });
-
+describe("automatic check (D95): what the booth asks and says", () => {
   it("reads the review status, and treats every failure as 'ask again'", async () => {
     const answer = (status: number, body: unknown) =>
       vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;

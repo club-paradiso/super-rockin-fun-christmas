@@ -1501,3 +1501,27 @@ Why not auto-reject on UNSAFE: the cost of a false "unsafe" is a volunteer's tap
 automatic rejection of an ordinary family photo is a guest told "no" by a machine, with nobody
 having looked. Why not a separate jobs table: the row already has everything a job needs, and a
 second table is a second thing to keep consistent with moderation.
+
+## D96 · The booth does not announce the AI check; it tells guests that staff can hide a photo
+
+**Decided by the user (2026-11-14), after D95 was merged:** "AI 관련해서 굳이 사람들한테 말할 필요는 없을
+듯. 대신, 사진의 경우 관리자에 의해 숨김처리 가능함을 알리는게 나을것같애."
+
+- **Removed:** the consent-screen line about the outside AI service, and with it the `aiNotice` flag
+  on the consent request, in the booth's offline consent queue and in `sendWallConsent`. D95 queued
+  a photo only when the guest had seen that line; there is no such line any more.
+- **Now:** while the event is in `auto` mode, every photo whose guest says yes to the wall is
+  queued for the AI by the consent route. Nothing else about D95 changes: one path to APPROVED,
+  fail closed, a person always wins, phone uploads always reviewed by a person, only the prepared
+  copy leaves the server.
+- **Added:** a third line in the consent screen's small print, in all three booth languages, shown
+  in every mode: "화면에 어울리지 않는 사진은 운영팀이 숨길 수 있어요." Written by Claude; the user has
+  not yet reworded it (D76). It sits with the two lines about retention and taking a photo down on
+  request, so the answers stay where they were (measured: no scrolling at the six tablet sizes).
+- **The booth still knows whether a check is running** (heartbeat `aiReview`), only to choose the
+  line under the QR ("사진을 확인하고 있어요…" → "큰 화면에서 내 사진을 찾아보세요").
+- **What this costs, stated once:** a guest can no longer tell from the booth that their photo is
+  sent to a company abroad. The open legal questions of D95 (개인정보 보호법 제28조의8, 제22조의2,
+  제26조) are unchanged and now rest entirely on what the church publishes or decides elsewhere.
+  The AI is still off (mode `manual`, no provider configured), so nothing is sent until a person
+  switches it on.
