@@ -91,7 +91,7 @@ async function settings(body: Record<string, unknown>, cookie = staff) {
   const { POST } = await import("@/app/api/admin/settings/route");
   return POST(json("/api/admin/settings", body, cookie), noParams);
 }
-async function shoot(kiosk: string) {
+async function shoot(kiosk: string, frameId = "navy-strip") {
   const sessionId = uuid();
   const { POST } = await import("@/app/api/photos/route");
   const res = await POST(
@@ -101,7 +101,7 @@ async function shoot(kiosk: string) {
       headers: {
         "content-type": "image/jpeg",
         "x-session-id": sessionId,
-        "x-frame-id": "starlight-strip",
+        "x-frame-id": frameId,
         origin: ORIGIN,
         cookie: kiosk,
       },
@@ -537,5 +537,31 @@ describe("who may ask what", () => {
     } finally {
       backend.aiReviews.claim = real;
     }
+  });
+});
+
+describe("every shot is checked on its own (D97)", () => {
+  it("a strip of four costs four requests and is approved when all four are safe", async () => {
+    const { getAiReview } = await import("@/lib/moderation/server");
+    const before = (await getAiReview().status()).usage.requests;
+    const p = await shoot(kiosk);
+    await consent(kiosk, p.sessionId);
+    await settle();
+    expect(await row(p.id)).toMatchObject({ moderationStatus: "APPROVED", ai: { status: "SAFE" } });
+    expect((await getAiReview().status()).usage.requests - before).toBe(4);
+  });
+
+  it("a photo in a retired frame cannot be cut up: nothing is sent and a person decides", async () => {
+    const { getAiReview } = await import("@/lib/moderation/server");
+    const before = (await getAiReview().status()).usage.requests;
+    const p = await shoot(kiosk, "starlight-strip");
+    await consent(kiosk, p.sessionId);
+    await settle();
+    expect(await row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "FAILED", reason: "unsupported_image" },
+    });
+    expect((await getAiReview().status()).usage.requests).toBe(before);
+    expect((await feed(wall)).photos.map((x) => x.id)).not.toContain(p.id);
   });
 });

@@ -2,7 +2,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { prepareModerationImage } from "@/lib/moderation/image";
+import { FRAMES } from "@/config/frames";
+import { prepareModerationImage, prepareModerationShots } from "@/lib/moderation/image";
 import { decide } from "@/lib/moderation/policy";
 import { createChatVisionProvider } from "@/lib/moderation/providers/chat-vision";
 import { createGeminiProvider } from "@/lib/moderation/providers/gemini";
@@ -17,9 +18,12 @@ import { parseServerConfig } from "@/lib/server/env";
  *     npx vitest run tests/integration/ai-provider-eval.test.ts
  *
  * The set is a folder with `manifest.json`:
- *   [{ "file": "family-01.jpg", "expect": "safe", "group": "family" },
+ *   [{ "file": "strip-01.jpg", "expect": "safe", "group": "family", "frame": "navy-strip" },
  *    { "file": "gesture-03.jpg", "expect": "review", "group": "gesture" }, …]
  * "safe" = should be approved automatically; "review" = must NOT be (a person has to see it).
+ * With "frame" the file is a composed booth photo of that frame and goes the way the service
+ * sends it: cut into its shots, each sent on its own, approved only if every shot is safe (D97).
+ * Without it the file is one camera shot.
  *
  * Use only synthetic, staged or properly licensed pictures you are allowed to send to the
  * provider. NEVER guests' photos. docs/AI_MODERATION.md lists what the set should contain.
@@ -34,6 +38,7 @@ interface Item {
   file: string;
   expect: "safe" | "review";
   group?: string;
+  frame?: string;
 }
 
 function providerFromEnv(): ModerationProvider {
@@ -59,22 +64,30 @@ describe.skipIf(!DIR)("live provider evaluation", () => {
     for (const item of items) {
       const bytes = new Uint8Array(await readFile(path.join(DIR!, item.file)));
       const mime = item.file.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
-      const image = await prepareModerationImage(bytes, mime);
+      const one = item.frame ? null : await prepareModerationImage(bytes, mime);
+      const shots = item.frame
+        ? await prepareModerationShots(bytes, mime, FRAMES.find((f) => f.id === item.frame) ?? null)
+        : one && [one];
       let outcome: string;
       let detail = "";
       const started = Date.now();
-      if (!image) outcome = "UNSUPPORTED";
+      if (!shots?.length) outcome = "UNSUPPORTED";
       else
         try {
-          const decision = decide(
-            await provider.analyze(
-              image,
-              AbortSignal.timeout(Number(process.env.AI_MODERATION_TIMEOUT_MS ?? 20_000)),
-            ),
-          );
+          const timeout = Number(process.env.AI_MODERATION_TIMEOUT_MS ?? 20_000);
+          const decisions = (
+            await Promise.all(shots.map((s) => provider.analyze(s, AbortSignal.timeout(timeout))))
+          ).map(decide);
           latencies.push(Date.now() - started);
-          outcome = decision.outcome;
-          detail = decision.categories.join(",") || (decision.reason ?? "");
+          // The service's rule: one flagged shot flags the photo; SAFE needs every shot.
+          const flagged = decisions.filter((d) => d.outcome === "UNSAFE");
+          const held = decisions.find((d) => d.outcome !== "SAFE");
+          outcome = flagged.length ? "UNSAFE" : (held?.outcome ?? "SAFE");
+          detail =
+            [...new Set((flagged.length ? flagged : decisions).flatMap((d) => d.categories))].join(
+              ",",
+            ) ||
+            (held?.reason ?? "");
         } catch (err) {
           outcome = "ERROR";
           detail = err instanceof ProviderError ? err.kind : String(err);

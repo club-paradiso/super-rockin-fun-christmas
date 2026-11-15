@@ -52,7 +52,7 @@ const STAFF = uuid();
 
 function world(
   provider: ModerationProvider | null,
-  opts: { dailyLimit?: number; timeoutMs?: number; mode?: "auto" | "manual" } = {},
+  opts: { dailyLimit?: number; timeoutMs?: number; mode?: "auto" | "manual"; shots?: number } = {},
 ) {
   const backend = createMemoryBackend();
   backend.settings.value.moderationMode = opts.mode ?? "auto";
@@ -65,7 +65,13 @@ function world(
     new AiReviewService(backend, {
       provider: p,
       // The real preparation needs a real picture; these tests are about decisions.
-      prepare: async (data) => ({ data, mime: "image/jpeg", width: 1, height: 1 }),
+      prepare: async (data) =>
+        Array.from({ length: opts.shots ?? 1 }, () => ({
+          data,
+          mime: "image/jpeg" as const,
+          width: 1,
+          height: 1,
+        })),
       dailyLimit: opts.dailyLimit ?? 100,
       timeoutMs: opts.timeoutMs ?? 50,
       timeZone: "Asia/Seoul",
@@ -693,7 +699,7 @@ describe("AI review: what leaves the server, and swapping providers", () => {
           return SAFE;
         },
       },
-      prepare: async () => prepared,
+      prepare: async () => [prepared],
       dailyLimit: 10,
       timeoutMs: 50,
       timeZone: "Asia/Seoul",
@@ -745,5 +751,168 @@ describe("AI review: what leaves the server, and swapping providers", () => {
     });
     // What the old provider left undecided still waits for a person.
     expect((await w.row(first.id)).moderationStatus).toBe("PENDING");
+  });
+});
+
+describe("AI review: every shot is checked on its own (D97)", () => {
+  /** Answers by position: shot 1 gets the first step, shot 2 the second, and so on. */
+  const perShot = (...steps: (ProviderAssessment | ProviderError)[]) => {
+    let i = 0;
+    const seen: ModerationImage[] = [];
+    const provider: ModerationProvider = {
+      id: "scripted",
+      model: "scripted-1",
+      async analyze(image) {
+        seen.push(image);
+        const step = steps[i++ % steps.length]!;
+        if (step instanceof ProviderError) throw step;
+        return step;
+      },
+    };
+    return { provider, seen };
+  };
+
+  it("a strip of four is four requests, and is approved only when all four are safe", async () => {
+    const { provider, seen } = perShot(SAFE, SAFE, SAFE, SAFE);
+    const w = world(provider, { shots: 4 });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "APPROVED",
+      ai: { status: "SAFE" },
+    });
+    expect(seen).toHaveLength(4);
+    expect(await w.usage()).toMatchObject({ requests: 4, approved: 1 });
+  });
+
+  it("one flagged shot among safe ones keeps the whole photo for a person", async () => {
+    const w = world(perShot(SAFE, SAFE, UNSAFE, SAFE).provider, { shots: 4 });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "UNSAFE", categories: ["gesture"] },
+    });
+    expect(await w.photos.wallPhotos(100)).toEqual([]);
+  });
+
+  it("flags from several shots are shown together, each category once", async () => {
+    const other: ProviderAssessment = {
+      verdict: "unsafe",
+      categories: ["gesture", "nudity"],
+      embeddedInstructions: false,
+    };
+    const w = world(perShot(UNSAFE, SAFE, other, SAFE).provider, { shots: 4 });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect((await w.row(p.id)).ai?.categories).toEqual(["gesture", "nudity"]);
+  });
+
+  it("one shot the model is unsure about is enough to leave the photo for a person", async () => {
+    const w = world(perShot(SAFE, UNSURE, SAFE, SAFE).provider, { shots: 4 });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "UNCERTAIN", reason: "model_unsure" },
+    });
+  });
+
+  it("one shot that got no answer: three safe answers approve nothing", async () => {
+    const w = world(
+      perShot(SAFE, SAFE, new ProviderError("unavailable", "HTTP 503"), SAFE).provider,
+      { shots: 4 },
+    );
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    // Queued again for a retry, still private.
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "QUEUED" },
+    });
+    expect(await w.photos.wallPhotos(100)).toEqual([]);
+  });
+
+  it("a failed shot that can never succeed fails the photo closed", async () => {
+    const w = world(
+      perShot(SAFE, new ProviderError("bad_response", "not JSON"), SAFE, SAFE).provider,
+      { shots: 4 },
+    );
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "FAILED", reason: "bad_response" },
+    });
+  });
+
+  it("a flagged shot is reported even when another shot got no answer", async () => {
+    const w = world(perShot(new ProviderError("timeout", "slow"), UNSAFE, SAFE, SAFE).provider, {
+      shots: 4,
+    });
+    const p = await w.shoot();
+    await w.ai.request(p.id);
+    await w.ai.processOne(p.id);
+    expect(await w.row(p.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "UNSAFE", categories: ["gesture"] },
+    });
+  });
+
+  it("the daily limit counts shots, and a photo is never half checked", async () => {
+    const { provider, seen } = perShot(SAFE);
+    const w = world(provider, { shots: 4, dailyLimit: 6 });
+    const a = await w.shoot();
+    const b = await w.shoot();
+    await w.ai.request(a.id);
+    await w.ai.request(b.id);
+    await w.ai.processDue(10);
+    expect((await w.row(a.id)).moderationStatus).toBe("APPROVED");
+    expect(await w.row(b.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "SKIPPED", reason: "daily_limit" },
+    });
+    // The second photo had budget for two of its four shots: none of them was sent.
+    expect(seen).toHaveLength(4);
+  });
+
+  it("the shots are cut with the photo's own frame, and no shots means nothing is sent", async () => {
+    const { provider, seen } = perShot(SAFE);
+    const backend = createMemoryBackend();
+    backend.settings.value.moderationMode = "auto";
+    const photos = new PhotoService(backend, { linkTtlHours: 72, retentionDays: 30 });
+    const asked: string[] = [];
+    const ai = new AiReviewService(backend, {
+      provider,
+      prepare: async (_data, _mime, frameId) => {
+        asked.push(frameId);
+        return [];
+      },
+      dailyLimit: 10,
+      timeoutMs: 50,
+      timeZone: "Asia/Seoul",
+    });
+    const put = await photos.put({
+      sessionId: uuid(),
+      kioskId: null,
+      frameId: "navy-strip",
+      mime: "image/jpeg",
+      data: JPEG,
+    });
+    await photos.setWallConsent(put.token, true, null);
+    await ai.request(put.photo.id);
+    await ai.processOne(put.photo.id);
+    expect(asked).toEqual(["navy-strip"]);
+    expect(await backend.photos.getById(put.photo.id)).toMatchObject({
+      moderationStatus: "PENDING",
+      ai: { status: "FAILED", reason: "unsupported_image" },
+    });
+    expect(seen).toHaveLength(0);
   });
 });

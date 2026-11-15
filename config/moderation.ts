@@ -18,11 +18,15 @@ export const MODERATION_CONFIG = {
   sweepBatch: 4,
   sweepEveryMs: 5_000,
   /**
-   * The copy sent to the provider: long edge in pixels, JPEG quality. The stored photo is never
-   * sent. A booth strip is 1200×3600; at 1024 on the long edge each cut is still about 340 px
-   * wide, enough to read a gesture or a hand-written sign, and about a tenth of the bytes.
+   * The copies sent to the provider: long edge in pixels, JPEG quality. The stored photo is never
+   * sent. Each shot of a frame is sent on its own (D97): a whole 1200×3600 strip scaled to 1024
+   * leaves each shot about 300 px wide, and measured against a real provider that missed a raised
+   * middle finger and stage blood in one shot of four, while the same shots alone were caught at
+   * 448 px and at 640 px. `imageLongEdge` is for a frame with one photo, `shotLongEdge` for each
+   * shot of a frame with several.
    */
   imageLongEdge: 1024,
+  shotLongEdge: 640,
   imageQuality: 80,
   /** Refuse to decode anything larger than this many pixels (a decompression bomb). */
   maxInputPixels: 40_000_000,
@@ -73,7 +77,7 @@ export const REASON_LABEL_KO: Record<string, string> = {
   not_configured: "AI 설정이 없어요",
   interrupted: "AI 확인이 중간에 끊겼어요",
   image_missing: "사진 파일을 읽지 못했어요",
-  unsupported_image: "AI에 보낼 수 없는 사진 형식이에요",
+  unsupported_image: "AI에 보낼 수 없는 사진이에요 (형식이나 틀을 알 수 없음)",
   timeout: "AI 응답이 너무 늦었어요",
   rate_limited: "AI 서비스 사용량 제한에 걸렸어요",
   unavailable: "AI 서비스가 응답하지 않았어요",

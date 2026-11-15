@@ -119,6 +119,11 @@ jobs:
           # Pinned: "latest" asks the GitHub API which release is newest, and that
           # unauthenticated call is rate-limited on shared runners.
           version: 2.120.0
+      # Supabase's local ports (54320-54329) sit inside Linux's ephemeral range, so an outgoing
+      # connection (an image pull) can hold one as its source port at the moment the stack binds
+      # it: "failed to bind host port for 0.0.0.0:54322 ... address already in use". Reserve them.
+      - name: Keep Supabase's ports out of the ephemeral range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=54320-54329
       - name: Start Supabase (migrations, Auth, Storage, Mailpit)
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
       - name: E2E — local Supabase (kiosk + staff admin flows)
@@ -153,6 +158,11 @@ jobs:
           # Pinned: "latest" asks the GitHub API which release is newest, and that
           # unauthenticated call is rate-limited on shared runners.
           version: 2.120.0
+      # Supabase's local ports (54320-54329) sit inside Linux's ephemeral range, so an outgoing
+      # connection (an image pull) can hold one as its source port at the moment the stack binds
+      # it: "failed to bind host port for 0.0.0.0:54322 ... address already in use". Reserve them.
+      - name: Keep Supabase's ports out of the ephemeral range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=54320-54329
       - name: Start Supabase (applies supabase/migrations; Mailpit for staff OTP)
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,supavisor,postgres-meta
       - name: Integration tests (contracts, RLS, audit, staff auth, admin + kiosk APIs)

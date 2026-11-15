@@ -12,7 +12,7 @@ import { MODERATION_CATEGORIES } from "@/config/moderation";
  */
 const MODEL_CATEGORIES = MODERATION_CATEGORIES.filter((c) => c !== "provider_blocked");
 
-export const MODERATION_PROMPT = `You check one photo for a family event at a church. Approved photos are shown on a large public screen where children are present. The photo is usually a photo-booth strip or collage of several small shots with a decorative printed frame.
+export const MODERATION_PROMPT = `You check one photo for a family event at a church. Approved photos are shown on a large public screen where children are present. The photo is one shot taken in a photo booth; part of the booth's decorative printed frame may show around its edges.
 
 Decide whether the photo is fine for that screen. Answer with ONE JSON object and nothing else:
 {"verdict":"safe"|"unsafe"|"unsure","categories":[...],"text_instructions":true|false}
