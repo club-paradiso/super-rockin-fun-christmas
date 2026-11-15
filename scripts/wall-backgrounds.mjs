@@ -34,6 +34,10 @@ const SOURCES = [
   { file: "s01.jpg", id: "snowy-chapel", top: 100, board: 778 },
   { file: "s02.jpg", id: "star-of-peace", top: 60, board: 200 },
   { file: "s04.jpg", id: "bethlehem", top: 100, board: 778 },
+  // c01, c02 and c04 show a door with two knobs. After cutting, the lower knob was painted out
+  // (2026-11-14) in public/wall/themes/*.jpg only, inside these boxes (x0, y0, x1, y1 on the cut
+  // picture): sunset-window 3747,620–3786,653 · pastel-coast 3751,634–3793,671 ·
+  // winter-sea 3405,641–3441,677. Re-running this script from the originals brings them back.
   { file: "c01.jpg", id: "sunset-window", top: 0 },
   { file: "c02.jpg", id: "pastel-coast", top: 0 },
   // c03 was replaced (2026-11-14) by a 3:1 repaint (one door knob), 4× upscaled to 8720 × 2884;
