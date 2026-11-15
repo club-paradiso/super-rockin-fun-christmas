@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { FRAMES } from "@/config/frames";
 import { MODERATION_CONFIG } from "@/config/moderation";
 import { WALL_CONFIG } from "@/config/wall";
-import { getServerConfig, type AiModerationConfig } from "@/lib/server/env";
+import { getServerConfig, type AiProviderSettings } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { getBackend } from "@/lib/storage/server";
 import { prepareModerationShots } from "./image";
@@ -14,7 +14,7 @@ import { AiReviewService } from "./service";
 import type { ModerationProvider } from "./types";
 
 /** The only place that knows which adapters exist. A new provider is one more case here. */
-function createProvider(config: AiModerationConfig | null): ModerationProvider | null {
+function createProvider(config: AiProviderSettings | null): ModerationProvider | null {
   if (!config) return null;
   switch (config.kind) {
     case "chat":
@@ -43,8 +43,19 @@ export function getAiReview(): AiReviewService {
   if (g.__ftlAiReview) return g.__ftlAiReview;
   const config = getServerConfig();
   const ai = config.aiModeration;
+  const fallback = config.aiModerationFallback;
+  const fallbackProvider = createProvider(fallback);
   g.__ftlAiReview = new AiReviewService(getBackend(), {
     provider: createProvider(ai),
+    // D98: only while the primary cannot take a photo (its daily limit here, or its own 429).
+    fallback:
+      fallback && fallbackProvider
+        ? {
+            provider: fallbackProvider,
+            timeoutMs: fallback.timeoutMs,
+            sequential: fallback.sequential,
+          }
+        : null,
     // Only a current frame has slot data to cut the shots out with. `getFrame` falls back to a
     // default frame, which would cut the wrong places: look the id up exactly.
     prepare: (data, mime, frameId) =>

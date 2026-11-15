@@ -1554,3 +1554,31 @@ in the prompt to look at each shot fixed one of the three.
 - **The model is chosen by measurement, not by this file**: Mistral Small 3.1 was faster and
   approved a Korean profanity card and a written threat; Qwen 3.8 and Gemma 4 spend the answer's
   token budget on thinking. Details: `docs/AI_MODERATION.md` 2.2–2.3.
+
+## D98 · A fallback provider takes the photos the primary cannot; it never replaces a person
+
+**User request (2026-11-15):** keep Cloudflare's free tier as the primary and, when it runs out,
+send photos to an OpenAI-compatible fallback (Ollama on the operator's M1 MacBook Air behind a
+Cloudflare Tunnel) instead of straight to people.
+
+- **When:** only while the primary cannot take a photo: its daily limit here is used up
+  (`takeBudget` refused), or it answered `rate_limited` (HTTP 429, including Cloudflare's 4006
+  "daily free allocation used up"). After a 429 the primary is skipped until 00:00 UTC (when
+  Cloudflare's free quota resets), or for the `Retry-After` if one of five minutes or less came
+  with it. Other primary failures keep the D95 handling and do not move a photo.
+- **A flag is a verdict:** a shot the primary flagged is never re-asked elsewhere. A photo that goes
+  to the fallback is checked there whole, every shot; one provider answers for one photo and is
+  the one recorded (`ai.provider`, the audit details, the log's `route`).
+- **Nothing else changes:** same prompt, same per-shot copies (D97), same parser, same single
+  approval path (`ftl_ai_complete` with SAFE). The fallback never draws on the primary's daily
+  budget. Off, slow, wrong or unsure → PENDING, retried within `maxAttempts`, then a person.
+- **Time:** each fallback shot has its own timeout (default 20 s), and the whole photo must be done
+  22 s after its review began (`fallbackPhotoBudgetMs`), so it fits the 30 s functions and the 45 s
+  lease. Sequential mode (one shot at a time, stopping at the first flag or error) is for a fanless
+  laptop. The cron route now takes one photo at a time and stops starting new ones after 32 s.
+- **Configuration:** `AI_MODERATION_FALLBACK_*`; the key is optional for `openai-compatible`; plain
+  https, no private host; optional Cloudflare Access service token headers. A mistake turns only
+  the fallback off (`aiModerationFallbackProblem`, shown on /admin), never a `ConfigError`. A
+  fallback without a working primary is refused.
+- **Not verified:** no Ollama model has been evaluated with this prompt. The fallback can approve,
+  so it must pass the same evaluation (`docs/AI_MODERATION.md` 2.3) before it is switched on.
