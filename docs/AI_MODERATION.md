@@ -62,6 +62,15 @@
 | ShieldGemma 2                                 | —                                      | **호스팅 API 없음.** 가중치만 공개 [A]                                                   | —                                    | —                                                                                                    | —                                     | 위험물·성적·폭력 3종, 한 번에 한 종류 [A]                               | 탈락 (GPU 필요)               |
 | Gemma 4 (`gemma-4-26b-a4b-it` 등, Gemini API) | 예 [A]                                 | 무료 등급만 있음(유료 "Not available") [S]                                               | —                                    | 무료 등급 조건 적용 → 학습에 쓰임                                                                    | —                                     | —                                                                       | 탈락 (개인정보)               |
 
+**ShieldGemma 2에 대해 (2026-11-15 추가 확인, 사용자 요청).** Google의 이미지 안전 분류 모델이다.
+이 Cloudflare 계정의 모델 목록(75개)에 없다(직접 조회). Cloudflare의 안전 모델은 `llama-guard-3-8b`
+하나이고 글자 전용이다. Hugging Face의 공식 저장소 `google/shieldgemma-2-4b-it`는 Google 라이선스 동의가
+필요한 잠긴 저장소다(API로 확인: `gated: manual`). 기본 정책은 성적 노출·위험물·폭력 세 가지뿐이라 [S]
+손가락 욕·욕설 글자·혐오 상징은 범위 밖이고, 직접 정책 문장을 써서 물을 수는 있으나 그 용도로 학습된
+것은 아니다. **이 세션에서는 돌려 보지 못했다:** 동의 없이 받을 수 있는 제3자 재배포본이 있지만 라이선스
+동의를 건너뛰는 일이라 받지 않았다. 시험하려면 계정 주인이 Hugging Face에서 라이선스에 동의하고 토큰을
+줘야 한다. 쓰려면 GPU 서버(유료)나 현장 PC가 필요하다.
+
 확인한 사실 몇 가지:
 
 - **Google AI Pro 구독에는 개발자 API 사용량이 들어 있지 않다.** "Direct use of the Gemini API … is billed and managed separately" [S]. Gemini CLI 문서도 Pro 한도는 Google 계정 로그인용이고 API 키와 별개라고 적는다 [A]. 월 10달러 개발자 크레딧이 있다는 발췌는 있으나 [S] 직접 확인하지 못했다.
@@ -363,8 +372,10 @@ interface ModerationProvider {
 한도가 하루 10,000 neurons [S]라면 4컷 기준 **하루 약 75~100장**이다. 기획안의 부스당 시간당 20건에
 동의율 60%를 가정하면 하루 6시간에 약 70장이라 빠듯하다. 한도를 넘는 사진은 사람이 본다.
 `AI_MODERATION_DAILY_LIMIT`은 컷 수 기준이므로 **280**을 권한다(280컷 × 약 33 ≈ 9,200 neurons).
-**무료 한도를 넘겼을 때 Cloudflare가 어떤 응답을 주는지는 확인하지 못했다.** 어떤 오류든 사진은 사람에게
-간다. 첫날 대시보드의 사용량과 Cloudflare 콘솔을 비교한다.
+**무료 한도를 넘기면** Cloudflare는 HTTP 429와 오류 코드 4006("you have used up your daily free
+allocation of 10,000 neurons")을 준다. `Retry-After`는 없다(2026-11-15, 평가로 한도를 다 쓴 뒤 확인).
+이 서버는 그것을 `rate_limited`로 보고 호출을 1분씩 멈추며, 사진은 세 번 시도한 뒤 사람에게 간다.
+한도는 00:00 UTC(한국 시간 09:00)에 초기화된다 [S]. 첫날 대시보드의 사용량과 Cloudflare 콘솔을 비교한다.
 
 ---
 
