@@ -18,8 +18,23 @@ export interface QueuedUpload {
   state: "pending" | "auth";
 }
 
+type UploadMetadata = Omit<QueuedUpload, "data">;
+
+function uploadMetadata({
+  sessionId,
+  frameId,
+  mime,
+  createdAt,
+  attempts,
+  nextAttemptAt,
+  lastError,
+  state,
+}: QueuedUpload): UploadMetadata {
+  return { sessionId, frameId, mime, createdAt, attempts, nextAttemptAt, lastError, state };
+}
+
 export interface QueueStore {
-  all(): Promise<QueuedUpload[]>;
+  metadata(): Promise<UploadMetadata[]>;
   get(sessionId: string): Promise<QueuedUpload | null>;
   put(entry: QueuedUpload): Promise<void>;
   delete(sessionId: string): Promise<void>;
@@ -29,6 +44,9 @@ export class MemoryQueueStore implements QueueStore {
   private readonly entries = new Map<string, QueuedUpload>();
   async all() {
     return [...this.entries.values()].sort((a, b) => a.createdAt - b.createdAt);
+  }
+  async metadata() {
+    return (await this.all()).map(uploadMetadata);
   }
   async get(id: string) {
     return this.entries.get(id) ?? null;
@@ -109,6 +127,16 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+/** The bytes are durable only after the transaction commits, not when put() succeeds. */
+function write(store: IDBObjectStore, change: () => IDBRequest): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = store.transaction;
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error ?? new Error("IndexedDB write aborted"));
+    change();
+  });
+}
+
 export class IndexedDbQueueStore implements QueueStore {
   private db: Promise<IDBDatabase> | null = null;
 
@@ -130,16 +158,36 @@ export class IndexedDbQueueStore implements QueueStore {
     const rows = await request((await this.tx("readonly")).getAll() as IDBRequest<QueuedUpload[]>);
     return rows.sort((a, b) => a.createdAt - b.createdAt);
   }
+  async metadata(): Promise<UploadMetadata[]> {
+    // A long outage can create many entries. Do not deserialize every JPEG into one array.
+    const cursor = (await this.tx("readonly")).openCursor();
+    return new Promise((resolve, reject) => {
+      const rows: UploadMetadata[] = [];
+      cursor.onerror = () => reject(cursor.error);
+      cursor.onsuccess = () => {
+        const row = cursor.result;
+        if (!row) {
+          resolve(rows.sort((a, b) => a.createdAt - b.createdAt));
+          return;
+        }
+        rows.push(uploadMetadata(row.value as QueuedUpload));
+        row.continue();
+      };
+    });
+  }
+
   async get(id: string) {
     return (
       ((await request((await this.tx("readonly")).get(id))) as QueuedUpload | undefined) ?? null
     );
   }
   async put(e: QueuedUpload) {
-    await request((await this.tx("readwrite")).put(e));
+    const store = await this.tx("readwrite");
+    await write(store, () => store.put(e));
   }
   async delete(id: string) {
-    await request((await this.tx("readwrite")).delete(id));
+    const store = await this.tx("readwrite");
+    await write(store, () => store.delete(id));
   }
 
   close() {
@@ -166,10 +214,12 @@ export class IndexedDbConsentStore implements ConsentStore {
     return rows.sort((a, b) => a.createdAt - b.createdAt);
   }
   async put(e: QueuedConsent) {
-    await request((await this.tx("readwrite")).put(e));
+    const store = await this.tx("readwrite");
+    await write(store, () => store.put(e));
   }
   async delete(id: string) {
-    await request((await this.tx("readwrite")).delete(id));
+    const store = await this.tx("readwrite");
+    await write(store, () => store.delete(id));
   }
 
   close() {
@@ -188,7 +238,7 @@ export async function openQueueStore(): Promise<{
     const store = new IndexedDbQueueStore();
     const consents = new IndexedDbConsentStore();
     try {
-      await store.all();
+      await store.metadata();
       await consents.all();
       return { store, consents, durable: true };
     } catch {

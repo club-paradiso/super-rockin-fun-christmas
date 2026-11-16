@@ -1,77 +1,45 @@
-# STUDIO SHALOM: iPad mini 4 (iPadOS 15 / Safari 15)
+# STUDIO SHALOM kiosk on iPadOS 15
 
-Status: **compatibility hardening, not a certified device pass.**
+The supported legacy baseline is **Safari / iPadOS 15.6–15.8.x**. Update the iPad mini 4 to its latest available iPadOS 15 patch. Use HTTPS and a normal Safari tab with local browser storage available.
 
-CI note: The newly added WebKit job uses a current engine with an iOS 15 UA and
-is intended as a cross-engine safety check, not a simulation of Safari 15's
-CSS parser or camera permission UI.
+## Routing
 
-## Why this needs a special path
+| Browser signature                                                    | Auto                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Explicit iPhone/iPad/iPod OS below 16.4                              | Standalone legacy renderer                                                    |
+| Explicit iPhone/iPad/iPod OS 16.4 or later                           | Existing Next kiosk                                                           |
+| Macintosh WebKit (including desktop-site iPad) or missing User-Agent | HTML capability probe. Modern if CSS color-mix is available, legacy otherwise |
+| Other recognizable modern browsers                                   | Existing Next kiosk                                                           |
 
-Apple's iPad mini 4 remains on iPadOS 15. The main application uses Next.js 16, whose
-**officially supported Safari baseline is 16.4**. Setting `browserslist` to Safari 15.6
-does not certify the framework runtime on Safari 15. No source change or emulated
-desktop browser can prove a physical iPad mini 4 works without testing that hardware.
+[Next.js 16 supports Safari 16.4 and later](https://nextjs.org/docs/app/getting-started/installation#supported-browsers). PR #61 added capture and CSS fallbacks that need a working runtime. The Vite build compiles the shared React booth directly for Safari 15 and is served by a route handler that emits standalone HTML without Next.js scripts or hydration. Both versions use the same enrollment, camera APIs, composition, consent, upload queues, moderation and QR APIs.
 
-## Implemented fallback (only for iOS 15)
+The probe checks capability before fetching either renderer. It reloads the same URL once with a scoped session-only routing cookie. If script cookie storage is blocked, it uses a validated query marker and retains other parameters such as camera mode. If the probe script fails, the page contains a link to the legacy renderer. Camera permission and enrollment play no part in routing. Kiosk responses are private/no-store.
 
-- iOS 15 iPad UA, including desktop-site mode (MacIntel + multi-touch), enables a
-  reduced-memory profile. Desktop Safari on a genuine Mac is unaffected.
-- Camera input hint: 1280×720 instead of 1920×1080 (both are `ideal`, not
-  hard requirements; the iPad may choose another resolution).
-- Captured photograph long edge: maximum 960px rather than 1600px. Photo compositing
-  uses design scale 1, typically a **600×1800 JPEG** rather than 1200×3600.
-  Frame preview thumbnails also use a smaller scale. Each guest retains all six
-  originals and the optional seventh photo.
-- Optional session **video recording is disabled** on iOS 15 to protect the
-  primary photo and QR workflow from old WebKit memory/encoder failures.
-- Legacy browser profile uses a live `visualViewport` height measurement to avoid
-  controls being hidden by Safari's browser chrome. Missing `color-mix()` and CSS
-  container queries get explicit sRGB, paper, and grid-size fallbacks.
-- UUIDs use Web Crypto `getRandomValues()` when `randomUUID()` is unavailable;
-  no weak `Math.random()` fallback. No authentication bypass or modified server
-  upload/consent behavior.
-- The frame picker tolerates a memory-limited browser declining to create a
-  thumbnail data URL, rather than taking down the entire kiosk.
+### Staff override
 
-## Validation
+On the enrolled booth browser, open `/kiosk/enroll` → **키오스크 화면 설정** (or `/kiosk/frontend`). Choose **Auto**, **Modern** or **Legacy** and apply. Use the existing operator password when enabled, or an existing staff session on that browser. The override is stored as an HttpOnly preference cookie scoped to the kiosk. Auto clears it and rechecks the browser. Switch only between guests. The enrollment cookie remains valid.
 
-- `tests/unit/legacy-ios.test.ts` covers normal and desktop iPadOS 15 UAs,
-  modern-iPad separation, budget caps, CSS guardrails and cryptographic UUID fallback.
-- `e2e/legacy-ipad.spec.ts` runs a complete mock seven-photo → composite → QR
-  session at 768×1024, verifies the low-memory 600×1800 output and no page exceptions.
-- CI runs this test in Chromium (existing sharded suites) **and modern WebKit**
-  (`playwright.webkit.config.ts`). **Modern Playwright WebKit is NOT an iOS 15
-  Safari build.** These tests catch regressions but do not replace the hardware test.
+## Legacy build and behavior
 
-## Required real-device acceptance (before relying on event-day operations)
+- **Build.** `npm run build:kiosk-legacy` targets Safari/iOS 15 for JavaScript and 15.6 for CSS. It generates `public/kiosk-legacy-assets/` before `npm run build` and `npm run dev`. Use Node 22.12+ for a new installation. Stable entry files revalidate and font assets are fingerprinted. The build has plain viewport and sRGB fallbacks, secure UUID v4 generation via getRandomValues, and a FileReader fallback for reading blobs.
+- **Memory.** The browser camera asks for an ideal 1280×720 stream, audio off. Seven 960×720 capture canvases use about 18.5 MiB of RGBA backing stores. The largest output is 600×1800 or about 4.2 MiB RGBA. Frame thumbnails use a 0.35 scale. The kiosk releases capture surfaces after composition or reset, and guest object URLs on reset or unmount. Browser, video-stream and decoded-image memory are additional. Legacy disables optional video recording. Existing remote camera and mobile-upload code is included, with physical Safari 15 remote pairing pending.
+- **Outages and privacy.** Finished JPEGs and wall answers use the existing same-origin IndexedDB stores. Retry uses the original session ID, and the displayed QR comes from the server response. If storage is unavailable, the kiosk marks temporary storage, holds the pending photo, and prompts staff to keep the tab open. When an unsaved session times out, it hides the photo and any future QR while retry remains possible. After delivery it returns to the attract screen. Unfinished captures stay in memory. The first page load needs access to the kiosk server. After a reload with a durable queued photo, retry resumes and staff can recover issued QR codes in recent sessions.
 
-1. On the actual iPad mini 4, update to its latest available iPadOS 15 patch.
-   Use Safari and HTTPS (e.g. `https://studio-shalom.vercel.app/kiosk`).
-   Ensure the kiosk is enrolled with staff credentials or an issued code.
-2. Load the booth from a clean Safari tab. Verify first tap, language switches,
-   frame selection, camera permissions, a **live and oriented front-camera preview**,
-   front/back camera switching if applicable, and an unobscured capture CTA.
-3. Shoot six photos; optionally shoot exactly one more; verify seven previews,
-   original six preserved, final selection, 600×1800 JPEG, and a usable QR link on
-   a separate phone. Also test choosing NOT to take the optional seventh shot.
-4. Rotate landscape/portrait, bring Safari into the background and return,
-   and test low-power mode. Confirm the preview recovers and the buttons remain
-   reachable under Safari's top and bottom bars.
-5. Run at least 10 consecutive full sessions without reloading; watch for
-   disappearing controls, unexpected browser reloads, camera black screens,
-   high memory pressure, dropped uploads or frozen QR generation.
-6. Repeat with the intended kiosk stand, lighting, and Wi-Fi/cellular network.
-   The screen "flash" is not an LED flash. If the camera is remote, test phone
-   pairing/reconnection separately.
+## Preview and physical device acceptance
 
-**If this device still fails:** do not use it unattended. Safari 15 is outside
-Next.js 16's supported runtime baseline; a **separate, Safari-15-targeted
-standalone kiosk bundle** or a newer supported iPad is necessary before a 100%
-compatibility claim.
+The Vercel project's branch Previews check the build. For a runtime trial, configure separate preview storage, a preview public origin, kiosk enrollment and session credentials, and a cron secret (see DEPLOYMENT.md). An unenrolled request to `/kiosk` with an iPadOS 15 UA should show enrollment with no Next scripts. After enrollment the legacy renderer should load `/kiosk-legacy-assets/entry.js` and `entry.css` with the proper MIME types and no `/_next/` scripts. On a supported browser, confirm the Next kiosk. Verify the response caching and cookie continuity on both. Use synthetic photos for preview tests.
 
-## User-facing trade-off
+Run the following on the physical iPad mini 4 with the event network. Record the OS patch, deployment SHA, orientation and each result.
 
-This mode prioritizes reliable photographs over high-resolution exports and
-optional video. On modern iPads, the existing 1600px captures, 1200×3600 exports,
-and video recording remain unchanged.
+| Check              | Pass condition                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Enrollment         | Opening the kiosk URL selects Legacy. Native enrollment succeeds and survives closing and reopening Safari.                                                                                                              |
+| Desktop-site mode  | Request desktop and mobile sites in turn and reopen the URL. Auto selects Legacy and enrollment persists.                                                                                                                |
+| Touch and viewport | Attract opens on first touch. Rotate with Safari bars shown and hidden. All frame, review, consent and delivery controls stay reachable.                                                                                 |
+| Camera             | Deny permission, then allow it and retry. Lock/unlock or background/resume the booth. Captures remain visible, mirrored and correctly cropped.                                                                           |
+| Memory and flash   | Run ten consecutive sessions with seven shots, flash on and off, tall and square frames, and Korean and Chinese. No tab reloads, black captures or camera still on after reset.                                          |
+| Consent and QR     | Try both consent answers. Scan the resulting QR from a second phone on mobile data. Download the correct JPEG. Confirm the moderation queue follows consent and the guest QR clears after reset.                         |
+| Network outage     | Disconnect during composition. Observe the queued indicator and absence of a QR. Reconnect and retry. Repeat with a reload after durable queueing. Verify one photo per session and recover the QR from recent sessions. |
+| Staff and modern   | Exercise all three preferences while idle; restore Auto. Verify Modern on a supported iPad and desktop, including video/remote camera where configured.                                                                  |
+
+CI uses Playwright Chromium and current WebKit with iPadOS 15 routing and viewport simulation. [Sauce Labs offers real devices on iPadOS 15](https://docs.saucelabs.com/mobile-apps/supported-devices/) and [BrowserStack selects Safari according to the device OS](https://www.browserstack.com/support/faq/live/browsers-amp-platforms-live/i-want-to-test-on-a-particular-browser-version-on-mobile-devices-is-that-supported). Verify exact model and OS availability before using either. Physical mini 4 testing is required for camera, touch, memory and event-network sign-off.

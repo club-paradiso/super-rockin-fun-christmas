@@ -53,7 +53,7 @@ jobs:
         run: npx playwright install webkit
       - name: Install WebKit OS dependencies
         run: timeout 180s npx playwright install-deps webkit
-      - name: Safari-like mock iPadOS 15 camera → seven shots → QR
+      - name: Adaptive routing, iPadOS 15 profile, camera recovery, offline retry and QR
         run: npx playwright test --config playwright.webkit.config.ts
         env:
           CI: "true"

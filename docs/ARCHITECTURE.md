@@ -519,3 +519,18 @@ wall browser (/wall, enrolled like a kiosk) ──cookie: ftl_kiosk──► Nex
   idempotent), but the second tab's response would rotate the first tab's token.
 - Queue entries are never expired client-side. Staff see the count and can clear site data if
   they really must.
+
+## Adaptive booth frontends
+
+`/kiosk` uses the same enrollment, API routes and data stores on every device.
+Within the exact kiosk-entry match, `proxy.ts` applies the rules in `lib/kiosk/frontend.ts`.
+The modern renderer is `app/kiosk/page.tsx`. The legacy renderer is standalone HTML from
+`app/kiosk/legacy/route.ts` booting the Safari-targeted Vite build in `legacy-kiosk/`.
+Both render the shared kiosk component, state machine, camera interfaces, compositor,
+offline upload and consent queues. Both verify enrollment and bootstrap from the same
+wall settings and moderation code.
+
+The staff page at `/kiosk/frontend` changes the renderer preference for that browser.
+It verifies kiosk enrollment, Origin, and a staff session or the existing operator password
+with its existing rate limits. It issues no kiosk or staff session.
+See [the legacy kiosk runbook](IPAD_MINI4_COMPAT.md) for deployment and device acceptance.

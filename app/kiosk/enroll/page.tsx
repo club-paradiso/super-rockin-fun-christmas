@@ -61,6 +61,11 @@ export default async function EnrollPage({
               <a href={toWall ? "/wall" : "/kiosk"} className="btn-primary">
                 {toWall ? "미디어월 열기" : "키오스크 열기"}
               </a>
+              {!toWall && (
+                <a href="/kiosk/frontend" className="btn-secondary">
+                  키오스크 화면 설정
+                </a>
+              )}
               <form method="post" action="/api/kiosk/signout">
                 <button type="submit" className="btn-secondary">
                   이 기기 등록 해제

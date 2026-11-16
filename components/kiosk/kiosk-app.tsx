@@ -12,7 +12,7 @@ import {
 } from "react";
 import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/config/frames";
 import { KIOSK_CONFIG } from "@/config/kiosk";
-import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
+import { blobToArrayBuffer, canvasToBlob, createDomCanvas } from "@/lib/canvas";
 import {
   CameraError,
   createCamera,
@@ -109,6 +109,13 @@ interface FinalImage {
 type State = KioskState<Shot>;
 type Action = KioskAction<Shot>;
 
+function releaseCanvases(canvases: Set<HTMLCanvasElement>) {
+  for (const canvas of canvases) {
+    canvas.width = canvas.height = 0;
+  }
+  canvases.clear();
+}
+
 const DEVICE_KEY = "ftl.cameraDeviceId";
 const noSubscribe = () => () => {};
 /** The QR ticket's torn ends (a receipt), as a clip-path. */
@@ -140,8 +147,10 @@ export function KioskApp({
   initialWallPublic = false,
   initialAiReview = false,
   staffHelp = false,
+  frontend = "modern",
 }: {
   cameraMode: CameraMode;
+  frontend?: "modern" | "legacy";
   /** From event settings at page load; refreshed by heartbeats and upload responses. */
   initialWallSubmissions?: "open" | "paused";
   /** Staff have the public wall on (D86): the consent screen says so and sends that scope. */
@@ -161,15 +170,18 @@ export function KioskApp({
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
+  const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(readStoredDevice);
   const urlsRef = useRef(new Set<string>());
+  const shotCanvasesRef = useRef(new Set<HTMLCanvasElement>());
   // Tablet screen light, not a hardware LED torch (iOS Safari cannot reliably control it).
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [screenFlashActive, setScreenFlashActive] = useState(false);
+  const [composeAttempt, setComposeAttempt] = useState(0);
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   // "오늘 N번째 기록" for this session's ticket, as the server counted it (absent = no number).
@@ -180,13 +192,18 @@ export function KioskApp({
   const online = useOnline();
   // useSyncExternalStore supplies a stable server snapshot for hydration, then detects
   // Safari 15 on the real device without a server/client markup mismatch.
-  const legacyIOS15 = useSyncExternalStore(noSubscribe, legacyIOS15InBrowser, () => false);
+  const browserNeedsLegacyBudget = useSyncExternalStore(
+    noSubscribe,
+    legacyIOS15InBrowser,
+    () => false,
+  );
+  const legacyIOS15 = frontend === "legacy" || browserNeedsLegacyBudget;
   const renderBudget = kioskRenderBudget(legacyIOS15);
 
   // The booth has one scroll area. Every new screen starts at its top (a screen left scrolled
   // would hide the next one's header); `moreBelow` marks a screen taller than the booth.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}`;
+  const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}:${privateDelivery}`;
   // When the screen on show appeared, and what made the last press: finger taps in the first
   // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
   const tapRef = useRef({ screenShownAt: 0, pointerType: "", previousTouchAt: -Infinity });
@@ -227,18 +244,20 @@ export function KioskApp({
 
   // ── Mount: create the camera provider once ──────────────────────────────────────────────
   useEffect(() => {
-    cameraRef.current = createCamera(cameraMode);
+    cameraRef.current = createCamera(cameraMode, frontend === "legacy");
     const off = cameraRef.current.onDisconnect(() => {
       setStream(null);
       dispatch({ type: "CAMERA_FAILED", kind: "missing" });
     });
     const urls = urlsRef.current;
+    const shotCanvases = shotCanvasesRef.current;
     return () => {
       off();
       cameraRef.current?.stop();
       releaseUrls(urls);
+      releaseCanvases(shotCanvases);
     };
-  }, [cameraMode]);
+  }, [cameraMode, frontend]);
 
   // ── Session video (D72): a silent highlight reel, strictly best-effort ───────────────────
   // Recorded only during the last seconds of each countdown and the capture moment. Nothing in
@@ -303,11 +322,13 @@ export function KioskApp({
     setStream(null);
     releaseUrls(urlsRef.current);
     urlsRef.current.clear();
+    releaseCanvases(shotCanvasesRef.current);
     setFinalImage(null);
     setQrSvg(null);
     setTicket(null);
     setMobileQr(null);
     setConfirmHome(false);
+    setPrivateDelivery(false);
     setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
@@ -403,6 +424,7 @@ export function KioskApp({
     let cancelled = false;
     const camera = cameraRef.current;
     let flashTimeout: ReturnType<typeof setTimeout> | undefined;
+    let unclaimedCanvas: HTMLCanvasElement | undefined;
     (async () => {
       try {
         // Gone, or muted by the browser (a black frame): take the camera again before the shot.
@@ -428,8 +450,14 @@ export function KioskApp({
         });
         // The blink comes after the grab, so it can never light (or spoil) the photo itself.
         if (!cancelled) setShutterBlink((n) => n + 1);
-        const blob = await canvasToBlob(frame.canvas as HTMLCanvasElement, "image/jpeg", 0.9);
+        const canvas = frame.canvas as HTMLCanvasElement;
+        if (legacyIOS15) unclaimedCanvas = canvas;
+        const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
         if (cancelled) return;
+        if (unclaimedCanvas) {
+          shotCanvasesRef.current.add(unclaimedCanvas);
+          unclaimedCanvas = undefined;
+        }
         dispatch({
           type: "SHOT_CAPTURED",
           shot: { frame, url: trackUrl(URL.createObjectURL(blob)) },
@@ -437,6 +465,7 @@ export function KioskApp({
       } catch {
         if (!cancelled) dispatch({ type: "CAPTURE_FAILED" });
       } finally {
+        if (unclaimedCanvas) unclaimedCanvas.width = unclaimedCanvas.height = 0;
         if (flashTimeout) clearTimeout(flashTimeout);
         if (!cancelled) setScreenFlashActive(false);
       }
@@ -446,7 +475,15 @@ export function KioskApp({
       if (flashTimeout) clearTimeout(flashTimeout);
       setScreenFlashActive(false);
     };
-  }, [state.phase, state.shotIndex, deviceId, flashEnabled, renderBudget.captureMaxWidth, sound]);
+  }, [
+    state.phase,
+    state.shotIndex,
+    deviceId,
+    flashEnabled,
+    legacyIOS15,
+    renderBudget.captureMaxWidth,
+    sound,
+  ]);
 
   const images = useMemo(
     () =>
@@ -481,20 +518,22 @@ export function KioskApp({
     if (!thumbSource || !assets) return out;
     const context = { dateLabel: formatDateLabel(new Date()), assets };
     for (const frame of FRAMES) {
-      const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
-        createCanvas: createDomCanvas,
-        context,
-        scale: renderBudget.thumbScale,
-      }) as HTMLCanvasElement;
+      let canvas: HTMLCanvasElement | undefined;
       try {
+        canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
+          createCanvas: createDomCanvas,
+          context,
+          scale: renderBudget.thumbScale,
+        }) as HTMLCanvasElement;
         out[frame.id] = canvas.toDataURL("image/jpeg", 0.85);
       } catch {
-        // Older WebKit may refuse the data URL under memory pressure; keep the
-        // frame picker usable instead of crashing the entire guest session.
+        // Older WebKit may refuse the canvas or data URL under memory pressure.
+      } finally {
+        if (canvas && legacyIOS15) canvas.width = canvas.height = 0;
       }
     }
     return out;
-  }, [thumbSource, assets, renderBudget.thumbScale]);
+  }, [thumbSource, assets, legacyIOS15, renderBudget.thumbScale]);
 
   // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
@@ -506,29 +545,45 @@ export function KioskApp({
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
     // A font or asset that failed to load must not block the guest: compose without it.
-    void Promise.all([fontsRef.current, assetsRef.current]).then(async ([, loaded]) => {
-      if (cancelled) return;
-      const canvas = composeFrame(frame, chosen, {
-        createCanvas: createDomCanvas,
-        context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
-        scale: renderBudget.outputScale,
-      }) as HTMLCanvasElement;
-      const blob = await canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality);
-      if (cancelled) return;
-      setFinalImage({
-        frameId: frame.id,
-        selectionKey,
-        blob,
-        url: trackUrl(URL.createObjectURL(blob)),
-        width: canvas.width,
-        height: canvas.height,
+    void Promise.all([fontsRef.current, assetsRef.current])
+      .then(async ([, loaded]) => {
+        if (cancelled) return;
+        const canvas = composeFrame(frame, chosen, {
+          createCanvas: createDomCanvas,
+          context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
+          scale: renderBudget.outputScale,
+        }) as HTMLCanvasElement;
+        try {
+          const blob = await canvasToBlob(
+            canvas,
+            KIOSK_CONFIG.outputMime,
+            KIOSK_CONFIG.outputQuality,
+          );
+          if (cancelled) return;
+          setFinalImage({
+            frameId: frame.id,
+            selectionKey,
+            blob,
+            url: trackUrl(URL.createObjectURL(blob)),
+            width: canvas.width,
+            height: canvas.height,
+          });
+          // Frames are final now. Keep just the encoded result and release the RGBA surfaces.
+          if (legacyIOS15) releaseCanvases(shotCanvasesRef.current);
+        } finally {
+          if (legacyIOS15) canvas.width = canvas.height = 0;
+        }
+      })
+      .catch(() => {
+        if (!cancelled) dispatch({ type: "DELIVERY_FAILED", message: "composition failed" });
       });
-    });
     return () => {
       cancelled = true;
     };
   }, [
     finalPhase,
+    composeAttempt,
+    legacyIOS15,
     state.frameId,
     state.selectedShotIndices,
     selectionKey,
@@ -610,6 +665,8 @@ export function KioskApp({
           sendVideo(event.sessionId);
           // A wall answer given while this photo was still queued can go now.
           void consents.then((c) => c.processDue(true));
+        } else if (event.type === "dropped" && event.sessionId === sessionRef.current) {
+          dispatch({ type: "DELIVERY_FAILED", message: "upload refused" });
         }
       });
       void queue.emitStatus();
@@ -680,11 +737,11 @@ export function KioskApp({
         sessionId,
         frameId: finalImage.frameId,
         mime: finalImage.blob.type === "image/png" ? "image/png" : "image/jpeg",
-        data: await finalImage.blob.arrayBuffer(),
+        data: await blobToArrayBuffer(finalImage.blob),
       });
       photoQueued(sessionId).resolve();
       const outcome = await queue.deliverNow(sessionId);
-      if (outcome.ok) return; // the "uploaded" event shows the QR
+      if (outcome.ok || sessionRef.current !== sessionId) return; // "uploaded" shows the QR
       if (outcome.kind === "network" || outcome.kind === "server") {
         dispatch({ type: "DELIVERY_QUEUED", reason: "network" });
       } else if (outcome.kind === "auth") {
@@ -693,12 +750,22 @@ export function KioskApp({
         dispatch({ type: "DELIVERY_FAILED", message: outcome.message });
       }
     } catch (err) {
+      if (sessionRef.current !== sessionId) return;
       dispatch({
         type: "DELIVERY_FAILED",
         message: err instanceof Error ? err.message : String(err),
       });
     }
   }, [finalImage, state.sessionId, photoQueued]);
+
+  const retryDelivery = () => {
+    if (finalImage) {
+      void deliver();
+    } else {
+      dispatch({ type: "DELIVERY_RETRY_COMPOSE" });
+      setComposeAttempt((attempt) => attempt + 1);
+    }
+  };
 
   // The upload starts by itself once the composite exists: no button, no waiting at the QR.
   const deliveryIdle = state.delivery.status === "idle";
@@ -755,14 +822,46 @@ export function KioskApp({
     };
   }, [reviewSession]);
 
+  const deliveryStatus = state.delivery.status;
+  const photoAtRisk =
+    finalPhase &&
+    deliveryStatus !== "ready" &&
+    deliveryStatus !== "qr-pending" &&
+    !(deliveryStatus === "queued" && queueStatus.durable);
+  useEffect(() => {
+    if (!photoAtRisk) return;
+    const confirmClose = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", confirmClose);
+    return () => window.removeEventListener("beforeunload", confirmClose);
+  }, [photoAtRisk]);
+
+  // Conceal an abandoned guest's preview and future QR while a pending photo remains at risk.
+  // The upload can finish in the background. It then resets straight to attract for the next guest.
+  const onIdle = useCallback(() => {
+    if (photoAtRisk) {
+      setConfirmHome(false);
+      setPrivateDelivery(true);
+    } else {
+      reset();
+    }
+  }, [photoAtRisk, reset]);
+  useEffect(() => {
+    if (!privateDelivery || photoAtRisk) return;
+    const timeout = setTimeout(reset, 0);
+    return () => clearTimeout(timeout);
+  }, [photoAtRisk, privateDelivery, reset]);
+
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
   const idle = useIdleReset(
     // The welcome choices go back to the attract screen too, so a half-chosen language never
     // waits for the next guest (D80).
-    state.phase !== "attract" && !isShooting(state.phase),
+    state.phase !== "attract" && !isShooting(state.phase) && !privateDelivery,
     KIOSK_CONFIG.idleResetSeconds,
-    reset,
+    onIdle,
   );
 
   const selectDevice = (id: string) => {
@@ -875,7 +974,8 @@ export function KioskApp({
     state.phase === "delivery" ||
     (state.phase === "mobile" &&
       (state.mobile.status === "received" || state.mobile.status === "failed"));
-  const midSession = state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
+  const midSession =
+    !privateDelivery && state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
   const requestHome = useCallback(() => {
     // Nothing to lose on these screens: go straight home. Elsewhere, ask first.
     if (state.phase === "mobile") reset();
@@ -947,6 +1047,7 @@ export function KioskApp({
         // iOS lets a page start sound only from a touch: the first one unlocks it (no sound here).
         onPointerDownCapture={() => sound?.unlock()}
         onKeyDownCapture={() => sound?.unlock()}
+        data-kiosk-frontend={frontend}
         data-phase={state.phase}
         data-lang={state.lang}
         data-legacy-ios15={legacyIOS15 ? "true" : undefined}
@@ -992,7 +1093,10 @@ export function KioskApp({
             thumbs={thumbs}
             finalImage={finalImage}
             qrSvg={qrSvg}
-            onRetryDelivery={deliver}
+            onRetryDelivery={retryDelivery}
+            onDiscard={requestHome}
+            durableQueue={queueStatus.durable}
+            privateDelivery={privateDelivery}
             onConsent={chooseConsent}
             onReset={reset}
             onOpen={() => dispatch({ type: "OPEN" })}
@@ -1110,6 +1214,9 @@ interface ScreenProps {
   finalImage: FinalImage | null;
   qrSvg: string | null;
   onRetryDelivery: () => void;
+  onDiscard: () => void;
+  durableQueue: boolean;
+  privateDelivery: boolean;
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onOpen: () => void;
@@ -1154,6 +1261,28 @@ function Screen(p: ScreenProps) {
   const progress = progressStep(state.phase, p.wallSubmissionsOpen);
   const sessionCode = state.sessionId.slice(0, 8);
   const t = KIOSK_COPY[state.lang];
+
+  if (p.privateDelivery) {
+    return (
+      <BoothScreen testId="screen-private-delivery" progress={null}>
+        <div className="booth-message">
+          <h1 className="booth-title">{t.delivery.authTitle}</h1>
+          <p className="booth-lead">{t.delivery.temporaryQueue}</p>
+          <div className="booth-actions">
+            <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
+              {t.delivery.retry}
+            </button>
+            <button type="button" className="booth-btn-secondary" onClick={p.onDiscard}>
+              {t.delivery.home}
+            </button>
+          </div>
+          <p className="booth-meta" data-testid="session-code">
+            {t.delivery.session(sessionCode)}
+          </p>
+        </div>
+      </BoothScreen>
+    );
+  }
 
   switch (state.phase) {
     case "attract":
@@ -1738,7 +1867,15 @@ function Screen(p: ScreenProps) {
                 {d.reason === "auth" ? t.delivery.authTitle : t.delivery.queuedTitle}
               </h1>
               <p className="booth-lead">
-                {d.reason === "auth" ? t.delivery.authLead : <Lines text={t.delivery.queuedLead} />}
+                <Lines
+                  text={
+                    !p.durableQueue
+                      ? t.delivery.temporaryQueue
+                      : d.reason === "auth"
+                        ? t.delivery.authLead
+                        : t.delivery.queuedLead
+                  }
+                />
               </p>
               <div className="booth-actions">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
@@ -1748,10 +1885,10 @@ function Screen(p: ScreenProps) {
                 <button
                   type="button"
                   className="booth-btn-secondary"
-                  data-testid="queued-continue"
-                  onClick={p.onReset}
+                  data-testid={p.durableQueue ? "queued-continue" : undefined}
+                  onClick={p.durableQueue ? p.onReset : p.onDiscard}
                 >
-                  {t.delivery.withoutQr}
+                  {p.durableQueue ? t.delivery.withoutQr : t.delivery.home}
                 </button>
               </div>
               <p className="booth-meta" data-testid="session-code">
@@ -1762,9 +1899,17 @@ function Screen(p: ScreenProps) {
             <div className="booth-message">
               <h1 className="booth-title">{t.delivery.failedTitle}</h1>
               <p className="booth-lead">{t.delivery.failedLead}</p>
-              <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
-                {t.delivery.home}
-              </button>
+              <div className="booth-actions">
+                <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
+                  {t.delivery.retry}
+                </button>
+                <button type="button" className="booth-btn-secondary" onClick={p.onDiscard}>
+                  {t.delivery.home}
+                </button>
+              </div>
+              <p className="booth-meta" data-testid="session-code">
+                {t.delivery.session(sessionCode)}
+              </p>
             </div>
           ) : (
             <div className="booth-message" role="status">
