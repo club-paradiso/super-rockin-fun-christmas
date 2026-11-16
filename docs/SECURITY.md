@@ -115,6 +115,26 @@ decision: one credential to hand to volunteers, no second administrator password
 | A rescan kills a guest's QR                       | Per-photo lock on the hub: the kiosk's QR request and the background worker never upload the same photo twice at once.                                                                                                                         |
 | Staff delete does not reach the cloud             | Queued as `DELETE_PENDING` and retried until the cloud confirms; shown on the hub overview ("삭제 대기 N건").                                                                                                                                  |
 
+## Remote Camera (D100, `docs/REMOTE_CAMERA.md`)
+
+| Threat                                  | Mitigation                                                                                                                                                                                                                                                            |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A stranger links their phone to a booth | Pairing needs a staff-made code: 8 random characters (≈8.5e11), single use, 10 minutes, one live code per kiosk, only its SHA-256 stored. Guessing is limited to 10 tries per address and 60 per 10 minutes overall; wrong, used and expired codes give the same 400. |
+| A stolen or leaked camera cookie        | `ftl_camera` is HttpOnly, SameSite=Lax, Secure on https, 30 days, signed with its own key (derived from both booth secrets). Revoking the pairing in /admin kills it at once: every call re-checks the pairing row.                                                   |
+| A booth, phone or visitor acts as staff | The mailbox accepts staff commands (`cmd`) only from the admin route; booth and camera messages are parsed per sender (`parseSignal`). Booth, camera and staff cookies never stand in for each other.                                                                 |
+| Someone watches or records the stream   | No public streaming. Video and photos travel phone → iPad over DTLS-encrypted WebRTC and never through the server. The server stores only short-lived signaling (2 min) and numbers/codes. Audio is never requested.                                                  |
+| A photo is kept without a decision      | The phone holds a finished photo in memory only until the booth acknowledges it (or 60 s). The server never sees it. The staff "test capture" thumbnail (160 px) is dropped after two minutes.                                                                        |
+| Oversized or malformed signaling        | Bodies ≤ 40 KB, SDP ≤ 24 KB, strict schema per message type, per-pairing mailbox cap (300), per-booth and per-camera rate limits.                                                                                                                                     |
+| A damaged or forged photo is used       | A photo is accepted only for the pending request id, with the announced length and CRC-32 (damage check; authenticity comes from DTLS + pairing). Late results are dropped.                                                                                           |
+| Replay of an old offer or command       | A restarting page skips the mailbox backlog; offers older than 20 s are ignored; messages carry a per-connection id and are discarded when it does not match.                                                                                                         |
+| TURN credentials                        | Only from the `REMOTE_CAMERA_ICE_SERVERS` server setting, sent to a paired camera and an enrolled booth only. A wrong value is ignored (default STUN) and shown to staff.                                                                                             |
+| Need to stop it                         | `REMOTE_CAMERA_DISABLED=1` makes every route a 404; revoke the pairing; remove `?camera=remote` from the booth address.                                                                                                                                               |
+
+The QR carries the code in the address (`/camera/remote?code=…`), so a request log (Vercel) can contain a code. It is single use and dead after 10 minutes, and the page removes it from the address bar at once.
+
+Not covered: a compromised venue Wi-Fi can see that a WebRTC link exists and its endpoints, not its
+content. The phone page is public HTML (it holds no secret). Nothing was tested on Apple devices.
+
 ## Accepted limitations
 
 - **Rate limits are per server instance** (in memory). On Vercel each instance counts separately

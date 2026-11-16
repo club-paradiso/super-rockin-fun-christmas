@@ -47,7 +47,7 @@ export interface CapturedFrame {
  * the mock used in CI, and any future vendor shell are interchangeable.
  */
 export interface CameraProvider {
-  readonly kind: "browser" | "mock";
+  readonly kind: "browser" | "mock" | "remote";
   /** Acquire the camera. Throws CameraError. Safe to call again to reconnect. */
   start(deviceId?: string): Promise<void>;
   stop(): void;

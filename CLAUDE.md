@@ -173,6 +173,20 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
+- **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
+  `RemoteCamera` is one more `CameraProvider`, chosen only by `?camera=remote` or
+  `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, retake, compositing, consent and
+  upload code are shared and must not fork. The phone (`/camera/remote`) takes the photo from its own
+  full-resolution feed on request and sends it over the WebRTC data channel; **a failed, late or
+  damaged capture is an error and a previous frame is never reused** (unique request id, one shot
+  per id, length + CRC check, bounded resends). Never send a guest photo, video or id through the
+  signaling routes or log them: the server only carries short-lived offers/answers and numbers
+  (`CameraReport`). Pairing is a single-use 10-minute code for one kiosk, stored as a hash, exchanged
+  for the `ftl_camera` cookie (own MAC key; revocation checked on every call); staff use the existing
+  login (never a new password), and a booth or a phone can never issue a staff command. The camera
+  page needs https and no microphone (`audio:false`). `REMOTE_CAMERA_DISABLED=1` turns every route
+  into a 404. Route names must not contain "ai" or "review" (`tests/unit/ai-api.test.ts` guards that:
+  hence `/link`, not `/pair`).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
   wall only picks the first usable id. Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
@@ -223,7 +237,11 @@ lib/staff-auth         staff sessions: shared password (shared.ts, D84), Supabas
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
 components/brand.tsx   the STUDIO SHALOM lockup and one-line wordmark as text (styles in app/globals.css)
-lib/camera             CameraProvider: BrowserCamera, MockCamera, shared grabFrame
+lib/camera             CameraProvider: BrowserCamera, MockCamera, RemoteCamera (D100), shared grabFrame
+lib/remote-camera      Remote Camera: protocol, shutter (host/client), chunked transfer, signaling client,
+                       iPhone logic (phone.ts), pairing code + cookie, mailbox stores (memory, Supabase)
+app/camera/remote      the iPhone's page · app/api/camera + app/api/kiosk/camera (signaling, status, link)
+                       · app/api/admin/remote-camera (staff: pair, commands, revoke) · /admin/remote-camera
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client,
                        booth copy in Korean and English (copy.ts, D78),
