@@ -1134,7 +1134,7 @@ body {
     color: var(--color-ink);
   }
 
-  /* 3 · Review and 5 · Select: six 4:3 prints in a grid that fits the stage. The grid works its
+  /* 3 · Review and 5 · Select: six 4:3 prints (seven after one extra) fit the stage. The grid works its
      own width out from the stage's height (rows, gaps and whatever sits under each print), so
      the prints are as large as they can be and the buttons stay on screen. */
   .fit-stage {
@@ -1177,7 +1177,12 @@ body {
     --fit-min: calc(2 * (var(--ctl-h) + var(--gap-xs) + 84px) + var(--gap-s));
   }
   .review-grid {
-    --extra: calc(var(--ctl-h) + var(--gap-xs));
+    --extra: 0px;
+  }
+  /* One optional seventh shot: three rows on a tall screen, two across a wide screen. */
+  .review-grid.has-extra {
+    --cols: 3;
+    --rows: 3;
   }
   .review-cell {
     display: flex;
@@ -1198,9 +1203,7 @@ body {
     height: 100%;
     object-fit: cover;
   }
-  .review-cell .booth-btn-m {
-    padding-inline: 8px;
-  }
+  /* Review prints are no longer per-photo retake buttons. All six are preserved. */
   .review-actions {
     display: flex;
   }
@@ -1215,11 +1218,28 @@ body {
     --rows: 3;
     --extra: 16px;
   }
+  .select-grid.has-extra {
+    --rows: 4;
+  }
   /* Two columns of three or three of two: whichever makes the prints larger in the room there
      is. The break-even is a stage as wide as one print is (4:3). */
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
       --cols: 3;
+      --rows: 2;
+    }
+    .select-grid.has-extra {
+      --rows: 3;
+    }
+    .review-grid.has-extra {
+      --cols: 4;
+      --rows: 2;
+    }
+    .select-grid.has-extra {
+      --rows: 3;
+    }
+    .review-grid.has-extra {
+      --cols: 4;
       --rows: 2;
     }
   }
@@ -1794,16 +1814,10 @@ main input:focus-visible,
   outline-offset: 2px;
 }
 
-@keyframes flash {
-  from {
-    opacity: 0.95;
-  }
-  to {
-    opacity: 0;
-  }
-}
-.capture-flash {
-  animation: flash 450ms ease-out forwards;
+/* Screen illumination is steady while the shutter opens, then turns off. It is not
+   a camera LED torch or a post-capture decorative blink. */
+.capture-illumination {
+  background: #fff;
 }
 
 @keyframes pop {
@@ -1826,8 +1840,7 @@ main input:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .countdown-pop,
-  .capture-flash {
+  .countdown-pop {
     animation: none;
   }
 }
