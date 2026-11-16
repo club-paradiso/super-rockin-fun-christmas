@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { findGuestPhoto } from "@/lib/storage/guest";
+import { getPhotoService } from "@/lib/storage/server";
 import { BrandLockup } from "@/components/brand";
+import { StampTicket } from "@/components/studio/stamp-ticket";
 import { SavePhoto } from "./save-photo";
 import { SaveVideo } from "./save-video";
 
@@ -19,6 +21,8 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
   if (!photo) notFound();
 
   const src = `/p/${encodeURIComponent(token)}/image`;
+  // "오늘 N번째 기록" (the stamp ticket). Null when it cannot be counted: the ticket has no number.
+  const ordinal = await getPhotoService().dayOrdinal(photo.createdAt);
   const expires = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
     month: "long",
@@ -40,6 +44,7 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
         {photo.video && (
           <SaveVideo videoUrl={`/p/${encodeURIComponent(token)}/video`} mime={photo.video.mime} />
         )}
+        <StampTicket info={{ ordinal, createdAt: photo.createdAt }} />
         <p className="text-center text-sm text-ink/75">
           {expires}까지 열 수 있어요. 꼭 저장해 주세요.
         </p>

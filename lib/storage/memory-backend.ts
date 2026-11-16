@@ -242,6 +242,16 @@ export class MemoryPhotoRepository implements PhotoRepository {
         objectPath,
       }));
   }
+  async countCreatedBetween(fromIso: string, toIso: string): Promise<number> {
+    const from = Date.parse(fromIso);
+    const to = Date.parse(toIso);
+    let n = 0;
+    for (const r of this.rows.values()) {
+      const at = Date.parse(r.createdAt);
+      if (at >= from && at <= to) n++;
+    }
+    return n;
+  }
   async stats(): Promise<PhotoStats> {
     const byStatus = Object.fromEntries(MODERATION_STATES.map((s) => [s, 0])) as Record<
       ModerationStatus,

@@ -233,6 +233,12 @@ export interface PhotoRepository {
   /** Hub only. Rows whose cloud upload, video upload or delete is due, oldest first. */
   listCloudDue(nowIso: string, limit: number): Promise<PhotoRow[]>;
   stats(): Promise<PhotoStats>;
+  /**
+   * How many photo rows were created in [fromIso, toIso], both ends included, whatever their
+   * state (a deleted photo still happened). Read-only; used for "오늘 N번째 기록" (the stamp
+   * ticket): no ids, no tokens, only a number.
+   */
+  countCreatedBetween(fromIso: string, toIso: string): Promise<number>;
 }
 
 export interface ObjectStorage {

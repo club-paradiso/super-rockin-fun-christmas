@@ -4,6 +4,7 @@ import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
+  openWelcome,
   startSession,
   storedPhotos,
   toConsent,
@@ -69,7 +70,17 @@ async function pairPhone(phone: Page, code: string) {
 
 async function liveBooth(page: Page) {
   await page.goto("/kiosk?camera=remote");
-  await startSession(page);
+  await openWelcome(page);
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  // The remote camera is ready only once the WebRTC link is up: the booth's own budget is a 10 s
+  // connect plus retries (lib/camera/remote-camera.ts), more than the 5 s startSession allows a
+  // local webcam. Wait for either outcome, then insist on the right one, so a booth that falls
+  // to the camera error screen still fails here, at once and by name.
+  const ready = page.getByTestId("screen-ready");
+  await expect(ready.or(page.getByTestId("screen-camera-error"))).toBeVisible({ timeout: 25_000 });
+  await expect(ready, "booth fell to the camera error screen").toBeVisible({ timeout: 1 });
   // The preview is the remote stream: it has real pixels once WebRTC delivers video.
   await expect
     .poll(

@@ -9,6 +9,24 @@ import { PHONE_CARD, type WallSceneConfig } from "./layout";
  * (`WallLook`) and the clock, on the server, so every display shows the same one.
  */
 
+/**
+ * The wall's one light: a lamp at the top left (135°), the same light as the booth
+ * (app/globals.css "One light"). Every shadow drawn on the wall falls down and to the right by
+ * these scene pixels: the hung photos (`photo`, also `--wall-photo-drop` in app/globals.css), and
+ * the twine's shadow on the backdrop (`rope`). A theme picture's own light is part of the picture.
+ */
+export const WALL_LIGHT = {
+  photo: { x: 10, y: 14, blur: 22 },
+  rope: { x: 4, y: 6 },
+} as const;
+
+/** CSS for a hung photo's shadow under WALL_LIGHT, in the theme's shadow colour. */
+export const wallPhotoShadow = (kind: "filter" | "box") => {
+  const { x, y, blur } = WALL_LIGHT.photo;
+  const offset = `${x}px ${y}px ${blur}px var(--wall-photo-shadow)`;
+  return kind === "filter" ? `drop-shadow(${offset})` : offset;
+};
+
 export interface WallTheme {
   id: string;
   /** Staff-facing name (Korean), as labelled in Figma. */

@@ -39,6 +39,9 @@ export function HelpPanel(p: {
   loadQueue: () => Promise<HelpQueueView>;
   onSendNow: () => Promise<void>;
   onReset: () => void;
+  /** Booth sounds (lib/kiosk/sound.ts); the switch is kept on this device. */
+  soundMuted: boolean;
+  onToggleSound: (() => void) | null;
 }) {
   const [state, dispatch] = useReducer(helpReducer, HELP_CLOSED);
   const cornerRef = useRef<HTMLDivElement>(null);
@@ -257,6 +260,8 @@ function HelpMenu(p: {
   loadQueue: () => Promise<HelpQueueView>;
   onSendNow: () => Promise<void>;
   onReset: () => void;
+  soundMuted: boolean;
+  onToggleSound: (() => void) | null;
   onClose: () => void;
 }) {
   const [devices, setDevices] = useState<CameraDevice[] | null>(null);
@@ -294,6 +299,21 @@ function HelpMenu(p: {
           </select>
         )}
       </section>
+
+      {p.onToggleSound && (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-2xl font-bold">소리</h3>
+          <button
+            type="button"
+            className="btn-secondary"
+            data-testid="help-sound"
+            aria-pressed={!p.soundMuted}
+            onClick={p.onToggleSound}
+          >
+            {p.soundMuted ? "꺼져 있어요 · 켜기" : "켜져 있어요 · 끄기"}
+          </button>
+        </section>
+      )}
 
       <section className="flex flex-col gap-2" data-testid="help-queue">
         <h3 className="text-2xl font-bold">보내지 못한 것</h3>

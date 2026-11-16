@@ -141,7 +141,7 @@ describe("phone upload (D66)", () => {
 
     const res = await upload(tokenOf(url), original);
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ status: "received", review: "pending" });
+    expect(await res.json()).toEqual({ status: "received", review: "pending", dayOrdinal: 1 });
     expect(await status(cookie, sessionId)).toBe("received");
 
     const { getBackend } = await routes.storage();
