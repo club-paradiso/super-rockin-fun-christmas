@@ -42,7 +42,6 @@ describe("stray taps on a screen that has just appeared", () => {
   });
 });
 
-
 describe("kiosk attract screen touch behavior", () => {
   const tap = { now: 10_040, screenShownAt: 10_000, pointerType: "touch" };
 
