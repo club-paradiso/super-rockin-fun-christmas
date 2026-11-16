@@ -2,6 +2,10 @@
 
 Status: **compatibility hardening, not a certified device pass.**
 
+CI note: The newly added WebKit job uses a current engine with an iOS 15 UA and
+is intended as a cross-engine safety check, not a simulation of Safari 15's
+CSS parser or camera permission UI.
+
 ## Why this needs a special path
 
 Apple's iPad mini 4 remains on iPadOS 15. The main application uses Next.js 16, whose
