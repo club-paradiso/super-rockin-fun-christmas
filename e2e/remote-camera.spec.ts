@@ -83,7 +83,7 @@ async function liveBooth(page: Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("pair from /admin, preview on the booth, shoot six, retake one, frame, consent, QR", async ({
+test("pair from /admin, preview, shoot six, take one extra, frame, consent, QR", async ({
   browser,
   page,
 }) => {
@@ -126,10 +126,12 @@ test("pair from /admin, preview on the booth, shoot six, retake one, frame, cons
   for (const [w, h] of sizes) expect(w / h).toBeCloseTo(4 / 3, 2);
   await expect(phone.getByTestId("shots")).toHaveText("촬영 6장");
 
-  // Individual retake: only that shot is taken again, through the phone.
-  await page.getByRole("button", { name: "3번째 사진 다시 찍기" }).click();
+  // One extra photo goes through the phone without replacing any original frame.
+  await page.getByTestId("take-extra-shot").click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(phone.getByTestId("shots")).toHaveText("촬영 7장");
+  await expect(page.getByTestId("review-shot-6")).toBeVisible();
+  await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
 
   // Existing flow after the shots: frame, photo choice, consent, a real QR.
   await toConsent(page);
