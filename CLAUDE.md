@@ -175,7 +175,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
   `RemoteCamera` is one more `CameraProvider`, chosen only by `?camera=remote` or
-  `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, retake, compositing, consent and
+  `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, optional one extra shot, compositing, consent and
   upload code are shared and must not fork. The phone (`/camera/remote`) takes the photo from its own
   full-resolution feed on request and sends it over the WebRTC data channel; **a failed, late or
   damaged capture is an error and a previous frame is never reused** (unique request id, one shot
