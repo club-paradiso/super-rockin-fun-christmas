@@ -35,6 +35,35 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Second engine: Playwright's WebKit checks Safari-specific behaviour rather than relying
+  # only on Chromium's user-agent emulation. It is a modern WebKit build, not Safari 15;
+  # the real mini 4 still needs physical acceptance testing.
+  webkit-legacy:
+    name: WebKit kiosk legacy profile (iPadOS 15 simulation)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install WebKit
+        run: npx playwright install webkit
+      - name: Install WebKit OS dependencies
+        run: timeout 180s npx playwright install-deps webkit
+      - name: Safari-like mock iPadOS 15 camera → seven shots → QR
+        run: npx playwright test --config playwright.webkit.config.ts
+        env:
+          CI: "true"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-webkit-legacy
+          path: test-results/
+          retention-days: 7
+
   # The suite is run twice: on the local file store (the hub, where staff specs for the cloud skip)
   # and on a local Supabase stack. They are separate jobs, and the hub run is split into shards:
   # one job doing both in sequence no longer fits its time limit (2026-11-14: cancelled at 35
