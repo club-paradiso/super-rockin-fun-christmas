@@ -1886,7 +1886,9 @@ function useMoreBelow(ref: React.RefObject<HTMLElement | null>, screenKey: strin
     const check = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() =>
-        setMore(el.scrollHeight - el.clientHeight - el.scrollTop > 24),
+        // Even a small hidden part of the page should show the scroll cue. The former
+        // 24px dead zone hid it on short viewports despite there being more content.
+        setMore(el.scrollHeight - el.clientHeight - el.scrollTop > 1),
       );
     };
     check();
