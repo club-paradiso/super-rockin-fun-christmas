@@ -1,3 +1,5 @@
+import { KIOSK_CONFIG } from "@/config/kiosk";
+
 /**
  * iPad mini 4 ends at iPadOS 15. iOS WebKit 15 does not have all of the CSS/JS
  * features or memory headroom expected by the standard Next 16 kiosk.
@@ -39,9 +41,9 @@ export function legacyIOS15InBrowser(): boolean {
 export const STANDARD_RENDER_BUDGET = {
   cameraWidth: 1920,
   cameraHeight: 1080,
-  captureMaxWidth: 1600,
-  outputScale: 2,
-  thumbScale: 0.62,
+  captureMaxWidth: KIOSK_CONFIG.captureMaxWidth,
+  outputScale: KIOSK_CONFIG.outputScale,
+  thumbScale: KIOSK_CONFIG.thumbScale,
   recordVideo: true,
 } as const;
 
