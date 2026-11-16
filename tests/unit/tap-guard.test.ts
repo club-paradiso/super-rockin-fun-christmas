@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TAP_GUARD_MS, isStrayTap } from "@/lib/kiosk/tap-guard";
+import { TAP_GUARD_MS, isStrayTap, shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 
 /**
  * A new booth screen often puts a button where the last one had one. A double tap, or a tap
@@ -39,5 +39,20 @@ describe("stray taps on a screen that has just appeared", () => {
     expect(
       isStrayTap({ now: shownAt + 100, screenShownAt: shownAt, pointerType: "touch", guardMs: 50 }),
     ).toBe(false);
+  });
+});
+
+
+describe("kiosk attract screen touch behavior", () => {
+  const tap = { now: 10_040, screenShownAt: 10_000, pointerType: "touch" };
+
+  it("accepts the very first finger tap instead of silently dropping it", () => {
+    expect(shouldBlockKioskTap({ ...tap, phase: "attract" })).toBe(false);
+    expect(shouldBlockKioskTap({ ...tap, pointerType: "pen", phase: "attract" })).toBe(false);
+  });
+
+  it("still blocks accidental follow-up taps on the newly opened welcome screen", () => {
+    expect(shouldBlockKioskTap({ ...tap, phase: "welcome" })).toBe(true);
+    expect(shouldBlockKioskTap({ ...tap, now: 10_400, phase: "welcome" })).toBe(false);
   });
 });
