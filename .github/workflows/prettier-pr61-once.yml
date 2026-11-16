@@ -27,5 +27,7 @@ jobs:
           git add components/kiosk/kiosk-app.tsx tests/unit/legacy-ios.test.ts
           if ! git diff --cached --quiet; then
             git commit -m "style(kiosk): format Safari 15 compatibility changes"
+            git fetch origin fix/ipad-mini4-ios15-kiosk-compat-20261117
+            git rebase origin/fix/ipad-mini4-ios15-kiosk-compat-20261117
             git push origin HEAD:fix/ipad-mini4-ios15-kiosk-compat-20261117
           fi
