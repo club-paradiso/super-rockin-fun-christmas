@@ -6,7 +6,7 @@ import type { KioskLang } from "@/lib/kiosk/copy";
 /**
  * Pure kiosk session state machine. No timers, no camera, no DOM: the KioskApp component runs
  * effects in response to phases and dispatches the results back here. That keeps every rule
- * (exactly N shots, retake, reset) unit-testable.
+ * (exactly N initial shots, one optional extra, reset) unit-testable.
  *
  * attract ("화면을 눌러 시작", D80) → welcome → pick (frame) → camera → ready → countdown ⇄
  *         capturing → review → frame (again, with the guest's photos) → consent → delivery (QR)
@@ -80,8 +80,8 @@ export interface KioskState<Shot> {
   shots: (Shot | null)[];
   /** Index of the shot the countdown / capture is for. */
   shotIndex: number;
-  /** When retaking a single shot from review, its index; null during the first pass. */
-  retakeIndex: number | null;
+  /** A single additional capture is pending. Initial six frames are never overwritten. */
+  extraShotPending: boolean;
   /** The guest asked for recommended poses (D71). False = free poses. Per guest. */
   poseGuide: boolean;
   remaining: number;
@@ -111,8 +111,8 @@ export type KioskAction<Shot> =
   | { type: "TICK" }
   | { type: "SHOT_CAPTURED"; shot: Shot }
   | { type: "CAPTURE_FAILED" }
-  | { type: "RETAKE"; index: number }
-  | { type: "RETAKE_ALL" }
+  /** One optional seventh photo; it is appended rather than replacing an original. */
+  | { type: "TAKE_EXTRA_SHOT" }
   | { type: "CONFIRM_SHOTS" }
   | { type: "SELECT_FRAME"; frameId: string }
   /** The frame is final. askConsent is false while staff pause wall submissions. */
@@ -166,7 +166,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     countdownSeconds: init.countdownSeconds,
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
-    retakeIndex: null,
+    extraShotPending: false,
     poseGuide: false,
     remaining: init.countdownSeconds,
     frameId: init.frameId,
@@ -285,6 +285,17 @@ export function kioskReducer<Shot>(
     case "BEGIN_SHOOTING":
       if (state.phase !== "ready") return state;
       {
+        // Reconnect during the optional extra shot must resume that capture.
+        if (state.extraShotPending) {
+          return {
+            ...state,
+            phase: "countdown",
+            poseGuide: action.guide,
+            shotIndex: state.shotCount,
+            remaining: state.countdownSeconds,
+            captureFailures: 0,
+          };
+        }
         // Resume at the first empty slot (after a reconnect, earlier shots are kept).
         const firstEmpty = state.shots.findIndex((s) => s === null);
         if (firstEmpty === -1) return { ...state, phase: "review" };
@@ -309,7 +320,11 @@ export function kioskReducer<Shot>(
       const shots = state.shots.slice();
       shots[state.shotIndex] = action.shot;
       const base = { ...state, shots, captureFailures: 0 };
-      if (state.retakeIndex !== null) return { ...base, phase: "review", retakeIndex: null };
+      if (state.extraShotPending) {
+        // Only slot N may be added, exactly once. The six original shots remain untouched.
+        if (state.shotIndex !== state.shotCount) return state;
+        return { ...base, phase: "review", extraShotPending: false };
+      }
       const next = shots.findIndex((s) => s === null);
       if (next === -1) return { ...base, phase: "review" };
       return { ...base, phase: "countdown", shotIndex: next, remaining: state.countdownSeconds };
@@ -329,30 +344,34 @@ export function kioskReducer<Shot>(
       };
     }
 
-    case "RETAKE":
-      if (state.phase !== "review") return state;
-      if (action.index < 0 || action.index >= state.shotCount) return state;
+    case "TAKE_EXTRA_SHOT":
+      // At most once after the six required photos are complete.
+      // Never overwrite, remove or re-order any original photograph.
+      if (
+        state.phase !== "review" ||
+        state.extraShotPending ||
+        state.shots.length !== state.shotCount ||
+        capturedCount(state) !== state.shotCount
+      )
+        return state;
       return {
         ...state,
         phase: "countdown",
-        shotIndex: action.index,
-        retakeIndex: action.index,
-        remaining: state.countdownSeconds,
-      };
-
-    case "RETAKE_ALL":
-      if (state.phase !== "review") return state;
-      return {
-        ...state,
-        phase: "countdown",
-        shots: state.shots.map(() => null),
-        shotIndex: 0,
-        retakeIndex: null,
+        shotIndex: state.shotCount,
+        extraShotPending: true,
+        captureFailures: 0,
         remaining: state.countdownSeconds,
       };
 
     case "CONFIRM_SHOTS":
-      if (state.phase !== "review" || capturedCount(state) !== state.shotCount) return state;
+      if (
+        state.phase !== "review" ||
+        state.extraShotPending ||
+        capturedCount(state) !== state.shots.length ||
+        state.shots.length < state.shotCount ||
+        state.shots.length > state.shotCount + 1
+      )
+        return state;
       return { ...state, phase: "frame" };
 
     case "SELECT_FRAME":
@@ -361,14 +380,14 @@ export function kioskReducer<Shot>(
         : state;
 
     case "CONFIRM_FRAME":
-      return state.phase === "frame" && capturedCount(state) === state.shotCount
+      return state.phase === "frame" && capturedCount(state) === state.shots.length
         ? { ...state, phase: "select", selectedShotIndices: [] }
         : state;
 
     case "TOGGLE_SHOT_SELECTION": {
       if (state.phase !== "select") return state;
       const index = action.index;
-      if (!Number.isInteger(index) || index < 0 || index >= state.shotCount || !state.shots[index])
+      if (!Number.isInteger(index) || index < 0 || index >= state.shots.length || !state.shots[index])
         return state;
       const selected = state.selectedShotIndices;
       if (selected.includes(index))
