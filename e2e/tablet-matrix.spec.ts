@@ -466,7 +466,6 @@ test.describe("finger taps", () => {
   });
 });
 
-
 test.describe("attract screen first tap", () => {
   test.use({ hasTouch: true });
 
