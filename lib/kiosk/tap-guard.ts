@@ -29,6 +29,8 @@ export function isStrayTap(input: {
  * touch makes the kiosk appear broken, especially on a slow/older iPad after page load.
  * Keep the short guard only after the guest has actually opened a subsequent screen.
  */
-export function shouldBlockKioskTap(input: Parameters<typeof isStrayTap>[0] & { phase: string }): boolean {
+export function shouldBlockKioskTap(
+  input: Parameters<typeof isStrayTap>[0] & { phase: string },
+): boolean {
   return input.phase !== "attract" && isStrayTap(input);
 }
