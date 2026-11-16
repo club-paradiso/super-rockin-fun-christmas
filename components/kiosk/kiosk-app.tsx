@@ -38,6 +38,7 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
+import { kioskRenderBudget, legacyIOS15InBrowser } from "@/lib/kiosk/legacy-ios";
 import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
 import {
@@ -141,6 +142,10 @@ export function KioskApp({
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const online = useOnline();
+  // useSyncExternalStore supplies a stable server snapshot for hydration, then detects
+  // Safari 15 on the real device without a server/client markup mismatch.
+  const legacyIOS15 = useSyncExternalStore(noSubscribe, legacyIOS15InBrowser, () => false);
+  const renderBudget = kioskRenderBudget(legacyIOS15);
 
   // The booth has one scroll area. Every new screen starts at its top (a screen left scrolled
   // would hide the next one's header); `moreBelow` marks a screen taller than the booth.
@@ -154,6 +159,30 @@ export function KioskApp({
     tapRef.current.screenShownAt = performance.now();
   }, [screenKey]);
   const moreBelow = useMoreBelow(scrollRef, screenKey);
+
+  // Safari 15 on a tablet can expose a visual viewport shorter than 100vh while
+  // its browser chrome is present. Keep the kiosk shell within the genuinely visible area.
+  useEffect(() => {
+    if (!legacyIOS15) return;
+    const root = scrollRef.current?.closest<HTMLElement>(".kiosk-root");
+    if (!root) return;
+    const measure = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      if (height > 0) root.style.setProperty("--legacy-visible-height", `${Math.floor(height)}px`);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    window.addEventListener("pageshow", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+      window.removeEventListener("pageshow", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+      root.style.removeProperty("--legacy-visible-height");
+    };
+  }, [legacyIOS15]);
 
   const trackUrl = (url: string) => {
     urlsRef.current.add(url);
@@ -182,6 +211,7 @@ export function KioskApp({
   const canRecordVideo = useSyncExternalStore(
     noSubscribe,
     () => {
+      if (!renderBudget.recordVideo) return false;
       const env = browserRecorderEnv();
       return !!env && pickVideoMime(env.isTypeSupported) !== null;
     },
@@ -190,15 +220,18 @@ export function KioskApp({
   // Finished videos by session, kept in memory until their photo is on the server.
   const videosRef = useRef(new Map<string, Promise<RecordedVideo | null>>());
   useEffect(() => {
-    recorderRef.current = new SessionRecorder(browserRecorderEnv(), {
+    recorderRef.current = new SessionRecorder(
+      renderBudget.recordVideo ? browserRecorderEnv() : null,
+      {
       maxSeconds: KIOSK_CONFIG.videoMaxSeconds,
       maxBytes: KIOSK_CONFIG.videoMaxBytes,
       bitsPerSecond: KIOSK_CONFIG.videoBitsPerSecond,
       // The last seconds of the countdown plus the capture itself.
-      segmentSeconds: KIOSK_CONFIG.videoSecondsPerShot + 1,
-    });
+        segmentSeconds: KIOSK_CONFIG.videoSecondsPerShot + 1,
+      },
+    );
     return () => recorderRef.current?.discard();
-  }, []);
+  }, [renderBudget.recordVideo]);
   const filming =
     state.phase === "capturing" ||
     (state.phase === "countdown" && state.remaining <= KIOSK_CONFIG.videoSecondsPerShot);
@@ -347,7 +380,7 @@ export function KioskApp({
         const frame = await camera.capture({
           aspect: KIOSK_CONFIG.captureAspect,
           mirror: KIOSK_CONFIG.mirror,
-          maxWidth: KIOSK_CONFIG.captureMaxWidth,
+          maxWidth: renderBudget.captureMaxWidth,
         });
         const blob = await canvasToBlob(frame.canvas as HTMLCanvasElement, "image/jpeg", 0.9);
         if (cancelled) return;
@@ -367,7 +400,7 @@ export function KioskApp({
       if (flashTimeout) clearTimeout(flashTimeout);
       setScreenFlashActive(false);
     };
-  }, [state.phase, state.shotIndex, deviceId, flashEnabled]);
+  }, [state.phase, state.shotIndex, deviceId, flashEnabled, renderBudget.captureMaxWidth]);
 
   const images = useMemo(
     () =>
@@ -405,12 +438,17 @@ export function KioskApp({
       const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
         createCanvas: createDomCanvas,
         context,
-        scale: KIOSK_CONFIG.thumbScale,
+        scale: renderBudget.thumbScale,
       }) as HTMLCanvasElement;
-      out[frame.id] = canvas.toDataURL("image/jpeg", 0.85);
+      try {
+        out[frame.id] = canvas.toDataURL("image/jpeg", 0.85);
+      } catch {
+        // Older WebKit may refuse the data URL under memory pressure; keep the
+        // frame picker usable instead of crashing the entire guest session.
+      }
     }
     return out;
-  }, [thumbSource, assets]);
+  }, [thumbSource, assets, renderBudget.thumbScale]);
 
   // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
@@ -427,7 +465,7 @@ export function KioskApp({
       const canvas = composeFrame(frame, chosen, {
         createCanvas: createDomCanvas,
         context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
-        scale: KIOSK_CONFIG.outputScale,
+        scale: renderBudget.outputScale,
       }) as HTMLCanvasElement;
       const blob = await canvasToBlob(canvas, KIOSK_CONFIG.outputMime, KIOSK_CONFIG.outputQuality);
       if (cancelled) return;
@@ -451,6 +489,7 @@ export function KioskApp({
     images,
     finalImage?.frameId,
     finalImage?.selectionKey,
+    renderBudget.outputScale,
   ]);
 
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
@@ -846,6 +885,7 @@ export function KioskApp({
         className="kiosk-root kiosk-desk"
         data-phase={state.phase}
         data-lang={state.lang}
+        data-legacy-ios15={legacyIOS15 ? "true" : undefined}
         data-wall-submissions={wallSubmissions}
       >
         <div
