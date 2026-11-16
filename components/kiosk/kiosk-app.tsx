@@ -1723,13 +1723,15 @@ function Screen(p: ScreenProps) {
                 {d.reason === "auth" ? t.delivery.authTitle : t.delivery.queuedTitle}
               </h1>
               <p className="booth-lead">
-                {d.reason === "auth" ? (
-                  t.delivery.authLead
-                ) : (
-                  <Lines
-                    text={p.durableQueue ? t.delivery.queuedLead : t.delivery.temporaryQueue}
-                  />
-                )}
+                <Lines
+                  text={
+                    !p.durableQueue
+                      ? t.delivery.temporaryQueue
+                      : d.reason === "auth"
+                        ? t.delivery.authLead
+                        : t.delivery.queuedLead
+                  }
+                />
               </p>
               <div className="booth-actions">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>

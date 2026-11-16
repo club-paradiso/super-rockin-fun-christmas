@@ -23,17 +23,44 @@ test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", asy
   page.on("request", (request) => {
     if (request.resourceType() === "script") scripts.push(new URL(request.url()).pathname);
   });
+  // Check the two feature-local JS fallbacks even on the newer Playwright engines.
+  await page.addInitScript(() => {
+    Object.defineProperty(Blob.prototype, "arrayBuffer", { configurable: true, value: undefined });
+    Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined });
+  });
   await page.goto("/kiosk?camera=mock");
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
   expect(scripts).toContain("/kiosk-legacy-assets/entry.js");
   expect(scripts.some((path) => path.startsWith("/_next/"))).toBe(false);
   await startSession(page, "clothesline");
-  await page.getByTestId("flash-toggle").click();
+  const flash = page.getByTestId("flash-toggle");
+  await flash.click();
+  await expect(flash).toHaveAttribute("aria-pressed", "true");
+  // The 250 ms flash can land between Playwright polls. Count actual DOM insertions and
+  // confirm they cover the viewport and leave touch events available.
+  await page.evaluate(() => {
+    const root = document.querySelector(".kiosk-root")!;
+    let visibleFlashes = 0;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof HTMLElement) || node.dataset.testid !== "screen-flash") continue;
+          const box = node.getBoundingClientRect();
+          if (
+            box.width >= innerWidth &&
+            box.height >= innerHeight &&
+            getComputedStyle(node).pointerEvents === "none"
+          )
+            root.setAttribute("data-test-flashes", String(++visibleFlashes));
+        }
+      }
+    }).observe(root, { childList: true });
+  });
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-flash")).toBeAttached();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-legacy-ios15", "true");
   const root = page.locator(".kiosk-root");
+  await expect(root).toHaveAttribute("data-test-flashes", "6");
   const height = await root.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeGreaterThan(500);
   expect(height).toBeLessThanOrEqual(1025);
@@ -43,6 +70,16 @@ test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", asy
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.getByTestId("review-shot-6").locator("img")).toBeVisible();
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
+  await expect(root).toHaveAttribute("data-test-flashes", "7");
+  expect(
+    await page
+      .getByTestId("review-shot-6")
+      .locator("img")
+      .evaluate(async (img: HTMLImageElement) => {
+        await img.decode();
+        return [img.naturalWidth, img.naturalHeight];
+      }),
+  ).toEqual([960, 720]);
 
   // Keep the strip private and queued while the network is unavailable. Once the route is
   // reachable, retry uses the same session ID and only the server response can create a QR.
