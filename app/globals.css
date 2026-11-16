@@ -1961,3 +1961,13 @@ main input:focus-visible,
 .kiosk-root[data-legacy-ios15="true"] {
   height: var(--legacy-visible-height, 100vh);
 }
+.kiosk-root[data-legacy-ios15="true"] .letter-sheet {
+  background-color: #f2e5d8;
+}
+.kiosk-root[data-legacy-ios15="true"] .fit-grid {
+  max-width: min(100%, 70vh);
+}
+.kiosk-root[data-legacy-ios15="true"] .review-grid.has-extra,
+.kiosk-root[data-legacy-ios15="true"] .select-grid.has-extra {
+  max-width: min(100%, 60vh);
+}
