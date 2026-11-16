@@ -39,3 +39,6 @@ supabase/.temp
 
 # agent worktrees (whole copies of the repository)
 .claude/worktrees/
+
+# Standalone kiosk assets (generated before dev and production builds)
+public/kiosk-legacy-assets/

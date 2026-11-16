@@ -44,6 +44,7 @@ export class BrowserCamera implements CameraProvider {
     private readonly mediaDevices: MediaDevices | undefined = typeof navigator !== "undefined"
       ? navigator.mediaDevices
       : undefined,
+    private readonly forceLegacyBudget = false,
   ) {}
 
   async start(deviceId?: string): Promise<void> {
@@ -54,7 +55,7 @@ export class BrowserCamera implements CameraProvider {
     }
     let stream: MediaStream;
     try {
-      const budget = kioskRenderBudget(legacyIOS15InBrowser());
+      const budget = kioskRenderBudget(this.forceLegacyBudget || legacyIOS15InBrowser());
       stream = await this.mediaDevices.getUserMedia({
         audio: false,
         video: {

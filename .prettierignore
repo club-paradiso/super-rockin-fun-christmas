@@ -7,3 +7,5 @@ next-env.d.ts
 supabase/.temp
 docs/measurements/raw/
 .claude
+
+public/kiosk-legacy-assets/

@@ -1,0 +1,13 @@
+/* Tailwind's preflight layers work on the supported 15.6+ baseline. Keep critical geometry
+   independent of its newer utility output, including flash and scroll on older WebKit. */
+html,
+body {
+  margin: 0;
+}
+
+.capture-illumination {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}

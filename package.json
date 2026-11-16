@@ -4,11 +4,11 @@
   "private": true,
   "description": "STUDIO SHALOM — four-cut photo booth and participatory media wall for Christmas Village 2026",
   "engines": {
-    "node": ">=20.9"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:kiosk-legacy && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -19,7 +19,9 @@
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "test:supabase": "bash scripts/test-supabase.sh",
-    "staff:add": "node scripts/staff-add.mjs"
+    "staff:add": "node scripts/staff-add.mjs",
+    "build:kiosk-legacy": "vite build --config legacy-kiosk/vite.config.mts",
+    "predev": "npm run build:kiosk-legacy"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-kr": "^5.3.1",
@@ -55,6 +57,7 @@
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
+    "vite": "8.3.3",
     "vitest": "^5.0.3"
   },
   "browserslist": [
