@@ -38,7 +38,7 @@ import {
   type KioskState,
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
-import { isStrayTap } from "@/lib/kiosk/tap-guard";
+import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
 import {
   HTML_LANG,
@@ -838,7 +838,14 @@ export function KioskApp({
             tapRef.current.pointerType = e.pointerType;
           }}
           onClickCapture={(e) => {
-            if (isStrayTap({ now: performance.now(), ...tapRef.current })) {
+            const blocked = shouldBlockKioskTap({
+              now: performance.now(),
+              ...tapRef.current,
+              phase: state.phase,
+            });
+            // A later keyboard or assistive click must not inherit an earlier finger's type.
+            tapRef.current.pointerType = "";
+            if (blocked) {
               e.preventDefault();
               e.stopPropagation();
             }

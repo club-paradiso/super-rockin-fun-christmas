@@ -465,3 +465,24 @@ test.describe("finger taps", () => {
     await expect(page.getByTestId("screen-pick")).toBeVisible();
   });
 });
+
+test.describe("attract screen first tap", () => {
+  test.use({ hasTouch: true });
+
+  test("tap on the paper or the main button enters welcome without a startup delay", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/kiosk?camera=mock");
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+
+    // No artificial 500 ms pause: an intentional first tap should always work.
+    await page.getByTestId("attract-start").tap();
+    await expect(page.getByTestId("screen-welcome")).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+    await page.touchscreen.tap(410, 590);
+    await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  });
+});

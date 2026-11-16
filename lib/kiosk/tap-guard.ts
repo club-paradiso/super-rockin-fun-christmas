@@ -23,3 +23,14 @@ export function isStrayTap(input: {
   const finger = input.pointerType === "touch" || input.pointerType === "pen";
   return finger && input.now - input.screenShownAt < (input.guardMs ?? TAP_GUARD_MS);
 }
+
+/**
+ * The attract screen has no previous guest button to protect against. Blocking its first
+ * touch makes the kiosk appear broken, especially on a slow/older iPad after page load.
+ * Keep the short guard only after the guest has actually opened a subsequent screen.
+ */
+export function shouldBlockKioskTap(
+  input: Parameters<typeof isStrayTap>[0] & { phase: string },
+): boolean {
+  return input.phase !== "attract" && isStrayTap(input);
+}
