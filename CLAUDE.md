@@ -173,7 +173,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
-- **Remote Camera is a camera provider, not a second booth** (D99, `docs/REMOTE_CAMERA.md`).
+- **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
   `RemoteCamera` is one more `CameraProvider`, chosen only by `?camera=remote` or
   `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, retake, compositing, consent and
   upload code are shared and must not fork. The phone (`/camera/remote`) takes the photo from its own
@@ -237,7 +237,7 @@ lib/staff-auth         staff sessions: shared password (shared.ts, D84), Supabas
 proxy.ts               refreshes staff sessions for /admin pages (no authorization here)
 components/admin       admin UI (cards, dialogs, emergency switches, kiosk/staff managers)
 components/brand.tsx   the STUDIO SHALOM lockup and one-line wordmark as text (styles in app/globals.css)
-lib/camera             CameraProvider: BrowserCamera, MockCamera, RemoteCamera (D99), shared grabFrame
+lib/camera             CameraProvider: BrowserCamera, MockCamera, RemoteCamera (D100), shared grabFrame
 lib/remote-camera      Remote Camera: protocol, shutter (host/client), chunked transfer, signaling client,
                        iPhone logic (phone.ts), pairing code + cookie, mailbox stores (memory, Supabase)
 app/camera/remote      the iPhone's page · app/api/camera + app/api/kiosk/camera (signaling, status, link)

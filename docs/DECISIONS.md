@@ -1583,7 +1583,28 @@ Cloudflare Tunnel) instead of straight to people.
 - **Not verified:** no Ollama model has been evaluated with this prompt. The fallback can approve,
   so it must pass the same evaluation (`docs/AI_MODERATION.md` 2.3) before it is switched on.
 
-## D99 · Remote Camera: an iPhone as the booth's rear camera (iPad mini 4 kiosk)
+## D99 · Two frames picked from the reference set join the booth as raster overlays
+
+**User request (2026-11-16):** confirm two of the redesigned reference templates in Figma (SS 04
+"50" gingham and "52" pixel windows) and put them in the real kiosk.
+
+- **What:** `gingham-plates` (체크 식탁, 3 photos, 440 × 1280) and `pixel-windows` (픽셀 창, 4 photos,
+  720 × 1280), after the landscape frames and before Template A–D. Figma: SS 02, section
+  `✅ 네컷 프레임 확정본 · 키오스크 반영`.
+- **How:** their art is raster (a photographed tablecloth, pixel windows), so each is one overlay
+  exported from Figma at 2× with the photo holes transparent (`public/frames/*.webp`), drawn after
+  the photos. The background colour shows through the rest of each hole as a paper mat.
+- **Booth rules kept, which changed the confirmed Figma art:** every photo is 4:3 (preview =
+  result), so the gingham holes got a paper mat and the pixel windows were re-laid in two staggered
+  columns that no longer cover one another; the standard lockup replaces the one-line wordmark,
+  centred below the last photo. Brand tokens only for the solid colours; the overlays keep the
+  approved art.
+- **Picker room:** 16 frames need a third row of tiles on a tall booth. The stacked picker now
+  splits preview and tiles evenly (`1fr 1fr`, was `1.25fr 1fr`: the ratio holds even at the
+  tiles' floor, so it pushed the frame screen 12 px past 768 × 1024) and narrow screens use six
+  columns (was five). Seven columns stay the most that keep "대림절 달력" whole at 768 px.
+
+## D100 · Remote Camera: an iPhone as the booth's rear camera (iPad mini 4 kiosk)
 
 **User request (2026-11-16):** the guest-facing booth is an iPad mini 4 in an enclosure; the camera
 is a permanently mounted iPhone 12 (rear, 1x) over Wi-Fi. No Mac, no native app, no paid app.

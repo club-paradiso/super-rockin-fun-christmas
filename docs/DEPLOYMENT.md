@@ -309,7 +309,7 @@ A preview for real-device testing, without a hub. Checklist: `docs/PREVIEW_DEVIC
   purpose: `HUB_SYNC_SECRET` (no hub yet),
   `KIOSK_AUTH_DISABLED`.
 
-## Remote Camera Mode (D99)
+## Remote Camera Mode (D100)
 
 Prerequisites before anyone uses `?camera=remote` (full guide: `docs/REMOTE_CAMERA.md`):
 

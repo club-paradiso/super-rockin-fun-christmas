@@ -115,7 +115,7 @@ decision: one credential to hand to volunteers, no second administrator password
 | A rescan kills a guest's QR                       | Per-photo lock on the hub: the kiosk's QR request and the background worker never upload the same photo twice at once.                                                                                                                         |
 | Staff delete does not reach the cloud             | Queued as `DELETE_PENDING` and retried until the cloud confirms; shown on the hub overview ("삭제 대기 N건").                                                                                                                                  |
 
-## Remote Camera (D99, `docs/REMOTE_CAMERA.md`)
+## Remote Camera (D100, `docs/REMOTE_CAMERA.md`)
 
 | Threat                                  | Mitigation                                                                                                                                                                                                                                                            |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

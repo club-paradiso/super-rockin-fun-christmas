@@ -4,7 +4,7 @@
 이전 기록 `docs/STATUS_2026-10-12.md`는 PR #7(미디어월) 병합 전 내용이라 "Phase 4 미착수"로 적혀
 있다. 역사 기록으로만 본다.
 
-## 원격 카메라 모드: 아이폰을 아이패드 부스의 후면 카메라로 (2026-11-16, D99)
+## 원격 카메라 모드: 아이폰을 아이패드 부스의 후면 카메라로 (2026-11-16, D100)
 
 브랜치 `claude/friendly-albattani-1ba3t9`. 설계·설치·문제 해결은 `docs/REMOTE_CAMERA.md`, 봉사자용 안내는
 `docs/REMOTE_CAMERA_GUIDE_KO.md`. **켜지 않으면 아무것도 달라지지 않는다.** 부스 주소에 `?camera=remote`를 붙이거나
