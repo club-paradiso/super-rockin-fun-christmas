@@ -1285,16 +1285,18 @@ body {
   .pick {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1.25fr 1fr auto;
+    /* Equal shares: the fr ratio holds even at the tiles' floor, so a bigger preview share would
+       push three rows of tiles (16 frames since D99) off a tall booth. */
+    grid-template-rows: auto 1fr 1fr auto;
     grid-template-areas: "head" "preview" "tiles" "actions";
     gap: var(--gap-m);
     --tile-cols: 7;
-    --tile-rows: 2;
+    --tile-rows: 3;
   }
   @media (max-width: 699px) {
     .pick {
       grid-template-rows: auto 1fr 1.3fr auto;
-      --tile-cols: 5;
+      --tile-cols: 6;
       --tile-rows: 3;
     }
   }

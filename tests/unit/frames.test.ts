@@ -54,8 +54,28 @@ describe("frame definitions", () => {
     for (const f of landscape) expect(f.outputWidth).toBeGreaterThan(f.outputHeight);
   });
 
+  it("follows the landscape frames with the two picked from the reference set (D99)", () => {
+    expect(FRAMES.slice(10, 12).map((f) => [f.id, f.slots.length])).toEqual([
+      ["gingham-plates", 3],
+      ["pixel-windows", 4],
+    ]);
+    // One overlay with the photo holes cut out, drawn over the photos, under the lockup.
+    for (const f of FRAMES.slice(10, 12)) {
+      const kinds = f.decorations.map((d) => d.type);
+      expect(kinds.slice(0, f.slots.length)).toEqual(f.slots.map(() => "photo"));
+      const overlay = f.decorations[f.slots.length]!;
+      expect(overlay).toMatchObject({
+        type: "image",
+        x: 0,
+        y: 0,
+        width: f.outputWidth,
+        height: f.outputHeight,
+      });
+    }
+  });
+
   it("preserves the four Figma templates A–D after the letter set", () => {
-    expect(FRAMES.slice(10).map((f) => [f.id, f.label])).toEqual([
+    expect(FRAMES.slice(12).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],
       ["wood-window", "창틀"],
       ["clothesline", "빨랫줄"],
@@ -198,6 +218,8 @@ describe("frame definitions", () => {
         "shalom-ticket": [960, 470],
         "shalom-card": [1000, 720],
         "shalom-advent": [900, 700],
+        "gingham-plates": [440, 1280],
+        "pixel-windows": [720, 1280],
       };
       const size = sizes[frame.id] ?? [600, 1800];
       expect([frame.outputWidth, frame.outputHeight]).toEqual(size);
