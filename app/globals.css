@@ -151,7 +151,11 @@ body {
 }
 @media (max-height: 759px) {
   .kiosk-root > * {
-    --btn-h: clamp(64px, 9.6 * var(--bh), 80px);
+    --btn-h: clamp(56px, 9.6 * var(--bh), 80px);
+    --booth-pad: clamp(10px, 2.2 * var(--bh), 18px);
+    --sheet-pad-y: clamp(14px, 2.2 * var(--bh), 24px);
+    --gap-m: clamp(8px, 1.5 * var(--bh), 16px);
+    --gap-l: clamp(10px, 2.5 * var(--bh), 24px);
   }
 }
 
@@ -159,6 +163,8 @@ body {
    (a very short window, very large text) grows and scrolls here, never sideways. */
 .kiosk-scroll {
   height: 100%;
+  min-height: 0;
+  scroll-padding-bottom: max(16px, env(safe-area-inset-bottom));
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: none;
@@ -653,7 +659,10 @@ body {
   .booth-screen {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* A zero-minimum 1fr row let tall content bleed over the next footer or disappear
+       below the bottom of the viewport. Honor the sheet's intrinsic minimum instead.
+       When it cannot fit, the kiosk's existing single scroll area becomes scrollable. */
+    grid-template-rows: auto minmax(min-content, 1fr) auto;
     min-height: 100%;
     padding: max(var(--booth-pad), env(safe-area-inset-top))
       max(var(--booth-pad), env(safe-area-inset-right))
@@ -1070,6 +1079,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-height: 0;
+    min-width: 0;
     gap: var(--gap-s);
     min-width: 0;
     text-align: center;
@@ -1080,10 +1091,12 @@ body {
     justify-content: center;
     gap: var(--gap-s);
     width: 100%;
+    min-width: 0;
     margin-block: var(--gap-xs);
   }
   .shoot-actions > * {
     flex: 1 1 9.5em;
+    min-width: 0;
     max-width: 26rem;
   }
   .shot-strip {
@@ -1174,7 +1187,9 @@ body {
     text-align: center;
   }
   .review .fit-stage {
-    --fit-min: calc(2 * (var(--ctl-h) + var(--gap-xs) + 84px) + var(--gap-s));
+    /* Review no longer has a retake button beneath each photo; the old 2 × button
+       allowance reserved hundreds of phantom pixels and pushed the action row away. */
+    --fit-min: clamp(160px, 25 * var(--bh), 340px);
   }
   .review-grid {
     --extra: 0px;
@@ -1206,12 +1221,21 @@ body {
   /* Review prints are no longer per-photo retake buttons. All six are preserved. */
   .review-actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-s);
+    min-width: 0;
+    width: 100%;
+    /* Stay above sheet decoration, with a full-width touch area. */
+    position: relative;
+    z-index: 2;
   }
   .review-actions > * {
-    flex: 1 1 auto;
+    flex: 1 1 9em;
+    min-width: 0;
   }
   .select .fit-stage {
-    --fit-min: calc(3 * 96px + 2 * var(--gap-s));
+    /* Four rows after the optional seventh photo must not force the CTA off screen. */
+    --fit-min: clamp(180px, 28 * var(--bh), 350px);
   }
   .select-grid {
     --cols: 2;
@@ -1226,13 +1250,6 @@ body {
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
       --cols: 3;
-      --rows: 2;
-    }
-    .select-grid.has-extra {
-      --rows: 3;
-    }
-    .review-grid.has-extra {
-      --cols: 4;
       --rows: 2;
     }
     .select-grid.has-extra {
@@ -1291,9 +1308,12 @@ body {
     color: var(--color-button-text);
   }
   .select-actions {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     gap: var(--gap-s);
+    min-width: 0;
   }
   .select-actions > * {
     flex: 1 1 auto;
@@ -1434,7 +1454,10 @@ body {
   }
   .pick-actions {
     grid-area: actions;
+    position: relative;
+    z-index: 2;
     display: flex;
+    min-width: 0;
   }
   .pick-actions > * {
     flex: 1 1 auto;
@@ -1616,7 +1639,7 @@ body {
     .review .fit-stage,
     .select .fit-stage {
       grid-area: stage;
-      --fit-min: calc(2 * 110px + var(--gap-s));
+      --fit-min: clamp(160px, 27 * var(--bh), 300px);
     }
     .review-head,
     .select-head {
@@ -1628,6 +1651,10 @@ body {
     .select-actions {
       grid-area: actions;
       align-self: start;
+      min-width: 0;
+    }
+    .review-actions > * {
+      flex-basis: 100%;
     }
     .select-grid {
       --cols: 3;
