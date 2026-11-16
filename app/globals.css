@@ -52,6 +52,28 @@
   }
 }
 
+/* One light for everything (booth, phone pages, wall): a lamp at the top left, 135°. Every shadow
+   falls to the bottom right (+x, +y), and a lit edge is the top-left one. Shadows are ink
+   (#2b1a10) at a fraction; on the dark wood desk they are black. No glow, no coloured light. */
+:root {
+  --shadow-rest: 2px 3px 6px rgb(43 26 16 / 0.28);
+  --shadow-lift: 7px 11px 18px rgb(43 26 16 / 0.34);
+  --shadow-press: 1px 1px 2px rgb(43 26 16 / 0.32);
+  --shadow-desk: 3px 4px 6px rgb(0 0 0 / 0.45);
+  --shadow-desk-lift: 8px 12px 14px rgb(0 0 0 / 0.5);
+  /* A thing lying on paper (ticket, envelope): for filter: drop-shadow(). */
+  --drop-paper: 4px 7px 8px rgb(43 26 16 / 0.34);
+  /* The lit top-left edge of a dark object (the filled button). */
+  --highlight-tl: inset 1px 1px 0 rgb(246 238 228 / 0.22);
+  /* Kraft: accent and backdrop mixed (no new colour). Solid value for WebKit 15 first. */
+  --kraft: #a77b50;
+}
+@supports (color: color-mix(in srgb, red, blue)) {
+  :root {
+    --kraft: color-mix(in srgb, var(--color-accent) 55%, var(--color-backdrop));
+  }
+}
+
 html,
 body {
   background: var(--color-backdrop);
@@ -218,6 +240,9 @@ body {
   --wall-card-ink: #121a3d;
   --wall-card-mat: #1c2756;
   --wall-photo-shadow: rgba(0, 0, 0, 0.55);
+  /* The one light (top left): photos, tags and notes cast their shadow down and to the right.
+     Same numbers as WALL_LIGHT in lib/wall/themes.ts. */
+  --wall-photo-drop: 10px 14px 22px;
   background: var(--wall-floor);
   color: var(--wall-cream);
 }
@@ -241,7 +266,7 @@ body {
 .wall-wordmark[data-tone="label"] {
   padding: 0.3em 0.75em;
   background: var(--wall-card);
-  box-shadow: 0 8px 18px var(--wall-photo-shadow);
+  box-shadow: 6px 9px 18px var(--wall-photo-shadow);
 }
 .wall-wordmark-name {
   font-family: var(--font-display);
@@ -272,7 +297,7 @@ body {
   background: var(--wall-card);
   color: #2b1a10;
   font-weight: 600;
-  box-shadow: 0 10px 22px var(--wall-photo-shadow);
+  box-shadow: 7px 10px 22px var(--wall-photo-shadow);
 }
 .wall-background-in {
   animation: wall-fade-in 1.6s ease-out both;
@@ -286,26 +311,53 @@ body {
    whole transform. Low-spec mode (.wall-lite) and reduced motion keep only the fades. */
 .wall-photo-enter {
   transform-origin: 50% 0;
-  animation: wall-hang 2.4s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation: wall-hang 3.2s linear both;
 }
 .wall-photo-exit {
   transform-origin: 50% 0;
   animation: wall-unclip 1.5s ease-in both;
 }
+/* A damped pendulum: the photo drops from above, the line catches it (and gives a little), then
+   it swings about the clip, each swing two thirds of the last, a steady ~0.35 s per half swing,
+   and comes to rest. Each step eases in and out, the way a pendulum slows at the ends. */
 @keyframes wall-hang {
   0% {
     opacity: 0;
-    transform: translateY(-6%) rotate(-7deg);
+    transform: translateY(-38%) rotate(-2deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
   }
-  30% {
+  15% {
     opacity: 1;
-    transform: translateY(0) rotate(5deg);
+    transform: translateY(2.2%) rotate(-9deg);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.5, 1);
   }
-  55% {
-    transform: rotate(-3deg);
+  26% {
+    transform: translateY(-0.6%) rotate(6deg);
+    animation-timing-function: ease-in-out;
   }
-  78% {
-    transform: rotate(1.5deg);
+  37% {
+    transform: translateY(0.3%) rotate(-4deg);
+    animation-timing-function: ease-in-out;
+  }
+  48% {
+    transform: translateY(0) rotate(2.7deg);
+    animation-timing-function: ease-in-out;
+  }
+  59% {
+    transform: rotate(-1.8deg);
+    animation-timing-function: ease-in-out;
+  }
+  70% {
+    transform: rotate(1.2deg);
+    animation-timing-function: ease-in-out;
+  }
+  81% {
+    transform: rotate(-0.7deg);
+    animation-timing-function: ease-in-out;
+  }
+  91% {
+    transform: rotate(0.3deg);
+    animation-timing-function: ease-in-out;
   }
   100% {
     opacity: 1;
@@ -1870,7 +1922,7 @@ main input:focus-visible,
 /* The countdown sits on the live camera picture, whose colours we do not control: light digits
    with a tight dark edge stay readable on any of it. Not decoration. */
 .countdown-number {
-  text-shadow: 0 2px 10px rgb(43 26 16 / 0.65);
+  text-shadow: 3px 4px 10px rgb(43 26 16 / 0.65);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1970,4 +2022,388 @@ main input:focus-visible,
 .kiosk-root[data-legacy-ios15="true"] .review-grid.has-extra,
 .kiosk-root[data-legacy-ios15="true"] .select-grid.has-extra {
   max-width: min(100%, 60vh);
+}
+
+/* ── Studio props (public/studio, config/studio.ts) ─────────────────────────────────────────────
+   Real photographs of desk things, each with a CSS stand-in for when the picture is missing
+   (`data-art="drawn"`). All of them follow the one light (top left): shadows +x +y. Sizes come from
+   the booth tokens; nothing here changes a touch target or a layout rule. */
+@layer components {
+  /* Filled buttons and the welcome cards rest on the paper, lit from the top left. A press sinks
+     them and the shadow nearly disappears. */
+  .booth-btn-primary,
+  .welcome-choice-primary {
+    box-shadow: var(--highlight-tl), var(--shadow-rest);
+  }
+  .welcome-choice {
+    box-shadow: var(--shadow-rest);
+    transition:
+      transform 110ms ease-out,
+      box-shadow 110ms ease-out,
+      background-color 90ms ease-out;
+  }
+  .booth-btn-primary:active:not(:disabled),
+  .welcome-choice:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: var(--shadow-press);
+  }
+  .kiosk-dialog {
+    box-shadow: var(--shadow-lift);
+  }
+  .review-photo {
+    box-shadow: var(--shadow-rest);
+  }
+  .wax-seal {
+    filter: drop-shadow(2px 3px 3px rgb(43 26 16 / 0.35));
+  }
+
+  /* Sound switch on the welcome screen, beside the language. */
+  .booth-sound-btn[aria-pressed="false"] {
+    border-style: dashed;
+  }
+
+  /* The release button: a brass and leather knob set into the filled button. */
+  .shutter-btn {
+    gap: 0.55em;
+    padding-left: max(8px, calc(var(--btn-h, 80px) * 0.1));
+    transition:
+      transform 110ms ease-out,
+      box-shadow 110ms ease-out,
+      background-color 90ms ease-out;
+  }
+  .shutter-btn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: var(--shadow-press);
+  }
+  .shutter-knob {
+    position: relative;
+    flex: none;
+    width: calc(var(--btn-h, 80px) - 18px);
+    height: calc(var(--btn-h, 80px) - 18px);
+    border-radius: 9999px;
+    filter: drop-shadow(3px 4px 3px rgb(0 0 0 / 0.5));
+    transition:
+      transform 110ms ease-out,
+      filter 110ms ease-out;
+  }
+  .shutter-knob-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .shutter-btn[data-art="drawn"] .shutter-knob {
+    border: max(4px, calc(var(--btn-h, 80px) * 0.075)) solid var(--color-backdrop);
+    background: var(--color-accent);
+    box-shadow:
+      inset 2px 2px 0 rgb(246 238 228 / 0.3),
+      inset -3px -4px 0 rgb(43 26 16 / 0.35);
+  }
+  /* The knob goes down further than the button: the travel of a real release. */
+  .shutter-btn:active:not(:disabled) .shutter-knob {
+    transform: translateY(3px) scale(0.95);
+    filter: drop-shadow(1px 1px 1px rgb(0 0 0 / 0.5));
+  }
+  .shutter-label {
+    min-width: 0;
+  }
+
+  /* Frame pick: the samples are postcards on the wooden desk. */
+  /* The desk costs no height: its padding comes out of the tiles' floor (72 → 64 px a row, still
+     well above the 48 px touch minimum), so the screen fits exactly as it did before. */
+  .desk-tray {
+    --tray-pad: clamp(6px, 1 * var(--bh), 12px);
+    padding: var(--tray-pad);
+    grid-auto-rows: minmax(calc(72px - 2 * var(--tray-pad) / var(--tile-rows)), 1fr);
+    min-height: calc(
+      var(--tile-rows) * 72px + (var(--tile-rows) - 1) * clamp(6px, 1 * var(--bw), 12px)
+    );
+    border-radius: 6px;
+    background-color: var(--color-button);
+    background-position: 62% 38%;
+    background-size: cover;
+    box-shadow: inset 2px 3px 8px rgb(0 0 0 / 0.4);
+  }
+  .desk-tray[data-art="image"] {
+    background-image: url("/studio/desk-bg.jpg");
+  }
+  .desk-tray .pick-tile {
+    position: relative;
+    padding: 6px 4px 4px;
+    border: 0;
+    border-radius: 3px;
+    background-color: var(--color-paper);
+    box-shadow: var(--shadow-desk);
+    transform: rotate(var(--tilt, 0deg));
+    transition:
+      transform 180ms cubic-bezier(0.2, 0.8, 0.3, 1),
+      box-shadow 180ms ease-out;
+  }
+  .desk-tray .pick-tile:nth-child(3n + 1) {
+    --tilt: -0.8deg;
+  }
+  .desk-tray .pick-tile:nth-child(3n + 2) {
+    --tilt: 0.6deg;
+  }
+  .desk-tray .pick-tile:nth-child(3n) {
+    --tilt: -0.3deg;
+  }
+  .desk-tray .pick-tile:active {
+    transform: rotate(var(--tilt, 0deg)) translateY(1px);
+    box-shadow: var(--shadow-press);
+  }
+  /* Chosen: picked up off the desk (straight, higher, a longer shadow), ringed in ink, its tape
+     pressed down harder. */
+  .desk-tray .pick-tile[aria-pressed="true"] {
+    padding: 6px 4px 4px;
+    border: 0;
+    transform: translateY(-3px);
+    box-shadow:
+      inset 0 0 0 3px var(--color-ink),
+      var(--shadow-desk-lift);
+  }
+  .pick-tile-tape {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    width: 46%;
+    height: 11px;
+    transform: translateX(-50%) rotate(-3deg);
+    background-color: color-mix(in srgb, var(--color-paper) 60%, transparent);
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
+    pointer-events: none;
+  }
+  .desk-tray .pick-tile[aria-pressed="true"] .pick-tile-tape {
+    background-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  }
+
+  /* Delivery: the QR printed on a receipt ticket, lying on its kraft envelope. */
+  .qr-card-envelope {
+    gap: 0;
+    padding: 0 clamp(26px, 5 * var(--bw), 64px) clamp(14px, 2 * var(--bh), 28px);
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+  .kraft-envelope {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 84%;
+    transform: rotate(-2deg);
+    transform-origin: 50% 100%;
+    pointer-events: none;
+    filter: drop-shadow(var(--drop-paper));
+  }
+  .kraft-envelope > img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: 50% 100%;
+  }
+  /* Without the picture: a flat kraft envelope with its flap open. */
+  .kraft-envelope[data-art="drawn"] {
+    top: 30%;
+    height: auto;
+    border-radius: 4px;
+    background: var(--kraft);
+  }
+  .kraft-envelope[data-art="drawn"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 40%;
+    background: var(--kraft);
+    filter: brightness(0.86);
+    clip-path: polygon(0 100%, 50% 0, 100% 100%);
+  }
+  .qr-ticket-shadow {
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(var(--drop-paper));
+  }
+  .qr-ticket {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-xs);
+    padding: clamp(18px, 2.2 * var(--bh), 30px) clamp(14px, 2 * var(--bw), 26px);
+    background-color: var(--color-paper);
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
+  }
+
+  /* The stamp: an ink ring (stamp-mark.png, or a drawn double ring) with the brand inside. */
+  .stamp-mark {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--stamp-size, 64px);
+    height: var(--stamp-size, 64px);
+    border-radius: 9999px;
+    transform: rotate(-7deg);
+    color: var(--color-ink);
+  }
+  .stamp-mark[data-ink="drawn"] {
+    border: max(4px, calc(var(--stamp-size, 64px) * 0.075)) double var(--color-accent);
+  }
+  .stamp-mark-ink {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.94;
+    pointer-events: none;
+  }
+  .stamp-mark-center {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stamp-mark-small {
+    --stamp-size: clamp(48px, min(6 * var(--bh, 1vh), 7 * var(--bw, 1vw)), 64px);
+  }
+  .stamp-mark-small .brand-star-o {
+    font-size: calc(var(--stamp-size) * 0.52);
+    letter-spacing: 0;
+  }
+  .stamp-mark-small .brand-o {
+    --brand-o-tracking: 0em;
+  }
+  .stamp-mark-large {
+    --stamp-size: min(76vw, 290px);
+  }
+  .stamp-mark-large .brand-lockup {
+    font-size: calc(var(--stamp-size) * 0.15);
+  }
+  .ticket-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 1.4 * var(--bw), 14px);
+    width: 100%;
+    padding-top: var(--gap-xs);
+    border-top: 2px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
+  }
+  .ticket-line-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    line-height: 1.2;
+    text-align: left;
+  }
+  .ticket-line-record {
+    font-size: var(--fs-caption, 16px);
+    font-weight: 800;
+    color: var(--color-ink);
+  }
+  .ticket-line-date {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(14px, min(1.8 * var(--bh, 1vh), 2 * var(--bw, 1vw)), 17px);
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+
+  /* The phone pages' ticket (/p, /m). */
+  .stamp-ticket-shadow {
+    width: min(100%, 22rem);
+    filter: drop-shadow(5px 8px 10px rgb(43 26 16 / 0.3));
+  }
+  .stamp-ticket {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 36px 20px 32px;
+    background-color: var(--color-paper);
+    background-image: var(--grain-ink);
+    background-size: 240px 240px;
+    text-align: center;
+  }
+  .stamp-ticket-date {
+    margin-top: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 16px;
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .stamp-ticket-record {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--color-ink);
+  }
+  .stamp-ticket-perforation {
+    width: 86%;
+    margin: 6px 0;
+    border-top: 2px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
+  }
+  /* Accent as text only at 24 px or more (D73). */
+  .stamp-ticket-event {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-accent);
+  }
+}
+
+/* After each shot: a short paper-white blink, drawn after the frame is taken. */
+.shutter-blink {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  background: var(--color-paper);
+  opacity: 0;
+  animation: shutter-blink 420ms ease-out both;
+}
+@keyframes shutter-blink {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* The finished frame comes up like a print in the developer tray. */
+.print-develop {
+  animation: print-develop 2.8s cubic-bezier(0.3, 0.1, 0.3, 1) both;
+}
+@keyframes print-develop {
+  0% {
+    opacity: 0.12;
+    filter: sepia(0.9) brightness(1.6) contrast(0.35);
+  }
+  55% {
+    opacity: 0.85;
+    filter: sepia(0.45) brightness(1.15) contrast(0.8);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shutter-blink {
+    display: none;
+  }
+  .print-develop {
+    animation: none;
+  }
+  .desk-tray .pick-tile,
+  .shutter-btn,
+  .shutter-knob {
+    transition: none;
+  }
+}
+/* iPad mini 4 (Safari 15): no filter animation on the big picture. */
+.kiosk-root[data-legacy-ios15="true"] .print-develop {
+  animation: wall-fade-in 1.2s ease-out both;
 }

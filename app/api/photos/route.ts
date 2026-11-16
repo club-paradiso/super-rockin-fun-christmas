@@ -94,6 +94,8 @@ export const POST = route("upload", async (request: Request) => {
   // Freshest moment for the kiosk to learn whether the wall consent step should be offered.
   const wallSubmissions = (await getBackend().settings.get()).pauseSubmissions ? "paused" : "open";
   const status = result.duplicate ? 200 : 201;
+  // "오늘 N번째 기록" for the booth's stamp ticket. Best-effort: null leaves the number off.
+  const dayOrdinal = (await service.dayOrdinal(result.photo.createdAt)) ?? undefined;
 
   const sync = getCloudSync();
   if (sync) {
@@ -103,12 +105,12 @@ export const POST = route("upload", async (request: Request) => {
       // "gone" is not expected for a photo stored a moment ago; the kiosk keeps waiting either way.
       logEvent(`upload_qr_${outcome.reason}`, { kioskId: auth.kioskId, photoId: result.photo.id });
       return NextResponse.json(
-        { qr: "pending", duplicate: result.duplicate, wallSubmissions },
+        { qr: "pending", duplicate: result.duplicate, wallSubmissions, dayOrdinal },
         { status: 202, headers },
       );
     }
     return NextResponse.json(
-      { ...outcome.link, duplicate: result.duplicate, wallSubmissions },
+      { ...outcome.link, duplicate: result.duplicate, wallSubmissions, dayOrdinal },
       { status, headers },
     );
   }
@@ -119,6 +121,7 @@ export const POST = route("upload", async (request: Request) => {
       expiresAt: result.photo.tokenExpiresAt,
       duplicate: result.duplicate,
       wallSubmissions,
+      dayOrdinal,
     },
     { status, headers },
   );

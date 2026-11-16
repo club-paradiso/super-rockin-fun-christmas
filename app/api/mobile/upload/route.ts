@@ -115,8 +115,18 @@ export const POST = route("mobile_upload", async (request: Request) => {
     duplicate: result.duplicate,
     frameId: frame?.id ?? null,
   });
+  // "오늘 N번째 기록" for the phone's stamp ticket. Best-effort: absent when it cannot be counted.
+  const service = getPhotoService();
+  const row = await getBackend()
+    .photos.getById(result.photoId)
+    .catch(() => null);
+  const dayOrdinal = row ? ((await service.dayOrdinal(row.createdAt)) ?? undefined) : undefined;
   return NextResponse.json(
-    { status: "received", review: result.moderationStatus === "PENDING" ? "pending" : "done" },
+    {
+      status: "received",
+      review: result.moderationStatus === "PENDING" ? "pending" : "done",
+      dayOrdinal,
+    },
     { status: result.duplicate ? 200 : 201, headers: NO_STORE },
   );
 });

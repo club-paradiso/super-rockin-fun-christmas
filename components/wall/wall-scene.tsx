@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
-import { fitTheme, type WallTheme } from "@/lib/wall/themes";
+import { WALL_LIGHT, fitTheme, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
@@ -89,7 +89,8 @@ export function WallScene({
             stroke="rgba(43,26,16,0.28)"
             strokeWidth={theme.rope.width}
             strokeLinecap="round"
-            transform="translate(0 5)"
+            // The twine's shadow on the backdrop falls with the one light (top left).
+            transform={`translate(${WALL_LIGHT.rope.x} ${WALL_LIGHT.rope.y})`}
           />
           <path
             d={ropePath(theme.scene.line, theme.rope.x1, theme.rope.x2)}

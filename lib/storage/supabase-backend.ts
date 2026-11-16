@@ -371,6 +371,17 @@ class SupabasePhotoRepository implements PhotoRepository {
     return (data as Row[]).map(toWallEligible);
   }
 
+  /** A head-only count: no row ever leaves the database for this. */
+  async countCreatedBetween(fromIso: string, toIso: string): Promise<number> {
+    const { count, error } = await this.db
+      .from("photos")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso);
+    if (error) throw new SupabaseError("count photos", error);
+    return count ?? 0;
+  }
+
   async stats(): Promise<PhotoStats> {
     const { data, error } = await this.db.rpc("ftl_photo_stats");
     if (error) throw new SupabaseError("photo stats", error);

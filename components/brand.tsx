@@ -42,6 +42,19 @@ export function BrandWordmark({
   );
 }
 
+/**
+ * The O with its star on its own (D77): the emblem in the centre of a small stamp, where the whole
+ * wordmark would be too small to read. Set its size with font-size (1em = the O's capital height
+ * scale, as in the wordmark). Decorative: give the surrounding element the accessible name.
+ */
+export function BrandStarO({ className = "" }: { className?: string }) {
+  return (
+    <span className={`brand-wordmark brand-star-o ${className}`} aria-hidden>
+      <StarO />
+    </span>
+  );
+}
+
 /** The letter O with the star in its counter. The star is decoration (hidden from assistive tech). */
 function StarO() {
   return (

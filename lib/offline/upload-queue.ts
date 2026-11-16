@@ -8,10 +8,17 @@ export type UploadSuccess =
       duplicate: boolean;
       /** Whether staff currently accept new media-wall submissions. */
       wallSubmissions?: "open" | "paused";
+      /** "오늘 N번째 기록" for the stamp ticket; absent when the server could not count. */
+      dayOrdinal?: number;
       qrPending?: undefined;
     }
   /** Hub with a cloud: the photo is stored, its QR copy is not in the cloud yet (HTTP 202). */
-  | { qrPending: true; duplicate: boolean; wallSubmissions?: "open" | "paused" };
+  | {
+      qrPending: true;
+      duplicate: boolean;
+      wallSubmissions?: "open" | "paused";
+      dayOrdinal?: number;
+    };
 
 export type UploadOutcome =
   | { ok: true; result: UploadSuccess }

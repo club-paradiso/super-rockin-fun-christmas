@@ -171,6 +171,23 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
+- **Studio props are optional pictures with a CSS stand-in** (D101): `config/studio.ts` lists
+  `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
+  once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
+  missing file must never break a layout or a touch target. The shutter stays the screen's one
+  `.booth-btn-primary`; frame tiles are postcards on the desk (`.desk-tray`), their tape is
+  `.pick-tile-tape` (never `.tape`, which may not lie on a control).
+- **One light, top left (135°)** (D101): every cast shadow falls to +x +y: the `--shadow-*`,
+  `--drop-*` tokens in `app/globals.css`, `LIGHT` in `lib/studio/ticket.ts`, `WALL_LIGHT` in
+  `lib/wall/themes.ts` (= `--wall-photo-drop`). `tests/unit/studio.test.ts` reads the stylesheet
+  and fails on any shadow that falls another way.
+- **Booth sound is synthesised and optional** (D101): `lib/kiosk/sound.ts` (Web Audio, no files),
+  unlocked by the first touch, muted per device (`ftl.boothMuted`; welcome screen and staff help).
+  Nothing waits for a sound; it never touches the microphone (D72).
+- **"오늘 N번째 기록" is a count, nothing more** (D101): `PhotoService.dayOrdinal` counts the photo
+  rows of that photo's Asia/Seoul day up to it (`countCreatedBetween`, head-only on Supabase). The
+  upload answers carry it as `dayOrdinal`; anywhere it is missing the ticket says "오늘의 기록".
+  The PNG ticket is drawn on the guest's phone (`lib/studio/ticket.ts`) and sent nowhere.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).

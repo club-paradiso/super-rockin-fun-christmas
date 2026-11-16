@@ -13,6 +13,7 @@ import {
   planModeration,
   type ModerationAction,
 } from "@/lib/ops/moderation";
+import { seoulDayStart } from "@/lib/studio/day";
 import { hashToken, isWellFormedToken, newToken } from "./token";
 import type {
   Actor,
@@ -402,6 +403,20 @@ export class PhotoService {
     if (isWallEligible(row)) return "approved";
     if (row.moderationStatus !== "PENDING") return "none";
     return row.ai?.status === "QUEUED" ? "checking" : "staff";
+  }
+
+  /**
+   * "오늘 N번째 기록" (the stamp ticket): how many photos were made on this photo's Seoul day up
+   * to and including it. Stable for a photo (later photos never change its number). Null when it
+   * cannot be counted: the ticket then shows no number, and nothing else ever depends on it.
+   */
+  async dayOrdinal(createdAt: string): Promise<number | null> {
+    try {
+      const n = await this.backend.photos.countCreatedBetween(seoulDayStart(createdAt), createdAt);
+      return n >= 1 ? n : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Has the phone sent the photo for this QR yet? Only the QR's own booth may ask. */

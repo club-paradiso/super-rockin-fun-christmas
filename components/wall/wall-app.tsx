@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
-import { fitTheme } from "@/lib/wall/themes";
+import { fitTheme, wallPhotoShadow } from "@/lib/wall/themes";
 import { framedPhotoFrame, MOBILE_FRAME_ID } from "@/config/mobile";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { ageWeight } from "@/lib/wall/rotation";
@@ -475,7 +475,7 @@ export function WallApp({
                         style={{
                           top: card.y - place.y,
                           padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
-                          boxShadow: "0 12px 24px var(--wall-photo-shadow)",
+                          boxShadow: wallPhotoShadow("box"),
                         }}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL from our server */}
@@ -534,7 +534,7 @@ export function WallApp({
                       className="h-full w-full object-contain object-top"
                       style={{
                         paddingTop: box.y - place.y,
-                        filter: "drop-shadow(0 12px 24px var(--wall-photo-shadow))",
+                        filter: wallPhotoShadow("filter"),
                       }}
                     />
                   </div>

@@ -71,9 +71,26 @@ import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
+import { STUDIO_ASSETS } from "@/config/studio";
+import { boothSound, type BoothSound } from "@/lib/kiosk/sound";
+import { cleanOrdinal } from "@/lib/studio/day";
+import {
+  TicketStampLine,
+  useAssetReady,
+  zigzagClip,
+  type TicketInfo,
+} from "@/components/studio/stamp-ticket";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
-import { BoothScreen, BrandLockup, CameraPreview, LineIcon, PhotoCorners, Tape } from "./ui";
+import {
+  BoothScreen,
+  BrandLockup,
+  CameraPreview,
+  LineIcon,
+  PhotoCorners,
+  ShutterButton,
+  Tape,
+} from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -94,6 +111,20 @@ type Action = KioskAction<Shot>;
 
 const DEVICE_KEY = "ftl.cameraDeviceId";
 const noSubscribe = () => () => {};
+/** The QR ticket's torn ends (a receipt), as a clip-path. */
+const QR_TICKET_CLIP = zigzagClip(14, 8);
+
+/** Booth sounds (lib/kiosk/sound.ts): browser only, created on first use. */
+function useBoothSound(): { sound: BoothSound | null; muted: boolean } {
+  // The one player is a stable singleton, so it is a fine snapshot (none during server render).
+  const sound = useSyncExternalStore<BoothSound | null>(noSubscribe, boothSound, () => null);
+  const muted = useSyncExternalStore(
+    sound?.subscribe ?? noSubscribe,
+    () => sound?.isMuted() ?? false,
+    () => false,
+  );
+  return { sound, muted };
+}
 
 function readStoredDevice(): string | undefined {
   try {
@@ -141,6 +172,11 @@ export function KioskApp({
   const [screenFlashActive, setScreenFlashActive] = useState(false);
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
+  // "오늘 N번째 기록" for this session's ticket, as the server counted it (absent = no number).
+  const [ticket, setTicket] = useState<{ sessionId: string; ordinal: number | null } | null>(null);
+  // A short paper-white blink after each shot (decoration, after the frame is taken).
+  const [shutterBlink, setShutterBlink] = useState(0);
+  const { sound, muted } = useBoothSound();
   const online = useOnline();
   // useSyncExternalStore supplies a stable server snapshot for hydration, then detects
   // Safari 15 on the real device without a server/client markup mismatch.
@@ -269,6 +305,7 @@ export function KioskApp({
     urlsRef.current.clear();
     setFinalImage(null);
     setQrSvg(null);
+    setTicket(null);
     setMobileQr(null);
     setConfirmHome(false);
     setFlashEnabled(false);
@@ -354,6 +391,11 @@ export function KioskApp({
     const timer = setTimeout(() => dispatch({ type: "TICK" }), 1000);
     return () => clearTimeout(timer);
   }, [state.phase, state.remaining, state.shotIndex]);
+  // A clock tick each second, a brighter one for the last three. Sound only follows the count.
+  useEffect(() => {
+    if (state.phase !== "countdown") return;
+    sound?.play(state.remaining <= 3 ? "tickFinal" : "tick");
+  }, [sound, state.phase, state.remaining, state.shotIndex]);
 
   // ── Capture ──────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -377,11 +419,15 @@ export function KioskApp({
           await new Promise<void>((resolve) => setTimeout(resolve, 250));
           if (cancelled) return;
         }
+        // The release: the shutter and the film winder, as the frame is taken.
+        sound?.play("shutter");
         const frame = await camera.capture({
           aspect: KIOSK_CONFIG.captureAspect,
           mirror: KIOSK_CONFIG.mirror,
           maxWidth: renderBudget.captureMaxWidth,
         });
+        // The blink comes after the grab, so it can never light (or spoil) the photo itself.
+        if (!cancelled) setShutterBlink((n) => n + 1);
         const blob = await canvasToBlob(frame.canvas as HTMLCanvasElement, "image/jpeg", 0.9);
         if (cancelled) return;
         dispatch({
@@ -400,7 +446,7 @@ export function KioskApp({
       if (flashTimeout) clearTimeout(flashTimeout);
       setScreenFlashActive(false);
     };
-  }, [state.phase, state.shotIndex, deviceId, flashEnabled, renderBudget.captureMaxWidth]);
+  }, [state.phase, state.shotIndex, deviceId, flashEnabled, renderBudget.captureMaxWidth, sound]);
 
   const images = useMemo(
     () =>
@@ -492,6 +538,16 @@ export function KioskApp({
     renderBudget.outputScale,
   ]);
 
+  // The print has come up (the wall question shows it): a soft chime. The QR ticket: a stamp.
+  const printShown = finalPhase && finalImage?.frameId === state.frameId;
+  useEffect(() => {
+    if (printShown) sound?.play("develop");
+  }, [printShown, sound]);
+  const qrReady = state.phase === "delivery" && state.delivery.status === "ready";
+  useEffect(() => {
+    if (qrReady) sound?.play("stamp");
+  }, [qrReady, sound]);
+
   // ── Phone delivery via the durable offline queue ─────────────────────────────────────────
   // Every delivery is persisted to IndexedDB first, so a dropped network or a reload never loses
   // a finished photo. The QR appears only once the server has issued a real token.
@@ -517,6 +573,11 @@ export function KioskApp({
   const showQr = useCallback(async (sessionId: string, result: UploadSuccess) => {
     if (result.wallSubmissions) setWallSubmissions(result.wallSubmissions);
     if (sessionId !== sessionRef.current) return; // a previous guest's queued photo finished
+    // Keep the first number the server gave; a later answer without one never erases it.
+    const ordinal = cleanOrdinal(result.dayOrdinal);
+    setTicket((cur) =>
+      cur?.sessionId === sessionId && cur.ordinal ? cur : { sessionId, ordinal },
+    );
     if (result.qrPending) {
       dispatch({ type: "DELIVERY_QR_PENDING" });
       return;
@@ -883,6 +944,9 @@ export function KioskApp({
     <KioskChromeContext.Provider value={chrome}>
       <main
         className="kiosk-root kiosk-desk"
+        // iOS lets a page start sound only from a touch: the first one unlocks it (no sound here).
+        onPointerDownCapture={() => sound?.unlock()}
+        onKeyDownCapture={() => sound?.unlock()}
         data-phase={state.phase}
         data-lang={state.lang}
         data-legacy-ios15={legacyIOS15 ? "true" : undefined}
@@ -946,6 +1010,13 @@ export function KioskApp({
             wallPublic={wallPublic}
             reviewLine={aiConsent?.sessionId === state.sessionId ? aiConsent.line : null}
             videoNotice={canRecordVideo}
+            soundMuted={muted}
+            onToggleSound={sound ? () => sound.setMuted(!muted) : null}
+            ticket={
+              ticket?.sessionId === state.sessionId
+                ? { ordinal: ticket.ordinal, createdAt: new Date() }
+                : { ordinal: null, createdAt: new Date() }
+            }
           />
         </div>
         {moreBelow && !idle.warning && (
@@ -989,6 +1060,14 @@ export function KioskApp({
             <p className="booth-lead">{t.home.lead}</p>
           </KioskDialog>
         )}
+        {shutterBlink > 0 && (
+          <div
+            key={shutterBlink}
+            className="shutter-blink"
+            aria-hidden
+            data-testid="shutter-blink"
+          />
+        )}
         {screenFlashActive && state.phase === "capturing" && (
           <div
             data-testid="screen-flash"
@@ -1005,6 +1084,8 @@ export function KioskApp({
             loadQueue={loadQueue}
             onSendNow={sendNow}
             onReset={reset}
+            soundMuted={muted}
+            onToggleSound={sound ? () => sound.setMuted(!muted) : null}
           />
         )}
       </main>
@@ -1044,6 +1125,12 @@ interface ScreenProps {
   reviewLine: ReviewLine | null;
   /** This booth's browser can record the session video (D72): tell the guest before shooting. */
   videoNotice: boolean;
+  /** Booth sounds are off (lib/kiosk/sound.ts). */
+  soundMuted: boolean;
+  /** Null until the browser has a sound player. */
+  onToggleSound: (() => void) | null;
+  /** The stamp line on the QR ticket: today's number for this session, if the server gave one. */
+  ticket: TicketInfo;
 }
 
 /** Text with "\n" line breaks from the copy (lib/kiosk/copy.ts). */
@@ -1083,17 +1170,14 @@ function Screen(p: ScreenProps) {
           <BrandLockup className="attract-lockup" />
           <p className="booth-lead">{KIOSK_COPY.ko.attract.event}</p>
           <div className="attract-start">
-            <button
-              type="button"
-              className="booth-btn-primary"
-              data-testid="attract-start"
+            <ShutterButton
+              testId="attract-start"
+              label={KIOSK_COPY.ko.attract.start}
               onClick={(e) => {
                 e.stopPropagation();
                 p.onOpen();
               }}
-            >
-              {KIOSK_COPY.ko.attract.start}
-            </button>
+            />
             {(["en", "zh"] as const).map((lang) => (
               <p key={lang} lang={HTML_LANG[lang]} className="booth-caption">
                 {KIOSK_COPY[lang].attract.start}
@@ -1164,6 +1248,18 @@ function Screen(p: ScreenProps) {
                 </button>
               ))}
             </div>
+            {p.onToggleSound && (
+              <button
+                type="button"
+                className="booth-btn-m booth-sound-btn"
+                data-testid="sound-toggle"
+                aria-pressed={!p.soundMuted}
+                onClick={p.onToggleSound}
+              >
+                <LineIcon name={p.soundMuted ? "muted" : "sound"} />
+                {t.sound}
+              </button>
+            )}
           </div>
         </BoothScreen>
       );
@@ -1205,7 +1301,7 @@ function Screen(p: ScreenProps) {
               <span className="booth-caption">{t.frame.slots(chosen.slots.length)}</span>
             </p>
           </div>
-          <div className="pick-tiles" data-testid="frame-options">
+          <DeskTray className="pick-tiles" testId="frame-options">
             {FRAMES.map((frame) => {
               const selected = frame.id === state.frameId;
               return (
@@ -1217,6 +1313,7 @@ function Screen(p: ScreenProps) {
                   onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
                   className="pick-tile"
                 >
+                  <span className="pick-tile-tape" aria-hidden />
                   <span className="frame-art">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
@@ -1230,7 +1327,7 @@ function Screen(p: ScreenProps) {
                 </button>
               );
             })}
-          </div>
+          </DeskTray>
           <div className="pick-actions">
             <button
               type="button"
@@ -1328,14 +1425,11 @@ function Screen(p: ScreenProps) {
               <>
                 {/* One filled button only: free poses is the default, the guide is the option. */}
                 <div className="shoot-actions">
-                  <button
-                    type="button"
-                    className="booth-btn-primary"
-                    data-testid="shoot-free"
+                  <ShutterButton
+                    testId="shoot-free"
+                    label={t.shoot.free}
                     onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: false })}
-                  >
-                    {t.shoot.free}
-                  </button>
+                  />
                   <button
                     type="button"
                     className="booth-btn-secondary"
@@ -1584,22 +1678,28 @@ function Screen(p: ScreenProps) {
                   )}
                 </p>
               </div>
-              <div className="qr-card">
-                <Tape side="center" />
-                <div
-                  data-testid="qr-code"
-                  data-url={d.url}
-                  className="qr-code"
-                  // QR markup comes from the qrcode library, generated locally from our own URL.
-                  dangerouslySetInnerHTML={{ __html: p.qrSvg }}
-                />
-                <p className="qr-note">
-                  <Lines text={t.delivery.qrNote} />
-                </p>
-                {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
-                <p className="booth-meta" data-testid="session-code">
-                  {t.delivery.session(sessionCode)}
-                </p>
+              {/* The QR printed on a receipt ticket, lying on its kraft envelope. */}
+              <div className="qr-card qr-card-envelope" data-testid="qr-envelope">
+                <KraftEnvelope />
+                <div className="qr-ticket-shadow">
+                  <div className="qr-ticket" style={{ clipPath: QR_TICKET_CLIP }}>
+                    <div
+                      data-testid="qr-code"
+                      data-url={d.url}
+                      className="qr-code"
+                      // QR markup comes from the qrcode library, generated locally from our own URL.
+                      dangerouslySetInnerHTML={{ __html: p.qrSvg }}
+                    />
+                    <p className="qr-note">
+                      <Lines text={t.delivery.qrNote} />
+                    </p>
+                    <TicketStampLine info={p.ticket} lang={state.lang} />
+                    {/* Staff look this up in /admin → 최근 세션 if the QR gets lost. */}
+                    <p className="booth-meta" data-testid="session-code">
+                      {t.delivery.session(sessionCode)}
+                    </p>
+                  </div>
+                </div>
               </div>
               <div className="qr-more">
                 <button type="button" className="booth-btn-secondary" onClick={p.onReset}>
@@ -1799,6 +1899,8 @@ function FinalPreview({
         <img
           src={finalImage.url}
           alt={t.consent.finished}
+          // A darkroom print coming up in the tray (reduced motion: shown at once).
+          className="print-develop"
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
@@ -1807,6 +1909,44 @@ function FinalPreview({
         <div className="frame-art-wait animate-pulse" aria-label={t.consent.making} />
       )}
     </div>
+  );
+}
+
+/**
+ * The wooden desk the frame samples lie on (public/studio/desk-bg.jpg; a dark wood token colour
+ * without it). Only the picture changes with the asset: the tiles are the same.
+ */
+function DeskTray({
+  className,
+  testId,
+  children,
+}: {
+  className: string;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  const desk = useAssetReady(STUDIO_ASSETS.desk);
+  return (
+    <div
+      className={`${className} desk-tray`}
+      data-testid={testId}
+      data-art={desk ? "image" : "drawn"}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The kraft envelope under the QR ticket (decoration; a drawn one without the picture). */
+function KraftEnvelope() {
+  const art = useAssetReady(STUDIO_ASSETS.envelope);
+  return (
+    <span className="kraft-envelope" data-art={art ? "image" : "drawn"} aria-hidden>
+      {art && (
+        // eslint-disable-next-line @next/next/no-img-element -- fixed decoration asset
+        <img src={STUDIO_ASSETS.envelope} alt="" draggable={false} />
+      )}
+    </span>
   );
 }
 

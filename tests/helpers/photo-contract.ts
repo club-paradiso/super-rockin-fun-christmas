@@ -56,6 +56,20 @@ export function photoServiceContract(
       expect("data" in read && Array.from(read.data)).toEqual(Array.from(JPEG));
     });
 
+    it("numbers the photos of a Seoul day in order, stable per photo (stamp ticket)", async () => {
+      // Relative assertions only: this contract also runs on a shared database.
+      const first = await put();
+      now = new Date(now.getTime() + 60_000);
+      SESSION = uuid();
+      const second = await put();
+      const a = await svc.dayOrdinal(first.photo.createdAt);
+      const b = await svc.dayOrdinal(second.photo.createdAt);
+      expect(a).toBeGreaterThanOrEqual(1);
+      expect(b).toBeGreaterThan(a!);
+      // A later photo never changes an earlier photo's number.
+      expect(await svc.dayOrdinal(first.photo.createdAt)).toBe(a);
+    });
+
     it("stores only the token hash, with separate link and retention expiry", async () => {
       const { token, photo } = await put();
       const row = await backend.photos.findBySessionId(SESSION);

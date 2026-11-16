@@ -18,6 +18,13 @@ export const HTML_LANG: Record<KioskLang, string> = { ko: "ko", en: "en", zh: "z
 const ko = {
   langName: "한국어",
   langGroup: "언어 · Language",
+  /** Booth sound switch (Claude's wording, not D76: check with the user). */
+  sound: "소리",
+  /** The stamp ticket. The number comes from the server, or is left off. */
+  ticket: {
+    dayOrdinal: (n: number) => `오늘 ${n}번째 기록`,
+    dayRecord: "오늘의 기록",
+  },
   /** The attract screen (D80). The guest has not chosen a language yet: it shows both. */
   attract: {
     start: "화면을 눌러 시작",
@@ -187,6 +194,11 @@ export type KioskCopy = typeof ko;
 const en: KioskCopy = {
   langName: "English",
   langGroup: "언어 · Language",
+  sound: "Sound",
+  ticket: {
+    dayOrdinal: (n) => `Today's record No. ${n}`,
+    dayRecord: "Today's record",
+  },
   attract: {
     start: "Tap the screen to start",
     event: "Christmas Village 2026",
@@ -349,6 +361,11 @@ const en: KioskCopy = {
 const zh: KioskCopy = {
   langName: "中文",
   langGroup: "언어 · Language",
+  sound: "声音",
+  ticket: {
+    dayOrdinal: (n) => `今天第 ${n} 份记录`,
+    dayRecord: "今天的记录",
+  },
   attract: {
     start: "点击屏幕开始",
     event: "Christmas Village 2026",

@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { BrandLockup, BrandWordmark } from "@/components/brand";
+import { useAssetReady } from "@/components/studio/stamp-ticket";
+import { STUDIO_ASSETS } from "@/config/studio";
+import { boothSound } from "@/lib/kiosk/sound";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 
 export { BrandLockup, BrandWordmark };
@@ -21,6 +24,18 @@ const LINE_ICONS = {
     <>
       <rect x="7" y="3" width="10" height="18" rx="2" />
       <path d="M11 17.5h2" />
+    </>
+  ),
+  sound: (
+    <>
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+      <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+    </>
+  ),
+  muted: (
+    <>
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+      <path d="M16 9.5l5 5M21 9.5l-5 5" />
     </>
   ),
   /** "More below": shown only when a screen is taller than the booth. */
@@ -43,6 +58,44 @@ export function LineIcon({ name }: { name: keyof typeof LINE_ICONS }) {
     >
       {LINE_ICONS[name]}
     </svg>
+  );
+}
+
+/**
+ * The booth's filled button as a camera release (public/studio/shutter-button.png): a brass and
+ * leather knob that sinks when pressed, its shadow shrinking under the top-left light. Without
+ * the picture the knob is drawn in CSS. Still the one `.booth-btn-primary` of its screen, with
+ * the same label and touch size.
+ */
+export function ShutterButton({
+  label,
+  testId,
+  onClick,
+}: {
+  label: string;
+  testId: string;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const art = useAssetReady(STUDIO_ASSETS.shutter);
+  return (
+    <button
+      type="button"
+      className="booth-btn-primary shutter-btn"
+      data-testid={testId}
+      data-art={art ? "image" : "drawn"}
+      onClick={(event) => {
+        boothSound().play("press");
+        onClick(event);
+      }}
+    >
+      <span className="shutter-knob" aria-hidden>
+        {art && (
+          // eslint-disable-next-line @next/next/no-img-element -- fixed small asset
+          <img src={STUDIO_ASSETS.shutter} alt="" draggable={false} className="shutter-knob-img" />
+        )}
+      </span>
+      <span className="shutter-label">{label}</span>
+    </button>
   );
 }
 

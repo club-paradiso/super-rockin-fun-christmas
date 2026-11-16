@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "@/components/brand";
+import { StampTicket } from "@/components/studio/stamp-ticket";
+import { cleanOrdinal } from "@/lib/studio/day";
 import { FRAMES, getFrame } from "@/config/frames";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import { MOBILE_UPLOAD_CONFIG, mobileFramesFor } from "@/config/mobile";
@@ -23,7 +25,8 @@ type Phase =
   | { name: "preparing" }
   | { name: "preview" }
   | { name: "uploading"; progress: number; attempt: number }
-  | { name: "done" }
+  /** ordinal: "오늘 N번째 기록" as the server counted it; null when unknown. */
+  | { name: "done"; ordinal: number | null }
   | { name: "error"; message: string; retry: boolean }
   | { name: "expired" };
 
@@ -67,6 +70,8 @@ function send(
   /** The consent text on screen included the public-wall line (D86). */
   publicWall: boolean,
   onProgress: (fraction: number) => void,
+  /** Hears "오늘 N번째 기록" from a successful answer (optional; never affects the outcome). */
+  onOrdinal: (ordinal: number | null) => void = () => {},
 ): Promise<SendOutcome> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
@@ -88,8 +93,16 @@ function send(
           return "";
         }
       })();
-      if (xhr.status === 200 || xhr.status === 201) resolve("ok");
-      else if (xhr.status === 410) resolve("expired");
+      if (xhr.status === 200 || xhr.status === 201) {
+        try {
+          onOrdinal(
+            cleanOrdinal((JSON.parse(xhr.responseText) as { dayOrdinal?: unknown }).dayOrdinal),
+          );
+        } catch {
+          onOrdinal(null);
+        }
+        resolve("ok");
+      } else if (xhr.status === 410) resolve("expired");
       else if (xhr.status === 409) resolve(code === "paused" ? "paused" : "closed");
       else if (xhr.status === 413) resolve("too_large");
       else if (xhr.status === 400 && code === "too_small") resolve("too_small");
@@ -116,7 +129,9 @@ export function MobileUpload({
   expiresAt: string;
   alreadySent: boolean;
 }) {
-  const [phase, setPhase] = useState<Phase>(alreadySent ? { name: "done" } : { name: "pick" });
+  const [phase, setPhase] = useState<Phase>(
+    alreadySent ? { name: "done", ordinal: null } : { name: "pick" },
+  );
   // The picked photos, already shrunk (MOBILE_UPLOAD_CONFIG.sourceLongEdge), in slot order.
   const [photos, setPhotos] = useState<ComposeImage[]>([]);
   const [dropped, setDropped] = useState(0);
@@ -271,10 +286,18 @@ export function MobileUpload({
     try {
       for (let attempt = 0; ; attempt++) {
         setPhase({ name: "uploading", progress: 0, attempt });
-        const outcome = await send(token, preview.blob, preview.frameId, publicWall, (progress) =>
-          setPhase({ name: "uploading", progress, attempt }),
+        let ordinal: number | null = null;
+        const outcome = await send(
+          token,
+          preview.blob,
+          preview.frameId,
+          publicWall,
+          (progress) => setPhase({ name: "uploading", progress, attempt }),
+          (n) => {
+            ordinal = n;
+          },
         );
-        if (outcome === "ok") return setPhase({ name: "done" });
+        if (outcome === "ok") return setPhase({ name: "done", ordinal });
         if (outcome === "expired") return setPhase({ name: "expired" });
         const err = ERRORS[outcome]!;
         if (err.retry && attempt < AUTO_RETRIES.length) {
@@ -418,6 +441,7 @@ export function MobileUpload({
             <p className="text-base text-ink/75">
               내리고 싶으면 현장 안내 봉사자에게 말씀해 주세요. 이 창은 닫아도 돼요.
             </p>
+            <StampTicket info={{ ordinal: phase.ordinal, createdAt: new Date() }} />
           </section>
         )}
 
