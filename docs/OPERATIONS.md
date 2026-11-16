@@ -12,6 +12,12 @@ technical runbook.
 - [ ] At least two staff can log in to `/admin` (codes arrive by email within a minute).
 - [ ] Kiosk browser in full screen; screen sleep disabled; camera permission granted for the site.
 
+## Remote camera (iPhone as the booth camera)
+
+Only if the booth runs with `?camera=remote`. Daily start/stop, mounting, heat, and what to do when the
+booth says "카메라를 찾을 수 없어요": `docs/REMOTE_CAMERA.md` (sections 6–8) and the volunteer sheet
+`docs/REMOTE_CAMERA_GUIDE_KO.md`. Staff manage the phone at `/admin/remote-camera`.
+
 ## Kiosk badges (top-right, for staff)
 
 | badge            | meaning                                                                    | action                                                                                                                             |

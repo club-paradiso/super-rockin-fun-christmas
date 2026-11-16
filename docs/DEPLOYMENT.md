@@ -36,21 +36,23 @@ Next.js server is the only thing that talks to Supabase.
 2. Environment variables (Production, and Preview if you test previews). Use
    `openssl rand -base64 48` for the secrets:
 
-| name                        | value                                                                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open                                                              |
-| `PHOTO_STORE`               | `supabase`                                                                                                                                     |
-| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                                                                                    |
-| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                                                                               |
-| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                                                                              |
-| `KIOSK_ENROLL_SECRET`       | the one shared password: enrolls booths **and opens /admin** (D84). ≥ 12 chars (use 20+ random), different from session secret (**Sensitive**) |
-| `ADMIN_SESSION_HOURS`       | `12` (optional): how long an /admin password session lasts                                                                                     |
-| `WALL_HOSTS`                | the wall address(es), comma-separated, read at build time (section 8 / 10)                                                                     |
-| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically                                                                          |
-| `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub                                                            |
-| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                                                                                |
-| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                                                                                |
-| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                                                                                      |
+| name                        | value                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PUBLIC_BASE_URL`           | `https://<your-domain-or-project>.vercel.app` — the exact origin phones will open                                                                      |
+| `PHOTO_STORE`               | `supabase`                                                                                                                                             |
+| `SUPABASE_URL`              | `https://<ref>.supabase.co`                                                                                                                            |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**Sensitive**)                                                                                                                       |
+| `KIOSK_SESSION_SECRET`      | ≥ 32 random chars (**Sensitive**)                                                                                                                      |
+| `KIOSK_ENROLL_SECRET`       | the one shared password: enrolls booths **and opens /admin** (D84). ≥ 12 chars (use 20+ random), different from session secret (**Sensitive**)         |
+| `ADMIN_SESSION_HOURS`       | `12` (optional): how long an /admin password session lasts                                                                                             |
+| `WALL_HOSTS`                | the wall address(es), comma-separated, read at build time (section 8 / 10)                                                                             |
+| `CRON_SECRET`               | ≥ 32 random chars (**Sensitive**). Vercel Cron sends it automatically                                                                                  |
+| `HUB_SYNC_SECRET`           | ≥ 32 random chars, different from all of the above (**Sensitive**). Only with a hub                                                                    |
+| `PHOTO_LINK_TTL_HOURS`      | `72` (optional)                                                                                                                                        |
+| `PHOTO_RETENTION_DAYS`      | `30` (optional)                                                                                                                                        |
+| `NEXT_PUBLIC_CAMERA_MODE`   | `browser`                                                                                                                                              |
+| `REMOTE_CAMERA_ICE_SERVERS` | (optional) JSON array of STUN/TURN servers for Remote Camera, e.g. a TURN fallback; default is free STUN. A wrong value is ignored and shown in /admin |
+| `REMOTE_CAMERA_DISABLED`    | (optional) `1` = every Remote Camera route answers 404 (rollback switch)                                                                               |
 
 Preview deployments get a different URL per deploy. Set `PUBLIC_BASE_URL` (Preview scope) to
 the preview URL you are testing, or use a stable preview alias. Production refuses to start
@@ -306,3 +308,19 @@ A preview for real-device testing, without a hub. Checklist: `docs/PREVIEW_DEVIC
   `KIOSK_ENROLL_SECRET` (operator-selected). Not set on
   purpose: `HUB_SYNC_SECRET` (no hub yet),
   `KIOSK_AUTH_DISABLED`.
+
+## Remote Camera Mode (D99)
+
+Prerequisites before anyone uses `?camera=remote` (full guide: `docs/REMOTE_CAMERA.md`):
+
+1. Apply `supabase/migrations/20261116090000_remote_camera.sql` to the Supabase project (cloud
+   deployments). It adds three empty, RLS-locked tables and one function; nothing existing changes.
+   Until it is applied the Remote Camera routes answer 500 and nothing else is affected.
+2. The phone page and the booth must share one **https** origin (the cloud address). A hub on plain
+   `http://<ip>:3000` cannot give the iPhone a camera.
+3. Put the iPad and iPhone on the same Wi-Fi with client isolation off. For networks that block direct
+   links set `REMOTE_CAMERA_ICE_SERVERS` to a TURN server.
+4. Open the booth as `…/kiosk?camera=remote` (or build with `NEXT_PUBLIC_CAMERA_MODE=remote`), pair the
+   phone from `/admin/remote-camera`, and run the real-device list in `docs/REMOTE_CAMERA.md` section 10.
+
+Rollback: remove `?camera=remote`, or set `REMOTE_CAMERA_DISABLED=1` and redeploy.

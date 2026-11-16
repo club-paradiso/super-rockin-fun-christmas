@@ -10,6 +10,7 @@ const ITEMS = [
   ["/admin/sessions", "최근 세션"],
   ["/admin/photos", "사진"],
   ["/admin/kiosks", "키오스크"],
+  ["/admin/remote-camera", "원격 카메라"],
   ["/admin/settings", "설정"],
   ["/admin/audit", "기록"],
 ] as const;

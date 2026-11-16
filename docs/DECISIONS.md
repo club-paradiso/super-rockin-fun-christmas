@@ -1582,3 +1582,46 @@ Cloudflare Tunnel) instead of straight to people.
   fallback without a working primary is refused.
 - **Not verified:** no Ollama model has been evaluated with this prompt. The fallback can approve,
   so it must pass the same evaluation (`docs/AI_MODERATION.md` 2.3) before it is switched on.
+
+## D99 · Remote Camera: an iPhone as the booth's rear camera (iPad mini 4 kiosk)
+
+**User request (2026-11-16):** the guest-facing booth is an iPad mini 4 in an enclosure; the camera
+is a permanently mounted iPhone 12 (rear, 1x) over Wi-Fi. No Mac, no native app, no paid app.
+Everything else (frames, countdown, retakes, QR, consent, moderation, enrollment, offline upload
+queue) stays as it is. Full design: `docs/REMOTE_CAMERA.md`.
+
+- **A fourth `CameraProvider`, not a second booth.** `RemoteCamera` (`lib/camera/remote-camera.ts`)
+  sits beside `BrowserCamera` and `MockCamera`. The booth state machine, countdown, retake, review,
+  compositing and upload code are untouched. Selected with `?camera=remote` or
+  `NEXT_PUBLIC_CAMERA_MODE=remote`; anything unknown is still the webcam.
+- **The booth makes the WebRTC offer, the phone answers** (`lib/remote-camera/phone.ts`). The phone
+  page (`/camera/remote`) owns the rear camera; the iPad only receives a ≈720p preview and never
+  opens a camera.
+- **The photo is not the preview.** The phone cuts a still from its full-resolution camera feed
+  (canvas → JPEG, center crop to the booth's aspect, never upscaled) when asked, and sends it over
+  the WebRTC data channel in 16 KiB chunks with backpressure, length and CRC-32 checks,
+  acknowledgments, bounded resends and duplicate detection (`lib/remote-camera/shutter.ts`,
+  `transfer.ts`). A failed, late or damaged capture is an error; the booth's existing
+  retry-the-same-shot path handles it. A previous frame is never reused.
+- **Signaling is the app's own API, polled.** Vercel functions cannot hold sockets, so offers,
+  answers and ICE go through a short-lived mailbox (`/api/camera/signal`, `/api/kiosk/camera/signal`):
+  in memory on the hub, in three new Supabase tables on the cloud (migration
+  `20261116090000_remote_camera.sql`). No new paid service. Photos and video never touch the
+  server; only numbers and stable codes are reported to staff.
+- **Pairing reuses existing authentication.** Staff (shared admin password, D84, or staff login)
+  create a single-use 8-character code for one kiosk, valid 10 minutes, stored only as a hash. The
+  phone exchanges it for its own HttpOnly cookie (`ftl_camera`, own MAC key, bound to both
+  secrets). Revocation is checked on every call. One active camera per kiosk. No new password.
+- **Same-origin, HTTPS.** iPhone Safari allows the camera only on a secure origin. The booth and
+  the phone page must use the same origin, which in practice means the HTTPS cloud address (or a hub
+  behind HTTPS). A plain `http://<hub>:3000` origin cannot work for the phone; the admin page and
+  the phone page say so.
+- **STUN by default, TURN only if staff configure it** (`REMOTE_CAMERA_ICE_SERVERS`). On the same
+  Wi-Fi the link uses local candidates. Some venue networks (client isolation) make direct links
+  impossible; that is documented, not hidden.
+- **Rollback is one switch.** `REMOTE_CAMERA_DISABLED=1` turns every route into a 404; removing
+  `?camera=remote` (or the build variable) puts the booth back on its webcam.
+- **Audit:** pairing and revocation are recorded in the pairing row (who, when) and the structured
+  log, not in the moderation audit table: nothing about a photo changes.
+- **Not verified:** nothing here has run on an iPad mini 4 or an iPhone 12. See the real-device
+  list in `docs/REMOTE_CAMERA.md`.
