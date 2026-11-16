@@ -27,7 +27,7 @@ On the enrolled booth browser, open `/kiosk/enroll` → **키오스크 화면 �
 
 ## Preview and physical device acceptance
 
-Use the PR Preview with preview credentials and storage. An unenrolled request to `/kiosk` with an iPadOS 15 UA should show enrollment with no Next scripts. After enrollment the legacy renderer should load `/kiosk-legacy-assets/entry.js` and `entry.css` with the proper MIME types and no `/_next/` scripts. On a supported browser, confirm the Next kiosk. Verify the response caching and cookie continuity on both. Use synthetic photos for preview tests.
+The Vercel project's branch Previews check the build. For a runtime trial, configure separate preview storage, a preview public origin, kiosk enrollment and session credentials, and a cron secret (see DEPLOYMENT.md). An unenrolled request to `/kiosk` with an iPadOS 15 UA should show enrollment with no Next scripts. After enrollment the legacy renderer should load `/kiosk-legacy-assets/entry.js` and `entry.css` with the proper MIME types and no `/_next/` scripts. On a supported browser, confirm the Next kiosk. Verify the response caching and cookie continuity on both. Use synthetic photos for preview tests.
 
 Run the following on the physical iPad mini 4 with the event network. Record the OS patch, deployment SHA, orientation and each result.
 
