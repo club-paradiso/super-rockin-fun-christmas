@@ -39,10 +39,17 @@ async function adminPage(browser: Browser): Promise<{ ctx: BrowserContext; page:
 }
 
 /** Staff creates a pairing code for the E2E booth. */
-async function createCode(admin: Page): Promise<string> {
+async function boothKioskId(booth: Page): Promise<string> {
+  const cookie = (await booth.context().cookies()).find((c) => c.name === "ftl_kiosk");
+  // v1.<kioskId>.<issued>.<expires>.<mac>: the booth's own id, so labels shared by other specs'
+  // kiosks can never make staff pair the wrong booth.
+  return decodeURIComponent(cookie!.value).split(".")[1]!;
+}
+
+async function createCode(admin: Page, booth: Page): Promise<string> {
   await admin.goto("/admin/remote-camera");
   await expect(admin.getByTestId("remote-camera-manager")).toBeVisible();
-  await admin.getByTestId("pair-kiosk").selectOption({ label: KIOSK_LABEL });
+  await admin.getByTestId("pair-kiosk").selectOption(await boothKioskId(booth));
   await admin.getByTestId("pair-create").click();
   await expect(admin.getByTestId("pair-qr").locator("svg")).toBeVisible();
   const code = (await admin.getByTestId("pair-code-value").textContent())!.trim();
@@ -89,7 +96,7 @@ test("pair from /admin, preview on the booth, shoot six, retake one, frame, cons
   const phone = await phoneCtx.newPage();
 
   const pairStart = Date.now();
-  const code = await createCode(admin);
+  const code = await createCode(admin, page);
   await pairPhone(phone, code);
   const pairMs = Date.now() - pairStart;
 
@@ -160,7 +167,7 @@ test("staff test capture shows a thumbnail; mode switch and revoke work", async 
     permissions: ["camera"],
   });
   const phone = await phoneCtx.newPage();
-  await pairPhone(phone, await createCode(admin));
+  await pairPhone(phone, await createCode(admin, page));
 
   await admin.goto("/admin/remote-camera");
   await expect(admin.getByTestId("camera-item")).toHaveAttribute("data-state", /idle|live/, {
@@ -199,7 +206,7 @@ test("the phone page reloads mid-session: the booth shows the camera error, then
     permissions: ["camera"],
   });
   const phone = await phoneCtx.newPage();
-  await pairPhone(phone, await createCode(admin));
+  await pairPhone(phone, await createCode(admin, page));
   await liveBooth(page);
 
   // The phone's browser reloads (a crash, a refresh): the link breaks.
