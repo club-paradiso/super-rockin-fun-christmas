@@ -5,6 +5,7 @@ import { getBackend } from "@/lib/storage/server";
 import {
   getIceConfig,
   getRemoteCameraStore,
+  purgeRemoteCameraSoon,
   remoteCameraDisabled,
 } from "@/lib/remote-camera/server";
 import { toStaffCameraView } from "@/lib/remote-camera/admin";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 /** Staff: every paired camera with live state, plus the kiosks that could get one. */
 export const GET = staffRoute("admin_remote_camera_list", async () => {
   if (remoteCameraDisabled()) return NextResponse.json({ disabled: true }, { headers: NO_STORE });
+  purgeRemoteCameraSoon();
   const [pairings, kiosks] = await Promise.all([
     getRemoteCameraStore().list(),
     getBackend().kiosks.list(),

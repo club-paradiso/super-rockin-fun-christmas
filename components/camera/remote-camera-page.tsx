@@ -44,9 +44,12 @@ const STATE_TEXT: Record<PhoneView["state"], string> = {
 
 export function RemoteCameraPage({ initialCode = "" }: { initialCode?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // A new PhoneCamera after every successful pairing: a revoked one stays revoked.
+  const [phoneKey, setPhoneKey] = useState(0);
   const phone = useMemo(
     () => (typeof window === "undefined" ? null : new PhoneCamera(defaultPhoneDeps())),
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phoneKey],
   );
   const [phase, setPhase] = useState<Phase>("checking");
   const [view, setView] = useState<PhoneView | null>(null);
@@ -109,8 +112,10 @@ export function RemoteCameraPage({ initialCode = "" }: { initialCode?: string })
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code: normalized, name }),
       });
-      if (res.ok) setPhase("ready");
-      else if (res.status === 429) setMessage("시도가 너무 많아요. 잠시 뒤에 다시 하세요.");
+      if (res.ok) {
+        setPhoneKey((k) => k + 1);
+        setPhase("ready");
+      } else if (res.status === 429) setMessage("시도가 너무 많아요. 잠시 뒤에 다시 하세요.");
       else setMessage("코드가 틀렸거나 만료됐어요. 관리자 화면에서 새 코드를 만드세요.");
     } catch {
       setMessage("서버에 연결하지 못했어요.");

@@ -765,3 +765,68 @@ describe("phone camera errors", () => {
     expect(p.phone.getView().recovery).toBeGreaterThan(0);
   });
 });
+
+describe("review findings", () => {
+  it("camera recovery keeps retrying (all 5 attempts) after its own reopen attempts", async () => {
+    const net = new FakeNet();
+    const s = await newSession(`recover-${Math.random().toString(36).slice(2, 8)}`);
+    const { cookie } = await pairPhone(await issueCode(s));
+    const p = makePhone(net, cookie);
+    live.push(p.phone);
+    await p.phone.start(p.video);
+    const calls = p.gum.mock.calls.length;
+    p.gum.mockImplementation(async () => {
+      throw Object.assign(new Error("busy"), { name: "NotReadableError" });
+    });
+    p.track.end();
+    // each attempt tries 3 constraint sets; recovery must make its 5 attempts, not stop after 1
+    for (let i = 0; i < 200 && p.gum.mock.calls.length < calls + 15; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(p.gum.mock.calls.length - calls).toBeGreaterThanOrEqual(15);
+  });
+
+  it("a staff takeover (stop) ends a recovery loop", async () => {
+    const net = new FakeNet();
+    const s = await newSession(`takeover-${Math.random().toString(36).slice(2, 8)}`);
+    const { cookie } = await pairPhone(await issueCode(s));
+    const p = makePhone(net, cookie);
+    live.push(p.phone);
+    await p.phone.start(p.video);
+    p.gum.mockImplementation(async () => {
+      throw Object.assign(new Error("busy"), { name: "NotReadableError" });
+    });
+    p.track.end();
+    await new Promise((r) => setTimeout(r, 30));
+    p.phone.stop();
+    const after = p.gum.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 150));
+    expect(p.gum.mock.calls.length).toBe(after);
+  });
+
+  it("a test thumbnail is dropped by the status route when stale, and by purge when the phone is silent", async () => {
+    const s = await newSession(`thumb-${Math.random().toString(36).slice(2, 8)}`);
+    const { cookie } = await pairPhone(await issueCode(s));
+    const { getRemoteCameraStore } = await import("@/lib/remote-camera/server");
+    const store = getRemoteCameraStore();
+    const pairing = (await store.activeForKiosk(s.kioskId))!;
+    const old = new Date(Date.now() - 5 * 60_000).toISOString();
+    const report = {
+      ...pairing.report,
+      state: "idle" as const,
+      testThumb: "data:image/jpeg;base64,AAAA",
+      testAt: old,
+    };
+    // the phone keeps re-sending a five-minute-old thumbnail: the route refuses to keep it
+    const res = await routedFetch(cookie)("/api/camera/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ report }),
+    });
+    expect(res.status).toBe(200);
+    expect((await store.get(pairing.id))!.report.testThumb).toBeNull();
+    // a silent phone: the stored thumbnail goes with the next purge
+    await store.setReport(pairing.id, report, new Date().toISOString());
+    await store.purge(new Date().toISOString());
+    expect((await store.get(pairing.id))!.report.testThumb).toBeNull();
+  });
+});

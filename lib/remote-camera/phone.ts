@@ -55,6 +55,7 @@ export interface PhoneView {
 const MODE_KEY = "ftl.cameraMode";
 /** The booth waits at most this long for an answer, so an older offer is stale. */
 const OFFER_MAX_AGE_MS = 20_000;
+const THUMB_TTL_MS = 120_000;
 
 /**
  * The iPhone's half of Remote Camera. Owns the rear camera, answers the booth's WebRTC offer,
@@ -87,6 +88,8 @@ export class PhoneCamera {
   private started = false;
   private recoveryAttempt = 0;
   private cameraGeneration = 0;
+  /** Bumped by anything that takes over the camera (stop, start, staff commands): ends a recovery loop. */
+  private recoverToken = 0;
   private swapStrategy = false;
 
   constructor(private readonly deps: PhoneDeps) {
@@ -121,6 +124,7 @@ export class PhoneCamera {
   stop() {
     this.started = false;
     this.cameraGeneration++;
+    this.recoverToken++;
     this.closeLink();
     this.signaling?.stop();
     this.releaseCamera();
@@ -230,10 +234,11 @@ export class PhoneCamera {
   /** Bounded retries with exponential backoff; after that staff must look at the phone. */
   private async recoverCamera() {
     if (!this.started) return;
-    const generation = this.cameraGeneration;
+    // Our own reopen attempts bump cameraGeneration; only an outside takeover bumps this token.
+    const token = ++this.recoverToken;
     for (let attempt = 0; attempt < 5; attempt++) {
       await this.deps.sleep(backoffMs(attempt, 1_000, 15_000));
-      if (!this.started || generation !== this.cameraGeneration) return;
+      if (!this.started || token !== this.recoverToken) return;
       if (this.deps.isHidden()) continue;
       this.set({ recovery: this.view.recovery + 1 });
       await this.openCamera();
@@ -568,6 +573,7 @@ export class PhoneCamera {
         this.scheduleReport(true);
         break;
       case "reconnect":
+        this.recoverToken++;
         this.closeLink();
         await this.openCamera();
         break;
@@ -575,6 +581,7 @@ export class PhoneCamera {
         await this.testCapture();
         break;
       case "setMode":
+        this.recoverToken++;
         this.deps.storage.set(MODE_KEY, cmd.mode);
         this.set({ mode: cmd.mode });
         this.closeLink();
@@ -602,6 +609,10 @@ export class PhoneCamera {
 
   private async postReport() {
     const v = this.view;
+    // A staff test thumbnail lives two minutes, here as well as on the server.
+    const testAt = this.report.testAt ? Date.parse(this.report.testAt) : NaN;
+    if (this.report.testThumb && !(Date.now() - testAt < THUMB_TTL_MS))
+      this.report = { ...this.report, testThumb: null, testAt: null };
     const report: CameraReport = {
       ...EMPTY_REPORT,
       ...this.report,

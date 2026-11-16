@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { NO_STORE, jsonError } from "@/lib/server/http";
 import { RateLimiter } from "@/lib/server/rate-limit";
-import { getRemoteCameraStore } from "@/lib/remote-camera/server";
+import { getRemoteCameraStore, purgeRemoteCameraSoon } from "@/lib/remote-camera/server";
+import { withFreshThumb } from "@/lib/remote-camera/store";
 import { parseReport } from "@/lib/remote-camera/protocol";
 import { cameraRoute, readLimitedJson } from "@/lib/remote-camera/routes";
 
@@ -17,6 +18,12 @@ export const POST = cameraRoute("camera_status", limiter, async (request, pairin
   const body = (await readLimitedJson(request, 20_000)) as { report?: unknown } | null;
   const report = parseReport(body?.report);
   if (!report) return jsonError(400, "invalid report");
-  await getRemoteCameraStore().setReport(pairing.id, report, new Date().toISOString());
+  const now = new Date();
+  await getRemoteCameraStore().setReport(
+    pairing.id,
+    withFreshThumb(report, now.getTime()),
+    now.toISOString(),
+  );
+  purgeRemoteCameraSoon();
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 });

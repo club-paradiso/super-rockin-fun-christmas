@@ -198,5 +198,18 @@ export class SupabaseRemoteCameraStore implements RemoteCameraStore {
     if (a.error) fail("purge signals", a.error);
     const b = await this.db.from("remote_camera_codes").delete().lt("expires_at", nowIso);
     if (b.error) fail("purge codes", b.error);
+    // Staff test thumbnails live two minutes, also when the phone has stopped reporting.
+    const thumbCutoff = new Date(Date.parse(nowIso) - 120_000).toISOString();
+    const { data, error } = await this.db
+      .from("remote_camera_pairings")
+      .select("id, report")
+      .not("report->>testThumb", "is", null)
+      .lt("report->>testAt", thumbCutoff);
+    if (error) fail("find old thumbnails", error);
+    for (const row of (data ?? []) as Row[]) {
+      const report = { ...(row.report as object), testThumb: null, testAt: null };
+      const upd = await this.db.from("remote_camera_pairings").update({ report }).eq("id", row.id);
+      if (upd.error) fail("clear thumbnail", upd.error);
+    }
   }
 }

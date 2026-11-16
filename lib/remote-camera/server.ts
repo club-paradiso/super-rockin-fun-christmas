@@ -144,3 +144,23 @@ export function cameraGate(
     return jsonError(429, "too many requests");
   return null;
 }
+
+let lastPurge = 0;
+
+/**
+ * Housekeeping at most once a minute, from calls that already happen (the phone's status report,
+ * the admin list): old mailbox rows, spent codes, and staff test thumbnails past their two minutes
+ * (which must go even when the phone has stopped reporting). Never awaited, never throws.
+ */
+export function purgeRemoteCameraSoon(now = Date.now()): void {
+  if (now - lastPurge < 60_000) return;
+  lastPurge = now;
+  void getRemoteCameraStore()
+    .purge(new Date(now).toISOString())
+    .catch(() => undefined);
+}
+
+/** For tests only. */
+export function resetPurgeForTests() {
+  lastPurge = 0;
+}

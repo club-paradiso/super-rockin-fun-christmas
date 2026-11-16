@@ -244,6 +244,7 @@ export class MemoryRemoteCameraStore implements RemoteCameraStore {
   async purge(nowIso: string): Promise<void> {
     const now = Date.parse(nowIso);
     for (const [hash, c] of this.codes) if (c.used || c.expiresAt <= now) this.codes.delete(hash);
+    for (const p of this.pairings.values()) p.report = withFreshThumb(p.report, now);
     const cutoff = now - TIMING.signalTtlMs;
     this.mailbox = this.mailbox.filter((m) => Date.parse(m.at) >= cutoff);
     const live = new Set(this.mailbox.map((m) => m.seq));
