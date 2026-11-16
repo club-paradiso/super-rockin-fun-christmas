@@ -148,7 +148,7 @@ export function KioskApp({
   const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}`;
   // When the screen on show appeared, and what made the last press: finger taps in the first
   // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
-  const tapRef = useRef({ screenShownAt: 0, pointerType: "" });
+  const tapRef = useRef({ screenShownAt: 0, pointerType: "", previousTouchAt: -Infinity });
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     tapRef.current.screenShownAt = performance.now();
@@ -856,13 +856,19 @@ export function KioskApp({
             tapRef.current.pointerType = e.pointerType;
           }}
           onClickCapture={(e) => {
+            const now = performance.now();
+            const pointerType = tapRef.current.pointerType;
             const blocked = shouldBlockKioskTap({
-              now: performance.now(),
+              now,
               ...tapRef.current,
               phase: state.phase,
             });
-            // A later keyboard or assistive click must not inherit an earlier finger's type.
+            // Track only an accepted finger click, not pointerdown, and never let a stale
+            // touch type affect later keyboard/assistive clicks. Automatic transitions
+            // after countdowns do not count as an interaction.
             tapRef.current.pointerType = "";
+            if (!blocked && (pointerType === "touch" || pointerType === "pen"))
+              tapRef.current.previousTouchAt = now;
             if (blocked) {
               e.preventDefault();
               e.stopPropagation();
