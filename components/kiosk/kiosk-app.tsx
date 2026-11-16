@@ -139,6 +139,7 @@ export function KioskApp({
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
+  const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -166,7 +167,7 @@ export function KioskApp({
   // The booth has one scroll area. Every new screen starts at its top (a screen left scrolled
   // would hide the next one's header); `moreBelow` marks a screen taller than the booth.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}`;
+  const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}:${privateDelivery}`;
   // When the screen on show appeared, and what made the last press: finger taps in the first
   // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
   const tapRef = useRef({ screenShownAt: 0, pointerType: "", previousTouchAt: -Infinity });
@@ -290,6 +291,7 @@ export function KioskApp({
     setQrSvg(null);
     setMobileQr(null);
     setConfirmHome(false);
+    setPrivateDelivery(false);
     setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
@@ -774,14 +776,30 @@ export function KioskApp({
     return () => window.removeEventListener("beforeunload", confirmClose);
   }, [photoAtRisk]);
 
+  // Conceal an abandoned guest's preview and future QR while a pending photo remains at risk.
+  // The upload can finish in the background. It then resets straight to attract for the next guest.
+  const onIdle = useCallback(() => {
+    if (photoAtRisk) {
+      setConfirmHome(false);
+      setPrivateDelivery(true);
+    } else {
+      reset();
+    }
+  }, [photoAtRisk, reset]);
+  useEffect(() => {
+    if (!privateDelivery || photoAtRisk) return;
+    const timeout = setTimeout(reset, 0);
+    return () => clearTimeout(timeout);
+  }, [photoAtRisk, privateDelivery, reset]);
+
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
   const idle = useIdleReset(
     // The welcome choices go back to the attract screen too, so a half-chosen language never
     // waits for the next guest (D80).
-    state.phase !== "attract" && !isShooting(state.phase) && !photoAtRisk,
+    state.phase !== "attract" && !isShooting(state.phase) && !privateDelivery,
     KIOSK_CONFIG.idleResetSeconds,
-    reset,
+    onIdle,
   );
 
   const selectDevice = (id: string) => {
@@ -894,7 +912,8 @@ export function KioskApp({
     state.phase === "delivery" ||
     (state.phase === "mobile" &&
       (state.mobile.status === "received" || state.mobile.status === "failed"));
-  const midSession = state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
+  const midSession =
+    !privateDelivery && state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
   const requestHome = useCallback(() => {
     // Nothing to lose on these screens: go straight home. Elsewhere, ask first.
     if (state.phase === "mobile") reset();
@@ -1012,6 +1031,7 @@ export function KioskApp({
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
             durableQueue={queueStatus.durable}
+            privateDelivery={privateDelivery}
             onConsent={chooseConsent}
             onReset={reset}
             onOpen={() => dispatch({ type: "OPEN" })}
@@ -1114,6 +1134,7 @@ interface ScreenProps {
   onRetryDelivery: () => void;
   onDiscard: () => void;
   durableQueue: boolean;
+  privateDelivery: boolean;
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onOpen: () => void;
@@ -1152,6 +1173,28 @@ function Screen(p: ScreenProps) {
   const progress = progressStep(state.phase, p.wallSubmissionsOpen);
   const sessionCode = state.sessionId.slice(0, 8);
   const t = KIOSK_COPY[state.lang];
+
+  if (p.privateDelivery) {
+    return (
+      <BoothScreen testId="screen-private-delivery" progress={null}>
+        <div className="booth-message">
+          <h1 className="booth-title">{t.delivery.authTitle}</h1>
+          <p className="booth-lead">{t.delivery.temporaryQueue}</p>
+          <div className="booth-actions">
+            <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
+              {t.delivery.retry}
+            </button>
+            <button type="button" className="booth-btn-secondary" onClick={p.onDiscard}>
+              {t.delivery.home}
+            </button>
+          </div>
+          <p className="booth-meta" data-testid="session-code">
+            {t.delivery.session(sessionCode)}
+          </p>
+        </div>
+      </BoothScreen>
+    );
+  }
 
   switch (state.phase) {
     case "attract":

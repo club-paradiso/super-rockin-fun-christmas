@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, SHOOT_TIMEOUT, startSession, toConsent } from "./helpers";
+import {
+  enrollKiosk,
+  SHOOT_TIMEOUT,
+  shootSixWithMock,
+  startSession,
+  storedPhotos,
+  toConsent,
+} from "./helpers";
 
 // Playwright simulates the iPadOS 15 User-Agent on both engines. The real mini 4
 // is needed to verify Safari 15 compatibility and memory usage.
@@ -110,4 +117,34 @@ test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", asy
   await expect(page.getByTestId("screen-attract")).toBeVisible();
   await expect(page.getByTestId("qr-code")).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("idle recovery conceals a guest photo when durable storage is unavailable", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "indexedDB", { configurable: true, value: undefined });
+  });
+  await page.clock.install();
+  const before = new Set((await storedPhotos()).map((photo) => photo.sessionId));
+  await shootSixWithMock(page);
+  await page.route("**/api/photos", (route) => route.abort("internetdisconnected"));
+  await toConsent(page);
+  await expect(page.getByText("임시 저장소")).toBeVisible();
+  await expect(page.getByTestId("queue-badge")).toHaveText("전송 대기 1건");
+
+  await page.clock.fastForward(95_000);
+  await expect(page.getByTestId("screen-private-delivery")).toBeVisible();
+  await expect(page.getByTestId("screen-consent")).toHaveCount(0);
+  await expect(page.getByTestId("final-image")).toHaveCount(0);
+  await expect(page.getByTestId("qr-code")).toHaveCount(0);
+
+  await page.unroute("**/api/photos");
+  await page.getByRole("button", { name: "다시 시도" }).click();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
+  await expect(page.getByTestId("qr-code")).toHaveCount(0);
+  const photos = (await storedPhotos()).filter((photo) => !before.has(photo.sessionId));
+  expect(photos).toHaveLength(1);
+  expect(photos[0]?.wallConsent).toBe(false);
 });
