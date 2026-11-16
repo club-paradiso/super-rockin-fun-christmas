@@ -28,12 +28,12 @@ describe("iPad mini 4 / Safari 15 detection", () => {
   });
 
   it("detects iPad desktop website UA using its touch signature", () => {
-    expect(isLegacyIOS15({ userAgent: IPAD_DESKTOP, platform: "MacIntel", maxTouchPoints: 5 })).toBe(
-      true,
-    );
-    expect(isLegacyIOS15({ userAgent: IPAD_DESKTOP, platform: "MacIntel", maxTouchPoints: 0 })).toBe(
-      false,
-    );
+    expect(
+      isLegacyIOS15({ userAgent: IPAD_DESKTOP, platform: "MacIntel", maxTouchPoints: 5 }),
+    ).toBe(true);
+    expect(
+      isLegacyIOS15({ userAgent: IPAD_DESKTOP, platform: "MacIntel", maxTouchPoints: 0 }),
+    ).toBe(false);
     expect(isLegacyIOS15({ userAgent: IPAD_DESKTOP, platform: "Win32", maxTouchPoints: 5 })).toBe(
       false,
     );
@@ -41,8 +41,20 @@ describe("iPad mini 4 / Safari 15 detection", () => {
 
   it("does not penalize modern iPads or non-Apple desktop browsers", () => {
     expect(isLegacyIOS15({ userAgent: IPAD_15.replace(/15_8_8/g, "16_7_2") })).toBe(false);
-    expect(isLegacyIOS15({ userAgent: IPAD_DESKTOP.replace("Version/15.8", "Version/17.1"), platform: "MacIntel", maxTouchPoints: 5 })).toBe(false);
-    expect(isLegacyIOS15({ userAgent: "Mozilla/5.0 Chrome/121.0", platform: "MacIntel", maxTouchPoints: 0 })).toBe(false);
+    expect(
+      isLegacyIOS15({
+        userAgent: IPAD_DESKTOP.replace("Version/15.8", "Version/17.1"),
+        platform: "MacIntel",
+        maxTouchPoints: 5,
+      }),
+    ).toBe(false);
+    expect(
+      isLegacyIOS15({
+        userAgent: "Mozilla/5.0 Chrome/121.0",
+        platform: "MacIntel",
+        maxTouchPoints: 0,
+      }),
+    ).toBe(false);
   });
 
   it("keeps standard photo output on newer tablets but cuts memory cost on iOS 15", () => {
@@ -74,7 +86,9 @@ describe("cryptographic UUID fallback on older WebKit", () => {
     vi.stubGlobal("crypto", {
       getRandomValues: (bytes: Uint8Array) => {
         count++;
-        bytes.forEach((_, i) => { bytes[i] = (i + count) & 255; });
+        bytes.forEach((_, i) => {
+          bytes[i] = (i + count) & 255;
+        });
         return bytes;
       },
     });

@@ -223,10 +223,10 @@ export function KioskApp({
     recorderRef.current = new SessionRecorder(
       renderBudget.recordVideo ? browserRecorderEnv() : null,
       {
-      maxSeconds: KIOSK_CONFIG.videoMaxSeconds,
-      maxBytes: KIOSK_CONFIG.videoMaxBytes,
-      bitsPerSecond: KIOSK_CONFIG.videoBitsPerSecond,
-      // The last seconds of the countdown plus the capture itself.
+        maxSeconds: KIOSK_CONFIG.videoMaxSeconds,
+        maxBytes: KIOSK_CONFIG.videoMaxBytes,
+        bitsPerSecond: KIOSK_CONFIG.videoBitsPerSecond,
+        // The last seconds of the countdown plus the capture itself.
         segmentSeconds: KIOSK_CONFIG.videoSecondsPerShot + 1,
       },
     );
