@@ -1599,3 +1599,7 @@ Cloudflare Tunnel) instead of straight to people.
   columns that no longer cover one another; the standard lockup replaces the one-line wordmark,
   centred below the last photo. Brand tokens only for the solid colours; the overlays keep the
   approved art.
+- **Picker room:** 16 frames need a third row of tiles on a tall booth. The stacked picker now
+  splits preview and tiles evenly (`1fr 1fr`, was `1.25fr 1fr`: the ratio holds even at the
+  tiles' floor, so it pushed the frame screen 12 px past 768 × 1024) and narrow screens use six
+  columns (was five). Seven columns stay the most that keep "대림절 달력" whole at 768 px.
