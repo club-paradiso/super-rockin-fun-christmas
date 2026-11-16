@@ -387,7 +387,12 @@ export function kioskReducer<Shot>(
     case "TOGGLE_SHOT_SELECTION": {
       if (state.phase !== "select") return state;
       const index = action.index;
-      if (!Number.isInteger(index) || index < 0 || index >= state.shots.length || !state.shots[index])
+      if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= state.shots.length ||
+        !state.shots[index]
+      )
         return state;
       const selected = state.selectedShotIndices;
       if (selected.includes(index))

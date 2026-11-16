@@ -1647,7 +1647,6 @@ queue) stays as it is. Full design: `docs/REMOTE_CAMERA.md`.
 - **Not verified:** nothing here has run on an iPad mini 4 or an iPhone 12. See the real-device
   list in `docs/REMOTE_CAMERA.md`.
 
-
 ## D101 · Screen flash and one optional additional capture (2026-11-16)
 
 User decision: add a flash option to the kiosk and replace the per-photo overwrite-style

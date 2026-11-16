@@ -126,11 +126,10 @@ describe("one optional extra photo", () => {
     s = run(s, { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME", askConsent: true });
     s = run(s, { type: "TOGGLE_SHOT_SELECTION", index: 6 });
     expect(s.selectedShotIndices).toEqual([6]);
-    s = run(
-      s,
-      ...[0, 2, 4].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
-      { type: "CONFIRM_SELECTION", askConsent: true },
-    );
+    s = run(s, ...[0, 2, 4].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const), {
+      type: "CONFIRM_SELECTION",
+      askConsent: true,
+    });
     expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [6, 0, 2, 4]]);
   });
 

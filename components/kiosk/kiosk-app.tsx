@@ -1272,9 +1272,7 @@ function Screen(p: ScreenProps) {
           </div>
           <div className="shoot-panel">
             <p className="booth-title" data-testid="shot-label">
-              {state.extraShotPending
-                ? t.shoot.extraShot
-                : t.shoot.shot(state.shotIndex + 1)}
+              {state.extraShotPending ? t.shoot.extraShot : t.shoot.shot(state.shotIndex + 1)}
             </p>
             <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
             <p className="booth-lead">
@@ -1348,7 +1346,9 @@ function Screen(p: ScreenProps) {
           <div className="review-head">
             <h1 className="booth-title">{t.review.title}</h1>
             {state.shots.length > state.shotCount && (
-              <p className="booth-caption" data-testid="extra-shot-done">{t.review.extraDone}</p>
+              <p className="booth-caption" data-testid="extra-shot-done">
+                {t.review.extraDone}
+              </p>
             )}
           </div>
           <div className="fit-stage">
@@ -1408,8 +1408,10 @@ function Screen(p: ScreenProps) {
             </p>
           </div>
           <div className="fit-stage">
-            <div className={`fit-grid select-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
-              data-testid="select-grid">
+            <div
+              className={`fit-grid select-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
+              data-testid="select-grid"
+            >
               {state.shots.map((shot, index) => {
                 const order = selected.indexOf(index);
                 return (
@@ -1764,7 +1766,8 @@ function FinalPreview({
 
 /** Six required shots, plus one pending or completed extra: never overwrite an original. */
 function ShotStrip({ state, current }: { state: State; current: number }) {
-  const count = state.shotCount + (state.extraShotPending || state.shots.length > state.shotCount ? 1 : 0);
+  const count =
+    state.shotCount + (state.extraShotPending || state.shots.length > state.shotCount ? 1 : 0);
   return (
     <div
       className="shot-strip"
