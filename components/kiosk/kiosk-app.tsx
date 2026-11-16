@@ -135,7 +135,9 @@ export function KioskApp({
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(readStoredDevice);
   const urlsRef = useRef(new Set<string>());
-  const [flash, setFlash] = useState(0);
+  // Tablet screen light, not a hardware LED torch (iOS Safari cannot reliably control it).
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [screenFlashActive, setScreenFlashActive] = useState(false);
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const online = useOnline();
@@ -236,6 +238,8 @@ export function KioskApp({
     setQrSvg(null);
     setMobileQr(null);
     setConfirmHome(false);
+    setFlashEnabled(false);
+    setScreenFlashActive(false);
     dispatch({ type: "RESET" });
   }, []);
 
@@ -323,13 +327,22 @@ export function KioskApp({
     if (state.phase !== "capturing" || !cameraRef.current) return;
     let cancelled = false;
     const camera = cameraRef.current;
-    setFlash((n) => n + 1);
+    let flashTimeout: ReturnType<typeof setTimeout> | undefined;
     (async () => {
       try {
         // Gone, or muted by the browser (a black frame): take the camera again before the shot.
         if (!camera.isActive() || camera.isStalled()) {
           await camera.start(deviceId);
           setStream(camera.getStream());
+        }
+        if (cancelled) return;
+        if (flashEnabled) {
+          // Paint white *before* grabbing the frame, so this is light rather than a
+          // decorative post-capture blink. Bound exposure time on slow remote links.
+          setScreenFlashActive(true);
+          flashTimeout = setTimeout(() => setScreenFlashActive(false), 2_000);
+          await new Promise<void>((resolve) => setTimeout(resolve, 250));
+          if (cancelled) return;
         }
         const frame = await camera.capture({
           aspect: KIOSK_CONFIG.captureAspect,
@@ -344,12 +357,17 @@ export function KioskApp({
         });
       } catch {
         if (!cancelled) dispatch({ type: "CAPTURE_FAILED" });
+      } finally {
+        if (flashTimeout) clearTimeout(flashTimeout);
+        if (!cancelled) setScreenFlashActive(false);
       }
     })();
     return () => {
       cancelled = true;
+      if (flashTimeout) clearTimeout(flashTimeout);
+      setScreenFlashActive(false);
     };
-  }, [state.phase, state.shotIndex, deviceId]);
+  }, [state.phase, state.shotIndex, deviceId, flashEnabled]);
 
   const images = useMemo(
     () =>
@@ -859,6 +877,8 @@ export function KioskApp({
             deviceId={deviceId}
             onSelectDevice={selectDevice}
             guestCameraChoice={!staffHelp}
+            flashEnabled={flashEnabled}
+            onToggleFlash={() => setFlashEnabled((enabled) => !enabled)}
             thumbs={thumbs}
             finalImage={finalImage}
             qrSvg={qrSvg}
@@ -923,11 +943,11 @@ export function KioskApp({
             <p className="booth-lead">{t.home.lead}</p>
           </KioskDialog>
         )}
-        {flash > 0 && state.phase === "capturing" && (
+        {screenFlashActive && state.phase === "capturing" && (
           <div
-            key={flash}
-            className="capture-flash pointer-events-none fixed inset-0 z-20 bg-paper"
-            aria-hidden
+            data-testid="screen-flash"
+            className="capture-illumination pointer-events-none fixed inset-0 z-50"
+            aria-hidden="true"
           />
         )}
         <StatusBadges cameraMode={cameraMode} online={online} queue={queueStatus} />
@@ -957,6 +977,8 @@ interface ScreenProps {
   onSelectDevice: (id: string) => void;
   /** Without staff help mode (cloud kiosks) the camera choice stays on the ready screen. */
   guestCameraChoice: boolean;
+  flashEnabled: boolean;
+  onToggleFlash: () => void;
   thumbs: Record<string, string>;
   finalImage: FinalImage | null;
   qrSvg: string | null;
@@ -1250,8 +1272,8 @@ function Screen(p: ScreenProps) {
           </div>
           <div className="shoot-panel">
             <p className="booth-title" data-testid="shot-label">
-              {state.retakeIndex !== null
-                ? t.shoot.retakeShot(state.shotIndex + 1)
+              {state.extraShotPending
+                ? t.shoot.extraShot
                 : t.shoot.shot(state.shotIndex + 1)}
             </p>
             <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
@@ -1279,6 +1301,15 @@ function Screen(p: ScreenProps) {
                     {t.shoot.guide}
                   </button>
                 </div>
+                <button
+                  type="button"
+                  data-testid="flash-toggle"
+                  aria-pressed={p.flashEnabled}
+                  className="booth-btn-m"
+                  onClick={p.onToggleFlash}
+                >
+                  {p.flashEnabled ? t.shoot.flashOff : t.shoot.flashOn}
+                </button>
                 <p className="booth-caption" data-testid="shoot-plan">
                   {t.shoot.plan(state.countdownSeconds, total)}
                 </p>
@@ -1311,15 +1342,20 @@ function Screen(p: ScreenProps) {
     }
 
     case "review":
-      // Six prints, three by two, as large as the room allows: under the title on a tall
-      // screen, beside it on a wide one. "다시 찍기" sits under its own print.
+      // The six originals are immutable. A guest may append one seventh shot, once.
       return (
         <BoothScreen testId="screen-review" progress={progress} className="review">
           <div className="review-head">
             <h1 className="booth-title">{t.review.title}</h1>
+            {state.shots.length > state.shotCount && (
+              <p className="booth-caption" data-testid="extra-shot-done">{t.review.extraDone}</p>
+            )}
           </div>
           <div className="fit-stage">
-            <div className="fit-grid review-grid" data-testid="review-grid">
+            <div
+              className={`fit-grid review-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
+              data-testid="review-grid"
+            >
               {state.shots.map((shot, i) => (
                 <div key={i} className="review-cell">
                   <div
@@ -1333,19 +1369,21 @@ function Screen(p: ScreenProps) {
                       <img src={shot.url} alt={t.shoot.shot(i + 1)} />
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "RETAKE", index: i })}
-                    className="booth-btn-m"
-                    aria-label={t.shoot.retakeShot(i + 1)}
-                  >
-                    {t.review.retake}
-                  </button>
                 </div>
               ))}
             </div>
           </div>
           <div className="review-actions">
+            {state.shots.length === state.shotCount && (
+              <button
+                type="button"
+                data-testid="take-extra-shot"
+                className="booth-btn-secondary"
+                onClick={() => dispatch({ type: "TAKE_EXTRA_SHOT" })}
+              >
+                {t.review.retake}
+              </button>
+            )}
             <button
               type="button"
               className="booth-btn-primary"
@@ -1363,14 +1401,15 @@ function Screen(p: ScreenProps) {
       return (
         <BoothScreen testId="screen-select" progress={progress} className="select">
           <div className="select-head">
-            <h1 className="booth-title">{t.select.title(required, total)}</h1>
+            <h1 className="booth-title">{t.select.title(required, state.shots.length)}</h1>
             <p className="booth-lead" data-testid="select-required" data-required={required}>
               {/* "2 / 4장" stays on one line (no-break spaces): the count is one thing to read. */}
               {t.select.lead(selected.length, required).replace(" / ", "\u00a0/\u00a0")}
             </p>
           </div>
           <div className="fit-stage">
-            <div className="fit-grid select-grid" data-testid="select-grid">
+            <div className={`fit-grid select-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
+              data-testid="select-grid">
               {state.shots.map((shot, index) => {
                 const order = selected.indexOf(index);
                 return (
@@ -1723,14 +1762,15 @@ function FinalPreview({
   );
 }
 
-/** Six small boxes beside the camera: filled ✓ = done, ink outline on paper = this shot. */
+/** Six required shots, plus one pending or completed extra: never overwrite an original. */
 function ShotStrip({ state, current }: { state: State; current: number }) {
+  const count = state.shotCount + (state.extraShotPending || state.shots.length > state.shotCount ? 1 : 0);
   return (
     <div
       className="shot-strip"
-      aria-label={KIOSK_COPY[state.lang].shoot.progress(capturedCount(state), state.shotCount)}
+      aria-label={KIOSK_COPY[state.lang].shoot.progress(capturedCount(state), count)}
     >
-      {state.shots.map((shot, i) => (
+      {Array.from({ length: count }, (_, i) => state.shots[i] ?? null).map((shot, i) => (
         <span
           key={i}
           className={`shot-strip-cell ${
@@ -1741,7 +1781,7 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
         </span>
       ))}
       <span className="sr-only" data-testid="shot-progress">
-        {capturedCount(state)} / {state.shotCount}
+        {capturedCount(state)} / {count}
       </span>
     </div>
   );
