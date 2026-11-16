@@ -1,4 +1,5 @@
 import { createDomCanvas, type CanvasFactory } from "@/lib/canvas";
+import { kioskRenderBudget, legacyIOS15InBrowser } from "@/lib/kiosk/legacy-ios";
 import { grabFrame } from "./capture";
 import {
   CameraError,
@@ -53,12 +54,15 @@ export class BrowserCamera implements CameraProvider {
     }
     let stream: MediaStream;
     try {
+      const budget = kioskRenderBudget(legacyIOS15InBrowser());
       stream = await this.mediaDevices.getUserMedia({
         audio: false,
         video: {
           ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" }),
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          // iPad mini 4: 720p capture instead of 1080p; "ideal" still allows the
+          // device to select a supported camera format rather than failing startup.
+          width: { ideal: budget.cameraWidth },
+          height: { ideal: budget.cameraHeight },
         },
       });
     } catch (err) {
