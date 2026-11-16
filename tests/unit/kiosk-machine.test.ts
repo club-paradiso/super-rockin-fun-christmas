@@ -104,25 +104,53 @@ describe("exactly six captures", () => {
   });
 });
 
-describe("retake", () => {
-  it("retakes a single shot and returns to review", () => {
-    let s = run(toReview(), { type: "RETAKE", index: 2 });
-    expect([s.phase, s.shotIndex, s.retakeIndex]).toEqual(["countdown", 2, 2]);
-    s = shoot(s, "new-2");
-    expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "new-2", "shot-3", "shot-4", "shot-5"]);
-    expect(s.retakeIndex).toBeNull();
+describe("one optional extra photo", () => {
+  it("takes one seventh frame without overwriting or replacing any of the original six", () => {
+    const six = toReview();
+    let s = run(six, { type: "TAKE_EXTRA_SHOT" });
+    expect([s.phase, s.shotIndex, s.extraShotPending]).toEqual(["countdown", 6, true]);
+    expect(s.shots).toEqual(six.shots);
+
+    s = shoot(s, "extra");
+    expect([s.phase, s.extraShotPending]).toEqual(["review", false]);
+    expect(s.shots).toEqual([...six.shots, "extra"]);
+    expect(capturedCount(s)).toBe(7);
+    expect(run(s, { type: "TAKE_EXTRA_SHOT" })).toBe(s);
+    expect(run(s, { type: "SHOT_CAPTURED", shot: "eighth" })).toBe(s);
   });
 
-  it("retake all clears every shot and starts from the first", () => {
-    const s = run(toReview(), { type: "RETAKE_ALL" });
-    expect(s.shots).toEqual([null, null, null, null, null, null]);
-    expect([s.phase, s.shotIndex]).toEqual(["countdown", 0]);
+  it("can skip the extra and proceed with only six, or include the extra in the final selection", () => {
+    const six = toReview();
+    expect(run(six, { type: "CONFIRM_SHOTS" }).phase).toBe("frame");
+    let s = shoot(run(six, { type: "TAKE_EXTRA_SHOT" }), "extra");
+    s = run(s, { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME", askConsent: true });
+    s = run(s, { type: "TOGGLE_SHOT_SELECTION", index: 6 });
+    expect(s.selectedShotIndices).toEqual([6]);
+    s = run(s, ...[0, 2, 4].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const), {
+      type: "CONFIRM_SELECTION",
+      askConsent: true,
+    });
+    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [6, 0, 2, 4]]);
   });
 
-  it("ignores out-of-range retakes", () => {
-    const s = toReview();
-    expect(run(s, { type: "RETAKE", index: 6 })).toBe(s);
+  it("cannot add an extra before the full first six or after confirmation", () => {
+    const partial = shoot(run(toReady(), { type: "BEGIN_SHOOTING", guide: false }), "first");
+    expect(run(partial, { type: "TAKE_EXTRA_SHOT" })).toBe(partial);
+    const confirmed = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(confirmed, { type: "TAKE_EXTRA_SHOT" })).toBe(confirmed);
+  });
+
+  it("preserves the pending extra after camera failure and a reconnect", () => {
+    const six = toReview();
+    let s = run(six, { type: "TAKE_EXTRA_SHOT" });
+    s = run(s, { type: "CAMERA_FAILED", kind: "missing" });
+    expect(s.extraShotPending).toBe(true);
+    s = run(s, { type: "CAMERA_RETRY" }, { type: "CAMERA_READY" });
+    s = run(s, { type: "BEGIN_SHOOTING", guide: false });
+    expect([s.phase, s.shotIndex]).toEqual(["countdown", 6]);
+    s = shoot(s, "extra");
+    expect(s.shots).toEqual([...six.shots, "extra"]);
+    expect(s.extraShotPending).toBe(false);
   });
 });
 
@@ -266,7 +294,7 @@ describe("reset", () => {
     expect(s.shots).toEqual([null, null, null, null, null, null]);
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
-    expect(s.retakeIndex).toBeNull();
+    expect(s.extraShotPending).toBe(false);
     expect(s.frameId).toBe("wood-window"); // last choice becomes the next default
   });
 
@@ -401,12 +429,11 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(currentPose(s)).toBeNull();
   });
 
-  it("retaking shot i shows pose i; retake all starts from the first pose", () => {
+  it("the only extra photo keeps the chosen pose guide and uses the next pose", () => {
     let s = begin(true);
     for (let i = 0; i < 6; i++) s = shoot(s, `g-${i}`);
-    const retake = run(s, { type: "RETAKE", index: 4 });
-    expect(currentPose(retake)).toEqual(POSE_SEQUENCE[4]);
-    expect(currentPose(run(s, { type: "RETAKE_ALL" }))).toEqual(POSE_SEQUENCE[0]);
+    const extra = run(s, { type: "TAKE_EXTRA_SHOT" });
+    expect(currentPose(extra)).toEqual(POSE_SEQUENCE[6 % POSE_SEQUENCE.length]);
   });
 
   it("the guide changes nothing about the countdown", () => {

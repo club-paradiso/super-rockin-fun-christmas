@@ -19,7 +19,7 @@ children through older adults, on unreliable venue Wi-Fi, without collecting per
 ## 3. Core experience
 
 ```
-ATTRACT → PICK A FRAME → CAMERA → COUNTDOWN → 4-CUT CAPTURE → REVIEW → (RETAKE)
+ATTRACT → PICK A FRAME → CAMERA → COUNTDOWN → 4-CUT CAPTURE → REVIEW → (OPTIONAL ONE EXTRA PHOTO)
        → FRAME AGAIN (with the guest's photos) → MEDIA WALL QUESTION → QR → DOWNLOAD
 separately:  WALL "YES" → MODERATION → APPROVED → MEDIA WALL
 ```
@@ -35,7 +35,7 @@ Download and public consent are independent. Saying no to the wall never affects
 ### Kiosk (`/kiosk`)
 
 Screens (Figma `01 Platform — Booth & Admin`, 01–07): attract ("화면을 눌러 시작"), frame choice
-("이 틀로 찍기"), camera permission, preview and countdown, review with one retake button per photo,
+("이 틀로 찍기"), camera permission, preview and countdown, review with an optional one-time extra photo (six originals unchanged),
 frame choice again with the guest's photos in every frame ("사진을 넣어 봤어요", the first choice
 preselected, "이 틀로 할게요"), media-wall question beside the finished strip, QR ("휴대폰으로 사진을
 받아 가세요", session code under the QR, "다 받았어요"), auto reset.

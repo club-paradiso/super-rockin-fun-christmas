@@ -1,36 +1,35 @@
 /**
- * Stray taps on a touch screen. A new booth screen often puts a button where the last screen had
- * one ("이대로 좋아요" and "이 틀로 할게요" share a spot; the QR screen's "다 받았어요" can arrive
- * under a finger that was going for "다시 시도"). A double tap, or a tap that lands just as the
- * screen changes, would press a button the guest never saw. For a moment after a screen appears,
- * finger taps on it are therefore ignored.
- *
- * Only touch and pen: a person cannot read a screen and aim a finger at it in this time, so
- * nothing deliberate is lost. Mouse and keyboard are left alone (staff at a desk, and automated
- * tests, press on purpose).
+ * Prevent a fast second finger tap from activating a different button after a screen switch.
+ * A time window since render alone is insufficient: the review screen also appears AUTOMATICALLY
+ * after six captures, and a legitimate first touch there must never silently disappear.
  */
 export const TAP_GUARD_MS = 350;
 
-export function isStrayTap(input: {
-  /** performance.now() at the tap. */
+export interface TouchGuardInput {
+  /** performance.now() when this click fired. */
   now: number;
-  /** performance.now() when the screen on show appeared. */
+  /** When the current screen appeared. */
   screenShownAt: number;
-  /** The pointer that made the tap ("touch", "pen", "mouse", or "" for the keyboard). */
+  /** Last accepted touch/pen click, possibly on the preceding screen. */
+  previousTouchAt?: number;
   pointerType: string;
   guardMs?: number;
-}): boolean {
-  const finger = input.pointerType === "touch" || input.pointerType === "pen";
-  return finger && input.now - input.screenShownAt < (input.guardMs ?? TAP_GUARD_MS);
 }
 
-/**
- * The attract screen has no previous guest button to protect against. Blocking its first
- * touch makes the kiosk appear broken, especially on a slow/older iPad after page load.
- * Keep the short guard only after the guest has actually opened a subsequent screen.
- */
-export function shouldBlockKioskTap(
-  input: Parameters<typeof isStrayTap>[0] & { phase: string },
-): boolean {
+export function isStrayTap(input: TouchGuardInput): boolean {
+  const finger = input.pointerType === "touch" || input.pointerType === "pen";
+  const windowMs = input.guardMs ?? TAP_GUARD_MS;
+  const previous = input.previousTouchAt ?? Number.NEGATIVE_INFINITY;
+  return (
+    finger &&
+    input.now - input.screenShownAt >= 0 &&
+    input.now - input.screenShownAt < windowMs &&
+    input.now - previous >= 0 &&
+    input.now - previous < windowMs
+  );
+}
+
+/** The initial attract surface never has a prior button to protect against. */
+export function shouldBlockKioskTap(input: TouchGuardInput & { phase: string }): boolean {
   return input.phase !== "attract" && isStrayTap(input);
 }

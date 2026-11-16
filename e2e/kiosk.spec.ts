@@ -128,7 +128,9 @@ test("decline path: consent NO leaves the download working and nothing queued fo
   expect((await photoForToken(tokenFromUrl(phoneUrl)))!.moderationStatus).toBe("NONE");
 });
 
-test("retaking one shot keeps the other five", async ({ page }) => {
+test("one optional extra photo keeps all six originals, can be selected, and cannot be repeated", async ({
+  page,
+}) => {
   await shootFourWithMock(page);
   const srcs = async () =>
     Promise.all(
@@ -137,18 +139,44 @@ test("retaking one shot keeps the other five", async ({ page }) => {
       ),
     );
   const before = await srcs();
-  await page.getByRole("button", { name: "2번째 사진 다시 찍기" }).click();
-  await expect(page.getByText("2번째 사진 다시 찍기")).toBeVisible();
+  const extra = page.getByTestId("take-extra-shot");
+  await expect(extra).toHaveCount(1);
+  await extra.click();
+  await expect(page.getByTestId("shot-label")).toHaveText("추가 사진 1컷");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 30_000 });
-  const after = await srcs();
-  expect([after[0], after[2], after[3], after[4], after[5]]).toEqual([
-    before[0],
-    before[2],
-    before[3],
-    before[4],
-    before[5],
-  ]);
-  expect(after[1]).not.toBe(before[1]);
+  expect(await srcs()).toEqual(before);
+  await expect(page.getByTestId("review-shot-6").locator("img")).toBeVisible();
+  await expect(page.getByTestId("extra-shot-done")).toContainText("총 7장");
+  await expect(extra).toHaveCount(0);
+
+  await page.getByRole("button", { name: "이대로 좋아요" }).click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  await expect(page.getByText(/7장 중 \d장을 골라주세요/)).toBeVisible();
+  await page.getByTestId("select-shot-6").click();
+  await expect(page.getByTestId("select-shot-6")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("screen flash can be toggled before shooting and lights the display only when enabled", async ({
+  page,
+}) => {
+  await page.goto("/kiosk?camera=mock");
+  await startSession(page);
+  const toggle = page.getByTestId("flash-toggle");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveText("화면 플래시 끄기");
+  await page.getByTestId("shoot-free").click();
+  await expect(page.getByTestId("screen-flash")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-flash")).toHaveCount(0);
+  await page.getByRole("button", { name: "이대로 좋아요" }).click();
+  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await page.getByTestId("go-home").click();
+  await page.getByTestId("confirm-home-yes").click();
+  await startSession(page);
+  await expect(page.getByTestId("flash-toggle")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("unknown photo link: friendly page with a 404 status", async ({ page }) => {
@@ -181,9 +209,9 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(pose).toHaveCount(0);
 
-  await page.getByRole("button", { name: "1번째 사진 다시 찍기" }).click();
+  await page.getByTestId("take-extra-shot").click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
-  await expect(pose).toContainText("서로 마주 보기"); // a retake keeps this guest's choice
+  await expect(pose).toBeVisible(); // the optional extra keeps this guest's guide choice
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   // Free poses: nothing extra during the countdown.
   await page.getByTestId("go-home").click();

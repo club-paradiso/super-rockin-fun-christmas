@@ -73,7 +73,9 @@ const ko = {
   },
   shoot: {
     shot: (n: number) => `${n}번째 사진`,
-    retakeShot: (n: number) => `${n}번째 사진 다시 찍기`,
+    extraShot: "추가 사진 1컷",
+    flashOn: "화면 플래시 켜기",
+    flashOff: "화면 플래시 끄기",
     lead: "카메라를 보고 웃어주세요.\n숫자가 0이 되면 찍혀요.",
     free: "자유 포즈로 찍기",
     guide: "포즈 추천받고 찍기",
@@ -84,7 +86,8 @@ const ko = {
   },
   review: {
     title: "잘 나왔나요?",
-    retake: "다시 찍기",
+    retake: "한 컷 더 찍기 (1회)",
+    extraDone: "추가 촬영 완료 · 총 7장",
     confirm: "이대로 좋아요",
   },
   select: {
@@ -238,7 +241,9 @@ const en: KioskCopy = {
   },
   shoot: {
     shot: (n) => `Photo ${n}`,
-    retakeShot: (n) => `Retaking photo ${n}`,
+    extraShot: "One extra photo",
+    flashOn: "Turn screen flash on",
+    flashOff: "Turn screen flash off",
     lead: "Look at the camera and smile.\nThe photo is taken when the count reaches 0.",
     free: "Pose freely",
     guide: "Get pose ideas",
@@ -249,7 +254,8 @@ const en: KioskCopy = {
   },
   review: {
     title: "How did they turn out?",
-    retake: "Retake",
+    retake: "Take 1 extra photo (once)",
+    extraDone: "Extra photo taken · 7 in total",
     confirm: "Looks good",
   },
   select: {
@@ -397,7 +403,9 @@ const zh: KioskCopy = {
   },
   shoot: {
     shot: (n) => `第 ${n} 张照片`,
-    retakeShot: (n) => `重拍第 ${n} 张照片`,
+    extraShot: "额外拍摄 1 张",
+    flashOn: "开启屏幕补光",
+    flashOff: "关闭屏幕补光",
     lead: "请看着镜头微笑。\n数字变成 0 就会拍下来。",
     free: "自由摆姿势",
     guide: "给我姿势建议",
@@ -408,7 +416,8 @@ const zh: KioskCopy = {
   },
   review: {
     title: "拍得好看吗？",
-    retake: "重拍",
+    retake: "再拍 1 张（仅限一次）",
+    extraDone: "补拍完成 · 共 7 张",
     confirm: "就这样吧",
   },
   select: {

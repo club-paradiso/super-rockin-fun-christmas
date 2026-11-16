@@ -1646,3 +1646,26 @@ queue) stays as it is. Full design: `docs/REMOTE_CAMERA.md`.
   log, not in the moderation audit table: nothing about a photo changes.
 - **Not verified:** nothing here has run on an iPad mini 4 or an iPhone 12. See the real-device
   list in `docs/REMOTE_CAMERA.md`.
+
+## D101 · Screen flash and one optional additional capture (2026-11-16)
+
+User decision: add a flash option to the kiosk and replace the per-photo overwrite-style
+"다시 찍기" with **one additional new photograph, at most once per guest session**.
+
+- The base session is six photographs. Review offers one secondary action,
+  "한 컷 더 찍기 (1회)", instead of per-photo replacement buttons. Its successful capture is
+  appended at index 6. The original six images stay untouched. The review and selection grids
+  can display seven images; choosing a template still requires only its slot count and the
+  seventh photo is selectable in any position. Continuing without an extra is unchanged.
+- The state machine enforces the limit, including late capture events and a reconnect while
+  the extra is in progress. A failed capture can be retried without spending an additional slot.
+  A new guest starts with no extra and screen flash off.
+- "화면 플래시" is an opt-in, per-guest screen light, not an LED torch. The kiosk screen becomes
+  white before the camera snapshot, remains bright until the shot or a 2-second upper bound,
+  and turns off on success, failure, cancellation, or reset. This can help a front-facing camera;
+  the **remote iPhone rear LED is not controlled** (Safari support cannot be assumed).
+- Strings for Korean, English and Simplified Chinese are in `lib/kiosk/copy.ts`. Regression
+  coverage includes immutable six-photo preservation, at-most-once seventh capture, recovery,
+  final selection, screen flash, plus a remote WebRTC capture flow.
+- Device acceptance is **unverified** until a real tablet and, for remote mode, iPhone capture
+  are tested. In particular iPad mini 4's Safari 15 remains outside Next.js 16's supported range.

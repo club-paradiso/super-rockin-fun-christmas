@@ -244,14 +244,14 @@
 
 ### 9.1 자동 시험
 
-| 시험                                            | 파일                                    | 범위                                                                                                              |
-| ----------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 프로토콜·모드 선택·코드·쿠키·ICE                | `tests/unit/remote-protocol.test.ts`    | 순수 함수                                                                                                         |
-| 조각·재조립·CRC·역압·정지·닫힘                  | `tests/unit/remote-transfer.test.ts`    | 순수 + 가짜 채널                                                                                                  |
-| 셔터: 중복·재전송·손상·시간 초과·늦은 결과·busy | `tests/unit/remote-shutter.test.ts`     | 가짜 링크. 손실 링크 40세션 시뮬레이션 포함                                                                       |
-| 우편함·페어링 저장소                            | `tests/unit/remote-store.test.ts`       | 메모리 구현(Supabase 구현은 같은 인터페이스, 통합 시험 미실행)                                                    |
-| 페어링→시그널링→협상→촬영→해제 (실제 라우트)    | `tests/unit/remote-camera-flow.test.ts` | 실제 라우트·쿠키·저장소 + 가짜 WebRTC. RemoteCamera·PhoneCamera 실물                                              |
-| 전체 방문객 흐름                                | `e2e/remote-camera.spec.ts`             | 실제 Chromium WebRTC 2개 컨텍스트(부스·폰 역할), 가짜 웹캠. 페어링·6컷·개별 다시 찍기·틀·동의·QR·관리자·해제·복구 |
+| 시험                                            | 파일                                    | 범위                                                                                                                   |
+| ----------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 프로토콜·모드 선택·코드·쿠키·ICE                | `tests/unit/remote-protocol.test.ts`    | 순수 함수                                                                                                              |
+| 조각·재조립·CRC·역압·정지·닫힘                  | `tests/unit/remote-transfer.test.ts`    | 순수 + 가짜 채널                                                                                                       |
+| 셔터: 중복·재전송·손상·시간 초과·늦은 결과·busy | `tests/unit/remote-shutter.test.ts`     | 가짜 링크. 손실 링크 40세션 시뮬레이션 포함                                                                            |
+| 우편함·페어링 저장소                            | `tests/unit/remote-store.test.ts`       | 메모리 구현(Supabase 구현은 같은 인터페이스, 통합 시험 미실행)                                                         |
+| 페어링→시그널링→협상→촬영→해제 (실제 라우트)    | `tests/unit/remote-camera-flow.test.ts` | 실제 라우트·쿠키·저장소 + 가짜 WebRTC. RemoteCamera·PhoneCamera 실물                                                   |
+| 전체 방문객 흐름                                | `e2e/remote-camera.spec.ts`             | 실제 Chromium WebRTC 2개 컨텍스트(부스·폰 역할), 가짜 웹캠. 페어링·6컷·추가 1컷(원본 유지)·틀·동의·QR·관리자·해제·복구 |
 
 ### 9.2 측정 (**시뮬레이션: Node·헤드리스 Chromium. 실제 Apple 기기 수치가 아니다**)
 

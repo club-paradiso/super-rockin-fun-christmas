@@ -280,6 +280,8 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       ).not.toBeNull();
     });
 
+    // Two sequential OTP API requests, Mailpit delivery, and polling can exceed Vitest's
+    // default 5-second deadline under CI load. Keep all privacy and delivery assertions.
     it("emails a login code only to active staff, with an identical response either way", async () => {
       const mails = async (to: string) => {
         const r = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
@@ -300,7 +302,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
       ).json();
       expect(String(msg.Text)).toMatch(/\b\d{6}\b/);
       expect(await mails(outsiderEmail)).toHaveLength(0);
-    });
+    }, 20_000);
   });
 
   describe("kiosk enrollment, heartbeat, revocation", () => {
