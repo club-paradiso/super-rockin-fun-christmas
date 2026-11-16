@@ -24,8 +24,8 @@ export function resolveCameraMode(
   return mode === "mock" || mode === "remote" ? mode : "browser";
 }
 
-export function createCamera(mode: CameraMode): CameraProvider {
+export function createCamera(mode: CameraMode, legacyBudget = false): CameraProvider {
   if (mode === "mock") return new MockCamera();
   if (mode === "remote") return new RemoteCamera();
-  return new BrowserCamera();
+  return new BrowserCamera(undefined, undefined, legacyBudget);
 }

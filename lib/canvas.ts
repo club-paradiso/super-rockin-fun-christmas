@@ -46,3 +46,15 @@ export function canvasToBlob(
  */
 export const BRAND_FONT = "Noto Sans KR Variable";
 export const FONT_STACK = `"${BRAND_FONT}", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif`;
+
+/** Some older WebKit builds expose FileReader without Blob.arrayBuffer(). */
+export function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.onabort = () => reject(new Error("Photo read interrupted"));
+    reader.readAsArrayBuffer(blob);
+  });
+}

@@ -122,6 +122,7 @@ export type KioskAction<Shot> =
   | { type: "BACK_TO_FRAME" }
   | { type: "DELIVERY_QR_PENDING" }
   | { type: "DELIVERY_STARTED" }
+  | { type: "DELIVERY_RETRY_COMPOSE" }
   | { type: "DELIVERY_SUCCEEDED"; token: string; url: string; expiresAt: string }
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
@@ -414,6 +415,11 @@ export function kioskReducer<Shot>(
         ? { ...state, phase: "frame", selectedShotIndices: [] }
         : state;
 
+    case "DELIVERY_RETRY_COMPOSE":
+      return uploading(state) && state.delivery.status === "failed"
+        ? { ...state, delivery: { status: "idle" } }
+        : state;
+
     case "DELIVERY_STARTED":
       return uploading(state) && state.delivery.status !== "ready"
         ? { ...state, delivery: { status: "uploading" } }
@@ -442,7 +448,9 @@ export function kioskReducer<Shot>(
         : state;
 
     case "DELIVERY_FAILED":
-      return uploading(state)
+      return uploading(state) &&
+        state.delivery.status !== "ready" &&
+        state.delivery.status !== "qr-pending"
         ? { ...state, delivery: { status: "failed", message: action.message } }
         : state;
 

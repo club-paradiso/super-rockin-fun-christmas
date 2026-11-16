@@ -283,22 +283,32 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
     // Two sequential OTP API requests, Mailpit delivery, and polling can exceed Vitest's
     // default 5-second deadline under CI load. Keep all privacy and delivery assertions.
     it("emails a login code only to active staff, with an identical response either way", async () => {
+      // The setup login mints a link for staffEmail. Supabase records that request on the user,
+      // so reusing that account here makes delivery depend on the OTP resend interval.
+      const recipient = `otp-${tag}@example.org`;
+      const recipientId = await createUser(recipient);
+      const { getBackend } = await import("@/lib/storage/server");
+      await getBackend().staff.upsert(
+        { userId: recipientId, email: recipient, displayName: "OTP 검수 담당" },
+        null,
+      );
+
       const mails = async (to: string) => {
         const r = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
         return ((await r.json()) as { messages: { ID: string }[] }).messages;
       };
       const a = await call(routes.otp(), "POST", "/api/admin/auth/otp", {
-        body: { email: staffEmail },
+        body: { email: recipient },
       });
       const b = await call(routes.otp(), "POST", "/api/admin/auth/otp", {
         body: { email: outsiderEmail },
       });
       expect([a.status, await a.json()]).toEqual([b.status, await b.json()]);
       await expect
-        .poll(async () => (await mails(staffEmail)).length, { timeout: 10_000 })
+        .poll(async () => (await mails(recipient)).length, { timeout: 10_000 })
         .toBeGreaterThan(0);
       const msg = await (
-        await fetch(`${MAILPIT}/api/v1/message/${(await mails(staffEmail))[0]!.ID}`)
+        await fetch(`${MAILPIT}/api/v1/message/${(await mails(recipient))[0]!.ID}`)
       ).json();
       expect(String(msg.Text)).toMatch(/\b\d{6}\b/);
       expect(await mails(outsiderEmail)).toHaveLength(0);

@@ -7,7 +7,7 @@ import base from "./playwright.config";
  */
 export default defineConfig({
   ...base,
-  testMatch: /legacy-ipad\.spec\.ts/,
+  testMatch: /(?:legacy-ipad|kiosk-frontend)\.spec\.ts/,
   projects: [
     {
       name: "kiosk-webkit",

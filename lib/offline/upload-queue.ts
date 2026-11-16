@@ -75,7 +75,7 @@ export class UploadQueue {
   }
 
   async emitStatus() {
-    const all = await this.store.all();
+    const all = await this.store.metadata();
     this.emit({
       type: "status",
       depth: all.length,
@@ -84,14 +84,14 @@ export class UploadQueue {
   }
 
   async depth(): Promise<number> {
-    return (await this.store.all()).length;
+    return (await this.store.metadata()).length;
   }
 
   /** What staff see in help mode: oldest first, without the image bytes. */
   async entries(): Promise<
     Pick<QueuedUpload, "sessionId" | "createdAt" | "attempts" | "lastError" | "state">[]
   > {
-    return (await this.store.all())
+    return (await this.store.metadata())
       .map(({ sessionId, createdAt, attempts, lastError, state }) => ({
         sessionId,
         createdAt,
@@ -173,7 +173,7 @@ export class UploadQueue {
   processDue(force = false): Promise<void> {
     this.processing ??= (async () => {
       try {
-        for (const entry of await this.store.all()) {
+        for (const entry of await this.store.metadata()) {
           if (!force && entry.nextAttemptAt > this.now()) continue;
           const outcome = await this.deliverNow(entry.sessionId);
           // Still offline: no point hammering the rest of the queue this round.
