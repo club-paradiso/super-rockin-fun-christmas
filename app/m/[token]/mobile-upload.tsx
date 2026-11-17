@@ -4,34 +4,48 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "@/components/brand";
 import { StampTicket } from "@/components/studio/stamp-ticket";
 import { cleanOrdinal } from "@/lib/studio/day";
-import { FRAMES, getFrame } from "@/config/frames";
+import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/config/frames";
 import { KIOSK_CONFIG } from "@/config/kiosk";
-import { MOBILE_UPLOAD_CONFIG, mobileFramesFor } from "@/config/mobile";
+import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { composeFrame, formatDateLabel } from "@/lib/compositor/compose";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
+import { placeholderPhotos } from "@/lib/compositor/placeholders";
 import type { ComposeImage } from "@/lib/compositor/types";
+import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
-  cycleOrder,
   decodePhotoFile,
   drawPhoto,
   limitPicked,
+  settleSelection,
+  toggleOrdered,
   type DecodeFailure,
 } from "@/lib/mobile/prepare";
 
+/**
+ * The phone page goes in the booth's order (D103): choose a frame, choose exactly as many photos
+ * as it holds in the order they go in, then answer the media-wall question with two equal answers.
+ * Either way the guest can save the finished picture; only a "yes" sends it anywhere.
+ */
 type Phase =
-  | { name: "pick" }
+  | { name: "frame" }
+  | { name: "photos" }
   | { name: "preparing" }
-  | { name: "preview" }
+  | { name: "consent" }
   | { name: "uploading"; progress: number; attempt: number }
   /** ordinal: "오늘 N번째 기록" as the server counted it; null when unknown. */
   | { name: "done"; ordinal: number | null }
-  | { name: "error"; message: string; retry: boolean }
+  /** The guest said no to the wall: the picture stays on the phone, nothing was sent. */
+  | { name: "kept" }
+  | { name: "error"; reason: string; message: string; retry: boolean }
   | { name: "expired" };
 
 /** Network trouble is retried by itself this many times, with growing waits, before asking. */
 const AUTO_RETRIES = [1_000, 3_000, 7_000];
+
+/** The booth's own words for the same steps (lib/kiosk/copy.ts, the user's wording, D76). */
+const BOOTH = KIOSK_COPY.ko;
 
 const ERRORS: Record<string, { message: string; retry: boolean }> = {
   heic: {
@@ -44,9 +58,9 @@ const ERRORS: Record<string, { message: string; retry: boolean }> = {
     retry: false,
   },
   too_small: { message: "사진이 너무 작아요. 더 큰 사진을 골라 주세요.", retry: false },
-  consent: { message: "동의 확인란을 눌러 주세요.", retry: false },
+  consent: { message: "미디어월 질문에 다시 답해 주세요.", retry: false },
   paused: {
-    message: "지금은 미디어월 게시 신청을 잠시 멈췄어요. 잠시 뒤 부스에서 다시 시도해 주세요.",
+    message: "지금은 미디어월 게시 신청을 잠시 멈췄어요. 완성된 사진은 아래에서 저장할 수 있어요.",
     retry: false,
   },
   closed: { message: "이 QR로 보낸 사진은 이미 처리됐어요.", retry: false },
@@ -58,6 +72,12 @@ const ERRORS: Record<string, { message: string; retry: boolean }> = {
   },
   server: { message: "잠시 문제가 생겼어요. 조금 뒤 다시 보내기를 눌러 주세요.", retry: true },
 };
+
+const fail = (reason: keyof typeof ERRORS): Phase => ({
+  name: "error",
+  reason,
+  ...ERRORS[reason]!,
+});
 
 type SendOutcome = "ok" | "expired" | keyof typeof ERRORS;
 
@@ -130,12 +150,15 @@ export function MobileUpload({
   alreadySent: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>(
-    alreadySent ? { name: "done", ordinal: null } : { name: "pick" },
+    alreadySent ? { name: "done", ordinal: null } : { name: "frame" },
   );
-  // The picked photos, already shrunk (MOBILE_UPLOAD_CONFIG.sourceLongEdge), in slot order.
-  const [photos, setPhotos] = useState<ComposeImage[]>([]);
+  // The booth preselects the same frame.
+  const [frameId, setFrameId] = useState<string>(DEFAULT_FRAME_ID);
+  // Every photo the guest has picked so far, already shrunk (MOBILE_UPLOAD_CONFIG.sourceLongEdge),
+  // and which of them go into the frame, in order (indices into `pool`).
+  const [pool, setPool] = useState<ComposeImage[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
   const [dropped, setDropped] = useState(0);
-  const [frameId, setFrameId] = useState<string | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
   // The encoded picture, with the frame and photo list it was made from: composing is async, so
   // the guest's current choice can be ahead of it for a moment.
@@ -145,14 +168,18 @@ export function MobileUpload({
     frameId: string;
     photos: ComposeImage[];
   } | null>(null);
-  const [consent, setConsent] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const sending = useRef(false);
 
-  // The QR stops working after its time; say so instead of failing on submit.
+  const frame = getFrame(frameId);
+  const required = frame.slots.length;
+  const chosen = useMemo(() => selected.map((i) => pool[i]!), [selected, pool]);
+
+  // The QR stops working after its time; say so instead of failing on submit. A guest who kept
+  // the picture for themselves needs no QR any more and keeps their screen.
   useEffect(() => {
+    if (phase.name === "done" || phase.name === "kept") return;
     const ms = new Date(expiresAt).getTime() - Date.now();
-    if (phase.name === "done") return;
     const timer = setTimeout(() => setPhase({ name: "expired" }), Math.max(0, ms));
     return () => clearTimeout(timer);
   }, [expiresAt, phase.name]);
@@ -176,43 +203,63 @@ export function MobileUpload({
     };
   }, []);
 
-  // Free the shrunk photos' pixels when the page goes away. A new pick frees the old ones itself
-  // (`release`); reordering keeps the same canvases, so it must not free anything.
-  const photosRef = useRef<ComposeImage[]>([]);
+  // Free the shrunk photos' pixels when the page goes away.
+  const poolRef = useRef<ComposeImage[]>([]);
   useEffect(() => {
-    photosRef.current = photos;
-  }, [photos]);
-  useEffect(() => () => release(photosRef.current), []);
+    poolRef.current = pool;
+  }, [pool]);
+  useEffect(() => () => release(poolRef.current), []);
 
-  const frames = useMemo(() => mobileFramesFor(photos.length), [photos.length]);
   const dateLabel = useMemo(() => formatDateLabel(new Date()), []);
 
-  // Small pictures of each frame this many photos fit, with the guest's own photos in them.
+  // The frame picker shows sample photos until the guest has their own, then their own (as the
+  // booth does after shooting), repeated to fill frames that hold more than they picked.
+  const samples = useMemo(() => (assets ? placeholderPhotos() : null), [assets]);
+  const thumbSource = useMemo(() => {
+    if (!samples) return null;
+    if (pool.length === 0) return samples;
+    return samples.map((_, i) => pool[i % pool.length]!);
+  }, [samples, pool]);
+
+  const onFrameScreen = phase.name === "frame";
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
-    if (!assets || photos.length === 0) return out;
-    for (const frame of frames) {
-      const canvas = composeFrame(frame, photos, {
+    if (!assets || !thumbSource || !onFrameScreen) return out;
+    for (const f of FRAMES) {
+      const canvas = composeFrame(f, thumbSource.slice(0, f.slots.length), {
         createCanvas: createDomCanvas,
         context: { dateLabel, assets },
         scale: KIOSK_CONFIG.thumbScale / 2,
       }) as HTMLCanvasElement;
-      out[frame.id] = canvas.toDataURL("image/jpeg", 0.8);
+      out[f.id] = canvas.toDataURL("image/jpeg", 0.8);
       canvas.width = canvas.height = 0;
     }
     return out;
-  }, [assets, frames, photos, dateLabel]);
+  }, [assets, thumbSource, dateLabel, onFrameScreen]);
 
-  // The JPEG that will be sent: the photos in the chosen frame at the booth's saved size, redrawn
-  // whenever the guest changes the frame or the order. Preview = result.
+  // The chosen frame, larger, above the tiles.
+  const framePreview = useMemo(() => {
+    if (!assets || !thumbSource || !onFrameScreen) return null;
+    const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
+      createCanvas: createDomCanvas,
+      context: { dateLabel, assets },
+      scale: 0.5,
+    }) as HTMLCanvasElement;
+    const url = canvas.toDataURL("image/jpeg", 0.85);
+    canvas.width = canvas.height = 0;
+    return url;
+  }, [assets, thumbSource, frame, dateLabel, onFrameScreen]);
+
+  // The JPEG that will be saved or sent: the chosen photos in the chosen frame at the booth's
+  // saved size. Preview = result.
+  const composing = phase.name === "consent" || phase.name === "uploading";
   useEffect(() => {
-    if (!assets || !frameId || photos.length === 0) return;
-    const frame = getFrame(frameId);
-    if (frame.id !== frameId || frame.slots.length !== photos.length) return;
+    if (!assets || !composing || chosen.length !== required) return;
+    if (preview && preview.frameId === frame.id && preview.photos === chosen) return;
     let cancelled = false;
     (async () => {
       try {
-        const canvas = composeFrame(frame, photos, {
+        const canvas = composeFrame(frame, chosen, {
           createCanvas: createDomCanvas,
           context: { dateLabel, assets },
           scale: KIOSK_CONFIG.outputScale,
@@ -224,26 +271,27 @@ export function MobileUpload({
         );
         canvas.width = canvas.height = 0; // let the browser drop the pixels now
         if (cancelled) return;
-        setPreview({ url: URL.createObjectURL(blob), blob, frameId: frame.id, photos });
-        setPhase((p) => (p.name === "preparing" || p.name === "preview" ? { name: "preview" } : p));
+        setPreview({ url: URL.createObjectURL(blob), blob, frameId: frame.id, photos: chosen });
       } catch {
-        if (!cancelled) setPhase({ name: "error", ...ERRORS.unreadable! });
+        if (!cancelled) setPhase(fail("unreadable"));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [assets, frameId, photos, dateLabel]);
+  }, [assets, composing, chosen, required, frame, dateLabel, preview]);
+
+  // Only a picture made from what is on screen now may be saved or sent: never an older frame's
+  // picture under the new frame's id (the server would refuse it), never an older choice.
+  const current =
+    preview && preview.frameId === frame.id && preview.photos === chosen ? preview : null;
 
   const pick = async (list: FileList | null) => {
     const files = list ? [...list] : [];
     if (files.length === 0) return;
-    const { kept, dropped: left } = limitPicked(files, MOBILE_UPLOAD_CONFIG.maxPhotos);
+    const room = MOBILE_UPLOAD_CONFIG.maxPhotos - poolRef.current.length;
+    const { kept, dropped: left } = limitPicked(files, room);
     setPhase({ name: "preparing" });
-    setPreview(null);
-    release(photosRef.current);
-    photosRef.current = [];
-    setPhotos([]);
     const shrunk: ComposeImage[] = [];
     try {
       // One at a time, each shrunk and its full-size bitmap freed before the next is opened.
@@ -264,24 +312,34 @@ export function MobileUpload({
       }
     } catch (failure) {
       release(shrunk);
-      const key = (failure as DecodeFailure) === "heic" ? "heic" : "unreadable";
-      setPhotos([]);
-      setFrameId(null);
-      setPhase({ name: "error", ...ERRORS[key]! });
+      setPhase(fail((failure as DecodeFailure) === "heic" ? "heic" : "unreadable"));
       return;
     }
+    const next = [...poolRef.current, ...shrunk];
+    poolRef.current = next;
     setDropped(left);
-    setPhotos(shrunk);
-    // The first frame in picker order for this many photos, as on the booth.
-    setFrameId(mobileFramesFor(shrunk.length)[0]?.id ?? null);
+    setPool(next);
+    setSelected((s) => settleSelection(s, next.length, required));
+    setPhase({ name: "photos" });
   };
 
-  // Only a picture made from what is on screen now may be sent: never an older frame's picture
-  // under the new frame's id (the server would refuse it), never the photos in an older order.
-  const previewCurrent = !!preview && preview.frameId === frameId && preview.photos === photos;
+  const choose = () => inputRef.current?.click();
 
-  const submit = useCallback(async () => {
-    if (!preview || !previewCurrent || !consent || sending.current) return;
+  const clearPool = () => {
+    release(poolRef.current);
+    poolRef.current = [];
+    setPool([]);
+    setSelected([]);
+    setDropped(0);
+  };
+
+  const confirmFrame = () => {
+    setSelected((s) => settleSelection(s, pool.length, required));
+    setPhase({ name: "photos" });
+  };
+
+  const answerYes = useCallback(async () => {
+    if (!current || sending.current) return;
     sending.current = true;
     try {
       for (let attempt = 0; ; attempt++) {
@@ -289,8 +347,8 @@ export function MobileUpload({
         let ordinal: number | null = null;
         const outcome = await send(
           token,
-          preview.blob,
-          preview.frameId,
+          current.blob,
+          current.frameId,
           publicWall,
           (progress) => setPhase({ name: "uploading", progress, attempt }),
           (n) => {
@@ -299,22 +357,20 @@ export function MobileUpload({
         );
         if (outcome === "ok") return setPhase({ name: "done", ordinal });
         if (outcome === "expired") return setPhase({ name: "expired" });
-        const err = ERRORS[outcome]!;
-        if (err.retry && attempt < AUTO_RETRIES.length) {
+        if (ERRORS[outcome]!.retry && attempt < AUTO_RETRIES.length) {
           await new Promise((r) => setTimeout(r, AUTO_RETRIES[attempt]));
           continue;
         }
-        return setPhase({ name: "error", ...err });
+        return setPhase(fail(outcome));
       }
     } finally {
       sending.current = false;
     }
-  }, [preview, previewCurrent, consent, token, publicWall]);
-
-  const choose = () => inputRef.current?.click();
+  }, [current, token, publicWall]);
 
   return (
-    <main className="min-h-dvh px-5 pb-12 pt-8" data-testid="mobile-upload">
+    // Korean never breaks inside a word on a narrow phone (it read "선택했/어요").
+    <main className="min-h-dvh break-keep px-5 pb-12 pt-8" data-testid="mobile-upload">
       <div className="mx-auto flex max-w-md flex-col gap-6">
         <header className="text-center">
           <BrandLockup className="text-[52px]" />
@@ -337,16 +393,119 @@ export function MobileUpload({
           }}
         />
 
-        {phase.name === "pick" && (
-          <section className="flex flex-col gap-4 text-center">
-            <p className="text-lg leading-relaxed text-ink/75">
-              휴대폰에 있는 사진을 1~6장 골라 포토부스 틀에 담아 보내면,
-              <br />
-              운영팀이 확인한 뒤 미디어월에 걸어 드려요.
-            </p>
-            <button type="button" className="btn-primary w-full" onClick={choose}>
-              사진 고르기 (최대 6장)
+        {phase.name === "frame" && (
+          <section className="flex flex-col gap-5" data-testid="mobile-step-frame">
+            <h2 className="text-center text-xl font-bold text-ink">{BOOTH.frame.pickTitle}</h2>
+            <figure className="flex flex-col items-center gap-2 rounded-3xl bg-paper p-3">
+              {framePreview ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data URL
+                <img
+                  src={framePreview}
+                  alt={`${frame.label} 틀 미리보기`}
+                  data-testid="mobile-frame-preview"
+                  data-frame={frame.id}
+                  className="max-h-[38dvh] w-auto rounded-lg"
+                />
+              ) : (
+                <span className="h-[38dvh]" aria-hidden />
+              )}
+              <figcaption className="text-lg font-bold text-ink">
+                {frame.label}{" "}
+                <span className="text-base font-normal text-ink/75">
+                  {BOOTH.frame.slots(required)}
+                </span>
+              </figcaption>
+            </figure>
+            <FramePicker
+              frames={FRAMES.map((f) => ({ id: f.id, label: f.label, thumb: thumbs[f.id] }))}
+              selected={frame.id}
+              onSelect={setFrameId}
+            />
+            <button
+              type="button"
+              className="btn-primary w-full"
+              data-testid="mobile-frame-confirm"
+              onClick={confirmFrame}
+            >
+              {BOOTH.frame.againConfirm}
             </button>
+          </section>
+        )}
+
+        {phase.name === "photos" && (
+          <section className="flex flex-col gap-4 text-center" data-testid="mobile-step-photos">
+            <h2 className="text-xl font-bold text-ink">
+              {pool.length > required
+                ? BOOTH.select.title(required, pool.length)
+                : `사진을 ${required}장 골라주세요`}
+            </h2>
+            <p className="text-base leading-relaxed text-ink/75" data-testid="mobile-select-lead">
+              {pool.length === 0
+                ? `휴대폰에 있는 사진을 골라 주세요. ${frame.label} 틀에 ${required}장이 들어가요.`
+                : BOOTH.select.lead(selected.length, required)}
+            </p>
+            {pool.length > 0 && (
+              <PhotoGrid
+                photos={pool}
+                selected={selected}
+                onToggle={(i) => setSelected((s) => toggleOrdered(s, i, required))}
+              />
+            )}
+            {dropped > 0 && (
+              <p className="text-base text-ink/75" data-testid="mobile-dropped">
+                사진은 {MOBILE_UPLOAD_CONFIG.maxPhotos}장까지 담아 둘 수 있어요. {dropped}장은 담지
+                않았어요.
+              </p>
+            )}
+            {pool.length < required ? (
+              <>
+                {pool.length > 0 && (
+                  <p className="text-base font-semibold text-ink" data-testid="mobile-need-more">
+                    사진이 {required - pool.length}장 더 필요해요.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary w-full"
+                  data-testid="mobile-choose"
+                  onClick={choose}
+                >
+                  {pool.length === 0 ? "사진 고르기" : "사진 더 고르기"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary w-full"
+                  data-testid="mobile-select-confirm"
+                  disabled={selected.length !== required}
+                  onClick={() => setPhase({ name: "consent" })}
+                >
+                  {BOOTH.select.confirm}
+                </button>
+                {pool.length < MOBILE_UPLOAD_CONFIG.maxPhotos && (
+                  <button type="button" className="btn-quiet self-center" onClick={choose}>
+                    사진 더 고르기
+                  </button>
+                )}
+              </>
+            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                className="btn-quiet"
+                data-testid="mobile-change-frame"
+                onClick={() => setPhase({ name: "frame" })}
+              >
+                {BOOTH.select.changeFrame}
+              </button>
+              {pool.length > 0 && (
+                <button type="button" className="btn-quiet" onClick={clearPool}>
+                  고른 사진 비우기
+                </button>
+              )}
+            </div>
           </section>
         )}
 
@@ -356,50 +515,70 @@ export function MobileUpload({
           </p>
         )}
 
-        {(phase.name === "preview" || phase.name === "uploading") && preview && (
-          <section className="flex flex-col gap-5">
+        {(phase.name === "consent" || phase.name === "uploading") && (
+          <section className="flex flex-col gap-5" data-testid="mobile-step-consent">
             <figure className="flex justify-center rounded-3xl bg-paper p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- local object URL */}
-              <img
-                src={preview.url}
-                alt="보낼 사진 미리보기"
-                data-testid="mobile-preview"
-                className="max-h-[46dvh] w-auto rounded-lg"
-              />
-            </figure>
-            {phase.name === "preview" && (
-              <>
-                {dropped > 0 && (
-                  <p className="text-center text-base text-ink/75" data-testid="mobile-dropped">
-                    한 틀에는 6장까지 담겨요. 앞의 6장만 담았어요.
-                  </p>
-                )}
-                <FramePicker
-                  frames={frames.map((f) => ({ id: f.id, label: f.label, thumb: thumbs[f.id] }))}
-                  selected={frameId}
-                  onSelect={setFrameId}
+              {current ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local object URL
+                <img
+                  src={current.url}
+                  alt="완성된 사진"
+                  data-testid="mobile-preview"
+                  className="max-h-[46dvh] w-auto rounded-lg"
                 />
-                {photos.length > 1 && (
+              ) : (
+                <p className="py-16 text-lg text-ink/75" role="status">
+                  {BOOTH.consent.making}
+                </p>
+              )}
+            </figure>
+            {phase.name === "consent" && (
+              <>
+                <div className="text-center">
+                  <h2 className="whitespace-pre-line text-2xl font-bold text-ink">
+                    {BOOTH.consent.title}
+                  </h2>
+                  <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-ink/75">
+                    {BOOTH.consent.lead}
+                  </p>
+                  {/* D86: said before the answer, at the lead's size, never in the small print. */}
+                  {publicWall && (
+                    <p
+                      className="mt-2 text-lg leading-relaxed text-ink/75"
+                      data-testid="mobile-public-note"
+                    >
+                      {BOOTH.consent.publicNote}
+                    </p>
+                  )}
+                </div>
+                <Notes />
+                {/* Equal size and weight on purpose, as on the booth: neither answer is the
+                    "right" one, and "no" still gives the guest their picture. */}
+                <div className="flex flex-col gap-3">
                   <button
                     type="button"
-                    className="min-h-12 self-center rounded-full border border-ink/50 px-5 text-base font-semibold text-ink"
-                    data-testid="mobile-reorder"
-                    onClick={() => setPhotos(cycleOrder)}
+                    className="btn-secondary w-full"
+                    data-testid="mobile-yes"
+                    disabled={!current}
+                    onClick={() => void answerYes()}
                   >
-                    ↻ 사진 순서 바꾸기
+                    {BOOTH.consent.yes}
                   </button>
-                )}
-                <Consent checked={consent} onChange={setConsent} publicWall={publicWall} />
+                  <button
+                    type="button"
+                    className="btn-secondary w-full"
+                    data-testid="mobile-no"
+                    disabled={!current}
+                    onClick={() => setPhase({ name: "kept" })}
+                  >
+                    {BOOTH.consent.no}
+                  </button>
+                </div>
                 <button
                   type="button"
-                  className="btn-primary w-full"
-                  data-testid="mobile-submit"
-                  disabled={!consent || !previewCurrent}
-                  onClick={() => void submit()}
+                  className="btn-quiet self-center"
+                  onClick={() => setPhase({ name: "photos" })}
                 >
-                  미디어월로 보내기
-                </button>
-                <button type="button" className="btn-quiet self-center" onClick={choose}>
                   사진 다시 고르기
                 </button>
               </>
@@ -439,9 +618,29 @@ export function MobileUpload({
               <strong className="text-ink">아직 미디어월에 나온 것은 아니에요.</strong>
             </p>
             <p className="text-base text-ink/75">
-              내리고 싶으면 현장 안내 봉사자에게 말씀해 주세요. 이 창은 닫아도 돼요.
+              내리고 싶으면 현장 안내 봉사자에게 말씀해 주세요.
             </p>
+            {preview && <SavePicture url={preview.url} />}
             <StampTicket info={{ ordinal: phase.ordinal, createdAt: new Date() }} />
+          </section>
+        )}
+
+        {phase.name === "kept" && current && (
+          <section className="flex flex-col gap-4 text-center" data-testid="mobile-kept">
+            <h2 className="text-2xl font-bold text-ink">사진이 완성됐어요</h2>
+            <p className="text-lg leading-relaxed text-ink/75">
+              미디어월에는 보내지 않았어요.
+              <br />이 창을 닫으면 사진이 사라지니 먼저 저장해 주세요.
+            </p>
+            <figure className="flex justify-center rounded-3xl bg-paper p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local object URL */}
+              <img
+                src={current.url}
+                alt="완성된 사진"
+                className="max-h-[46dvh] w-auto rounded-lg"
+              />
+            </figure>
+            <SavePicture url={current.url} />
           </section>
         )}
 
@@ -453,13 +652,19 @@ export function MobileUpload({
           >
             <h2 className="text-xl font-bold text-ink">보내지 못했어요</h2>
             <p className="text-lg leading-relaxed text-ink/75">{phase.message}</p>
-            {phase.retry && preview ? (
-              <button type="button" className="btn-primary w-full" onClick={() => void submit()}>
+            {phase.retry && current ? (
+              <button type="button" className="btn-primary w-full" onClick={() => void answerYes()}>
                 다시 보내기
               </button>
+            ) : phase.reason === "paused" && current ? (
+              <SavePicture url={current.url} />
             ) : (
-              <button type="button" className="btn-primary w-full" onClick={choose}>
-                다른 사진 고르기
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={() => setPhase({ name: "photos" })}
+              >
+                사진 다시 고르기
               </button>
             )}
           </section>
@@ -486,22 +691,42 @@ function release(photos: readonly ComposeImage[]) {
   }
 }
 
-/** The booth frames that hold this many photos, each shown with the guest's own photos in it. */
+/**
+ * Saves the finished picture on the phone. It never leaves the phone this way: the link is the
+ * picture's own local address. Long-press is the fallback where a browser ignores `download`.
+ */
+function SavePicture({ url }: { url: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <a
+        href={url}
+        download="studio-shalom.jpg"
+        className="btn-primary w-full"
+        data-testid="mobile-save"
+      >
+        사진 저장하기
+      </a>
+      <p className="text-base text-ink/75">저장되지 않으면 사진을 길게 눌러 저장해 주세요.</p>
+    </div>
+  );
+}
+
+/** Every booth frame, each with sample photos (or the guest's own) in it, in picker order. */
 function FramePicker({
   frames,
   selected,
   onSelect,
 }: {
   frames: { id: string; label: string; thumb: string | undefined }[];
-  selected: string | null;
+  selected: string;
   onSelect: (id: string) => void;
 }) {
-  if (frames.length < 2) return null;
   return (
     <div
       role="radiogroup"
       aria-label="틀 고르기"
-      className="flex flex-wrap justify-center gap-3"
+      // Three across keeps the longest name ("대림절 달력") whole at 360 px.
+      className="grid grid-cols-3 gap-2"
       data-testid="mobile-frames"
     >
       {frames.map((f) => (
@@ -512,7 +737,7 @@ function FramePicker({
           aria-checked={selected === f.id}
           data-frame-id={f.id}
           onClick={() => onSelect(f.id)}
-          className={`flex min-h-12 w-24 flex-col items-center gap-1 rounded-2xl p-2 text-sm font-semibold text-ink ${
+          className={`flex min-h-12 min-w-0 flex-col items-center gap-1 rounded-2xl p-1.5 text-sm font-semibold text-ink ${
             selected === f.id ? "bg-paper ring-2 ring-ink" : "border border-ink/30"
           }`}
         >
@@ -522,23 +747,70 @@ function FramePicker({
           ) : (
             <span className="h-20" aria-hidden />
           )}
-          {f.label}
+          <span className="w-full truncate">{f.label}</span>
         </button>
       ))}
     </div>
   );
 }
 
+/** The photos picked so far; a tap puts one in the frame (numbered in order) or takes it out. */
+function PhotoGrid({
+  photos,
+  selected,
+  onToggle,
+}: {
+  photos: ComposeImage[];
+  selected: number[];
+  onToggle: (index: number) => void;
+}) {
+  const urls = useMemo(
+    () =>
+      photos.map((p) => {
+        const canvas = p.source as HTMLCanvasElement;
+        return "toDataURL" in canvas ? canvas.toDataURL("image/jpeg", 0.6) : "";
+      }),
+    [photos],
+  );
+  return (
+    <div className="grid grid-cols-3 gap-2" data-testid="mobile-photos">
+      {photos.map((_, i) => {
+        const order = selected.indexOf(i);
+        return (
+          <button
+            key={i}
+            type="button"
+            aria-pressed={order >= 0}
+            aria-label={order >= 0 ? BOOTH.select.unchoose(order + 1) : `사진 ${i + 1} 넣기`}
+            data-testid={`mobile-photo-${i}`}
+            data-order={order >= 0 ? order + 1 : undefined}
+            onClick={() => onToggle(i)}
+            className={`relative aspect-[4/3] min-h-12 overflow-hidden rounded-xl ${
+              order >= 0 ? "ring-4 ring-ink" : "border border-ink/30"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+            <img src={urls[i]} alt="" className="h-full w-full object-cover" />
+            {order >= 0 && (
+              <span className="absolute left-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-ink text-base font-bold text-button-text">
+                {order + 1}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Steps({ phase }: { phase: Phase["name"] }) {
   const current =
-    phase === "pick" || phase === "preparing"
+    phase === "frame"
       ? 1
-      : phase === "preview"
+      : phase === "photos" || phase === "preparing" || phase === "error"
         ? 2
-        : phase === "done"
-          ? 3
-          : 2;
-  const steps = ["사진 고르기", "틀 고르고 보내기", "운영팀 확인"];
+        : 3;
+  const steps = ["틀 고르기", "사진 고르기", "완성"];
   return (
     // On a narrow phone the three steps do not fit in one row: a step moves to the next row whole
     // (it used to break in the middle of a word).
@@ -561,46 +833,22 @@ function Steps({ phase }: { phase: Phase["name"] }) {
 }
 
 /**
- * What the guest agrees to. Only facts the system enforces are stated; retention periods and the
- * age rule are the church's decision (docs/STATUS.md "14세 미만 기준, 보관 기간 확정") and are
- * deliberately not promised here.
+ * What the guest should know before answering. Only facts the system enforces are stated;
+ * retention periods and the age rule are the church's decision (docs/STATUS.md "14세 미만 기준,
+ * 보관 기간 확정") and are deliberately not promised here.
  */
-function Consent({
-  checked,
-  onChange,
-  publicWall,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  publicWall: boolean;
-}) {
+function Notes() {
   return (
     <div className="rounded-3xl border border-ink/15 bg-paper p-5">
-      <h2 className="text-lg font-bold text-ink">보내기 전에 꼭 읽어 주세요</h2>
+      <h3 className="text-lg font-bold text-ink">미디어월에 보내기 전에 읽어 주세요</h3>
       <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed text-ink/75">
         <li>이 사진은 크리스마스 마을의 공개된 미디어월에 다른 분들 사진과 함께 보일 수 있어요.</li>
-        {/* D86. Written by Claude (2026-11-13), pending the user's wording. */}
-        {publicWall && (
-          <li data-testid="mobile-public-note">
-            미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.
-          </li>
-        )}
         <li>운영팀이 직접 확인하고 승인한 사진만 걸려요. 승인되지 않을 수도 있어요.</li>
         <li>STUDIO SHALOM 미디어월에만 쓰고, 정해진 보관 기간이 지나면 지워져요.</li>
         <li>다른 사람이 함께 나온 사진은 그분께 먼저 허락을 받아 주세요.</li>
         <li>어린이가 나온 사진은 보호자가 함께 확인한 뒤 보내 주세요.</li>
         <li>사진 속 위치 정보 같은 기록은 지우고 사진만 저장해요.</li>
       </ul>
-      <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 text-base font-semibold text-ink">
-        <input
-          type="checkbox"
-          className="h-6 w-6 shrink-0 accent-button"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          data-testid="mobile-consent"
-        />
-        위 내용을 확인했고, 미디어월에 보내는 데 동의해요
-      </label>
     </div>
   );
 }

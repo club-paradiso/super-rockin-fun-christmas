@@ -244,11 +244,14 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
   })
     .jpeg()
     .toBuffer();
+  // D103: frame first (the one-photo frame), then the photo, then "yes".
+  await guest.locator('[data-frame-id="shalom-single"]').click();
+  await guest.getByTestId("mobile-frame-confirm").click();
   await guest
     .getByTestId("mobile-file")
     .setInputFiles({ name: "a.jpg", mimeType: "image/jpeg", buffer });
-  await guest.getByTestId("mobile-consent").check();
-  await guest.getByTestId("mobile-submit").click();
+  await guest.getByTestId("mobile-select-confirm").click();
+  await guest.getByTestId("mobile-yes").click();
   await expect(guest.getByTestId("mobile-done")).toBeVisible();
   await context.close();
 

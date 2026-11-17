@@ -169,8 +169,8 @@ const ko = {
     stepsLabel: "순서",
     steps: [
       "휴대폰 카메라로 QR을 찍어요",
-      "열린 화면에서 사진을 1~6장 고르고 틀을 골라요",
-      "안내를 읽고 ‘미디어월로 보내기’를 눌러요",
+      "열린 화면에서 틀을 고르고, 틀에 넣을 사진을 골라요",
+      "미디어월에 띄워도 될지 답하고, 완성된 사진을 저장해요",
     ],
     note: "운영팀이 확인한 사진만 미디어월에 걸려요. 회원가입이나 앱 설치는 필요 없어요.",
     lan: "휴대폰이 행사장 와이파이에 연결되어 있어야 열려요.",
@@ -339,8 +339,8 @@ const en: KioskCopy = {
     stepsLabel: "Steps",
     steps: [
       "Scan the QR code with your phone’s camera",
-      "On the page that opens, choose 1 to 6 photos and a frame",
-      "Read the note, then tap “미디어월로 보내기” (Send to the media wall)",
+      "On the page that opens, choose a frame, then the photos for it",
+      "Say whether it may go on the media wall, then save your photo",
     ],
     note: "Only photos our team has checked go on the wall. No sign-up or app needed.",
     lan: "Your phone needs to be on the event Wi-Fi for this to open.",
@@ -503,8 +503,8 @@ const zh: KioskCopy = {
     stepsLabel: "步骤",
     steps: [
       "用手机摄像头扫描二维码",
-      "在打开的页面中选 1～6 张照片，再选一个相框",
-      "阅读说明后，点“미디어월로 보내기”（发送到媒体墙）",
+      "在打开的页面中先选相框，再选要放进去的照片",
+      "回答是否放上媒体墙，然后保存做好的照片",
     ],
     note: "只有运营团队确认过的照片才会挂到媒体墙上。不需要注册，也不需要安装应用。",
     lan: "手机需要连接活动现场的 Wi-Fi 才能打开。",

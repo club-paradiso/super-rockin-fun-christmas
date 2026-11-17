@@ -125,13 +125,37 @@ export async function decodePhotoFile(file: File): Promise<DecodedPhoto> {
 
 /**
  * The photos a guest picked, in the order the picker gave them, at most `max` (D93: one booth
- * frame holds 1 to 6). `dropped` says how many were left out so the page can say so.
+ * frame holds 1 to 6; D103: `max` is the room left on the page). `dropped` says how many were
+ * left out so the page can say so.
  */
 export function limitPicked<T>(files: readonly T[], max: number): { kept: T[]; dropped: number } {
   return { kept: files.slice(0, max), dropped: Math.max(0, files.length - max) };
 }
 
-/** "순서 바꾸기": the first photo moves to the last slot, every other one moves up one. */
-export function cycleOrder<T>(list: readonly T[]): T[] {
-  return list.length < 2 ? [...list] : [...list.slice(1), list[0]!];
+/**
+ * Tap a photo to put it in the frame, tap again to take it out (D103, as on the booth's selection
+ * screen): photos go into the frame in the order they were tapped, never more than `required`.
+ */
+export function toggleOrdered(
+  selected: readonly number[],
+  index: number,
+  required: number,
+): number[] {
+  if (selected.includes(index)) return selected.filter((i) => i !== index);
+  return selected.length < required ? [...selected, index] : [...selected];
+}
+
+/**
+ * The photos chosen for a frame after the guest picks more: when the photos on hand are exactly
+ * what the frame holds and none is chosen yet, all of them, in the order picked (nothing to
+ * decide); otherwise the guest's own choice, with any no longer on hand left out.
+ */
+export function settleSelection(
+  selected: readonly number[],
+  available: number,
+  required: number,
+): number[] {
+  const kept = selected.filter((i) => i < available).slice(0, required);
+  if (kept.length === 0 && available === required) return [...Array(required).keys()];
+  return kept;
 }

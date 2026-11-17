@@ -97,15 +97,42 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const guest = await phone(browser);
   await guest.goto(url);
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
+  // D103: the booth's order. First the frame, from every booth frame, the booth's default chosen.
+  await expect(guest.getByTestId("mobile-step-frame")).toBeVisible();
+  const frames = guest.getByTestId("mobile-frames").getByRole("radio");
+  expect(await frames.count()).toBeGreaterThanOrEqual(16);
+  // Every frame name whole on a phone, as on the booth (no "대림절 …").
+  const cut = await guest
+    .getByTestId("mobile-frames")
+    .locator("button > span")
+    .evaluateAll((spans) =>
+      spans.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent),
+    );
+  expect(cut).toEqual([]);
+  await expect(guest.locator('[data-frame-id="navy-strip"]')).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await guest.locator('[data-frame-id="shalom-single"]').click();
+  await expect(guest.getByTestId("mobile-frame-preview")).toHaveAttribute(
+    "data-frame",
+    "shalom-single",
+  );
+  await guest.getByTestId("mobile-frame-confirm").click();
+  // Then exactly as many photos as the frame holds: one here, so it is chosen for the guest.
   await guest.getByTestId("mobile-file").setInputFiles(await photoFile(1600, 1200));
+  await expect(guest.getByTestId("mobile-photo-0")).toHaveAttribute("aria-pressed", "true");
+  await guest.getByTestId("mobile-select-confirm").click();
   await expect(guest.getByTestId("mobile-preview")).toBeVisible();
-  // One photo: the one booth frame that holds one (D93), so no frame choice to make.
-  await expect(guest.getByTestId("mobile-frames")).toHaveCount(0);
-  // Nothing goes anywhere without the guest's explicit consent.
-  await expect(guest.getByTestId("mobile-submit")).toBeDisabled();
-  await guest.getByTestId("mobile-consent").check();
-  await guest.getByTestId("mobile-submit").click();
+  // Nothing goes anywhere until the guest answers; both answers are the same size (as the booth).
+  const [yes, no] = [guest.getByTestId("mobile-yes"), guest.getByTestId("mobile-no")];
+  const [yesBox, noBox] = [(await yes.boundingBox())!, (await no.boundingBox())!];
+  expect([yesBox.width, yesBox.height]).toEqual([noBox.width, noBox.height]);
+  expect((await db()).photos.some((p) => p.sessionId === sessionId)).toBe(false);
+  await yes.click();
   await expect(guest.getByTestId("mobile-done")).toBeVisible();
+  // The guest keeps the finished picture too.
+  await expect(guest.getByTestId("mobile-save")).toHaveAttribute("download", /\.jpg$/);
   // Received is not approved, and the page says so.
   await expect(guest.getByTestId("mobile-done")).toContainText(
     "아직 미디어월에 나온 것은 아니에요",
@@ -173,21 +200,29 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
 
   const guest = await phone(browser);
   await guest.goto(url);
-  const files = await Promise.all(
-    [0, 1, 2, 3].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 40 + i * 50)),
-  );
-  await guest.getByTestId("mobile-file").setInputFiles(files);
-  await expect(guest.getByTestId("mobile-preview")).toBeVisible();
-  // Four photos: every booth frame for four, the 2×2 first as on the booth.
+  // Every booth frame, in the booth's picker order, before any photo is picked.
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
   await expect(frames.first()).toHaveAttribute("data-frame-id", "shalom-grid");
-  await expect(frames.first()).toHaveAttribute("aria-checked", "true");
-  expect(await frames.count()).toBeGreaterThanOrEqual(2);
   await guest.locator('[data-frame-id="shalom-letter"]').click();
   await expect(guest.locator('[data-frame-id="shalom-letter"]')).toHaveAttribute(
     "aria-checked",
     "true",
   );
+  await guest.getByTestId("mobile-frame-confirm").click();
+  // Two photos first: the frame holds four, so the page asks for more.
+  const files = await Promise.all(
+    [0, 1, 2, 3, 4].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 40 + i * 40)),
+  );
+  await guest.getByTestId("mobile-file").setInputFiles(files.slice(0, 2));
+  await expect(guest.getByTestId("mobile-need-more")).toContainText("2장");
+  await guest.getByTestId("mobile-choose").click({ trial: true });
+  await guest.getByTestId("mobile-file").setInputFiles(files.slice(2));
+  // Five photos for four places: the guest taps them in the order they go in, as on the booth.
+  await expect(guest.getByTestId("mobile-select-confirm")).toBeDisabled();
+  for (const i of [4, 0, 2, 1]) await guest.getByTestId(`mobile-photo-${i}`).click();
+  await expect(guest.getByTestId("mobile-photo-4")).toHaveAttribute("data-order", "1");
+  await expect(guest.getByTestId("mobile-photo-3")).toHaveAttribute("aria-pressed", "false");
+  await guest.getByTestId("mobile-select-confirm").click();
   // The preview is the picture that will be sent: the letter strip's 1:3 shape.
   await expect
     .poll(
@@ -199,9 +234,7 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
       { timeout: 15_000 },
     )
     .toBe(3);
-  await guest.getByTestId("mobile-reorder").click();
-  await guest.getByTestId("mobile-consent").check();
-  await guest.getByTestId("mobile-submit").click();
+  await guest.getByTestId("mobile-yes").click();
   await expect(guest.getByTestId("mobile-done")).toBeVisible();
   await guest.context().close();
 
@@ -211,6 +244,41 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
   const stored = (row as unknown as { objectPath: string }).objectPath;
   const meta = await sharp(await readFile(`.data-e2e/objects/${stored}`)).metadata();
   expect([meta.width, meta.height]).toEqual([1200, 3600]);
+});
+
+// D103: as on the booth, "no" to the wall still gives the guest their picture, and sends nothing.
+test("saying no on the phone: the guest saves the framed picture, nothing is sent", async ({
+  browser,
+}) => {
+  await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
+  await kiosk.getByTestId("start-mobile").click();
+  const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
+  const sessionId = sessionOf(url);
+
+  const guest = await phone(browser);
+  await guest.goto(url);
+  await guest.getByTestId("mobile-frame-confirm").click(); // the booth's default, four photos
+  await guest
+    .getByTestId("mobile-file")
+    .setInputFiles(
+      await Promise.all([0, 1, 2, 3].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 60 + i * 40))),
+    );
+  // Exactly four for four places: chosen for the guest in the order picked.
+  await expect(guest.getByTestId("mobile-photo-3")).toHaveAttribute("data-order", "4");
+  await guest.getByTestId("mobile-select-confirm").click();
+  await expect(guest.getByTestId("mobile-preview")).toBeVisible({ timeout: 15_000 });
+  await guest.getByTestId("mobile-no").click();
+  await expect(guest.getByTestId("mobile-kept")).toBeVisible();
+  const save = guest.getByTestId("mobile-save");
+  const [download] = await Promise.all([guest.waitForEvent("download"), save.click()]);
+  const saved = await sharp(await readFile((await download.path())!)).metadata();
+  // The navy strip at the booth's saved size.
+  expect([saved.width, saved.height]).toEqual([1200, 3600]);
+  await guest.context().close();
+
+  expect((await db()).photos.some((p) => p.sessionId === sessionId)).toBe(false);
+  await expect(kiosk.getByTestId("mobile-received")).toHaveCount(0);
 });
 
 test("staff pages on a phone: no sideways scrolling, big touch targets", async ({ browser }) => {
