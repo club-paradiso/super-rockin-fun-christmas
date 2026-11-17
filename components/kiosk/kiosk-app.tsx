@@ -1287,8 +1287,8 @@ function Screen(p: ScreenProps) {
 
   switch (state.phase) {
     case "attract":
-      // "화면을 눌러 시작" (D80): the whole screen is the start button, and the seal is the
-      // letter's closure the guest opens. Both languages, because nobody has chosen one yet.
+      // The memory journal cover opens on the first tap. The whole screen remains the start
+      // target, with all language hints visible before the guest chooses a language.
       return (
         <BoothScreen
           testId="screen-attract"
@@ -1314,6 +1314,9 @@ function Screen(p: ScreenProps) {
               </p>
             ))}
           </div>
+          <p className="journal-cover-edition" aria-hidden="true">
+            CHRISTMAS MEMORIES · 2026
+          </p>
         </BoothScreen>
       );
 
@@ -1417,7 +1420,12 @@ function Screen(p: ScreenProps) {
             <h1 className="booth-title">{pick ? t.frame.pickTitle : t.frame.againTitle}</h1>
             {!pick && <p className="booth-lead">{t.frame.againLead}</p>}
           </div>
-          <div className="pick-preview" data-testid="frame-preview" data-frame={chosen.id}>
+          <div
+            key={chosen.id}
+            className="pick-preview"
+            data-testid="frame-preview"
+            data-frame={chosen.id}
+          >
             <div className="frame-art">
               {p.thumbs[chosen.id] ? (
                 // eslint-disable-next-line @next/next/no-img-element -- generated data URL
@@ -1808,9 +1816,9 @@ function Screen(p: ScreenProps) {
                   )}
                 </p>
               </div>
-              {/* The QR printed on a receipt ticket, lying on its kraft envelope. */}
-              <div className="qr-card qr-card-envelope" data-testid="qr-envelope">
-                <KraftEnvelope />
+              {/* The QR is a still, scan-safe journal bookmark; only its surrounding ticket moves. */}
+              <div className="qr-card journal-qr-card" data-testid="qr-envelope">
+                <span className="journal-ticket-tab" aria-hidden="true" />
                 <div className="qr-ticket-shadow">
                   <div className="qr-ticket" style={{ clipPath: QR_TICKET_CLIP }}>
                     <div
@@ -2080,19 +2088,6 @@ function DeskTray({
     >
       {children}
     </div>
-  );
-}
-
-/** The kraft envelope under the QR ticket (decoration; a drawn one without the picture). */
-function KraftEnvelope() {
-  const art = useAssetReady(STUDIO_ASSETS.envelope);
-  return (
-    <span className="kraft-envelope" data-art={art ? "image" : "drawn"} aria-hidden>
-      {art && (
-        // eslint-disable-next-line @next/next/no-img-element -- fixed decoration asset
-        <img src={STUDIO_ASSETS.envelope} alt="" draggable={false} />
-      )}
-    </span>
   );
 }
 
