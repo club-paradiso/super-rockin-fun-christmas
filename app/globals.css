@@ -2446,7 +2446,7 @@ main input:focus-visible,
   border: 3px solid var(--color-button-text);
   border-radius: 50%;
   background: var(--color-button);
-  box-shadow: 0 0 0 2px var(--color-button);
+  outline: 2px solid var(--color-button);
 }
 
 .journal-sheet .journal-tab {
