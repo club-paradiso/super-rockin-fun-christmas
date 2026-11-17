@@ -4,6 +4,14 @@
 
 - 파일: https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB (file key `S5hz7sZaXXB2kNc9YrB3cB`)
 - 지금 쓰는 페이지: `STUDIO SHALOM · Kiosk`, `STUDIO SHALOM · Frame, Phone & Wall`
+- 추가 키오스크 편집 원본: https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU 의
+  `KIOSK · 하나로 · 태블릿 820×1180 (코드 순서대로) ← 여기서만 편집`, 공통 부품은 `SS 00 · 브랜드 · 공통 컴포넌트`.
+  **2026-11-17 D89 후속 정리:** 이 편집본에서 기본/간편 전환 토글(한글/영문), 간편 홈 화면,
+  간편모드 전용 Footer 인스턴스 10곳을 삭제했다. 공통 `Kiosk/Footer (코드)` 에서
+  `Type=ModeOnly` 변형과 간편 버튼도 삭제해 `Type=HomeOnly` 의 `처음으로` 버튼만 남겼다.
+  언어 선택(한국어/English)은 그대로 유지한다. 역사 보관 페이지는 현재 앱 UI가 아니다.
+  DB의 `kiosk_default_mode` 열/레거시 RPC 인자는 실행 중일 수 있는 이전 버전과의 호환을 위해
+  유지 중이며, 현재 부스 코드에서는 사용하지 않는다(별도의 안전한 DB 정리 필요).
 - 이전 디자인(FOLLOW THE LIGHTS)은 같은 파일의 `ARCHIVE · Follow the Lights` 페이지에 있다. 기록으로만 둔다.
 - 네컷 틀 A~D의 배치와 미디어월 장면은 이전 원본 https://www.figma.com/design/ZbeBrS0o5012SNFrGZNyIU
   (D65)에서 옮긴 값 그대로다. 리브랜딩에서 바꾼 것은 틀 안의 로고 락업과 미디어월 그림 속 워드마크뿐이다.
