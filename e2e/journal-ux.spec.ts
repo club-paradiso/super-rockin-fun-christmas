@@ -21,14 +21,17 @@ test("the 20 journal frames show a persistent selection and a truthful position"
 
   await page.getByTestId("frame-option-shalom-grid").click();
   await expect(pick.getByTestId("frame-index")).toHaveText("1 / 20");
-  await expect(page.getByTestId("frame-option-shalom-grid")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("frame-option-shalom-grid").locator(".pick-tile-check")).toBeVisible();
+  await expect(page.getByTestId("frame-option-shalom-grid")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(
+    page.getByTestId("frame-option-shalom-grid").locator(".pick-tile-check"),
+  ).toBeVisible();
   await expect(pick.locator('.pick-tile[aria-pressed="true"]')).toHaveCount(1);
 });
 
-test("the review offers one extra shot, not six misleading per-photo retakes", async ({
-  page,
-}) => {
+test("the review offers one extra shot, not six misleading per-photo retakes", async ({ page }) => {
   await shootSixWithMock(page);
   const review = page.getByTestId("screen-review");
   await expect(review.locator(".review-photo")).toHaveCount(6);
