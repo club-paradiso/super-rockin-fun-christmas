@@ -2656,7 +2656,6 @@ main input:focus-visible,
   animation: none;
 }
 
-
 /* D105 · Touch-first selection and safe binding clearance, matching the updated Figma. */
 .journal-sheet .pick-preview-index {
   display: inline-flex;
