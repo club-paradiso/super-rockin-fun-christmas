@@ -2413,3 +2413,240 @@ main input:focus-visible,
 .kiosk-root[data-legacy-ios15="true"] .print-develop {
   animation: wall-fade-in 1.2s ease-out both;
 }
+
+/* D104: STUDIO SHALOM memory journal.
+   The Figma source uses a book cover, bound paper, numbered chapter tabs, and a QR bookmark.
+   All decoration is inert. The still QR is never transformed independently of its ticket. */
+.journal-sheet {
+  --journal-line: rgba(122, 68, 14, 0.25);
+  animation: journal-page-enter 350ms ease-out both;
+}
+
+.journal-sheet .journal-spine {
+  position: absolute;
+  z-index: 1;
+  top: 13%;
+  bottom: 10%;
+  left: -5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  width: clamp(17px, 2.7vw, 28px);
+  border-radius: 8px;
+  background: var(--color-button);
+  pointer-events: none;
+}
+
+.journal-sheet .journal-ring {
+  display: block;
+  width: clamp(19px, 2.9vw, 32px);
+  height: clamp(19px, 2.9vw, 32px);
+  flex: none;
+  border: 3px solid var(--color-button-text);
+  border-radius: 50%;
+  background: var(--color-button);
+  box-shadow: 0 0 0 2px var(--color-button);
+}
+
+.journal-sheet .journal-tab {
+  position: absolute;
+  z-index: 2;
+  top: 14%;
+  right: -6px;
+  display: grid;
+  width: clamp(28px, 4vw, 38px);
+  height: clamp(50px, 7vh, 75px);
+  place-items: center;
+  border-radius: 5px 0 0 5px;
+  background: var(--color-accent);
+  color: var(--color-button-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(12px, 1.65vw, 16px);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.journal-sheet .journal-bookmark {
+  position: absolute;
+  z-index: 1;
+  top: 27%;
+  right: 3px;
+  width: clamp(12px, 1.9vw, 22px);
+  height: clamp(70px, 12vh, 115px);
+  border-radius: 3px 0 0 3px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.journal-sheet .tape-left,
+.journal-sheet .tape-right {
+  display: none;
+}
+
+/* Only the first screen is a closed, leather-look journal cover. Keep the original
+   brand lockup, translated start labels and full-screen tap target on its inset plaque. */
+.journal-sheet.attract {
+  overflow: visible;
+  border: 2px solid var(--color-button-text);
+  border-radius: 24px;
+  background: var(--color-button);
+  box-shadow:
+    inset 0 0 0 16px var(--color-button),
+    inset 0 0 0 18px rgba(246, 238, 228, 0.52);
+  animation: journal-cover-enter 620ms ease-out both;
+}
+
+.journal-sheet.attract::before {
+  inset: 5% 9% 23%;
+  border: 2px solid var(--color-accent);
+  border-radius: 14px;
+  background-color: var(--color-paper);
+  background-image: var(--grain-ink), var(--ruled-lines);
+  background-size: 240px 240px, 8px var(--rule, 44px);
+  mask: none;
+}
+
+.journal-sheet.attract::after {
+  display: none;
+}
+
+.journal-sheet.attract .journal-spine {
+  top: 4%;
+  bottom: 4%;
+  left: 3%;
+  width: clamp(13px, 2vw, 22px);
+  background: var(--color-accent);
+}
+
+.journal-sheet.attract .journal-ring,
+.journal-sheet.attract .journal-bookmark {
+  display: none;
+}
+
+.journal-cover-edition {
+  position: absolute;
+  bottom: 7%;
+  left: 10%;
+  width: 80%;
+  color: var(--color-button-text);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 3vw, 30px);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* One selected print lifts like an album photograph; subsequent taps re-mount
+   the keyed preview and re-run only this brief motion. */
+.journal-sheet .pick-preview {
+  animation: journal-print-lift 320ms ease-out both;
+}
+
+.journal-sheet .desk-tray .pick-tile[aria-pressed="true"] {
+  transform: translateY(-5px) rotate(-1deg);
+}
+
+.journal-sheet .review-photo,
+.journal-sheet .select-tile[aria-pressed="true"] {
+  box-shadow: 4px 6px 10px rgba(43, 26, 16, 0.15);
+}
+
+/* The receipt remains in a journal pocket, not a postal envelope. */
+.journal-sheet .journal-qr-card {
+  gap: 0;
+  padding: 0 clamp(22px, 4vw, 54px) clamp(12px, 2vh, 22px);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.journal-qr-card .journal-ticket-tab {
+  position: absolute;
+  z-index: 3;
+  top: 22%;
+  right: 14px;
+  width: clamp(12px, 1.7vw, 20px);
+  height: 46%;
+  border-radius: 3px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.journal-sheet .qr-ticket-shadow {
+  animation: journal-ticket-rise 540ms ease-out both;
+}
+
+.journal-sheet .qr-layout-sealed {
+  padding-right: 0;
+}
+
+.journal-sheet .qr-layout-sealed .qr-more > .booth-btn-secondary {
+  width: min(100%, 26rem);
+}
+
+@keyframes journal-cover-enter {
+  from {
+    opacity: 0.8;
+    transform: translateY(16px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes journal-page-enter {
+  from {
+    opacity: 0.84;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes journal-print-lift {
+  from {
+    opacity: 0.6;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes journal-ticket-rise {
+  from {
+    opacity: 0;
+    transform: translateY(60px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Fast, non-essential decoration must not cost camera performance or accessibility. */
+@media (prefers-reduced-motion: reduce) {
+  .journal-sheet,
+  .journal-sheet.attract,
+  .journal-sheet .pick-preview,
+  .journal-sheet .qr-ticket-shadow {
+    animation: none;
+  }
+  .journal-sheet .desk-tray .pick-tile[aria-pressed="true"] {
+    transform: none;
+  }
+}
+
+/* iPad mini 4 / Safari 15: avoid scale and nested animated surfaces. */
+.kiosk-root[data-legacy-ios15="true"] .journal-sheet,
+.kiosk-root[data-legacy-ios15="true"] .journal-sheet.attract,
+.kiosk-root[data-legacy-ios15="true"] .journal-sheet .pick-preview,
+.kiosk-root[data-legacy-ios15="true"] .journal-sheet .qr-ticket-shadow {
+  animation: none;
+}
