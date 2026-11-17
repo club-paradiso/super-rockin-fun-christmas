@@ -173,7 +173,11 @@ export function BoothScreen({
           {progress && <Stepper step={progress.step} total={progress.total} />}
         </header>
       )}
-      <LetterSheet seal={seal} className={className}>
+      <LetterSheet
+        seal={seal}
+        className={className}
+        chapter={progress?.step ?? (testId === "screen-welcome" ? 1 : undefined)}
+      >
         {children}
       </LetterSheet>
       {header && <BoothFooter />}
@@ -182,24 +186,35 @@ export function BoothScreen({
 }
 
 /**
- * The letter sheet (D79): every booth screen's content sits on one sheet of paper on the
- * backdrop. Layout classes go to the sheet itself, so screens keep their own arrangement.
+ * A ring-bound memory journal replaces the old envelope motif. Keep the LetterSheet export and
+ * test ID for compatibility with the kiosk's existing screen and camera layouts. All book parts
+ * are decoration: they cannot take focus, intercept a touch, or change the scroll dimensions.
  */
 export function LetterSheet({
   children,
   className = "",
   seal = false,
+  chapter,
 }: {
   children: React.ReactNode;
   className?: string;
   seal?: boolean;
+  chapter?: number;
 }) {
   return (
-    <div className={`letter-sheet ${className}`} data-testid="letter-sheet">
-      <Tape side="left" />
-      <Tape side="right" />
+    <div className={`letter-sheet journal-sheet ${className}`} data-testid="letter-sheet">
+      <span className="journal-spine" data-testid="journal-spine" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, index) => (
+          <span key={index} className="journal-ring" />
+        ))}
+      </span>
+      {chapter !== undefined && (
+        <span className="journal-tab" aria-hidden="true">
+          {String(chapter).padStart(2, "0")}
+        </span>
+      )}
       {children}
-      {seal && <WaxSeal />}
+      {seal && <JournalBookmark />}
     </div>
   );
 }
@@ -220,20 +235,9 @@ export function PhotoCorners() {
   );
 }
 
-/** Decoration only: no text, not focusable, never in the way of a touch. */
-export function WaxSeal() {
-  return (
-    // A fixed 27 KB asset at one size; next/image would add nothing here.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/brand/wax-seal.webp"
-      alt=""
-      aria-hidden
-      draggable={false}
-      data-testid="wax-seal"
-      className="wax-seal"
-    />
-  );
+/** A paper bookmark, not a wax seal. Decorative and never an overlay on QR pixels or buttons. */
+export function JournalBookmark() {
+  return <span aria-hidden="true" data-testid="journal-bookmark" className="journal-bookmark" />;
 }
 
 /**

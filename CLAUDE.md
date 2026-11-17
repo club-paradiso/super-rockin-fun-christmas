@@ -160,13 +160,16 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   or pose carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
   `:lang(zh-Hans)` (own font, no `word-break: keep-all`): keep `<html lang>` on `HTML_LANG`. Korean copy is the user's wording (D76). "이전" exists only
   where `canGoBack` allows it: never once a shot exists or the frame is final.
-- **The booth is a letter** (D79): booth content sits on one `LetterSheet` (paper on the backdrop).
-  The wax seal (`public/brand/wax-seal.webp`) is decoration only (`alt=""`, no pointer events,
-  never over a button, never causing scroll) and is pressed on two screens only: the attract screen and
-  the QR once it is real. The sheet is a faded diary page (D81): paper with 18 % backdrop, ink grain
-  and accent ruled lines as SVG data URIs in `app/globals.css` (never CSS gradients). Its edge is torn with an aged rim (SVG masks on `::before`/`::after`); `Tape` and
-  `PhotoCorners` are decoration only (`aria-hidden`, no pointer events, never over a button). Of the frames, only the letter frame (`shalom-letter`,
-  D82) carries the seal.
+- **The booth is a ring-bound memory journal** (D104): the `LetterSheet` export and
+  `data-testid="letter-sheet"` remain for compatibility, but the kiosk UI shows a leather-look
+  journal cover, binder rings, numbered chapter tabs and a QR bookmark. See the
+  `journal-*` selectors at the end of `app/globals.css` and `JournalBookmark` in
+  `components/kiosk/ui.tsx`. The old wax-seal asset is **not shown on kiosk screens**; it is
+  preserved only for frame artwork that explicitly uses it. The paper still uses the faded tone,
+  grain and ruled lines of D81. `Tape`, `PhotoCorners` and binder parts are inert decorations
+  (`aria-hidden`, no pointer events, no extra scrolling). The frame-picker, QR generation,
+  guest copy, consent and camera state machine do not change. Respect
+  `prefers-reduced-motion`; iPad mini 4 / Safari 15 disables journal entrance animations.
 - **The booth has one layout system** (D88): `main.kiosk-root` is the viewport and a size
   container, `.kiosk-scroll` is the only scroll area, and every size comes from the tokens in
   `app/globals.css` (`--bw`/`--bh`, `--gap-*`, `--fs-*`, `--btn-*`, `--ctl-*`). Never size a booth

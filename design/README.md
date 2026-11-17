@@ -1,5 +1,14 @@
 # 디자인 원본 (Figma) 과 코드의 연결
 
+**D104 · Memory Journal (2026-11-17):** 기존 편지 콘셉트를 다이어리/스크랩북
+콘셉트로 교체했다. 현재 Figma KIOSK
+(`ZbeBrS0o5012SNFrGZNyIU`)에는 가죽 표지, 바인더링, 챕터 탭,
+프레임·QR 전환 키프레임이 있다. 키오스크 코드는
+`components/kiosk/ui.tsx`, `components/kiosk/kiosk-app.tsx`,
+`app/globals.css`의 `journal-*` 스타일을 정본으로 삼는다.
+표의 D79 편지지/밀랍 봉인 설명은 **역사적 기록**이며 현재 부스 UI가 아니다.
+20종 프레임, 촬영, QR, 언어, 개인정보 동의 기능은 그대로 유지한다.
+
 편집 가능한 원본은 Figma 파일 하나다. 2026-11-11부터 브랜드는 **STUDIO SHALOM** 이다(D73).
 
 - 파일: https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB (file key `S5hz7sZaXXB2kNc9YrB3cB`)
