@@ -11,7 +11,7 @@ import {
 
 /**
  * STUDIO SHALOM booth (D77, D78, D79, D80): the star in the O, "이전", the English screens, the 2×2
- * frame, the attract screen and the letter sheet with its seal. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
+ * frame, the journal-cover attract screen and its QR bookmark. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -162,25 +162,26 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
-  // 화면을 눌러 시작 (D80): the sealed letter the guest opens.
+  // 화면을 눌러 시작: a memory journal cover, not a sealed letter.
   const attract = page.getByTestId("screen-attract");
   await expect(attract.getByTestId("letter-sheet")).toBeVisible();
   await expect(attract.getByRole("button", { name: "화면을 눌러 시작" })).toBeVisible();
   await expect(attract.getByText("Tap the screen to start")).toBeVisible();
-  const seal = attract.getByTestId("wax-seal");
-  await expect(seal).toBeVisible();
-  await expect(seal).toHaveAttribute("alt", "");
-  await expect(seal).toHaveCSS("pointer-events", "none");
+  const spine = attract.getByTestId("journal-spine");
+  await expect(spine).toBeVisible();
+  await expect(spine).toHaveCSS("pointer-events", "none");
+  await expect(attract.locator(".journal-cover-edition")).toContainText("CHRISTMAS MEMORIES");
   // Decoration never makes the booth scroll sideways.
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
-  // A touch anywhere opens the letter, not only the button.
+  // A touch anywhere opens the journal, not only the button.
   await page.mouse.click(200, 700);
   const welcome = page.getByTestId("screen-welcome");
   await expect(welcome.getByTestId("letter-sheet")).toBeVisible();
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
+  await expect(welcome.locator(".journal-tab")).toHaveText("01");
 
   await openWelcome(page);
   await page.getByTestId("start-camera").click();
@@ -194,7 +195,7 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
   await selectDefaultPhotos(page);
   await answerForQr(page, "no");
   await expect(page.getByTestId("delivery-ready")).toBeVisible();
-  await expect(page.getByTestId("screen-delivery").getByTestId("wax-seal")).toBeVisible();
+  await expect(page.getByTestId("screen-delivery").getByTestId("journal-bookmark")).toBeVisible();
 });
 
 test("the review screen fits without scrolling, landscape and portrait", async ({ page }) => {
