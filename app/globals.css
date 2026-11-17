@@ -2503,7 +2503,9 @@ main input:focus-visible,
   border-radius: 14px;
   background-color: var(--color-paper);
   background-image: var(--grain-ink), var(--ruled-lines);
-  background-size: 240px 240px, 8px var(--rule, 44px);
+  background-size:
+    240px 240px,
+    8px var(--rule, 44px);
   mask: none;
 }
 
