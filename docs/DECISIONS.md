@@ -1669,3 +1669,41 @@ User decision: add a flash option to the kiosk and replace the per-photo overwri
   final selection, screen flash, plus a remote WebRTC capture flow.
 - Device acceptance is **unverified** until a real tablet and, for remote mode, iPhone capture
   are tested. In particular iPad mini 4's Safari 15 remains outside Next.js 16's supported range.
+
+## D103 · The phone page goes in the booth's order, and "no" still gives the guest the picture (2026-11-17)
+
+User report: "QR코드 찍어서 사진 보내는 경우에는 키오스크에서 사진찍는거랑 뭐가 흐름이 많이 다르던데,
+문제를 확인하고 바로 해결해줘". What differed (D93 page):
+
+- **Order reversed.** The booth chooses the frame first and then exactly as many photos as it holds;
+  the phone chose photos first and then only offered frames for that count, so a guest who picked
+  one or two photos never saw the four-photo strips, and with one frame for a count no choice at all.
+- **Photo order** could only be cycled ("↻ 순서 바꾸기"), not chosen by tapping as on the booth.
+- **Consent was a gate, not a question.** A required checkbox, and no way to keep the framed
+  picture without sending it, while the booth asks yes/no with equal weight and gives the photo
+  either way (the "download and wall consent are independent" rule).
+
+What the phone page does now (`app/m/[token]/mobile-upload.tsx`):
+
+1. **틀 고르기**: every booth frame in picker order, with sample photos (`placeholderPhotos`, now in
+   `lib/compositor/placeholders.ts` and shared with the booth) or the guest's own once picked; the
+   booth's default is preselected. Booth wording ("마음에 드는 틀을 골라주세요", "이 틀로 할게요").
+2. **사진 고르기**: "사진을 N장 골라주세요"; photos can be picked in several goes (at most
+   `maxPhotos`, the room left is filled first); tapping puts them in the frame in order
+   (`toggleOrdered`), numbered, as on the booth's selection screen ("선택한 순서대로 프레임에 들어가요");
+   exactly N picked are chosen in pick order (`settleSelection`). "프레임 바꾸기" goes back.
+3. **완성**: the composed picture (preview = result, as D93), the booth's question
+   ("이 사진을 미디어월에 띄워도 될까요?", "네, 띄워주세요" / "아니요, 저만 볼게요", same size and
+   weight), the public-wall line (D86) and the phone notes kept in full above the answers.
+   "Yes" uploads exactly as before (`x-wall-consent: yes`, PENDING, human review). "No" sends
+   nothing: the QR stays unused and the booth keeps waiting until it times out.
+4. Either way **사진 저장하기** saves the framed JPEG from the phone's own memory (`download`
+   link to the local object URL, long-press as the fallback). Nothing about the server, the token,
+   moderation or the wall changes. If staff paused wall submissions, the error offers the save.
+
+Booth QR steps now say "열린 화면에서 틀을 고르고, 틀에 넣을 사진을 골라요" / "미디어월에 띄워도 될지
+답하고, 완성된 사진을 저장해요" (English and Chinese to match), written by Claude, pending the
+user's wording (D76). The phone page stays Korean only, as before.
+
+Not verified: saving with the `download` link on a real iPhone/Android (iOS shows a download
+sheet; long-press is the fallback), picking photos in several goes on iOS Safari.

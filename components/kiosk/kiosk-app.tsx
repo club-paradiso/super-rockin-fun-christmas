@@ -25,6 +25,7 @@ import {
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
+import { placeholderPhotos } from "@/lib/compositor/placeholders";
 import {
   canGoBack,
   capturedCount,
@@ -2119,27 +2120,6 @@ function ShotStrip({ state, current }: { state: State; current: number }) {
       </span>
     </div>
   );
-}
-
-/**
- * Sample photos for the frame picker before shooting (a plain warm-grey gradient). The
- * same compositor draws them, so the thumbnail is the frame the guest will get.
- */
-function placeholderPhotos(): ComposeImage[] {
-  return [1, 2, 3, 4, 5, 6].map((n) => {
-    const canvas = createDomCanvas(400, 300) as HTMLCanvasElement;
-    const ctx = canvas.getContext("2d")!;
-    const gradient = ctx.createLinearGradient(0, 0, 400, 300);
-    gradient.addColorStop(0, "#8a7565");
-    gradient.addColorStop(0.71, "#6b574a");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 400, 300);
-    ctx.fillStyle = "#f6eee4";
-    ctx.font = "18px ui-monospace, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`PHOTO ${n}`, 200, 156);
-    return { source: canvas, width: 400, height: 300 };
-  });
 }
 
 function StatusBadges({

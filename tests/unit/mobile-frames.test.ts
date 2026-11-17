@@ -11,7 +11,7 @@ import {
   mobileFramesFor,
   photoSource,
 } from "@/config/mobile";
-import { cycleOrder, limitPicked } from "@/lib/mobile/prepare";
+import { limitPicked, settleSelection, toggleOrdered } from "@/lib/mobile/prepare";
 import { matchesFrameShape } from "@/lib/mobile/image";
 
 /** D93: a phone photo can be put in any booth frame; its stored id says which. */
@@ -65,13 +65,36 @@ describe("phone photos in booth frames (D93)", () => {
     expect(matchesFrameShape({ width: 1200, height: 900 }, letter)).toBe(false);
   });
 
-  it("picking: at most six kept in the picker's order; reordering moves the first to the end", () => {
+  it("picking: at most six kept in the picker's order", () => {
     expect(limitPicked([1, 2, 3], 6)).toEqual({ kept: [1, 2, 3], dropped: 0 });
     expect(limitPicked([1, 2, 3, 4, 5, 6, 7, 8], 6)).toEqual({
       kept: [1, 2, 3, 4, 5, 6],
       dropped: 2,
     });
-    expect(cycleOrder(["a", "b", "c"])).toEqual(["b", "c", "a"]);
-    expect(cycleOrder(["a"])).toEqual(["a"]);
+    // Picking more later fills only the room left.
+    expect(limitPicked([7, 8, 9], 6 - 4)).toEqual({ kept: [7, 8], dropped: 1 });
+    expect(limitPicked([7], 0)).toEqual({ kept: [], dropped: 1 });
+  });
+
+  // D103: the phone chooses photos for a frame the way the booth does.
+  it("choosing: photos go in in the order tapped, never more than the frame holds", () => {
+    let chosen: number[] = [];
+    for (const i of [3, 0, 5]) chosen = toggleOrdered(chosen, i, 4);
+    expect(chosen).toEqual([3, 0, 5]);
+    expect(toggleOrdered(chosen, 0, 4)).toEqual([3, 5]);
+    chosen = toggleOrdered(chosen, 1, 4);
+    expect(chosen).toEqual([3, 0, 5, 1]);
+    // Full: a fifth tap changes nothing until one is taken out.
+    expect(toggleOrdered(chosen, 2, 4)).toEqual([3, 0, 5, 1]);
+  });
+
+  it("choosing: exactly as many photos as the frame holds are chosen for the guest", () => {
+    expect(settleSelection([], 4, 4)).toEqual([0, 1, 2, 3]);
+    expect(settleSelection([], 6, 4)).toEqual([]);
+    expect(settleSelection([], 2, 4)).toEqual([]);
+    // The guest's own choice stays, in its order; a smaller frame keeps the first ones tapped.
+    expect(settleSelection([2, 0], 6, 4)).toEqual([2, 0]);
+    expect(settleSelection([5, 2, 0], 6, 1)).toEqual([5]);
+    expect(settleSelection([5, 1], 3, 4)).toEqual([1]);
   });
 });

@@ -119,6 +119,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo
   comes up (`ageWeight` in `lib/wall/rotation.ts`); it never removes one, and with it off the
   order is exactly the fair order.
+- **The phone page goes in the booth's order** (D103): frame first, then exactly as many photos
+  as it holds in tap order, then the booth's yes/no wall question with equal weight. "No" sends
+  nothing and both answers can save the framed picture on the phone. Never make the wall answer a
+  condition for getting the picture, and never send it without "yes".
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put 1–6 photos in a current booth
   frame on the phone (D93: composed there with `composeFrame`, shape checked on the server, hung on
