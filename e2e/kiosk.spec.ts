@@ -19,6 +19,9 @@ test.beforeEach(async ({ page }) => {
 test("guest kiosk never asks for a name on welcome or frame picker", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
+  // D89 regression: no separate easy/standard screen toggle is offered to guests.
+  await expect(page.getByText(/간편 화면|쉬운 화면|Easy view|Standard view/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(기본 화면|간편 화면)$/ })).toHaveCount(0);
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();

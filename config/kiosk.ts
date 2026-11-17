@@ -7,7 +7,7 @@ function positiveInt(value: string | undefined, fallback: number): number {
 export const KIOSK_CONFIG = {
   shotsPerSession: 6,
   /**
-   * Seconds counted before every shot (D71). Easy mode is never shorter (lib/kiosk/machine.ts).
+   * Seconds counted before every shot (D71). The single kiosk flow has no easy-mode override (D89).
    * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
    * the E2E run does not wait 6 × 10 s per session. Do not set it on a real booth.
    */
