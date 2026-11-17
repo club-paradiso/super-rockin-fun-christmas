@@ -74,8 +74,17 @@ describe("frame definitions", () => {
     }
   });
 
+  it("follows the picked two with the 2026 collection (D102)", () => {
+    expect(FRAMES.slice(12, 16).map((f) => [f.id, f.slots.length])).toEqual([
+      ["vintage-christmas", 4],
+      ["peace-on-earth", 4],
+      ["analog-film", 4],
+      ["jeju-winter", 4],
+    ]);
+  });
+
   it("preserves the four Figma templates A–D after the letter set", () => {
-    expect(FRAMES.slice(12).map((f) => [f.id, f.label])).toEqual([
+    expect(FRAMES.slice(16).map((f) => [f.id, f.label])).toEqual([
       ["navy-strip", "남색"],
       ["wood-window", "창틀"],
       ["clothesline", "빨랫줄"],
@@ -124,6 +133,18 @@ describe("frame definitions", () => {
         if (decoration.type !== "text") continue;
         expect(decoration.text).not.toMatch(/\{(?:guestName|visitorName|name|이름|성함|닉네임)\}/i);
       }
+    }
+  });
+
+  // Two tiles with one name would leave a guest guessing (D102: the collection's film strip is
+  // "아날로그" because the letter set already has "필름").
+  it("give every frame its own picker name in each language", () => {
+    for (const key of ["label", "labelEn", "labelZh"] as const) {
+      const names = FRAMES.map((f) => f[key]);
+      expect(
+        names.filter((n, i) => names.indexOf(n) !== i),
+        key,
+      ).toEqual([]);
     }
   });
 

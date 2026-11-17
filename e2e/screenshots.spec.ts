@@ -115,6 +115,10 @@ for (const frame of [
   "shalom-advent",
   "gingham-plates",
   "pixel-windows",
+  "vintage-christmas",
+  "peace-on-earth",
+  "analog-film",
+  "jeju-winter",
 ]) {
   test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
     await enrollKiosk(page);

@@ -1398,6 +1398,12 @@ body {
       --tile-cols: 6;
       --tile-rows: 3;
     }
+    /* 20 frames (D102) are four rows at six columns. The tiles take the room their track gives
+       them and scroll inside it; their content must not grow the track and push the screen past
+       the fold (seven columns would cut "대림절 달력"). */
+    .pick-tiles {
+      contain: size;
+    }
   }
   .pick-head {
     grid-area: head;
