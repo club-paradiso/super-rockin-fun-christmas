@@ -1410,6 +1410,7 @@ function Screen(p: ScreenProps) {
       const pick = state.phase === "pick";
       const chosen = getFrame(state.frameId);
       const chosenName = localizedLabel(chosen, state.lang);
+      const chosenIndex = FRAMES.findIndex((frame) => frame.id === chosen.id) + 1;
       return (
         <BoothScreen
           testId={pick ? "screen-pick" : "screen-frame"}
@@ -1437,6 +1438,9 @@ function Screen(p: ScreenProps) {
             <p className="pick-preview-caption" aria-live="polite">
               <span className="pick-preview-name">{chosenName}</span>
               <span className="booth-caption">{t.frame.slots(chosen.slots.length)}</span>
+              <span className="pick-preview-index" data-testid="frame-index">
+                {chosenIndex} / {FRAMES.length}
+              </span>
             </p>
           </div>
           <DeskTray className="pick-tiles" testId="frame-options">
@@ -1452,6 +1456,11 @@ function Screen(p: ScreenProps) {
                   className="pick-tile"
                 >
                   <span className="pick-tile-tape" aria-hidden />
+                  {selected && (
+                    <span className="pick-tile-check" aria-hidden="true">
+                      ✓
+                    </span>
+                  )}
                   <span className="frame-art">
                     {p.thumbs[frame.id] ? (
                       // eslint-disable-next-line @next/next/no-img-element -- generated data URL
