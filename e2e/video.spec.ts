@@ -23,10 +23,10 @@ test("shoot → QR → the guest page offers the video and the server serves it 
 
   // Hold the video upload while the guest first opens the QR. This reproduces the race
   // where the photo arrives first and the server-rendered page initially has no video.
-  let releaseVideoUpload: (() => void) | null = null;
+  const videoGate: { release: (() => void) | null } = { release: null };
   await page.route("**/api/photos/video", async (route) => {
     await new Promise<void>((resolve) => {
-      releaseVideoUpload = resolve;
+      videoGate.release = resolve;
     });
     await route.continue();
   });
@@ -55,8 +55,8 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   // automatically, without a page refresh or a second scan of the QR.
   await phone.goto(url);
   await expect(phone.getByTestId("video-status")).toBeVisible();
-  await expect.poll(() => releaseVideoUpload !== null).toBe(true);
-  releaseVideoUpload!();
+  await expect.poll(() => videoGate.release !== null).toBe(true);
+  videoGate.release?.();
   await expect(phone.getByTestId("video-download-button")).toBeVisible({ timeout: 30_000 });
   await expect(phone.getByTestId("video-preview")).toBeVisible();
   await expect(phone.getByTestId("video-file-download")).toBeVisible();
