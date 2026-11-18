@@ -78,11 +78,9 @@ export function SaveVideo({
         response.ok ? response.blob() : Promise.reject(new Error(String(response.status))),
       )
       .then((blob) => {
-        const next = new File(
-          [blob],
-          "studio-shalom." + (mime === "video/mp4" ? "mp4" : "webm"),
-          { type: mime },
-        );
+        const next = new File([blob], "studio-shalom." + (mime === "video/mp4" ? "mp4" : "webm"), {
+          type: mime,
+        });
         if (!cancelled && navigator.canShare({ files: [next] })) setFile(next);
       })
       .catch(() => undefined);
@@ -134,12 +132,7 @@ export function SaveVideo({
               아이폰은 공유 메뉴에서 ‘비디오 저장’을 선택하세요.
             </p>
           )}
-          <a
-            href={downloadHref}
-            download
-            className="btn-quiet"
-            data-testid="video-file-download"
-          >
+          <a href={downloadHref} download className="btn-quiet" data-testid="video-file-download">
             파일로 받기
           </a>
           <p className="text-center text-sm text-ink/75">
