@@ -41,6 +41,10 @@ jobs:
   webkit-legacy:
     name: WebKit kiosk legacy profile (iPadOS 15 simulation)
     runs-on: ubuntu-24.04
+    # The Ubuntu runner's apt mirror has timed out while installing WebKit OS libraries.
+    # Use the Playwright-matched image: browsers and native dependencies are preinstalled.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +53,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install WebKit
-        run: npx playwright install webkit
-      - name: Install WebKit OS dependencies
-        run: timeout 180s npx playwright install-deps webkit
       - name: Adaptive routing, iPadOS 15 profile, camera recovery, offline retry and QR
         run: npx playwright test --config playwright.webkit.config.ts
         env:
@@ -61,6 +61,33 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-results-webkit-legacy
+          path: test-results/
+          retention-days: 7
+
+  # A fast independent gate for the guest's QR: photo download, delayed silent video upload,
+  # playable video + byte-range delivery, and unsupported/failed-recording fallbacks.
+  # It runs even when the full three-shard E2E matrix is busy or times out.
+  video-e2e:
+    name: Guest QR · photo & video download (Chromium)
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Video availability, preview, download and failure recovery
+        run: npx playwright test e2e/video.spec.ts
+        env:
+          CI: "true"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-guest-video
           path: test-results/
           retention-days: 7
 
