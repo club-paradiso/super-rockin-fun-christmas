@@ -14,12 +14,14 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   page,
   browser,
 }) => {
+  test.setTimeout(120_000);
   const recordable = await page.evaluate(
     () =>
       typeof MediaRecorder !== "undefined" &&
       ["video/mp4", "video/webm"].some((m) => MediaRecorder.isTypeSupported(m)),
   );
-  test.skip(!recordable, "this browser cannot record video");
+  // A Chromium gate must fail, not silently skip, if its recording capability regresses.
+  expect(recordable, "Chromium kiosk must support silent MediaRecorder").toBe(true);
 
   // Hold the video upload while the guest first opens the QR. This reproduces the race
   // where the photo arrives first and the server-rendered page initially has no video.
@@ -61,6 +63,13 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   await expect(phone.getByTestId("video-preview")).toBeVisible();
   await expect(phone.getByTestId("video-file-download")).toBeVisible();
   await expect(phone.getByTestId("video-download-button")).toHaveText("영상 저장");
+  // The availability probe is HEAD, while the explicit file link forces an attachment.
+  const head = await phone.request.head(`${url}/video`);
+  expect(head.status()).toBe(200);
+  expect(["video/mp4", "video/webm"]).toContain(head.headers()["content-type"]);
+  const attachment = await phone.request.get(`${url}/video?download=1`);
+  expect(attachment.status()).toBe(200);
+  expect(attachment.headers()["content-disposition"]).toContain("attachment");
   // The photo stays the one primary action.
   await expect(phone.getByTestId("download-button")).toBeVisible();
   await expect(phone.locator(".btn-primary")).toHaveCount(1);
