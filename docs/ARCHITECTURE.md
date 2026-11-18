@@ -425,6 +425,13 @@ the Next.js server.
   the share sheet with the file when `navigator.canShare({files})` is supported (iPhone → 이미지
   저장) and otherwise downloads. There is also a **파일로 받기** link and long-press guidance.
   JavaScript cannot save straight to the iOS Photos library.
+- **촬영 영상**: the same QR page checks `HEAD /p/[token]/video` every 3 s for up to 1 minute
+  when video is not available on the first render (the camera upload/cloud copy may finish later).
+  Once actual video bytes are stored, the video preview, **영상 저장**, and **파일로 받기**
+  appear without reloading. The share sheet offers iOS **비디오 저장** when supported; the
+  plain file download remains available on other browsers. Failed/unsupported recording leaves
+  the photo accessible and does not expose an unusable video link. The iPadOS 15 legacy budget
+  intentionally disables video encoding to protect photo capture reliability.
 
 ## Retention
 
