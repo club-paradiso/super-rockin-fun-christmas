@@ -142,7 +142,9 @@ function measureLayout(): LayoutReport {
       if (w > 1 && h > 1) out.overlaps.push(`${name(a.el)} × ${name(b.el)}`);
     }
   }
-  for (const d of root.querySelectorAll<HTMLElement>(".tape, .wax-seal")) {
+  for (const d of root.querySelectorAll<HTMLElement>(
+    ".tape, .wax-seal, .journal-spine, .journal-tab, .journal-bookmark",
+  )) {
     if (!shown(d)) continue;
     const dr = d.getBoundingClientRect();
     for (const { el, box } of boxes) {

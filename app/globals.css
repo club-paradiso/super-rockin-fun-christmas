@@ -1384,9 +1384,8 @@ body {
   .pick {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    /* Equal shares: the fr ratio holds even at the tiles' floor, so a bigger preview share would
-       push three rows of tiles (16 frames since D99) off a tall booth. */
-    grid-template-rows: auto 1fr 1fr auto;
+    /* Keep all 20 tiles reachable; the selected print receives a modest emphasis. */
+    grid-template-rows: auto 1.06fr 1fr auto;
     grid-template-areas: "head" "preview" "tiles" "actions";
     gap: var(--gap-m);
     --tile-cols: 7;
@@ -2418,8 +2417,8 @@ main input:focus-visible,
    The Figma source uses a book cover, bound paper, numbered chapter tabs, and a QR bookmark.
    All decoration is inert. The still QR is never transformed independently of its ticket. */
 .journal-sheet {
-  --journal-line: rgba(122, 68, 14, 0.25);
-  animation: journal-page-enter 350ms ease-out both;
+  transform-origin: left center;
+  animation: journal-page-turn 330ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .journal-sheet .journal-spine {
@@ -2432,7 +2431,7 @@ main input:focus-visible,
   flex-direction: column;
   align-items: center;
   justify-content: space-around;
-  width: clamp(17px, 2.7vw, 28px);
+  width: clamp(17px, 2.7 * var(--bw), 28px);
   border-radius: 8px;
   background: var(--color-button);
   pointer-events: none;
@@ -2440,8 +2439,8 @@ main input:focus-visible,
 
 .journal-sheet .journal-ring {
   display: block;
-  width: clamp(19px, 2.9vw, 32px);
-  height: clamp(19px, 2.9vw, 32px);
+  width: clamp(19px, 2.9 * var(--bw), 32px);
+  height: clamp(19px, 2.9 * var(--bw), 32px);
   flex: none;
   border: 3px solid var(--color-button-text);
   border-radius: 50%;
@@ -2455,14 +2454,14 @@ main input:focus-visible,
   top: 14%;
   right: -6px;
   display: grid;
-  width: clamp(28px, 4vw, 38px);
-  height: clamp(50px, 7vh, 75px);
+  width: clamp(28px, 4 * var(--bw), 38px);
+  height: clamp(50px, 7 * var(--bh), 75px);
   place-items: center;
   border-radius: 5px 0 0 5px;
   background: var(--color-accent);
   color: var(--color-button-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: clamp(12px, 1.65vw, 16px);
+  font-size: clamp(12px, 1.65 * var(--bw), 16px);
   font-weight: 700;
   pointer-events: none;
 }
@@ -2472,8 +2471,8 @@ main input:focus-visible,
   z-index: 1;
   top: 27%;
   right: 3px;
-  width: clamp(12px, 1.9vw, 22px);
-  height: clamp(70px, 12vh, 115px);
+  width: clamp(12px, 1.9 * var(--bw), 22px);
+  height: clamp(70px, 12 * var(--bh), 115px);
   border-radius: 3px 0 0 3px;
   background: var(--color-accent);
   pointer-events: none;
@@ -2517,7 +2516,7 @@ main input:focus-visible,
   top: 4%;
   bottom: 4%;
   left: 3%;
-  width: clamp(13px, 2vw, 22px);
+  width: clamp(13px, 2 * var(--bw), 22px);
   background: var(--color-accent);
 }
 
@@ -2533,7 +2532,7 @@ main input:focus-visible,
   width: 80%;
   color: var(--color-button-text);
   font-family: var(--font-display);
-  font-size: clamp(20px, 3vw, 30px);
+  font-size: clamp(20px, 3 * var(--bw), 30px);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-align: center;
@@ -2558,7 +2557,7 @@ main input:focus-visible,
 /* The receipt remains in a journal pocket, not a postal envelope. */
 .journal-sheet .journal-qr-card {
   gap: 0;
-  padding: 0 clamp(22px, 4vw, 54px) clamp(12px, 2vh, 22px);
+  padding: 0 clamp(22px, 4 * var(--bw), 54px) clamp(12px, 2 * var(--bh), 22px);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2569,7 +2568,7 @@ main input:focus-visible,
   z-index: 3;
   top: 22%;
   right: 14px;
-  width: clamp(12px, 1.7vw, 20px);
+  width: clamp(12px, 1.7 * var(--bw), 20px);
   height: 46%;
   border-radius: 3px;
   background: var(--color-accent);
@@ -2577,7 +2576,11 @@ main input:focus-visible,
 }
 
 .journal-sheet .qr-ticket-shadow {
-  animation: journal-ticket-rise 540ms ease-out both;
+  animation: none;
+}
+
+.journal-qr-card .journal-ticket-tab {
+  animation: journal-bookmark-drop 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .journal-sheet .qr-layout-sealed {
@@ -2599,10 +2602,10 @@ main input:focus-visible,
   }
 }
 
-@keyframes journal-page-enter {
+@keyframes journal-page-turn {
   from {
-    opacity: 0.84;
-    transform: translateY(14px);
+    opacity: 0.86;
+    transform: perspective(1400px) translateX(12px) rotateY(-4deg);
   }
   to {
     opacity: 1;
@@ -2621,14 +2624,14 @@ main input:focus-visible,
   }
 }
 
-@keyframes journal-ticket-rise {
+@keyframes journal-bookmark-drop {
   from {
-    opacity: 0;
-    transform: translateY(60px);
+    opacity: 0.65;
+    transform: translateY(-18px);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translateY(0);
   }
 }
 
@@ -2637,7 +2640,7 @@ main input:focus-visible,
   .journal-sheet,
   .journal-sheet.attract,
   .journal-sheet .pick-preview,
-  .journal-sheet .qr-ticket-shadow {
+  .journal-qr-card .journal-ticket-tab {
     animation: none;
   }
   .journal-sheet .desk-tray .pick-tile[aria-pressed="true"] {
@@ -2649,6 +2652,66 @@ main input:focus-visible,
 .kiosk-root[data-legacy-ios15="true"] .journal-sheet,
 .kiosk-root[data-legacy-ios15="true"] .journal-sheet.attract,
 .kiosk-root[data-legacy-ios15="true"] .journal-sheet .pick-preview,
-.kiosk-root[data-legacy-ios15="true"] .journal-sheet .qr-ticket-shadow {
+.kiosk-root[data-legacy-ios15="true"] .journal-qr-card .journal-ticket-tab {
   animation: none;
+}
+
+/* D105 · Touch-first selection and safe binding clearance, matching the updated Figma. */
+.journal-sheet .pick-preview-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.6em;
+  padding: 2px 8px;
+  border: 1px solid var(--color-accent);
+  border-radius: 9999px;
+  color: var(--color-ink);
+  font-size: var(--fs-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.journal-sheet .pick-tile {
+  position: relative;
+}
+.journal-sheet .pick-tile[aria-pressed="true"] {
+  border-color: var(--color-button);
+  box-shadow: var(--shadow-lift);
+}
+.journal-sheet .pick-tile:focus-visible {
+  outline: 3px solid var(--color-button);
+  outline-offset: 2px;
+}
+.journal-sheet .pick-tile-check {
+  position: absolute;
+  z-index: 3;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: clamp(21px, 3 * var(--bw), 28px);
+  height: clamp(21px, 3 * var(--bw), 28px);
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--color-button);
+  color: var(--color-button-text);
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 700;
+  pointer-events: none;
+}
+.journal-sheet .review-actions,
+.journal-sheet .pick-actions,
+.journal-sheet .qr-more {
+  padding-inline: clamp(28px, 4 * var(--bw), 42px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .journal-sheet .pick-tile[aria-pressed="true"] {
+    transform: none;
+  }
+}
+@media (max-width: 699px) {
+  .journal-sheet .review-actions,
+  .journal-sheet .pick-actions,
+  .journal-sheet .qr-more {
+    padding-inline: clamp(18px, 3 * var(--bw), 28px);
+  }
 }
