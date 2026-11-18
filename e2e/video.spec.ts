@@ -21,6 +21,15 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   );
   test.skip(!recordable, "this browser cannot record video");
 
+  // Hold the video upload while the guest first opens the QR. This reproduces the race
+  // where the photo arrives first and the server-rendered page initially has no video.
+  let releaseVideoUpload: (() => void) | null = null;
+  await page.route("**/api/photos/video", async (route) => {
+    await new Promise<void>((resolve) => {
+      releaseVideoUpload = resolve;
+    });
+    await route.continue();
+  });
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
@@ -42,11 +51,15 @@ test("shoot → QR → the guest page offers the video and the server serves it 
 
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const phone = await phoneContext.newPage();
-  // The video follows the photo by a moment; the page shows the button once it is really there.
-  await expect(async () => {
-    await phone.goto(url);
-    await expect(phone.getByTestId("video-download-button")).toBeVisible({ timeout: 1000 });
-  }).toPass({ timeout: 20_000 });
+  // The page initially has only the photo. Releasing the upload must reveal the video
+  // automatically, without a page refresh or a second scan of the QR.
+  await phone.goto(url);
+  await expect(phone.getByTestId("video-status")).toBeVisible();
+  await expect.poll(() => releaseVideoUpload !== null).toBe(true);
+  releaseVideoUpload!();
+  await expect(phone.getByTestId("video-download-button")).toBeVisible({ timeout: 30_000 });
+  await expect(phone.getByTestId("video-preview")).toBeVisible();
+  await expect(phone.getByTestId("video-file-download")).toBeVisible();
   await expect(phone.getByTestId("video-download-button")).toHaveText("영상 저장");
   // The photo stays the one primary action.
   await expect(phone.getByTestId("download-button")).toBeVisible();
@@ -124,10 +137,8 @@ test("no MediaRecorder: the same photo flow, no video notice, no video button, 4
   await phone.goto(url);
   await expect(phone.getByTestId("download-button")).toBeVisible();
   expect((await phone.request.get(`${url}/image`)).status()).toBe(200);
-  await phone.waitForTimeout(3000); // long enough for a video to have arrived, had there been one
-  await phone.reload();
-  await expect(phone.getByTestId("download-button")).toBeVisible();
-  await expect(phone.getByTestId("video-save")).toHaveCount(0);
+  await expect(phone.getByTestId("video-status")).toBeVisible();
+  await expect(phone.getByTestId("video-download-button")).toHaveCount(0);
   const missing = await phone.request.get(`${url}/video`);
   const unknown = await phone.request.get(`${new URL(url).origin}/p/${"A".repeat(32)}/video`);
   expect(missing.status()).toBe(404);
@@ -154,7 +165,8 @@ test("a failing video upload never touches the photo, the wall answer or the QR"
   await expect(phone.getByTestId("download-button")).toBeVisible();
   expect((await phone.request.get(`${url}/image`)).status()).toBe(200);
   expect((await phone.request.get(`${url}/video`)).status()).toBe(404);
-  await expect(phone.getByTestId("video-save")).toHaveCount(0);
+  await expect(phone.getByTestId("video-status")).toBeVisible();
+  await expect(phone.getByTestId("video-download-button")).toHaveCount(0);
   await phoneContext.close();
   // Nothing on the booth mentions the video.
   await expect(page.getByTestId("delivery-ready")).toBeVisible();
