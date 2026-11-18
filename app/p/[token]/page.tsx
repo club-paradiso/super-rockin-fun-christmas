@@ -40,10 +40,11 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
         {/* eslint-disable-next-line @next/next/no-img-element -- private, uncached image */}
         <img src={src} alt="내 네컷 사진" className="max-h-[70dvh] w-auto rounded-lg" />
         <SavePhoto imageUrl={src} mime={photo.mime} />
-        {/* Only when the server really has this session's video (D72). */}
-        {photo.video && (
-          <SaveVideo videoUrl={`/p/${encodeURIComponent(token)}/video`} mime={photo.video.mime} />
-        )}
+        {/* A video may arrive shortly after the photo/QR: the client checks without a reload. */}
+        <SaveVideo
+          videoUrl={`/p/${encodeURIComponent(token)}/video`}
+          initialMime={photo.video?.mime ?? null}
+        />
         <StampTicket info={{ ordinal, createdAt: photo.createdAt }} />
         <p className="text-center text-sm text-ink/75">
           {expires}까지 열 수 있어요. 꼭 저장해 주세요.
