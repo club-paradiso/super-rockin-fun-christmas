@@ -1,0 +1,114 @@
+/* D106 · Figma KIOSK 2026-11-19. Both Next and the Safari 15 Vite bundle import this file.
+   The left brass binder and parchment are a SINGLE decorative background, never a layout column.
+   Figma: STUDIO SHALOM / KIOSK, Edge-Spine master 792:76 and Intro background 694:1126.
+   Source PNGs are isolated paper artwork (no flattened interactive controls).
+   At 820×1180 they reproduce the Figma artwork exactly. The existing screen grid and touch
+   controls remain real DOM and retain their own keyboard/focus semantics. */
+
+.kiosk-root .booth-screen {
+  background-color: var(--sheet-faded);
+  background-image: url("/studio/kiosk-edge-spine.png");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: cover;
+  /* Background does not alter centering or become a hit target. */
+  position: relative;
+}
+
+/* Figma removed the old layered aged-paper and tiny, 5-ring journal overlay.
+   Do not draw another set of rings over the photographed binder. */
+.kiosk-root .booth-screen:not([data-testid="screen-attract"]) .letter-sheet::before,
+.kiosk-root .booth-screen:not([data-testid="screen-attract"]) .letter-sheet::after {
+  content: none;
+}
+.kiosk-root .booth-screen:not([data-testid="screen-attract"]) .journal-spine,
+.kiosk-root .booth-screen .journal-tab {
+  display: none;
+}
+
+/* The page's usable center is the actual viewport center, not a shifted x=464 safety axis.
+   Brass is cropped to the edge in the source image, outside the actionable content.
+   Avoid applying a second spine-related left margin to internal headings or CTAs. */
+.kiosk-root .booth-screen .letter-sheet {
+  background-color: transparent;
+  min-width: 0;
+}
+.kiosk-root .booth-screen .booth-header,
+.kiosk-root .booth-screen .booth-footer {
+  min-width: 0;
+}
+.kiosk-root .booth-screen .pick-head,
+.kiosk-root .booth-screen .pick-preview,
+.kiosk-root .booth-screen .pick-actions,
+.kiosk-root .booth-screen .review-actions,
+.kiosk-root .booth-screen .select-actions,
+.kiosk-root .booth-screen .consent-actions,
+.kiosk-root .booth-screen .qr-more {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The two D102 template pickers share the same 20 designs in 5 columns × 4 rows.
+   On a phone, 4 columns × 5 rows preserve tappability instead of shrinking tile labels. */
+.kiosk-root .booth-screen .pick {
+  --tile-cols: 5;
+  --tile-rows: 4;
+  grid-template-rows: auto minmax(140px, 0.75fr) minmax(324px, 1.5fr) auto;
+}
+.kiosk-root .booth-screen .pick-tiles {
+  grid-template-columns: repeat(var(--tile-cols), minmax(0, 1fr));
+  grid-auto-rows: minmax(72px, 1fr);
+}
+@media (max-width: 600px) {
+  .kiosk-root .booth-screen .pick {
+    --tile-cols: 4;
+    --tile-rows: 5;
+  }
+  .kiosk-root .booth-screen .pick-tiles {
+    min-height: calc(5 * 72px + 4 * 6px);
+  }
+}
+
+/* The cover is a different embossed olive sheet in Figma, not the ring-bound inner paper.
+   Keep the existing whole-screen tap/start affordance and language hints intact. */
+.kiosk-root .booth-screen[data-testid="screen-attract"] {
+  background-image: url("/studio/kiosk-intro-olive.png");
+  background-position: center center;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .journal-sheet.attract {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .journal-sheet.attract::before,
+.kiosk-root .booth-screen[data-testid="screen-attract"] .journal-sheet.attract::after {
+  content: none;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .journal-spine {
+  /* The existing inert spine marker remains present for the established E2E contract.
+     No second cluster of visible binder rings is drawn on the olive-cover artwork. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .attract .journal-ring {
+  display: none;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .shutter-btn {
+  min-width: min(440px, 75vw);
+  min-height: var(--btn-h);
+  justify-content: center;
+  padding-inline: var(--btn-pad);
+  border-radius: 9999px;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .shutter-knob {
+  display: none;
+}
+.kiosk-root .booth-screen[data-testid="screen-attract"] .journal-cover-edition {
+  color: var(--color-ink);
+}
+
+/* Visual asset and alignment overrides only: reduced-motion and Safari 15 retain their existing
+   non-animated camera/page behavior. QR pixels, media-wall consent, and touch event targets do
+   not depend on background image loading. */
