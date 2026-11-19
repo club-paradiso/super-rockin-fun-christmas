@@ -48,24 +48,21 @@
   max-width: 100%;
 }
 
-/* The two D102 template pickers share the same 20 designs in 5 columns × 4 rows.
-   On a phone, 4 columns × 5 rows preserve tappability instead of shrinking tile labels. */
-.kiosk-root .booth-screen .pick {
-  --tile-cols: 5;
-  --tile-rows: 4;
-  grid-template-rows: auto minmax(140px, 0.75fr) minmax(324px, 1.5fr) auto;
+/* D102 · Figma shows 20 tiles in 5 × 4 on a tall, full-size kiosk.
+   Keep the pre-existing adaptive grid on landscape and intermediate 600 px tablets:
+   forcing four rows there makes frame tiles overlap the CTA and the home dialog.
+   Small phones get 4 columns with their own scrollable tile well. */
+@media (min-width: 700px) and (min-height: 900px) and (max-aspect-ratio: 5/4) {
+  .kiosk-root .booth-screen .pick {
+    --tile-cols: 5;
+    --tile-rows: 4;
+    grid-template-rows: auto minmax(120px, 0.8fr) minmax(320px, 1.5fr) auto;
+  }
 }
-.kiosk-root .booth-screen .pick-tiles {
-  grid-template-columns: repeat(var(--tile-cols), minmax(0, 1fr));
-  grid-auto-rows: minmax(72px, 1fr);
-}
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .kiosk-root .booth-screen .pick {
     --tile-cols: 4;
     --tile-rows: 5;
-  }
-  .kiosk-root .booth-screen .pick-tiles {
-    min-height: calc(5 * 72px + 4 * 6px);
   }
 }
 
