@@ -30,10 +30,15 @@ test("both 20-frame pickers are five columns at the Figma portrait size", async 
     (el) => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length,
   );
   expect(columns).toBe(5);
-  const [screenBox, gridBox] = await Promise.all([pick.boundingBox(), grid.boundingBox()]);
+  const [screenBox, gridBox] = await Promise.all([
+    pick.boundingBox(),
+    grid.boundingBox(),
+  ]);
   expect(screenBox).not.toBeNull();
   expect(gridBox).not.toBeNull();
-  expect(Math.abs(gridBox!.x + gridBox!.width / 2 - (screenBox!.x + screenBox!.width / 2))).toBeLessThan(8);
+  expect(
+    Math.abs(gridBox!.x + gridBox!.width / 2 - (screenBox!.x + screenBox!.width / 2)),
+  ).toBeLessThan(8);
 });
 
 test("narrow phones retain at least four-column tappable frame choices", async ({ page }) => {
