@@ -6,6 +6,7 @@ import { useAssetReady } from "@/components/studio/stamp-ticket";
 import { STUDIO_ASSETS } from "@/config/studio";
 import { boothSound } from "@/lib/kiosk/sound";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
+import { KioskFullscreenControl } from "./fullscreen";
 
 export { BrandLockup, BrandWordmark };
 
@@ -181,6 +182,11 @@ export function BoothScreen({
         {children}
       </LetterSheet>
       {header && <BoothFooter />}
+      {!header && (
+        <div className="kiosk-fullscreen-corner">
+          <KioskFullscreenControl lang={chrome?.lang ?? "ko"} />
+        </div>
+      )}
     </section>
   );
 }
