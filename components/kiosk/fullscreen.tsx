@@ -35,8 +35,9 @@ type AppleNavigator = Navigator & { standalone?: boolean };
 function standaloneMode(): boolean {
   return (
     (navigator as AppleNavigator).standalone === true ||
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.matchMedia("(display-mode: fullscreen)").matches
+    (typeof window.matchMedia === "function" &&
+      (window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: fullscreen)").matches))
   );
 }
 
@@ -92,7 +93,7 @@ export function KioskFullscreenControl({ lang }: { lang: KioskLang }) {
         className="kiosk-fullscreen-button"
         data-testid="fullscreen-toggle"
         aria-expanded={help !== "none"}
-        aria-controls="kiosk-fullscreen-help"
+        aria-controls={help !== "none" ? "kiosk-fullscreen-help" : undefined}
         disabled={standalone}
         onClick={toggle}
       >
