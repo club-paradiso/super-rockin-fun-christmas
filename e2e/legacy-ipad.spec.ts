@@ -159,5 +159,9 @@ test("legacy kiosk uses the same Figma edge-spine without a second ring overlay"
   const welcome = page.getByTestId("screen-welcome");
   await expect(welcome).toHaveCSS("background-image", /journal-edge-spine\.png/);
   await expect(welcome.locator(".journal-spine")).toBeHidden();
+  await expect(welcome.locator(".journal-sheet")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
   await expect(welcome.locator(".journal-sheet")).toHaveCSS("animation-name", "none");
 });
