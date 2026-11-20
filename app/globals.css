@@ -2729,6 +2729,10 @@ main input:focus-visible,
   background-repeat: no-repeat;
 }
 /* The original synthetic paper and five CSS rings must not obscure or duplicate the artwork. */
+.booth-screen:not([data-testid="screen-attract"]) .journal-sheet {
+  /* Safari 15's opaque fallback must not cover the shared parchment artwork. */
+  background-color: transparent;
+}
 .booth-screen:not([data-testid="screen-attract"]) .journal-sheet::before,
 .booth-screen:not([data-testid="screen-attract"]) .journal-sheet::after {
   content: none;
