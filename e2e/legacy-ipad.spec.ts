@@ -149,7 +149,6 @@ test("idle recovery conceals a guest photo when durable storage is unavailable",
   expect(photos[0]?.wallConsent).toBe(false);
 });
 
-
 test("legacy kiosk uses the same Figma edge-spine without a second ring overlay", async ({
   page,
 }) => {
