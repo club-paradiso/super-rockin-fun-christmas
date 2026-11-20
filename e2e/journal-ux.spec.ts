@@ -55,7 +55,6 @@ test("reduced-motion preference leaves the journal and QR-independent interface 
   );
 });
 
-
 test("Figma edge-spine stays visible without shifting or covering the 20-frame picker", async ({
   page,
 }) => {
