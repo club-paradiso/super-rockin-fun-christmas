@@ -1388,16 +1388,16 @@ body {
     grid-template-rows: auto 1.06fr 1fr auto;
     grid-template-areas: "head" "preview" "tiles" "actions";
     gap: var(--gap-m);
-    --tile-cols: 7;
-    --tile-rows: 3;
+    --tile-cols: 5;
+    --tile-rows: 4;
   }
   @media (max-width: 699px) {
     .pick {
       grid-template-rows: auto 1fr 1.3fr auto;
-      --tile-cols: 6;
-      --tile-rows: 3;
+      --tile-cols: 4;
+      --tile-rows: 5;
     }
-    /* 20 frames (D102) are four rows at six columns. The tiles take the room their track gives
+    /* Narrow screens use five rows of four columns. The tiles take the room their track gives
        them and scroll inside it; their content must not grow the track and push the screen past
        the fold (seven columns would cut "대림절 달력"). */
     .pick-tiles {
@@ -2713,5 +2713,39 @@ main input:focus-visible,
   .journal-sheet .pick-actions,
   .journal-sheet .qr-more {
     padding-inline: clamp(18px, 3 * var(--bw), 28px);
+  }
+}
+
+
+/* D106 · Figma edge-spine binder (820 × 1180 master, 2026-11-20).
+   The artwork contains parchment, two visible brass rings and the thin brass spine rail.
+   It is one shared sheet background, never an interactive overlay. All page content, header,
+   buttons and QR remain centered on the full viewport rather than being shifted to dodge
+   the rings. Modern Next.js and the Safari 15 Vite frontend share this stylesheet. */
+.booth-screen:not([data-testid="screen-attract"]) {
+  background-color: #f2e5d8;
+  background-image: url("/studio/journal-edge-spine.png");
+  background-position: center top;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+/* The original synthetic paper and five CSS rings must not obscure or duplicate the artwork. */
+.booth-screen:not([data-testid="screen-attract"]) .journal-sheet::before,
+.booth-screen:not([data-testid="screen-attract"]) .journal-sheet::after {
+  content: none;
+}
+.booth-screen:not([data-testid="screen-attract"]) .journal-spine {
+  display: none;
+}
+/* A landscape tablet crops the tall page rather than stretching the metal rings sideways. */
+@media (min-aspect-ratio: 5/4) {
+  .booth-screen:not([data-testid="screen-attract"]) {
+    background-size: cover;
+    background-position: center center;
+  }
+  /* More columns in short landscape keeps touch targets and the CTA reachable. */
+  .pick {
+    --tile-cols: 7;
+    --tile-rows: 3;
   }
 }
