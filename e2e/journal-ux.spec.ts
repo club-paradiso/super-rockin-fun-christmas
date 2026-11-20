@@ -54,3 +54,43 @@ test("reduced-motion preference leaves the journal and QR-independent interface 
     "none",
   );
 });
+
+
+test("Figma edge-spine stays visible without shifting or covering the 20-frame picker", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto("/kiosk?camera=mock");
+  const attract = page.getByTestId("screen-attract");
+  await expect(attract.getByTestId("journal-spine")).toBeVisible();
+  await expect(attract).not.toHaveCSS("background-image", /journal-edge-spine/);
+
+  await openWelcome(page);
+  const welcome = page.getByTestId("screen-welcome");
+  await expect(welcome).toHaveCSS("background-image", /journal-edge-spine\.png/);
+  await expect(welcome.locator(".journal-spine")).toBeHidden();
+  await expect(welcome).toHaveCSS("background-size", "100% 100%");
+  const image = await page.request.get("/studio/journal-edge-spine.png");
+  expect(image.ok()).toBe(true);
+  expect(image.headers()["content-type"]).toContain("image/png");
+
+  await page.getByTestId("start-camera").click();
+  const picker = page.getByTestId("screen-pick");
+  await expect(picker.locator('[data-testid^="frame-option-"]')).toHaveCount(20);
+  const geometry = await picker.evaluate((screen) => {
+    const sheet = screen.querySelector<HTMLElement>(".journal-sheet")!;
+    const grid = screen.querySelector<HTMLElement>(".pick-tiles")!;
+    const s = sheet.getBoundingClientRect();
+    return {
+      center: s.left + s.width / 2,
+      columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+    };
+  });
+  expect(Math.abs(geometry.center - 410)).toBeLessThan(2);
+  expect(geometry.columns).toBe(5);
+  await expect(picker).toHaveCSS("background-image", /journal-edge-spine\.png/);
+
+  // Short landscape screens must not distort the Figma metal rings.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(picker).toHaveCSS("background-size", "cover");
+});
