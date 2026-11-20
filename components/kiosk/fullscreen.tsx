@@ -38,8 +38,7 @@ function standaloneMode(): boolean {
   if ((navigator as AppleNavigator).standalone === true) return true;
   if (typeof window.matchMedia !== "function") return false;
   return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.matchMedia("(display-mode: fullscreen)").matches
+    window.matchMedia("(display-mode: standalone)").matches
   );
 }
 
