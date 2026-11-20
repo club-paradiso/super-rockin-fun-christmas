@@ -104,3 +104,42 @@ test("welcome and picker align their content to the real screen center", async (
     );
   }
 });
+
+test("native fullscreen remains exit-able instead of being mistaken for an installed app", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: function (this: HTMLElement) {
+        fullscreenElement = this;
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      },
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: () => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      },
+    });
+  });
+
+  await page.goto("/kiosk?camera=mock");
+  const control = page.getByTestId("screen-attract").getByTestId("fullscreen-toggle");
+  await expect(control).toContainText("전체화면");
+  await control.click();
+  await expect(control).toContainText("전체화면 종료");
+  await expect(control).toBeEnabled();
+  await control.click();
+  await expect(control).toContainText("전체화면");
+  await expect(control).not.toContainText("전체화면 종료");
+});
