@@ -11,7 +11,7 @@ const LABELS = {
     installed: "전체화면 실행 중",
     help: "iPad Safari에서는 공유 → 홈 화면에 추가를 누르고, 홈 화면의 STUDIO SHALOM 아이콘으로 실행하세요. 주소 표시줄 없이 독립 실행됩니다.",
     failed:
-      failed: "브라우저에서 전체화면 전환이 허용되지 않았어요. 브라우저 메뉴에서 전체화면을 실행하거나 홈 화면에 추가해 주세요.",
+      "브라우저에서 전체화면 전환이 허용되지 않았어요. 브라우저 메뉴에서 전체화면을 실행하거나 홈 화면에 추가해 주세요.",
   },
   en: {
     enter: "Fullscreen",
@@ -20,7 +20,7 @@ const LABELS = {
     installed: "App mode active",
     help: "On iPad Safari, choose Share → Add to Home Screen, then launch STUDIO SHALOM from its home-screen icon to hide the browser bars.",
     failed:
-      failed: "The browser blocked fullscreen. Use the browser's fullscreen command or add this kiosk to your home screen.",
+      "The browser blocked fullscreen. Use the browser's fullscreen command or add this kiosk to your home screen.",
   },
   zh: {
     enter: "全屏显示",
