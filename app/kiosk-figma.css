@@ -238,3 +238,31 @@
     width: min(80vw, 21rem);
   }
 }
+
+/* D108 · Stabilize journal contents on every new screen.
+   The previous 3D page-turn translated and rotated the *entire interactive sheet*, making
+   headings visually off-center during its first 330 ms and inflating scrollHeight. A brief
+   opacity reveal keeps the paper feeling alive without moving controls or QR pixels. */
+@keyframes kiosk-paper-reveal {
+  from {
+    opacity: 0.86;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.kiosk-root .booth-screen:not([data-testid="screen-attract"]) .journal-sheet {
+  animation: kiosk-paper-reveal 200ms ease-out both;
+  transform-origin: center center;
+}
+
+/* Portrait keeps the Figma proportions; landscape needs vertical breathing room when
+   English/Chinese labels grow. Reduce only decorative spacing, never text or touch targets. */
+@media (min-aspect-ratio: 5/4) and (min-height: 760px) {
+  .kiosk-root .booth-screen .welcome {
+    gap: clamp(12px, 2.6 * var(--bh), 32px);
+  }
+  .kiosk-root .booth-screen .welcome-choice {
+    min-height: clamp(150px, 27 * var(--bh), 320px);
+  }
+}
