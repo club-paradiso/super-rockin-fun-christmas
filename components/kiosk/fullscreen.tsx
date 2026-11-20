@@ -33,11 +33,11 @@ const LABELS = {
 type AppleNavigator = Navigator & { standalone?: boolean };
 
 function standaloneMode(): boolean {
+  if ((navigator as AppleNavigator).standalone === true) return true;
+  if (typeof window.matchMedia !== "function") return false;
   return (
-    (navigator as AppleNavigator).standalone === true ||
-    (typeof window.matchMedia === "function" &&
-      (window.matchMedia("(display-mode: standalone)").matches ||
-        window.matchMedia("(display-mode: fullscreen)").matches))
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches
   );
 }
 
@@ -52,6 +52,10 @@ export function KioskFullscreenControl({ lang }: { lang: KioskLang }) {
   const [standalone, setStandalone] = useState(false);
   const [help, setHelp] = useState<"none" | "setup" | "failed">("none");
   const t = LABELS[lang];
+  let buttonLabel: string;
+  if (standalone) buttonLabel = t.installed;
+  else if (nativeFullscreen) buttonLabel = t.exit;
+  else buttonLabel = canToggle ? t.enter : t.setup;
 
   useEffect(() => {
     const update = () => {
@@ -113,9 +117,7 @@ export function KioskFullscreenControl({ lang }: { lang: KioskLang }) {
             <path d="M3 9V3h6m6 0h6v6M3 15v6h6m12-6v6h-6" />
           )}
         </svg>
-        <span>
-          {standalone ? t.installed : nativeFullscreen ? t.exit : canToggle ? t.enter : t.setup}
-        </span>
+        <span>{buttonLabel}</span>
       </button>
       {help !== "none" && (
         <div
