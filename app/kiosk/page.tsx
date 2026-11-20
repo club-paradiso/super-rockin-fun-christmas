@@ -13,6 +13,12 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "STUDIO SHALOM · Photo Booth",
   robots: { index: false, follow: false },
+  manifest: "/kiosk.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "STUDIO SHALOM",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 /**

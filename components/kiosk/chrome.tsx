@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useId, useRef } from "react";
 import { KIOSK_COPY, type KioskCopy, type KioskLang } from "@/lib/kiosk/copy";
+import { KioskFullscreenControl } from "./fullscreen";
 
 /**
  * What every booth screen shares (release 2.0): the guest's language and the way home.
@@ -38,6 +39,7 @@ export function BoothFooter() {
       >
         <span aria-hidden>←</span> {chrome.t.chrome.home}
       </button>
+      <KioskFullscreenControl lang={chrome.lang} />
     </footer>
   );
 }
