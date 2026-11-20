@@ -37,9 +37,7 @@ type AppleNavigator = Navigator & { standalone?: boolean };
 function standaloneMode(): boolean {
   if ((navigator as AppleNavigator).standalone === true) return true;
   if (typeof window.matchMedia !== "function") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches
-  );
+  return window.matchMedia("(display-mode: standalone)").matches;
 }
 
 /**
