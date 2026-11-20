@@ -266,3 +266,16 @@
     min-height: clamp(150px, 27 * var(--bh), 320px);
   }
 }
+
+/* D109 · Preserve accessibility and Safari 15's no-animation rendering budget.
+   This is deliberately more specific than D108's generic paper reveal. */
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-root .booth-screen:not([data-testid="screen-attract"]) .journal-sheet {
+    animation: none;
+  }
+}
+.kiosk-root[data-legacy-ios15="true"]
+  .booth-screen:not([data-testid="screen-attract"])
+  .journal-sheet {
+  animation: none;
+}
