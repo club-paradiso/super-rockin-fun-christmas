@@ -148,3 +148,17 @@ test("idle recovery conceals a guest photo when durable storage is unavailable",
   expect(photos).toHaveLength(1);
   expect(photos[0]?.wallConsent).toBe(false);
 });
+
+
+test("legacy kiosk uses the same Figma edge-spine without a second ring overlay", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto("/kiosk?camera=mock");
+  await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
+  await page.getByTestId("attract-start").click();
+  const welcome = page.getByTestId("screen-welcome");
+  await expect(welcome).toHaveCSS("background-image", /journal-edge-spine\.png/);
+  await expect(welcome.locator(".journal-spine")).toBeHidden();
+  await expect(welcome.locator(".journal-sheet")).toHaveCSS("animation-name", "none");
+});
