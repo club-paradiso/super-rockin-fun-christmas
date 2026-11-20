@@ -148,3 +148,24 @@ test("idle recovery conceals a guest photo when durable storage is unavailable",
   expect(photos).toHaveLength(1);
   expect(photos[0]?.wallConsent).toBe(false);
 });
+
+test("legacy kiosk advertises standalone and provides fullscreen setup without native API", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: false });
+  });
+  await page.goto("/kiosk?camera=mock");
+  await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+    "href",
+    "/kiosk.webmanifest",
+  );
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute(
+    "content",
+    "yes",
+  );
+  const control = page.getByTestId("screen-attract").getByTestId("fullscreen-toggle");
+  await control.click();
+  await expect(page.getByTestId("fullscreen-help")).toContainText("홈 화면에 추가");
+});
