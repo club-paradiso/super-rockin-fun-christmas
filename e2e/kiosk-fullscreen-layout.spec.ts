@@ -84,7 +84,7 @@ test("welcome and picker align their content to the real screen center", async (
     [820, 1180],
     [768, 1024],
     [1024, 768],
-  ]) {
+  ] as const) {
     await page.setViewportSize({ width, height });
     await page.goto("/kiosk?camera=mock");
     await openWelcome(page);
