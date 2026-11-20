@@ -7,10 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test("kiosk advertises home-screen standalone mode on the dedicated route", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
-  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
-    "href",
-    "/kiosk.webmanifest",
-  );
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/kiosk.webmanifest");
   const response = await page.request.get("/kiosk.webmanifest");
   expect(response.ok()).toBe(true);
   const manifest = (await response.json()) as {
@@ -43,10 +40,7 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   const cover = page.getByTestId("screen-attract");
   await expect(cover.getByTestId("fullscreen-toggle")).toBeVisible();
   await cover.getByTestId("fullscreen-toggle").click();
-  await expect(page.locator(".kiosk-root")).toHaveAttribute(
-    "data-fullscreen-requested",
-    "yes",
-  );
+  await expect(page.locator(".kiosk-root")).toHaveAttribute("data-fullscreen-requested", "yes");
   await expect(cover).toBeVisible();
   await openWelcome(page);
   await expect(page.getByTestId("screen-welcome").getByTestId("fullscreen-toggle")).toBeVisible();
