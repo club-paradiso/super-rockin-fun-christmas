@@ -157,10 +157,7 @@ test("legacy kiosk advertises standalone and provides fullscreen setup without n
   });
   await page.goto("/kiosk?camera=mock");
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
-  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
-    "href",
-    "/kiosk.webmanifest",
-  );
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/kiosk.webmanifest");
   await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute(
     "content",
     "yes",
