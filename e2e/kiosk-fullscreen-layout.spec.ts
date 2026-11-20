@@ -110,6 +110,10 @@ test("native fullscreen remains exit-able instead of being mistaken for an insta
 }) => {
   await page.addInitScript(() => {
     let fullscreenElement: Element | null = null;
+    const notifyFullscreen = (element: Element | null) => {
+      fullscreenElement = element;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
     Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
     Object.defineProperty(document, "fullscreenElement", {
       configurable: true,
@@ -118,16 +122,14 @@ test("native fullscreen remains exit-able instead of being mistaken for an insta
     Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
       configurable: true,
       value: function (this: HTMLElement) {
-        fullscreenElement = this;
-        document.dispatchEvent(new Event("fullscreenchange"));
+        notifyFullscreen(this);
         return Promise.resolve();
       },
     });
     Object.defineProperty(document, "exitFullscreen", {
       configurable: true,
       value: () => {
-        fullscreenElement = null;
-        document.dispatchEvent(new Event("fullscreenchange"));
+        notifyFullscreen(null);
         return Promise.resolve();
       },
     });
