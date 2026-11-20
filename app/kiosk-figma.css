@@ -274,8 +274,6 @@
     animation: none;
   }
 }
-.kiosk-root[data-legacy-ios15="true"]
-  .booth-screen:not([data-testid="screen-attract"])
-  .journal-sheet {
+.kiosk-root[data-legacy-ios15="true"] .booth-screen .journal-sheet {
   animation: none;
 }
