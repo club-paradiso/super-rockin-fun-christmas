@@ -90,7 +90,7 @@ export const shalomGrid: FrameDefinition = {
     },
     {
       type: "text",
-      text: "MT 5:9",
+      text: "Matthew 5:9",
       x: SIZE.width / 2,
       y: 721,
       size: 13,
