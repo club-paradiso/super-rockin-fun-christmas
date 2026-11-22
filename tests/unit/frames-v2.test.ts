@@ -231,7 +231,9 @@ describe("v2 frame details (Figma measurements)", () => {
     const withLogo = getFrame("film3-sepia-logo").slots;
     expect(withLogo.map((s) => Math.round(s.y * 100) / 100)).toEqual([14, 592.67, 1171.33]);
     expect(withLogo[0]!.height).toBeCloseTo(562.667, 2);
-    for (const f of V2_FRAMES.filter((f) => !f.id.startsWith("film3")))
+    // 폴라로이드 3컷 has Figma's "플래시 느낌" (836:1680); no other frame treats the photo.
+    expect(getFrame("polaroid3").photoTone).toBe("flash");
+    for (const f of V2_FRAMES.filter((f) => !f.id.startsWith("film3") && f.id !== "polaroid3"))
       expect(f.photoTone).toBeUndefined();
   });
 

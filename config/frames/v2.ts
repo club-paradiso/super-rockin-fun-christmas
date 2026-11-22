@@ -156,7 +156,9 @@ function film4(color: keyof typeof FILM4): FrameDefinition {
       ...photos(4),
       hand({
         text: { x: 38.931, y: 1600, deg: 3, width: 326, height: 56 },
-        scale: 1,
+        // Figma sets the film strip's handwriting at 44.72 px where the font table says 49
+        // (880:1717); every font of the cycle shrinks by the same share.
+        scale: 44.72 / 49,
         color: c.ink,
         heart: {
           src: `hand-heart-film4-${pen}.svg`,
@@ -193,7 +195,13 @@ const polaroid1: FrameDefinition = {
   outputHeight: 1459,
   background: { type: "solid", color: "#F4F1EA" },
   // The 4:3 photo is cropped to the square from its centre (coverCrop).
-  slots: [slot(61, 95, 1077, 1077)],
+  // Figma 873:1664: INNER_SHADOW radius 3, y 1, black 28 %.
+  slots: [
+    {
+      ...slot(61, 95, 1077, 1077),
+      innerShadow: { color: "rgba(0, 0, 0, 0.28)", blur: 3, offsetY: 1 },
+    },
+  ],
   decorations: [
     ...photos(1),
     hand({
@@ -251,13 +259,15 @@ const polaroid3: FrameDefinition = {
   outputWidth: 600,
   outputHeight: 1800,
   background: { type: "solid", color: "#EFE7D8" },
+  // Figma 836:1680 "플래시 느낌": exposure +0.06, contrast +0.18 (and saturation, temperature).
+  photoTone: "flash",
   slots: [
     slot(64.738, 93.194, 456, 342, 3.2),
     slot(80.975, 620.979, 456, 342, -2.6),
     slot(61.299, 1132.68, 456, 342, 1.8),
   ],
   decorations: [
-    art("polaroid3-base.jpg", 600, 1800),
+    art("polaroid3-base.png", 600, 1800),
     ...photos(3),
     stamp(368.379, 412.642, 3.2),
     stamp(415.344, 908.107, -2.6),
@@ -291,7 +301,7 @@ const verse4: FrameDefinition = {
   slots: [104, 474, 844, 1214].map((y) => slot(36, y, 528, 300)),
   decorations: [
     // Ivory gradient, "Christmas Village 2026", the rule and the Matthew 5:9 verse (NIV).
-    art("verse4-base.jpg", 600, 1800),
+    art("verse4-base.png", 600, 1800),
     ...photos(4),
     logo(414, 1729.223, 150, "#2B1A10", "#E6DCCB"),
   ],

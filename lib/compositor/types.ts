@@ -29,6 +29,11 @@ export interface FrameSlot {
    * `📷 SAGE OVAL`, the lace frame). Default "rect".
    */
   shape?: "rect" | "ellipse";
+  /**
+   * A shadow cast onto the photo from its own edge (Figma INNER_SHADOW: the polaroid's window).
+   * `blur` and `offsetY` are in frame units, as Figma gives them.
+   */
+  innerShadow?: { color: Color; blur: number; offsetY: number };
 }
 
 /**
@@ -36,7 +41,7 @@ export interface FrameSlot {
  * Done with per-pixel arithmetic (lib/compositor/tone.ts), never `ctx.filter`, so the iPad mini 4
  * (Safari 15), the preview, the saved file and the wall copy all get the same pixels.
  */
-export type PhotoTone = "mono" | "sepia";
+export type PhotoTone = "mono" | "sepia" | "flash";
 
 export type FrameDecoration =
   | {
@@ -184,7 +189,7 @@ export interface FrameDefinition {
    * with `photo` layers (then every slot appears exactly once).
    */
   decorations: FrameDecoration[];
-  /** Colour treatment of every photo in this frame (film 3컷: 흑백 or 세피아). */
+  /** Colour treatment of every photo in this frame (film 3컷: 흑백 or 세피아; polaroid 3컷: 플래시). */
   photoTone?: PhotoTone;
 }
 

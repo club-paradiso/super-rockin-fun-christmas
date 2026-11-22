@@ -4,7 +4,7 @@ import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
 import { composeFrame, formatStampLabel } from "@/lib/compositor/compose";
 import { frameFontRequests } from "@/lib/compositor/fonts";
-import { applyTone, toneTable } from "@/lib/compositor/tone";
+import { applyTone, greyLevel, toneTable } from "@/lib/compositor/tone";
 import type { CanvasFactory } from "@/lib/canvas";
 import type { ComposeImage } from "@/lib/compositor/types";
 import { FakeCanvas } from "../helpers/fake-canvas";
@@ -46,28 +46,51 @@ const assets = (srcs: string[]) =>
 describe("흑백 / 세피아 (pixel arithmetic, the same on every browser)", () => {
   it("흑백 is grey: r = g = b for every level, darker darks and lighter lights (contrast +0.12)", () => {
     const t = toneTable("mono");
+    expect(t.grey).toBe(true);
     for (let i = 0; i < 256; i++) {
-      expect(t[i * 3]).toBe(t[i * 3 + 1]);
-      expect(t[i * 3]).toBe(t[i * 3 + 2]);
+      expect(t.r[i]).toBe(t.g[i]);
+      expect(t.r[i]).toBe(t.b[i]);
     }
-    expect(t[64 * 3]!).toBeLessThan(64);
-    expect(t[192 * 3]!).toBeGreaterThan(192);
-    expect(t[0]).toBe(0);
-    expect(t[255 * 3]).toBe(255);
+    expect(t.r[64]!).toBeLessThan(64);
+    expect(t.r[192]!).toBeGreaterThan(192);
+    expect(t.r[0]).toBe(0);
+    expect(t.r[255]).toBe(255);
   });
 
   it("세피아 is warm (r > g > b), with lifted blacks (#2E1F14) and cream highlights (#F4E6CC)", () => {
     const t = toneTable("sepia");
-    const at = (i: number) => [t[i * 3]!, t[i * 3 + 1]!, t[i * 3 + 2]!];
+    expect(t.grey).toBe(true);
+    const at = (i: number) => [t.r[i]!, t.g[i]!, t.b[i]!];
     const [r, g, b] = at(128);
     expect(r).toBeGreaterThan(g!);
     expect(g).toBeGreaterThan(b!);
     expect(at(0)).toEqual([0x2e, 0x1f, 0x14]);
-    const white = at(255);
-    expect(white[0]).toBeLessThanOrEqual(0xf4);
-    expect(white[1]).toBeLessThanOrEqual(0xe6);
-    expect(white[2]).toBeLessThanOrEqual(0xcc);
+    expect(at(255)).toEqual([0xf4, 0xe6, 0xcc]);
     for (let i = 1; i < 256; i++) expect(luma(at(i))).toBeGreaterThanOrEqual(luma(at(i - 1)) - 1);
+  });
+
+  it("the grey of 흑백 and 세피아 is the Rec. 709 luminance in linear light", () => {
+    expect(greyLevel(0, 0, 0)).toBe(0);
+    expect(greyLevel(255, 255, 255)).toBe(255);
+    expect(greyLevel(120, 120, 120)).toBe(120);
+    // Pure colours: sRGB of 0.2126, 0.7152 and 0.0722.
+    expect(greyLevel(255, 0, 0)).toBe(127);
+    expect(greyLevel(0, 255, 0)).toBe(220);
+    expect(greyLevel(0, 0, 255)).toBe(76);
+  });
+
+  it("플래시 (폴라로이드 3컷) keeps colour: one rising curve per channel, brighter in the middle", () => {
+    const t = toneTable("flash");
+    expect(t.grey).toBe(false);
+    for (const c of [t.r, t.g, t.b]) {
+      for (let i = 1; i < 256; i++) expect(c[i]!).toBeGreaterThanOrEqual(c[i - 1]!);
+      expect(c[128]!).toBeGreaterThan(128);
+    }
+    // Warmer: red is lifted more than blue.
+    expect(t.r[128]!).toBeGreaterThan(t.b[128]!);
+    const px = new Uint8ClampedArray([128, 128, 128, 200]);
+    applyTone(px, "flash");
+    expect([...px]).toEqual([t.r[128], t.g[128], t.b[128], 200]);
   });
 
   it("rewrites RGB in place and keeps alpha", () => {
@@ -129,6 +152,24 @@ describe("shapes and turns", () => {
     const draw = created[0]!.callsTo("drawImage").find((c) => c.args.length === 9)!;
     expect(draw.args.slice(1, 5)).toEqual([200, 0, 1200, 1200]);
     expect(draw.args.slice(5)).toEqual([61, 95, 1077, 1077]);
+  });
+
+  it("폴라로이드 1컷 has Figma's inner shadow (blur 3, y 1, black 28 %), scaled with the output", () => {
+    const [slot] = getFrame("polaroid1").slots;
+    expect(slot!.innerShadow).toEqual({ color: "rgba(0, 0, 0, 0.28)", blur: 3, offsetY: 1 });
+    for (const scale of [1, 2]) {
+      const { factory, created } = pixelFactory();
+      composeFrame(getFrame("polaroid1"), [photo()], {
+        createCanvas: factory,
+        context: { dateLabel: "" },
+        scale,
+      });
+      const fills = created[0]!.calls.filter((c) => c.name === "fill" && c.args[0] === "evenodd");
+      expect(fills).toHaveLength(1);
+    }
+    // No other frame has one.
+    for (const id of ["polaroid3", "film4-cream", "lace1"])
+      for (const s of getFrame(id).slots) expect(s.innerShadow).toBeUndefined();
   });
 });
 

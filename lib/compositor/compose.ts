@@ -51,10 +51,11 @@ export function composeFrame(
   drawBackground(ctx, frame.background, frame.outputWidth, frame.outputHeight);
   const tone = frame.photoTone ? { tone: frame.photoTone, createCanvas, scale } : null;
   const placed = photoLayers(frame);
-  if (!placed) frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!, tone));
+  if (!placed) frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!, tone, scale));
   for (const deco of frame.decorations) {
-    if (deco.type === "photo") drawPhoto(ctx, frame.slots[deco.slot]!, images[deco.slot]!, tone);
-    else drawDecoration(ctx, deco, context);
+    if (deco.type === "photo")
+      drawPhoto(ctx, frame.slots[deco.slot]!, images[deco.slot]!, tone, scale);
+    else drawDecoration(ctx, deco, context, scale);
   }
 
   ctx.restore();
@@ -176,6 +177,7 @@ function drawPhoto(
   slot: FrameSlot,
   image: ComposeImage,
   tone: ToneJob | null = null,
+  scale = 1,
 ) {
   const crop = coverCrop(image.width, image.height, slot.width / slot.height);
   const toned = tone ? tonedPhoto(image, crop, slot, tone) : null;
@@ -212,6 +214,27 @@ function drawPhoto(
   }
   ctx.restore();
 
+  if (slot.innerShadow) {
+    // The shadow of a shape that covers everything but the photo, seen only inside the photo.
+    // Canvas shadows ignore the transform, so blur and offset are scaled by hand.
+    const { color, blur, offsetY } = slot.innerShadow;
+    const pad = 4 * (blur + Math.abs(offsetY)) + 8;
+    ctx.save();
+    rotate(ctx, slot.rotation, slot);
+    slotPath(ctx, slot);
+    ctx.clip();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur * scale;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = offsetY * scale;
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.rect(slot.x - pad, slot.y - pad, slot.width + 2 * pad, slot.height + 2 * pad);
+    ctx.rect(slot.x, slot.y, slot.width, slot.height);
+    ctx.fill("evenodd");
+    ctx.restore();
+  }
+
   if (slot.border && slot.border.width > 0) {
     ctx.save();
     rotate(ctx, slot.rotation, slot);
@@ -227,6 +250,7 @@ function drawDecoration(
   ctx: CanvasRenderingContext2D,
   deco: Exclude<FrameDecoration, { type: "photo" }>,
   context: ComposeContext,
+  scale = 1,
 ) {
   ctx.save();
   switch (deco.type) {
@@ -276,7 +300,8 @@ function drawDecoration(
       }
       if (deco.glow) {
         ctx.shadowColor = deco.glow.color;
-        ctx.shadowBlur = deco.glow.blur;
+        // Canvas shadows ignore the transform: scale the blur by hand.
+        ctx.shadowBlur = deco.glow.blur * scale;
       }
       const text = deco.text
         .replaceAll("{date}", context.dateLabel)
