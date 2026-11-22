@@ -226,7 +226,12 @@ for (const [width, height] of [
     for (const c of ["film3", "film4", "polaroid1", "polaroid3", "verse4", "check2", "lace1"])
       await expect(page.getByTestId(`frame-option-${c}`).locator("img")).toBeVisible();
     expect(await page.evaluate(onTheRings)).toEqual([]);
-    if (SAVE) await page.screenshot({ path: `${OUT}/${width}x${height}-2A-pick.png` });
+    if (SAVE)
+      await page.screenshot({
+        path: `${OUT}/${width}x${height}-2A-pick.jpg`,
+        type: "jpeg",
+        quality: 85,
+      });
     for (const [card, name] of [
       ["film3", "2B-film3-options"],
       ["film4", "2C-film4-options"],
@@ -242,7 +247,12 @@ for (const [width, height] of [
         return s.scrollHeight - s.clientHeight;
       });
       expect(scroll).toBeLessThanOrEqual(1);
-      if (SAVE) await page.screenshot({ path: `${OUT}/${width}x${height}-${name}.png` });
+      if (SAVE)
+        await page.screenshot({
+          path: `${OUT}/${width}x${height}-${name}.jpg`,
+          type: "jpeg",
+          quality: 85,
+        });
       await page.getByTestId("go-back").click();
       await expect(page.getByTestId("screen-pick")).toBeVisible();
     }
