@@ -1,0 +1,82 @@
+[
+  {
+    "what": "screen pick",
+    "overPct": 3.028,
+    "meanDeltaE": 0.628
+  },
+  {
+    "what": "screen film3",
+    "overPct": 1.032,
+    "meanDeltaE": 0.255
+  },
+  {
+    "what": "screen film4",
+    "overPct": 1.666,
+    "meanDeltaE": 0.376
+  },
+  {
+    "what": "screen check2",
+    "overPct": 2.357,
+    "meanDeltaE": 0.505
+  },
+  {
+    "what": "output film3-mono-logo",
+    "overPct": 0.082,
+    "meanDeltaE": 0.168
+  },
+  {
+    "what": "output film3-mono-plain",
+    "overPct": 0,
+    "meanDeltaE": 0
+  },
+  {
+    "what": "output film3-sepia-logo",
+    "overPct": 0.076,
+    "meanDeltaE": 0.227
+  },
+  {
+    "what": "output film3-sepia-plain",
+    "overPct": 0,
+    "meanDeltaE": 0
+  },
+  {
+    "what": "output film4-cream",
+    "overPct": 0.393,
+    "meanDeltaE": 0.245
+  },
+  {
+    "what": "output film4-red",
+    "overPct": 0.392,
+    "meanDeltaE": 0.187
+  },
+  {
+    "what": "output polaroid1",
+    "overPct": 0.551,
+    "meanDeltaE": 0.38
+  },
+  {
+    "what": "output polaroid3",
+    "overPct": 0.087,
+    "meanDeltaE": 0.193
+  },
+  {
+    "what": "output verse4",
+    "overPct": 0.021,
+    "meanDeltaE": 0.003
+  },
+  {
+    "what": "output check2-red",
+    "overPct": 0.079,
+    "meanDeltaE": 0.105
+  },
+  {
+    "what": "output check2-blue",
+    "overPct": 0.034,
+    "meanDeltaE": 0.004
+  },
+  {
+    "what": "output lace1",
+    "overPct": 0.021,
+    "meanDeltaE": 0.003
+  }
+]

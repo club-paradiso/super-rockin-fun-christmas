@@ -59,8 +59,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
   빼기" has none, the guest's choice) in `tests/unit/frames-v2.test.ts`; mirror frame changes in
-  Figma (`design/README.md`). Photo tones (흑백/세피아) are pixel arithmetic in
-  `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has none). The handwriting font is drawn
+  Figma (`design/README.md`). Photo tones (흑백/세피아, and 폴라로이드 3컷's
+  "플래시 느낌") are pixel arithmetic in `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has
+  none); their curves were measured from Figma exports, so change one only with a new measurement. The handwriting font is drawn
   per session (`config/hand-fonts.ts`), never the previous session's; the polaroid date stamp is the
   server's day (`lib/kiosk/clock.ts`), never the tablet clock.
 - **The brand is STUDIO SHALOM** (D73; lockup `STUDIO` / `SHALOM` / divider / `평화의 벽`, event
@@ -209,6 +210,16 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   rows of that photo's Asia/Seoul day up to it (`countCreatedBetween`, head-only on Supabase). The
   upload answers carry it as `dayOrdinal`; anywhere it is missing the ticket says "오늘의 기록".
   The PNG ticket is drawn on the guest's phone (`lib/studio/ticket.ts`) and sent nowhere.
+- **Figma is the answer for the v2 frames and their four screens, and the match is measured**
+  (「Figma 일치」, 2026-11-23, `docs/FIGMA_PARITY.md`): `e2e/figma-parity.spec.ts` (12 outputs: share of
+  pixels with ΔE00 > 5 at most 1 %, photos within 1 px) and `e2e/figma-parity-screens.spec.ts`
+  (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
+  exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
+  and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
+  to pass. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
+  16 px dots) on every booth screen. The width of a space differs between browsers with the same
+  font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
+  `word-spacing` for one engine.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
