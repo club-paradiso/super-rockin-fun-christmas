@@ -4,8 +4,23 @@ import type { ComposeImage, FrameDefinition } from "./types";
 export function frameAssetSources(frames: readonly FrameDefinition[]): string[] {
   const seen = new Set<string>();
   for (const frame of frames)
-    for (const d of frame.decorations) if (d.type === "image") seen.add(d.src);
+    for (const d of frame.decorations) {
+      if (d.type === "image") seen.add(d.src);
+      if (d.type === "hand") {
+        if (d.heart) seen.add(d.heart.src);
+        if (d.underline) seen.add(d.underline.src);
+      }
+    }
   return [...seen];
+}
+
+/**
+ * The v2 frame art (public/frames/v2) ships at 2× the frame size for the 2× saved file, and at 1×
+ * as `name@1x.ext` for a booth that saves at 1× (the iPad mini 4 budget, lib/kiosk/legacy-ios.ts):
+ * the same picture, a quarter of the memory once decoded. SVGs scale and have no 1× file.
+ */
+export function lowResSource(src: string): string {
+  return /^\/frames\/v2\/[^/]+\.(?:jpg|png)$/.test(src) ? src.replace(/(\.\w+)$/, "@1x$1") : src;
 }
 
 export type AssetLoader = (src: string) => Promise<ComposeImage>;
@@ -26,12 +41,13 @@ export const loadImageAsset: AssetLoader = async (src) => {
 export async function loadFrameAssets(
   frames: readonly FrameDefinition[],
   load: AssetLoader = loadImageAsset,
+  { lowRes = false }: { lowRes?: boolean } = {},
 ): Promise<{ assets: Map<string, ComposeImage>; complete: boolean }> {
   const assets = new Map<string, ComposeImage>();
   const sources = frameAssetSources(frames);
   await Promise.all(
     sources.map((src) =>
-      load(src).then(
+      load(lowRes ? lowResSource(src) : src).then(
         (image) => void assets.set(src, image),
         () => undefined,
       ),

@@ -1,4 +1,5 @@
 import { BRAND_FONT } from "@/lib/canvas";
+import { HAND_FONTS } from "@/config/hand-fonts";
 import type { FrameDefinition } from "./types";
 
 /**
@@ -9,12 +10,18 @@ import type { FrameDefinition } from "./types";
  */
 export function frameFontRequests(frames: readonly FrameDefinition[]) {
   const seen = new Map<string, string>();
+  const add = (spec: string, text: string) => seen.set(spec, (seen.get(spec) ?? "") + text);
   for (const frame of frames)
     for (const d of frame.decorations ?? []) {
+      if (d.type === "hand") {
+        // The font is chosen per session: every one of the ten must be ready.
+        for (const f of HAND_FONTS) add(`${f.weight} ${f.size * d.scale}px "${f.family}"`, d.text);
+        continue;
+      }
       if (d.type !== "text") continue;
-      const spec = `${d.weight ?? 500} ${d.size}px "${BRAND_FONT}"`;
-      // Digits and the date separator are filled in at compose time ({date}).
-      seen.set(spec, (seen.get(spec) ?? "") + d.text.replaceAll("{date}", "0123456789."));
+      const spec = `${d.weight ?? 500} ${d.size}px "${d.font ?? BRAND_FONT}"`;
+      // Digits and separators are filled in at compose time ({date}, {stamp}).
+      add(spec, d.text.replaceAll("{date}", "0123456789.").replaceAll("{stamp}", "'0123456789 "));
     }
   return [...seen].map(([spec, text]) => ({ spec, text }));
 }
