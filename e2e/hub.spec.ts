@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, USE_SUPABASE } from "./env";
-import { tokenFromUrl, openWelcome } from "./helpers";
+import { tokenFromUrl, openWelcome, confirmFrame } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, kioskPhotoToQr, newPage } from "./staff-helpers";
 
 // The default (local) E2E run is the on-site hub: FTL_ROLE=hub, local files, PIN staff login.
@@ -152,7 +152,7 @@ test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, star
   await kiosk.goto("/kiosk?camera=mock");
   await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(kiosk);
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
 
   // A guest's quick touch never opens it.

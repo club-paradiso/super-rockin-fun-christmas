@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ENROLL_SECRET } from "./env";
-import { enrollKiosk, openWelcome, startSession } from "./helpers";
+import { enrollKiosk, openWelcome, startSession, confirmFrame } from "./helpers";
 
 const DESKTOP_IPAD_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 " +
@@ -163,7 +163,7 @@ test("legacy camera denial can be retried without clearing enrollment", async ({
     await page.goto("/kiosk");
     await openWelcome(page);
     await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-    await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+    await confirmFrame(page);
     await expect(page.getByText("카메라 사용이 허용되지 않았어요")).toBeVisible();
     await page.getByRole("button", { name: "다시 시도" }).click();
     await expect(page.getByTestId("screen-ready")).toBeVisible();

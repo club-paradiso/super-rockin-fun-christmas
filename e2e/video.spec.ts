@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { answerForQr, enrollKiosk, shootSixWithMock, toConsent, openWelcome } from "./helpers";
+import {
+  answerForQr,
+  enrollKiosk,
+  shootSixWithMock,
+  toConsent,
+  openWelcome,
+  confirmFrame,
+} from "./helpers";
 
 /**
  * Session video (D72) with the mock camera: the booth records a silent reel while shooting, and
@@ -35,7 +42,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page);
   // The guest is told before shooting, in one line.
   await expect(page.getByTestId("video-notice")).toHaveText(
     "촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지 않아요.",
@@ -133,7 +140,7 @@ test("no MediaRecorder: the same photo flow, no video notice, no video button, 4
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page);
   await expect(page.getByTestId("shoot-plan")).toBeVisible();
   await expect(page.getByTestId("video-notice")).toHaveCount(0);
 

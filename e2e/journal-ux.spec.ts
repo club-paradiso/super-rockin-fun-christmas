@@ -5,37 +5,30 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("the 20 journal frames show a persistent selection and a truthful position", async ({
-  page,
-}) => {
+test("the seven v2 cards show one persistent selection, 필름 3컷 first", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByTestId("start-camera").click();
 
   const pick = page.getByTestId("screen-pick");
-  const tiles = pick.locator('[data-testid^="frame-option-"]');
-  await expect(tiles).toHaveCount(20);
-  await expect(pick.getByTestId("frame-index")).toHaveText("17 / 20");
-  await expect(pick.locator('.pick-tile[aria-pressed="true"]')).toHaveCount(1);
-  await expect(pick.locator('.pick-tile[aria-pressed="true"] .pick-tile-check')).toBeVisible();
+  const cards = pick.locator('[data-testid^="frame-option-"]');
+  await expect(cards).toHaveCount(7);
+  await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
+  await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("confirm-pick")).toHaveText("다음");
 
-  await page.getByTestId("frame-option-shalom-grid").click();
-  await expect(pick.getByTestId("frame-index")).toHaveText("1 / 20");
-  await expect(page.getByTestId("frame-option-shalom-grid")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(
-    page.getByTestId("frame-option-shalom-grid").locator(".pick-tile-check"),
-  ).toBeVisible();
-  await expect(pick.locator('.pick-tile[aria-pressed="true"]')).toHaveCount(1);
+  await page.getByTestId("frame-option-lace1").click();
+  await expect(page.getByTestId("frame-option-lace1")).toHaveAttribute("aria-pressed", "true");
+  await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
+  // A card without options shoots straight away.
+  await expect(page.getByTestId("confirm-pick")).toHaveText("이 틀로 찍기");
 });
 
-test("the review offers one extra shot, not six misleading per-photo retakes", async ({ page }) => {
+test("the review has no retake at all: six photos and one way on", async ({ page }) => {
   await shootSixWithMock(page);
   const review = page.getByTestId("screen-review");
   await expect(review.locator(".review-photo")).toHaveCount(6);
-  await expect(review.getByTestId("take-extra-shot")).toHaveCount(1);
+  await expect(review.getByTestId("take-extra-shot")).toHaveCount(0);
   await expect(review.getByText("다시 찍기", { exact: true })).toHaveCount(0);
   await expect(review.locator(".journal-tab")).toHaveText("03");
 });

@@ -5,8 +5,9 @@ import {
   selectDefaultPhotos,
   shootSixWithMock,
   startSession,
-  toFrame,
+  toSelect,
   openWelcome,
+  confirmFrame,
 } from "./helpers";
 
 /**
@@ -47,9 +48,12 @@ test("이전: frame pick → welcome, camera → frame pick, never during or aft
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
 
   await startSession(page);
+  // 필름 3컷 has options: back from the camera is the options screen, then the picker.
+  await page.getByTestId("go-back").click();
+  await expect(page.getByTestId("screen-options")).toBeVisible();
   await page.getByTestId("go-back").click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page);
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
@@ -67,14 +71,20 @@ test("English: the whole booth in English, the next guest back in Korean", async
   ).toBeVisible();
 
   await page.getByRole("button", { name: /Take photos here/ }).click();
-  await expect(page.getByText("Choose a frame you like")).toBeVisible();
-  await expect(page.getByTestId("frame-option-shalom-grid")).toContainText("Shalom 2×2");
-  await page.getByRole("button", { name: "Use this frame" }).click();
+  await expect(page.getByText("Pick a frame")).toBeVisible();
+  await expect(page.getByTestId("frame-option-film3")).toContainText("Film · 3 shots");
+  await expect(page.getByTestId("frame-option-film3")).toContainText("✎ Color & logo");
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Choose color and logo")).toBeVisible();
+  await expect(page.getByTestId("options-locked")).toHaveText(
+    "Film · 3 shots · Can't be changed after shooting",
+  );
+  await expect(page.getByTestId("option-color-sepia")).toHaveText("Sepia");
+  await page.getByRole("button", { name: "Start shooting" }).click();
   await page.getByRole("button", { name: "Pose freely" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("How did they turn out?")).toBeVisible();
   await page.getByRole("button", { name: "Looks good" }).click();
-  await page.getByRole("button", { name: "Go with this frame" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
   await expect(page.getByText(/^Pick \d of your 6 photos$/)).toBeVisible();
   await selectDefaultPhotos(page);
@@ -106,15 +116,19 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   await expect(page.getByRole("heading", { name: "一起留下圣诞的回忆" })).toBeVisible();
 
   await page.getByRole("button", { name: /在这里拍照/ }).click();
-  await expect(page.getByText("请选择你喜欢的相框")).toBeVisible();
-  await expect(page.getByTestId("frame-option-shalom-grid")).toContainText("Shalom 2×2");
-  await page.getByRole("button", { name: "用这个相框拍照" }).click();
+  await expect(page.getByText("选择一个相框")).toBeVisible();
+  await expect(page.getByTestId("frame-option-check2")).toContainText("格纹 2格");
+  await page.getByTestId("frame-option-check2").click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await expect(page.getByText("请选择颜色", { exact: true })).toBeVisible();
+  await page.getByTestId("option-color-blue").click();
+  await expect(page.getByTestId("option-color-blue")).toContainText("蓝色");
+  await page.getByRole("button", { name: "就这样拍" }).click();
   await page.getByRole("button", { name: "给我姿势建议" }).click();
   // The recommended pose is shown in Chinese during the countdown.
   await expect(page.getByTestId("pose-guide")).toContainText("面对面");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: "就这样吧" }).click();
-  await page.getByRole("button", { name: "就用这个相框" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("consent-yes")).toHaveText("好的，请放上去");
@@ -130,16 +144,10 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   await expect(page.locator("html")).toHaveAttribute("lang", "ko");
 });
 
-test("the STUDIO SHALOM 2×2: first in the picker, four photos, 1200 × 1500, delivered by QR", async ({
-  page,
-}) => {
-  await shootSixWithMock(page);
-  await toFrame(page);
-  const options = page.locator('[data-testid^="frame-option-"]');
-  await expect(options.first()).toHaveAttribute("data-testid", "frame-option-shalom-grid");
-  await page.getByTestId("frame-option-shalom-grid").click();
-  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
-  await expect(page.getByTestId("select-required")).toHaveAttribute("data-required", "4");
+test("레이스 1컷: one oval photo, 2400 × 3000 at 2×, delivered by QR", async ({ page }) => {
+  await shootSixWithMock(page, "lace1");
+  await toSelect(page);
+  await expect(page.getByTestId("select-required")).toHaveAttribute("data-required", "1");
   await selectDefaultPhotos(page);
   const finalImage = page.getByTestId("final-image");
   await expect(finalImage).toBeVisible();
@@ -147,11 +155,11 @@ test("the STUDIO SHALOM 2×2: first in the picker, four photos, 1200 × 1500, de
     await el.decode();
     return [el.naturalWidth, el.naturalHeight];
   });
-  expect(dims).toEqual([1200, 1500]); // 600 × 750 at 2×
+  expect(dims).toEqual([2400, 3000]); // 1200 × 1500 at 2×
   const loaded = await page.evaluate(() =>
     performance
       .getEntriesByType("resource")
-      .some((e) => e.name.endsWith("/frames/shalom-lockup.svg")),
+      .some((e) => e.name.endsWith("/frames/v2/lace1-base.jpg")),
   );
   expect(loaded).toBe(true);
   const url = await answerForQr(page, "yes");
@@ -189,9 +197,8 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
 
   await shootSixWithMock(page);
-  await toFrame(page);
+  await toSelect(page);
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
-  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
   await selectDefaultPhotos(page);
   await answerForQr(page, "no");
   await expect(page.getByTestId("delivery-ready")).toBeVisible();
