@@ -95,6 +95,7 @@ import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import { boothSound, type BoothSound } from "@/lib/kiosk/sound";
+import { measureSpaceEm, spaceCorrectionEm } from "@/lib/kiosk/space";
 import { cleanOrdinal } from "@/lib/studio/day";
 import { TicketStampLine, zigzagClip, type TicketInfo } from "@/components/studio/stamp-ticket";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
@@ -274,6 +275,28 @@ export function KioskApp({
       root.style.removeProperty("--legacy-visible-height");
     };
   }, [legacyIOS15]);
+
+  // The same font has a wider space in Chromium than in WebKit or Figma (lib/kiosk/space.ts):
+  // measure it once the fonts are in, and let the v2 screens correct by the difference.
+  useEffect(() => {
+    const root = scrollRef.current?.closest<HTMLElement>(".kiosk-root");
+    if (!root) return;
+    let live = true;
+    const apply = () => {
+      if (!live) return;
+      const family = getComputedStyle(root).fontFamily;
+      root.style.setProperty(
+        "--space-fix",
+        String(spaceCorrectionEm(measureSpaceEm(document, family))),
+      );
+    };
+    apply();
+    void document.fonts?.ready.then(apply);
+    return () => {
+      live = false;
+      root.style.removeProperty("--space-fix");
+    };
+  }, [state.lang]);
 
   const trackUrl = (url: string) => {
     urlsRef.current.add(url);
@@ -1585,7 +1608,11 @@ function Screen(p: ScreenProps) {
                       className="options-choice"
                       onClick={() => dispatch({ type: "SET_OPTION", key: option.key, value })}
                     >
-                      {on && <span aria-hidden>✓ </span>}
+                      {on && (
+                        <span aria-hidden className="options-choice-mark">
+                          ✓{" "}
+                        </span>
+                      )}
                       {t.value[value]}
                     </button>
                   );

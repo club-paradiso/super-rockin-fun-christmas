@@ -285,18 +285,42 @@
    photo is `cover` from 820 × 1180, where the rings end at 106.8 px (100 px at 768 × 1024). No
    button or picture is placed inside it; the header and the bottom bar sit above and below the
    rings, as in Figma. Touch targets never go under 48 px. */
-.kiosk-root .booth-screen.booth-screen-v2 {
+.kiosk-root .booth-screen {
+  /* One Figma pixel of the 768 × 1024 frames, as a length: every booth screen's header and
+     footer scale with it (「Figma 일치」, 2026-11-23). */
   --fx: min(calc(var(--bw) * 100 / 768), calc(var(--bh) * 100 / 1024));
+}
+/* A 3:4 tablet (iPad mini, 768 × 1024): Figma lays the same 820 × 1180 binder picture at its own
+   size from the top left corner (898:1677), where the taller 820 × 1180 frame fits it exactly.
+   Only the picker and the options screen: the other screens have no Figma frame at this size, and
+   their text was placed around the rings where "cover" puts them. */
+@media (min-aspect-ratio: 73/100) and (max-aspect-ratio: 4/5) {
+  .kiosk-root .booth-screen.booth-screen-v2 {
+    background-size: calc(820 * var(--fx)) auto;
+    background-position: left top;
+  }
+}
+.kiosk-root .booth-screen.booth-screen-v2 {
   --ring-safe: calc(106.8 * max(calc(var(--bw) * 100 / 820), calc(var(--bh) * 100 / 1180)));
-  --v2-ink-soft: color-mix(in srgb, var(--color-accent) 80%, var(--color-ink));
+  /* Figma: the subtitle #7A450E, the card hint #6B3D0D (both between accent and ink). */
+  --v2-sub: #7a450e;
+  --v2-hint: #6b3d0d;
+  /* Figma frame: 30 from the sides and the top, 24 from the bottom. */
+  padding: max(calc(30 * var(--fx)), env(safe-area-inset-top))
+    max(calc(30 * var(--fx)), env(safe-area-inset-right))
+    max(calc(24 * var(--fx)), env(safe-area-inset-bottom))
+    max(calc(30 * var(--fx)), env(safe-area-inset-left));
+}
+.kiosk-root .booth-screen.booth-screen-v2 .booth-header {
+  margin-bottom: calc(5 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .letter-sheet.pick-v2,
 .kiosk-root .booth-screen-v2 .letter-sheet.options {
   display: flex;
   flex-direction: column;
   gap: calc(12 * var(--fx));
-  padding: 0 max(0px, calc(36 * var(--fx) - var(--booth-pad))) 0
-    max(0px, calc(var(--ring-safe) - var(--booth-pad)));
+  /* Content x 100 → 732 of 768 (the header and the bar start at 30). */
+  padding: 0 calc(6 * var(--fx)) 0 max(0px, calc(var(--ring-safe) - 30 * var(--fx)));
 }
 .kiosk-root .booth-screen-v2 .pick-head {
   display: flex;
@@ -306,12 +330,12 @@
 }
 .kiosk-root .booth-screen-v2 .pick-head .booth-title {
   font-size: max(22px, calc(32 * var(--fx)));
-  line-height: 1.2;
+  line-height: calc(44 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .options-locked {
   font-size: max(15px, calc(18 * var(--fx)));
-  line-height: 1.25;
-  color: var(--v2-ink-soft);
+  line-height: calc(22 * var(--fx));
+  color: var(--v2-sub);
   text-align: center;
 }
 
@@ -334,9 +358,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(4 * var(--fx));
-  padding: calc(12 * var(--fx)) calc(6 * var(--fx)) calc(10 * var(--fx));
-  border: 3px solid transparent;
+  gap: calc(6 * var(--fx));
+  /* Figma: 12 above, 6 beside, 11 below; the chosen card's 3 px stroke takes its room from the
+     padding beside and below, and pushes the content 3 px down, as in 898:2168. */
+  padding: calc(12 * var(--fx)) calc(6 * var(--fx)) calc(11 * var(--fx));
+  border: 0 solid var(--color-ink);
   border-radius: calc(14 * var(--fx));
   background: rgb(255 255 255 / 0.55);
   color: var(--color-ink);
@@ -355,7 +381,12 @@
   grid-column: 6 / span 2;
 }
 .kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
-  border-color: var(--color-ink);
+  border-width: calc(3 * var(--fx));
+  padding: calc(12 * var(--fx)) calc(3 * var(--fx)) calc(5 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-card-name:nth-last-child(2) {
+  /* No hint under the name (the sr-only line is last): Figma leaves 14 below it. */
+  margin-bottom: calc(3 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .pick-card:focus-visible {
   outline: 3px solid var(--color-button);
@@ -368,13 +399,13 @@
 .kiosk-root .booth-screen-v2 .pick-card-name {
   font-size: max(13px, calc(18 * var(--fx)));
   font-weight: 700;
-  line-height: 1.2;
+  line-height: calc(22 * var(--fx));
   word-break: keep-all;
 }
 .kiosk-root .booth-screen-v2 .pick-card-hint {
   font-size: max(11px, calc(14 * var(--fx)));
-  line-height: 1.2;
-  color: var(--v2-ink-soft);
+  line-height: calc(17 * var(--fx));
+  color: var(--v2-hint);
   word-break: keep-all;
 }
 :root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-name,
@@ -387,7 +418,9 @@
   flex: 1 1 0;
   min-height: calc(160 * var(--fx));
   display: flex;
-  margin-block: calc(-2 * var(--fx)) 0;
+  /* The frame sits 6 inside the preview area, above and below (898:1948). */
+  padding-block: calc(6 * var(--fx));
+  margin-bottom: calc(2 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .options-preview .frame-art > img {
   filter: drop-shadow(1px 5px 5px rgb(0 0 0 / 0.2));
@@ -395,7 +428,8 @@
 .kiosk-root .booth-screen-v2 .options-rows {
   display: flex;
   flex-direction: column;
-  gap: calc(12 * var(--fx));
+  gap: calc(16 * var(--fx));
+  margin-bottom: calc(6 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .options-row {
   display: grid;
@@ -412,7 +446,8 @@
 .kiosk-root .booth-screen-v2 .options-choice {
   min-height: max(48px, calc(60 * var(--fx)));
   padding: 4px 12px;
-  border: 2px solid var(--color-ink);
+  /* Figma: the unchosen answer has a 2 px stroke of ink at 35 %. */
+  border: 2px solid rgb(43 26 16 / 0.35);
   border-radius: 9999px;
   background: rgb(255 255 255 / 0.7);
   color: var(--color-ink);
@@ -425,8 +460,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 .kiosk-root .booth-screen-v2 .options-choice[aria-checked="true"] {
+  border-color: var(--color-ink);
   background: var(--color-ink);
-  color: var(--color-paper);
+  color: #ffffff;
 }
 .kiosk-root .booth-screen-v2 .options-choice:focus-visible {
   outline: 3px solid var(--color-button);
@@ -443,15 +479,13 @@
   flex-wrap: nowrap;
   justify-content: flex-start;
   gap: calc(20 * var(--fx));
-  margin-top: calc(32 * var(--fx));
-  padding-right: max(0px, calc(36 * var(--fx) - var(--booth-pad)));
+  margin-top: calc(28 * var(--fx));
+  padding-right: calc(6 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .booth-footer-bar .booth-chrome-btn {
   flex: none;
   width: calc(174 * var(--fx));
   min-width: max-content;
-  min-height: max(48px, calc(76 * var(--fx)));
-  font-size: max(17px, calc(26 * var(--fx)));
 }
 .kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
   flex: 1 1 auto;
@@ -459,4 +493,95 @@
   min-height: max(56px, calc(76 * var(--fx)));
   padding-block: 4px;
   font-size: max(20px, calc(28 * var(--fx)));
+}
+
+/* 「Figma 일치」 (2026-11-23) · the shared header and footer at the Figma component sizes
+   (Kiosk/Header, Kiosk/Footer in 898:1677, read at 768 × 1024 and scaled by --fx):
+   "이전" and "처음으로" 75 tall, 26 px medium, 22 beside the label, 2 px ink stroke; the wordmark
+   30 px, 20 after "이전"; six 16 px dots, 14 apart. Never under the 52 px control height.
+   The header itself keeps its own minimum (--ctl-h): a screen without "이전" (review, wall
+   question, QR) has no Figma frame at this size, and a taller header there pushed the QR screen
+   into scrolling at 820 × 1060 (e2e/tablet-matrix.spec.ts). */
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen .booth-footer .booth-chrome-btn {
+  min-height: max(52px, calc(75 * var(--fx)));
+  padding: 0 max(14px, calc(22 * var(--fx) - 2px));
+  gap: max(5px, calc(8 * var(--fx)));
+  border: 2px solid var(--color-ink);
+  font-size: max(17px, calc(26 * var(--fx)));
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.kiosk-root .booth-screen .booth-header-left {
+  gap: max(10px, calc(20 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-wordmark {
+  font-size: max(18px, calc(30 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-steps {
+  gap: max(6px, calc(14 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-steps-dot {
+  width: max(8px, calc(16 * var(--fx)));
+  height: max(8px, calc(16 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn {
+  min-width: calc(109 * var(--fx));
+}
+/* Figma sets every label of these screens with no letter spacing, and its text sits one Figma
+   pixel higher in its line than a browser centres it (measured against the exports). */
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen .booth-footer .booth-chrome-btn {
+  letter-spacing: 0;
+  padding-bottom: calc(2 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  letter-spacing: 0;
+  padding-bottom: calc(4 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-head .booth-title,
+.kiosk-root .booth-screen-v2 .options-locked,
+.kiosk-root .booth-screen-v2 .pick-card-name {
+  position: relative;
+  top: calc(-1 * var(--fx));
+  letter-spacing: 0;
+}
+.kiosk-root .booth-screen-v2 .options-choice-mark {
+  margin-left: calc(-4 * var(--fx));
+}
+/* The bar's two buttons start on the same line (924); the main button is flat in Figma
+   (898:1677: a plain #412D1B pill, no bevel, no cast shadow). */
+.kiosk-root .booth-screen-v2 .booth-footer.booth-footer-bar {
+  align-items: flex-start;
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary,
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary:active:not(:disabled) {
+  box-shadow: none;
+  background-image: none;
+  border: 0;
+}
+/* Figma centres "이전" (75) and the dots (16) on the wordmark's line, half a pixel above where a
+   75-tall row puts them (29.5 and 59 in 898:1677). Everything else stays on whole pixels, so
+   Chromium and WebKit round the same way. */
+.kiosk-root .booth-screen-v2 .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen-v2 .booth-header .booth-steps {
+  position: relative;
+  top: calc(-0.5 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-card-hint {
+  /* The pencil comes from a fallback font here and is a little wider than Figma's. */
+  position: relative;
+  left: calc(-1 * var(--fx));
+}
+/* Figma's space in Noto Sans KR is 0.224 em. The same font file gives 0.28 em in Chromium and
+   0.227 em in WebKit, so the booth measures its own space (lib/kiosk/space.ts → --space-fix, in
+   em) and the difference is taken out here. It is set on each text itself, because an em here is
+   that text's own size and a button does not inherit word spacing. The hint line measured closest
+   with none. */
+.kiosk-root .booth-screen-v2 .pick-head .booth-title,
+.kiosk-root .booth-screen-v2 .options-locked,
+.kiosk-root .booth-screen-v2 .pick-card-name,
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  word-spacing: calc(var(--space-fix, 0) * 1em);
 }
