@@ -358,6 +358,8 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallSubmissions: "open",
         wallPublic: false,
         aiReview: false,
+        // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
+        serverNow: expect.any(String),
       });
       const { kiosks } = (await (
         await call(routes.kiosks(), "GET", "/api/admin/kiosks", { cookie: staffCookie })
@@ -568,6 +570,8 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallSubmissions: "paused",
         wallPublic: false,
         aiReview: false,
+        // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
+        serverNow: expect.any(String),
       });
       await call(routes.settings(), "POST", "/api/admin/settings", {
         cookie: staffCookie,
