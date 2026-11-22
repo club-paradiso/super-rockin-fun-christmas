@@ -12,5 +12,7 @@ export async function kioskBootstrap(camera?: string) {
     initialWallPublic: settings.wallPublic,
     initialAiReview: await getAiReview().active(),
     staffHelp: getServerConfig().staffAuth?.mode === "pin",
+    // The server's clock at page load: the booth dates photos by it, never by the tablet's own.
+    serverNow: new Date().toISOString(),
   };
 }

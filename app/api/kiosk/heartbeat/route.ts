@@ -80,6 +80,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       wallPublic: settings.wallPublic,
       // Automatic check (D95): the booth then shows the notice and says so with the consent.
       aiReview: await getAiReview().active(),
+      // The booth keeps its clock offset from this (polaroid date stamp, never the tablet clock).
+      serverNow: new Date().toISOString(),
     },
     { headers },
   );
