@@ -23,13 +23,18 @@ describe("mock camera flow", () => {
     let state: KioskState<CapturedFrame> = createInitialState({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
-      frameId: "navy-strip",
     });
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
     dispatch({ type: "OPEN" });
     dispatch({ type: "START", sessionId: crypto.randomUUID() });
-    dispatch({ type: "CONFIRM_PICK" });
+    // 필름 4컷 · 빨강: a card with an option and the handwriting.
+    dispatch({ type: "SELECT_CARD", cardId: "film4" });
+    dispatch({ type: "CONFIRM_PICK", random: 0.5 });
+    dispatch({ type: "SET_OPTION", key: "color", value: "red" });
+    dispatch({ type: "CONFIRM_OPTIONS", random: 0.5 });
+    expect(state.frameId).toBe("film4-red");
+    expect(state.handFont).not.toBeNull();
     await camera.start();
     dispatch({ type: "CAMERA_READY" });
     dispatch({ type: "BEGIN_SHOOTING", guide: false });
@@ -54,7 +59,6 @@ describe("mock camera flow", () => {
     expect(camera.captureCount).toBe(6);
 
     dispatch({ type: "CONFIRM_SHOTS" });
-    dispatch({ type: "CONFIRM_FRAME", askConsent: true });
     expect(state.phase).toBe("select");
     for (const index of [5, 1, 2, 0]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
     dispatch({ type: "CONFIRM_SELECTION", askConsent: true });
@@ -70,7 +74,7 @@ describe("mock camera flow", () => {
       }));
     const output = composeFrame(frame, images, {
       createCanvas: factory,
-      context: { dateLabel: "2026.12.24" },
+      context: { dateLabel: "2026.12.24", stampLabel: "'26 12 24", handFont: state.handFont! },
       scale: KIOSK_CONFIG.outputScale,
     });
     expect([output.width, output.height]).toEqual([1200, 3600]);

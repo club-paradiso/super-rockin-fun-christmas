@@ -25,21 +25,31 @@ export const useKioskChrome = () => useContext(KioskChromeContext);
 /** The guest's booth strings; Korean outside a booth (tests, previews). */
 export const useKioskCopy = (): KioskCopy => useContext(KioskChromeContext)?.t ?? KIOSK_COPY.ko;
 
-/** Footer of every booth screen: the way home (the only button; none where it makes no sense). */
-export function BoothFooter() {
+/**
+ * Footer of every booth screen: the way home (none where it makes no sense). On the v2 frame
+ * screens (`action`) it is the fixed bottom bar of Figma 898:1677: "처음으로" and the screen's
+ * main button, nothing else (the fullscreen switch stays on the cover, the welcome screen and
+ * every other footer).
+ */
+export function BoothFooter({ action }: { action?: React.ReactNode } = {}) {
   const chrome = useKioskChrome();
-  if (!chrome || chrome.quiet || !chrome.goHome) return null;
+  if (!chrome || chrome.quiet || (!chrome.goHome && !action)) return null;
   return (
-    <footer className="booth-footer" data-testid="booth-footer">
-      <button
-        type="button"
-        className="booth-chrome-btn"
-        onClick={chrome.goHome}
-        data-testid="go-home"
-      >
-        <span aria-hidden>←</span> {chrome.t.chrome.home}
-      </button>
-      <KioskFullscreenControl lang={chrome.lang} />
+    <footer
+      className={`booth-footer ${action ? "booth-footer-bar" : ""}`}
+      data-testid="booth-footer"
+    >
+      {chrome.goHome && (
+        <button
+          type="button"
+          className="booth-chrome-btn"
+          onClick={chrome.goHome}
+          data-testid="go-home"
+        >
+          <span aria-hidden>←</span> {chrome.t.chrome.home}
+        </button>
+      )}
+      {action ?? <KioskFullscreenControl lang={chrome.lang} />}
     </footer>
   );
 }

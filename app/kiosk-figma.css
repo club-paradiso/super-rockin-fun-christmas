@@ -277,3 +277,186 @@
 .kiosk-root[data-legacy-ios15="true"] .booth-screen .journal-sheet {
   animation: none;
 }
+
+/* 「틀 선택 v2」 (2026-11-22) · Figma 898:1677 (틀 고르기), 898:1938 / 898:2006 / 898:2083 (옵션).
+   The two screens are drawn at 768 × 1024 (iPad mini, portrait) and scale with the booth:
+   --fx is one Figma pixel (the smaller of width/768 and height/1024), so every other shape keeps
+   the proportions. --ring-safe is the binder's ring column at its actual size: the background
+   photo is `cover` from 820 × 1180, where the rings end at 106.8 px (100 px at 768 × 1024). No
+   button or picture is placed inside it; the header and the bottom bar sit above and below the
+   rings, as in Figma. Touch targets never go under 48 px. */
+.kiosk-root .booth-screen.booth-screen-v2 {
+  --fx: min(calc(var(--bw) * 100 / 768), calc(var(--bh) * 100 / 1024));
+  --ring-safe: calc(106.8 * max(calc(var(--bw) * 100 / 820), calc(var(--bh) * 100 / 1180)));
+  --v2-ink-soft: color-mix(in srgb, var(--color-accent) 80%, var(--color-ink));
+}
+.kiosk-root .booth-screen-v2 .letter-sheet.pick-v2,
+.kiosk-root .booth-screen-v2 .letter-sheet.options {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--fx));
+  padding: 0 max(0px, calc(36 * var(--fx) - var(--booth-pad))) 0
+    max(0px, calc(var(--ring-safe) - var(--booth-pad)));
+}
+.kiosk-root .booth-screen-v2 .pick-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(12 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-head .booth-title {
+  font-size: max(22px, calc(32 * var(--fx)));
+  line-height: 1.2;
+}
+.kiosk-root .booth-screen-v2 .options-locked {
+  font-size: max(15px, calc(18 * var(--fx)));
+  line-height: 1.25;
+  color: var(--v2-ink-soft);
+  text-align: center;
+}
+
+/* Seven cards: four, then three centred under the gaps (Figma: 149 × 357, 12 apart, rows 16
+   apart). Eight half-card tracks put the second row half a card in. */
+.kiosk-root .booth-screen-v2 .pick-cards {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, calc(80.5 * var(--fx))) calc(68.5 * var(--fx));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  row-gap: calc(16 * var(--fx));
+  justify-content: center;
+}
+.kiosk-root .booth-screen-v2 .pick-card {
+  grid-column: span 2;
+  width: calc(149 * var(--fx));
+  min-width: 48px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4 * var(--fx));
+  padding: calc(12 * var(--fx)) calc(6 * var(--fx)) calc(10 * var(--fx));
+  border: 3px solid transparent;
+  border-radius: calc(14 * var(--fx));
+  background: rgb(255 255 255 / 0.55);
+  color: var(--color-ink);
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(5) {
+  grid-column: 2 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(6) {
+  grid-column: 4 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(7) {
+  grid-column: 6 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
+  border-color: var(--color-ink);
+}
+.kiosk-root .booth-screen-v2 .pick-card:focus-visible {
+  outline: 3px solid var(--color-button);
+  outline-offset: 2px;
+}
+.kiosk-root .booth-screen-v2 .pick-card-art {
+  width: 100%;
+  filter: drop-shadow(1px 3px 3px rgb(0 0 0 / 0.18));
+}
+.kiosk-root .booth-screen-v2 .pick-card-name {
+  font-size: max(13px, calc(18 * var(--fx)));
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+.kiosk-root .booth-screen-v2 .pick-card-hint {
+  font-size: max(11px, calc(14 * var(--fx)));
+  line-height: 1.2;
+  color: var(--v2-ink-soft);
+  word-break: keep-all;
+}
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-name,
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-hint {
+  word-break: normal;
+}
+
+/* Options: the result above (changes at once), one row per option, two answers each. */
+.kiosk-root .booth-screen-v2 .options-preview {
+  flex: 1 1 0;
+  min-height: calc(160 * var(--fx));
+  display: flex;
+  margin-block: calc(-2 * var(--fx)) 0;
+}
+.kiosk-root .booth-screen-v2 .options-preview .frame-art > img {
+  filter: drop-shadow(1px 5px 5px rgb(0 0 0 / 0.2));
+}
+.kiosk-root .booth-screen-v2 .options-rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-row {
+  display: grid;
+  grid-template-columns: calc(60 * var(--fx)) minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: calc(12 * var(--fx));
+  align-items: center;
+}
+.kiosk-root .booth-screen-v2 .options-row-label {
+  font-size: max(15px, calc(20 * var(--fx)));
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.kiosk-root .booth-screen-v2 .options-choice {
+  min-height: max(48px, calc(60 * var(--fx)));
+  padding: 4px 12px;
+  border: 2px solid var(--color-ink);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.7);
+  color: var(--color-ink);
+  font-size: max(17px, calc(22 * var(--fx)));
+  font-weight: 700;
+  line-height: 1.15;
+  word-break: keep-all;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.kiosk-root .booth-screen-v2 .options-choice[aria-checked="true"] {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+.kiosk-root .booth-screen-v2 .options-choice:focus-visible {
+  outline: 3px solid var(--color-button);
+  outline-offset: 2px;
+}
+
+/* The bottom bar: "처음으로" at the left, the main button to the right edge of the content
+   (Figma: 30 → 204 and 224 → 732, 76 tall, 24 above the bottom), 32 below the content. It stays
+   at the bottom of the booth's one scroll area if a screen ever runs long. */
+.kiosk-root .booth-screen-v2 .booth-footer.booth-footer-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: calc(20 * var(--fx));
+  margin-top: calc(32 * var(--fx));
+  padding-right: max(0px, calc(36 * var(--fx) - var(--booth-pad)));
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-chrome-btn {
+  flex: none;
+  width: calc(174 * var(--fx));
+  min-width: max-content;
+  min-height: max(48px, calc(76 * var(--fx)));
+  font-size: max(17px, calc(26 * var(--fx)));
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: max(56px, calc(76 * var(--fx)));
+  padding-block: 4px;
+  font-size: max(20px, calc(28 * var(--fx)));
+}

@@ -395,7 +395,7 @@ export function MobileUpload({
 
         {phase.name === "frame" && (
           <section className="flex flex-col gap-5" data-testid="mobile-step-frame">
-            <h2 className="text-center text-xl font-bold text-ink">{BOOTH.frame.pickTitle}</h2>
+            <h2 className="text-center text-xl font-bold text-ink">{BOOTH.phoneFrame.pickTitle}</h2>
             <figure className="flex flex-col items-center gap-2 rounded-3xl bg-paper p-3">
               {framePreview ? (
                 // eslint-disable-next-line @next/next/no-img-element -- local data URL
@@ -427,7 +427,7 @@ export function MobileUpload({
               data-testid="mobile-frame-confirm"
               onClick={confirmFrame}
             >
-              {BOOTH.frame.againConfirm}
+              {BOOTH.phoneFrame.confirm}
             </button>
           </section>
         )}
@@ -498,7 +498,7 @@ export function MobileUpload({
                 data-testid="mobile-change-frame"
                 onClick={() => setPhase({ name: "frame" })}
               >
-                {BOOTH.select.changeFrame}
+                {BOOTH.phoneFrame.changeFrame}
               </button>
               {pool.length > 0 && (
                 <button type="button" className="btn-quiet" onClick={clearPool}>

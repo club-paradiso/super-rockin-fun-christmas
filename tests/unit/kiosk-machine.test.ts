@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { POSE_SEQUENCE } from "@/config/poses";
+import { getFrame } from "@/config/frames";
+import { HAND_FONTS } from "@/config/hand-fonts";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
@@ -22,38 +24,53 @@ function createInitialState<Shot>(init: Parameters<typeof attractState>[0]): Kio
 const SESSION = "11111111-2222-4333-8444-555555555555";
 
 function init(): S {
-  return createInitialState<string>({
-    shotCount: 6,
-    countdownSeconds: 3,
-    frameId: "navy-strip",
-  });
+  return createInitialState<string>({ shotCount: 6, countdownSeconds: 3 });
 }
 
 function run(state: S, ...actions: KioskAction<string>[]): S {
   return actions.reduce(kioskReducer<string>, state);
 }
 
+/** 필름 3컷 (the default card) → its options → the camera. */
 const toReady = (s = init()) =>
-  run(s, { type: "START", sessionId: SESSION }, { type: "CONFIRM_PICK" }, { type: "CAMERA_READY" });
+  run(
+    s,
+    { type: "START", sessionId: SESSION },
+    { type: "CONFIRM_PICK", random: 0 },
+    { type: "CONFIRM_OPTIONS", random: 0 },
+    { type: "CAMERA_READY" },
+  );
 const ticks = (n: number) => Array.from({ length: n }, () => ({ type: "TICK" }) as const);
 
 /** Count down and capture one shot. */
 const shoot = (s: S, label: string) =>
   run(s, ...ticks(s.remaining), { type: "SHOT_CAPTURED", shot: label });
 
-function toReview(): S {
-  let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+function shootSix(ready: S): S {
+  let s = run(ready, { type: "BEGIN_SHOOTING", guide: false });
   for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
   return s;
 }
+const toReview = (): S => shootSix(toReady());
 
-const selectFour = (frame: S, askConsent: boolean) =>
-  run(
-    frame,
-    { type: "CONFIRM_FRAME", askConsent },
-    ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+/** A card (and its options) on the picker, then the camera and six shots. */
+function toReviewWith(cardId: string, options: KioskAction<string>[] = []): S {
+  let s = run(init(), { type: "START", sessionId: SESSION }, { type: "SELECT_CARD", cardId });
+  s = run(s, { type: "CONFIRM_PICK", random: 0 });
+  if (s.phase === "options") s = run(s, ...options, { type: "CONFIRM_OPTIONS", random: 0 });
+  return shootSix(run(s, { type: "CAMERA_READY" }));
+}
+
+/** Review → choose as many photos as the frame holds → the wall question (or the QR). */
+const selectAll = (review: S, askConsent: boolean) => {
+  const s = run(review, { type: "CONFIRM_SHOTS" });
+  const n = getFrame(s.frameId).slots.length;
+  return run(
+    s,
+    ...Array.from({ length: n }, (_, index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     { type: "CONFIRM_SELECTION", askConsent },
   );
+};
 
 describe("countdown", () => {
   it("counts 3 → 2 → 1 → capturing", () => {
@@ -98,59 +115,36 @@ describe("exactly six captures", () => {
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
-  it("only confirms when all six exist", () => {
+  it("only confirms when all six exist, straight to choosing the photos", () => {
     const s = toReview();
-    expect(run(s, { type: "CONFIRM_SHOTS" }).phase).toBe("frame");
+    expect(run(s, { type: "CONFIRM_SHOTS" }).phase).toBe("select");
+    const five = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let partial = five;
+    for (let i = 0; i < 5; i++) partial = shoot(partial, `p-${i}`);
+    expect(run(partial, { type: "CONFIRM_SHOTS" })).toBe(partial);
   });
 });
 
-describe("one optional extra photo", () => {
-  it("takes one seventh frame without overwriting or replacing any of the original six", () => {
+describe("no extra photo, no second frame choice (v2)", () => {
+  it("has no seventh slot: the review holds exactly six and an unknown action changes nothing", () => {
     const six = toReview();
-    let s = run(six, { type: "TAKE_EXTRA_SHOT" });
-    expect([s.phase, s.shotIndex, s.extraShotPending]).toEqual(["countdown", 6, true]);
-    expect(s.shots).toEqual(six.shots);
-
-    s = shoot(s, "extra");
-    expect([s.phase, s.extraShotPending]).toEqual(["review", false]);
-    expect(s.shots).toEqual([...six.shots, "extra"]);
-    expect(capturedCount(s)).toBe(7);
-    expect(run(s, { type: "TAKE_EXTRA_SHOT" })).toBe(s);
-    expect(run(s, { type: "SHOT_CAPTURED", shot: "eighth" })).toBe(s);
+    expect(six.shots).toHaveLength(6);
+    expect("extraShotPending" in six).toBe(false);
+    for (const type of ["TAKE_EXTRA_SHOT", "BACK_TO_FRAME", "CONFIRM_FRAME", "SELECT_FRAME"])
+      expect(run(six, { type } as never)).toBe(six);
   });
 
-  it("can skip the extra and proceed with only six, or include the extra in the final selection", () => {
-    const six = toReview();
-    expect(run(six, { type: "CONFIRM_SHOTS" }).phase).toBe("frame");
-    let s = shoot(run(six, { type: "TAKE_EXTRA_SHOT" }), "extra");
-    s = run(s, { type: "CONFIRM_SHOTS" }, { type: "CONFIRM_FRAME", askConsent: true });
-    s = run(s, { type: "TOGGLE_SHOT_SELECTION", index: 6 });
-    expect(s.selectedShotIndices).toEqual([6]);
-    s = run(s, ...[0, 2, 4].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const), {
-      type: "CONFIRM_SELECTION",
-      askConsent: true,
-    });
-    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [6, 0, 2, 4]]);
-  });
-
-  it("cannot add an extra before the full first six or after confirmation", () => {
-    const partial = shoot(run(toReady(), { type: "BEGIN_SHOOTING", guide: false }), "first");
-    expect(run(partial, { type: "TAKE_EXTRA_SHOT" })).toBe(partial);
-    const confirmed = run(toReview(), { type: "CONFIRM_SHOTS" });
-    expect(run(confirmed, { type: "TAKE_EXTRA_SHOT" })).toBe(confirmed);
-  });
-
-  it("preserves the pending extra after camera failure and a reconnect", () => {
-    const six = toReview();
-    let s = run(six, { type: "TAKE_EXTRA_SHOT" });
-    s = run(s, { type: "CAMERA_FAILED", kind: "missing" });
-    expect(s.extraShotPending).toBe(true);
-    s = run(s, { type: "CAMERA_RETRY" }, { type: "CAMERA_READY" });
-    s = run(s, { type: "BEGIN_SHOOTING", guide: false });
-    expect([s.phase, s.shotIndex]).toEqual(["countdown", 6]);
-    s = shoot(s, "extra");
-    expect(s.shots).toEqual([...six.shots, "extra"]);
-    expect(s.extraShotPending).toBe(false);
+  it("after shooting the card, colour and logo cannot change", () => {
+    const select = run(toReview(), { type: "CONFIRM_SHOTS" });
+    const frameId = select.frameId;
+    const s = run(
+      select,
+      { type: "SELECT_CARD", cardId: "lace1" },
+      { type: "SET_OPTION", key: "color", value: "sepia" },
+      { type: "BACK" },
+    );
+    expect([s.phase, s.frameId]).toEqual(["select", frameId]);
+    expect(canGoBack(select)).toBe(false);
   });
 });
 
@@ -181,37 +175,132 @@ describe("failures", () => {
   });
 });
 
-describe("frame first, then again with the photos", () => {
-  it("start → pick a frame → camera; the choice is preselected after shooting", () => {
-    let s = run(init(), { type: "START", sessionId: SESSION });
-    expect(s.phase).toBe("pick");
-    s = run(s, { type: "SELECT_FRAME", frameId: "clothesline" }, { type: "CONFIRM_PICK" });
-    expect([s.phase, s.frameId]).toEqual(["camera", "clothesline"]);
-    s = run(s, { type: "CAMERA_READY" }, { type: "BEGIN_SHOOTING", guide: false });
-    for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
-    s = run(s, { type: "CONFIRM_SHOTS" });
-    expect([s.phase, s.frameId]).toEqual(["frame", "clothesline"]);
-    s = run(s, { type: "SELECT_FRAME", frameId: "cream-strip" });
-    expect(s.frameId).toBe("cream-strip");
+describe("틀 선택 v2: seven cards, options before shooting", () => {
+  it("starts on 필름 3컷 with its defaults (흑백, 로고 넣기)", () => {
+    const s = run(init(), { type: "START", sessionId: SESSION });
+    expect([s.phase, s.cardId, s.frameId]).toEqual(["pick", "film3", "film3-mono-logo"]);
+    expect(s.frameOptions).toEqual({ color: "mono", logo: "logoOn" });
+  });
+
+  it("a card with options goes to the options screen; one without goes straight to the camera", () => {
+    const pick = run(init(), { type: "START", sessionId: SESSION });
+    for (const id of ["film3", "film4", "check2"])
+      expect(
+        run(pick, { type: "SELECT_CARD", cardId: id }, { type: "CONFIRM_PICK", random: 0 }).phase,
+      ).toBe("options");
+    for (const id of ["polaroid1", "polaroid3", "verse4", "lace1"])
+      expect(
+        run(pick, { type: "SELECT_CARD", cardId: id }, { type: "CONFIRM_PICK", random: 0 }).phase,
+      ).toBe("camera");
+  });
+
+  it("every option combination is its own frame", () => {
+    const at = (cardId: string, ...opts: KioskAction<string>[]) =>
+      run(
+        init(),
+        { type: "START", sessionId: SESSION },
+        { type: "SELECT_CARD", cardId },
+        { type: "CONFIRM_PICK", random: 0 },
+        ...opts,
+      ).frameId;
+    const set = (key: "color" | "logo", value: string) =>
+      ({ type: "SET_OPTION", key, value }) as KioskAction<string>;
+    expect(at("film3")).toBe("film3-mono-logo");
+    expect(at("film3", set("logo", "logoOff"))).toBe("film3-mono-plain");
+    expect(at("film3", set("color", "sepia"))).toBe("film3-sepia-logo");
+    expect(at("film3", set("color", "sepia"), set("logo", "logoOff"))).toBe("film3-sepia-plain");
+    expect(at("film4")).toBe("film4-cream");
+    expect(at("film4", set("color", "red"))).toBe("film4-red");
+    expect(at("check2")).toBe("check2-red");
+    expect(at("check2", set("color", "blue"))).toBe("check2-blue");
+    // A value another card offers is refused.
+    expect(at("film4", set("color", "blue"))).toBe("film4-cream");
+    expect(at("check2", set("logo", "logoOff"))).toBe("check2-red");
+  });
+
+  it("back: options → pick, camera before the first shot → options (or the pick)", () => {
+    let s = run(init(), { type: "START", sessionId: SESSION }, { type: "CONFIRM_PICK", random: 0 });
+    expect(s.phase).toBe("options");
+    expect(run(s, { type: "BACK" }).phase).toBe("pick");
+    s = run(s, { type: "CONFIRM_OPTIONS", random: 0 }, { type: "CAMERA_READY" });
+    expect(run(s, { type: "BACK" }).phase).toBe("options");
+    const lace = run(
+      init(),
+      { type: "START", sessionId: SESSION },
+      { type: "SELECT_CARD", cardId: "lace1" },
+      { type: "CONFIRM_PICK", random: 0 },
+      { type: "CAMERA_READY" },
+    );
+    expect(run(lace, { type: "BACK" }).phase).toBe("pick");
+    const shot = shoot(run(lace, { type: "BEGIN_SHOOTING", guide: false }), "a");
+    expect(canGoBack(shot)).toBe(false);
   });
 
   it("does not start the camera or change the frame from other screens", () => {
     const welcome = init();
-    expect(run(welcome, { type: "CONFIRM_PICK" })).toBe(welcome);
+    expect(run(welcome, { type: "CONFIRM_PICK", random: 0 })).toBe(welcome);
+    expect(run(welcome, { type: "CONFIRM_OPTIONS", random: 0 })).toBe(welcome);
     const review = toReview();
-    expect(run(review, { type: "SELECT_FRAME", frameId: "x" })).toBe(review);
+    expect(run(review, { type: "SELECT_CARD", cardId: "lace1" })).toBe(review);
   });
 
   it("asks the wall question unless submissions are paused", () => {
-    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
-    expect(run(frame, { type: "CONFIRM_FRAME", askConsent: true }).phase).toBe("select");
-    expect(selectFour(frame, true).phase).toBe("consent");
-    expect(selectFour(frame, false).phase).toBe("delivery");
+    expect(run(toReview(), { type: "CONFIRM_SHOTS" }).phase).toBe("select");
+    expect(selectAll(toReview(), true).phase).toBe("consent");
+    expect(selectAll(toReview(), false).phase).toBe("delivery");
+  });
+});
+
+describe("handwriting font (film 4컷, polaroid 1컷)", () => {
+  const lockAt = (s: S, cardId: string, random: number) => {
+    let next = run(s, { type: "START", sessionId: SESSION }, { type: "SELECT_CARD", cardId });
+    next = run(next, { type: "CONFIRM_PICK", random });
+    if (next.phase === "options") next = run(next, { type: "CONFIRM_OPTIONS", random });
+    return next;
+  };
+
+  it("is drawn when shooting starts, only for frames that carry handwriting", () => {
+    expect(lockAt(init(), "film4", 0).handFont).toBe(HAND_FONTS[0]!.id);
+    expect(lockAt(init(), "polaroid1", 0.99).handFont).toBe(HAND_FONTS[9]!.id);
+    expect(lockAt(init(), "film3", 0).handFont).toBeNull();
+    expect(lockAt(init(), "lace1", 0).handFont).toBeNull();
+  });
+
+  it("never repeats the previous session's font: 20 sessions in a row", () => {
+    let s = init();
+    let previous: string | null = null;
+    let repeats = 0;
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      // The worst case for a naive pick: always the same random number.
+      s = lockAt(s, i % 2 ? "film4" : "polaroid1", 0);
+      if (s.handFont === previous) repeats++;
+      seen.add(s.handFont!);
+      previous = s.handFont;
+      s = run(s, { type: "RESET" }, { type: "OPEN" });
+    }
+    expect(repeats).toBe(0);
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("is kept across a reload through the initial state", () => {
+    const s = createInitialState<string>({
+      shotCount: 6,
+      countdownSeconds: 3,
+      lastHandFont: HAND_FONTS[0]!.id,
+    });
+    expect(lockAt(s, "film4", 0).handFont).not.toBe(HAND_FONTS[0]!.id);
+    const unknown = createInitialState<string>({
+      shotCount: 6,
+      countdownSeconds: 3,
+      lastHandFont: "x",
+    });
+    expect(unknown.lastHandFont).toBeNull();
   });
 });
 
 describe("delivery and consent are independent", () => {
-  const toConsent = () => selectFour(run(toReview(), { type: "CONFIRM_SHOTS" }), true);
+  const toConsent = () => selectAll(toReview(), true);
   const ready = {
     type: "DELIVERY_SUCCEEDED",
     token: "t",
@@ -255,47 +344,44 @@ describe("delivery and consent are independent", () => {
     expect([s.phase, s.consent, s.delivery.status]).toEqual(["delivery", "yes", "queued"]);
   });
 
-  it("ignores delivery events before the frame is final", () => {
-    const frame = run(toReview(), { type: "CONFIRM_SHOTS" });
-    expect(run(frame, ready)).toBe(frame);
-    expect(run(frame, { type: "DELIVERY_STARTED" })).toBe(frame);
+  it("ignores delivery events before the photos are chosen", () => {
+    const select = run(toReview(), { type: "CONFIRM_SHOTS" });
+    expect(run(select, ready)).toBe(select);
+    expect(run(select, { type: "DELIVERY_STARTED" })).toBe(select);
   });
 });
 
 describe("progress", () => {
-  it("counts seven steps, or six while wall submissions are paused", () => {
+  it("six steps (틀 → 촬영 → 확인 → 사진 고르기 → 동의 → QR), five while submissions are paused", () => {
     expect(progressStep("welcome", true)).toBeNull();
-    expect(progressStep("pick", true)).toEqual({ step: 1, total: 7 });
-    expect(progressStep("countdown", true)).toEqual({ step: 2, total: 7 });
-    expect(progressStep("review", true)).toEqual({ step: 3, total: 7 });
-    expect(progressStep("frame", true)).toEqual({ step: 4, total: 7 });
-    expect(progressStep("select", true)).toEqual({ step: 5, total: 7 });
-    expect(progressStep("consent", true)).toEqual({ step: 6, total: 7 });
-    expect(progressStep("delivery", true)).toEqual({ step: 7, total: 7 });
-    expect(progressStep("delivery", false)).toEqual({ step: 6, total: 6 });
+    expect(progressStep("pick", true)).toEqual({ step: 1, total: 6 });
+    expect(progressStep("options", true)).toEqual({ step: 1, total: 6 });
+    expect(progressStep("countdown", true)).toEqual({ step: 2, total: 6 });
+    expect(progressStep("review", true)).toEqual({ step: 3, total: 6 });
+    expect(progressStep("select", true)).toEqual({ step: 4, total: 6 });
+    expect(progressStep("consent", true)).toEqual({ step: 5, total: 6 });
+    expect(progressStep("delivery", true)).toEqual({ step: 6, total: 6 });
+    expect(progressStep("delivery", false)).toEqual({ step: 5, total: 5 });
   });
 });
 
 describe("reset", () => {
   it("clears the previous session entirely", () => {
     const done = run(
-      toReview(),
-      { type: "CONFIRM_SHOTS" },
-      { type: "SELECT_FRAME", frameId: "wood-window" },
-      { type: "CONFIRM_FRAME", askConsent: true },
-      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
-      { type: "CONFIRM_SELECTION", askConsent: true },
+      selectAll(toReviewWith("film4", [{ type: "SET_OPTION", key: "color", value: "red" }]), true),
       { type: "DELIVERY_SUCCEEDED", token: "t", url: "u", expiresAt: "e" },
       { type: "SET_CONSENT", consent: "yes" },
     );
+    expect(done.frameId).toBe("film4-red");
     const s = run(done, { type: "RESET" });
     expect(s.phase).toBe("attract");
     expect(s.sessionId).toBe("");
     expect(s.shots).toEqual([null, null, null, null, null, null]);
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
-    expect(s.extraShotPending).toBe(false);
-    expect(s.frameId).toBe("wood-window"); // last choice becomes the next default
+    // Every guest starts on 필름 3컷 (v2); only the font is remembered, so the next one differs.
+    expect([s.cardId, s.frameId, s.handFont]).toEqual(["film3", "film3-mono-logo", null]);
+    expect(s.lastHandFont).toBe(done.handFont);
   });
 
   it("each START begins a new session id", () => {
@@ -306,13 +392,7 @@ describe("reset", () => {
 });
 
 describe("ordered selection", () => {
-  const prepare = (id = "navy-strip") =>
-    run(
-      toReview(),
-      { type: "CONFIRM_SHOTS" },
-      { type: "SELECT_FRAME", frameId: id },
-      { type: "CONFIRM_FRAME", askConsent: true },
-    );
+  const prepare = (cardId = "verse4") => run(toReviewWith(cardId), { type: "CONFIRM_SHOTS" });
   it("cannot confirm early and preserves selection order", () => {
     let s = prepare();
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
@@ -326,33 +406,34 @@ describe("ordered selection", () => {
     );
     expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [5, 1, 3, 0]]);
   });
-  it("accepts a 1-slot, a 2-slot or a 6-slot template and prevents overflow", () => {
-    let one = prepare("shalom-single");
+  it("accepts a 1-slot, a 2-slot or a 3-slot frame and prevents overflow", () => {
+    let one = prepare("lace1");
     one = run(one, ...[3, 1].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
     expect(one.selectedShotIndices).toEqual([3]);
     expect(run(one, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
-    let two = prepare("shalom-postcard");
+    let two = prepare("check2");
     two = run(
       two,
       ...[2, 4, 5].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
     expect(two.selectedShotIndices).toEqual([2, 4]);
     expect(run(two, { type: "CONFIRM_SELECTION", askConsent: false }).phase).toBe("delivery");
-    let six = prepare("shalom-stamps");
-    six = run(
-      six,
-      ...[5, 4, 3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+    let three = prepare("polaroid3");
+    three = run(
+      three,
+      ...[5, 4, 3, 2].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
-    expect(run(six, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
+    expect(three.selectedShotIndices).toEqual([5, 4, 3]);
+    expect(run(three, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
-  it("deselects, and back returns to frame without uploading", () => {
+  it("deselects; there is no way back to a frame choice", () => {
     const s = run(
       prepare(),
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
-      { type: "BACK_TO_FRAME" },
+      { type: "BACK" },
     );
-    expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["frame", [], "idle"]);
+    expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["select", [], "idle"]);
   });
 });
 
@@ -429,13 +510,6 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(currentPose(s)).toBeNull();
   });
 
-  it("the only extra photo keeps the chosen pose guide and uses the next pose", () => {
-    let s = begin(true);
-    for (let i = 0; i < 6; i++) s = shoot(s, `g-${i}`);
-    const extra = run(s, { type: "TAKE_EXTRA_SHOT" });
-    expect(currentPose(extra)).toEqual(POSE_SEQUENCE[6 % POSE_SEQUENCE.length]);
-  });
-
   it("the guide changes nothing about the countdown", () => {
     expect(begin(true).remaining).toBe(begin(false).remaining);
     expect(currentPose(begin(true))).toEqual(POSE_SEQUENCE[0]);
@@ -475,7 +549,8 @@ describe("language (D78): a view, per guest", () => {
     let s = run(
       en,
       { type: "START", sessionId: SESSION },
-      { type: "CONFIRM_PICK" },
+      { type: "CONFIRM_PICK", random: 0 },
+      { type: "CONFIRM_OPTIONS", random: 0 },
       { type: "CAMERA_READY" },
     );
     s = run(s, { type: "BEGIN_SHOOTING", guide: false });
@@ -529,10 +604,10 @@ describe("back (D78): one step, never losing what the guest made", () => {
     expect([back.phase, back.sessionId]).toEqual(["welcome", ""]);
   });
 
-  it("camera before the first shot → frame pick", () => {
+  it("camera before the first shot → the options (the font is drawn again on the way back in)", () => {
     const s = toReady();
     expect(canGoBack(s)).toBe(true);
-    expect(run(s, { type: "BACK" }).phase).toBe("pick");
+    expect(run(s, { type: "BACK" }).phase).toBe("options");
   });
 
   it("not once a shot exists, not while shooting, not after the frame is final", () => {
@@ -550,30 +625,27 @@ describe("back (D78): one step, never losing what the guest made", () => {
     expect([reconnected.phase, canGoBack(reconnected)]).toEqual(["ready", false]);
     const review = toReview();
     expect(canGoBack(review)).toBe(false);
-    const frame = run(review, { type: "CONFIRM_SHOTS" });
-    expect(canGoBack(frame)).toBe(false);
-    const consent = selectFour(frame, true);
+    const select = run(review, { type: "CONFIRM_SHOTS" });
+    expect(canGoBack(select)).toBe(false);
+    const consent = selectAll(review, true);
     expect(consent.phase).toBe("consent");
     expect(canGoBack(consent)).toBe(false);
     expect(run(consent, { type: "BACK" })).toBe(consent);
   });
 
-  it("photo selection → frame, with the selection cleared", () => {
+  it("photo selection has no way back (v2: the frame is fixed once shooting starts)", () => {
     const select = run(
       toReview(),
       { type: "CONFIRM_SHOTS" },
-      { type: "CONFIRM_FRAME", askConsent: true },
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
     );
-    expect(canGoBack(select)).toBe(true);
-    const back = run(select, { type: "BACK" });
-    expect([back.phase, back.selectedShotIndices, capturedCount(back)]).toEqual(["frame", [], 6]);
+    expect(canGoBack(select)).toBe(false);
+    expect(run(select, { type: "BACK" })).toBe(select);
   });
 });
 
 describe("attract screen (D80): 화면을 눌러 시작", () => {
-  const fresh = () =>
-    attractState<string>({ shotCount: 6, countdownSeconds: 3, frameId: "navy-strip" });
+  const fresh = () => attractState<string>({ shotCount: 6, countdownSeconds: 3 });
 
   it("the booth starts on the attract screen, and only a touch opens the welcome choices", () => {
     const s = fresh();
