@@ -47,14 +47,27 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   (`aiModerationFallbackProblem`), never a `ConfigError`.
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
-  `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`.
+  `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
+  slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
+- **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
+  offers the seven cards of `config/frames/v2.ts` (Figma 898:1677); a card with options (colour,
+  logo) has an options screen; the guest then shoots six, reviews, chooses the photos. There is no
+  "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). Every option
+  combination is its own frame id. The earlier 20 frames (`FRAMES`) stay for the phone page (D93)
+  and for photos already stored; the booth does not offer them.
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
-  keeps the legible lockup rule in `tests/unit/frames.test.ts`; mirror frame changes in Figma
-  (`design/README.md`).
+  of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
+  Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
+  빼기" has none, the guest's choice) in `tests/unit/frames-v2.test.ts`; mirror frame changes in
+  Figma (`design/README.md`). Photo tones (흑백/세피아) are pixel arithmetic in
+  `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has none). The handwriting font is drawn
+  per session (`config/hand-fonts.ts`), never the previous session's; the polaroid date stamp is the
+  server's day (`lib/kiosk/clock.ts`), never the tablet clock.
 - **The brand is STUDIO SHALOM** (D73; lockup `STUDIO` / `SHALOM` / divider / `평화의 벽`, event
-  "Christmas Village 2026", verse reference "MT 5:9" and approved English verse in the Shalom 2×2 frame). Colours are the tokens in
+  "Christmas Village 2026", verse reference "Matthew 5:9" and approved English verse in the Shalom 2×2 frame). Colours are the tokens in
   `app/globals.css` (`backdrop`, `ink`, `button`, `button-text`/`paper`, `accent`, plus the staff
-  status colours): no other brand colours, no gradients or glow, one filled button per view,
+  status colours): no other brand colours, no gradients or glow, one filled button per view (the
+  v2 options screen marks the chosen answer filled, as in Figma; it is a state, not a second action),
   `accent` as text only at ≥ 24 px, never `button-text` on `backdrop`. The on-screen lockup is real
   text (`components/brand.tsx`); frames use outlined SVG paths. The media wall keeps its night
   scene with its own `--wall-*` palette (`.wall-stage`). Internal identifiers keep the old name
@@ -182,8 +195,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
   once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
   missing file must never break a layout or a touch target. The shutter stays the screen's one
-  `.booth-btn-primary`; frame tiles are postcards on the desk (`.desk-tray`), their tape is
-  `.pick-tile-tape` (never `.tape`, which may not lie on a control).
+  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 898:1677), not
+  postcards on the desk; nothing on the picker or the options screen sits on the binder rings
+  (`--ring-safe` in `app/kiosk-figma.css`).
 - **One light, top left (135°)** (D101): every cast shadow falls to +x +y: the `--shadow-*`,
   `--drop-*` tokens in `app/globals.css`, `LIGHT` in `lib/studio/ticket.ts`, `WALL_LIGHT` in
   `lib/wall/themes.ts` (= `--wall-photo-drop`). `tests/unit/studio.test.ts` reads the stylesheet
@@ -199,7 +213,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
   `RemoteCamera` is one more `CameraProvider`, chosen only by `?camera=remote` or
-  `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, optional one extra shot, compositing, consent and
+  `NEXT_PUBLIC_CAMERA_MODE=remote`; the state machine, countdown, compositing, consent and
   upload code are shared and must not fork. The phone (`/camera/remote`) takes the photo from its own
   full-resolution feed on request and sends it over the WebRTC data channel; **a failed, late or
   damaged capture is an error and a previous frame is never reused** (unique request id, one shot
@@ -296,7 +310,9 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
   run effects and dispatch.
 - Anything touching canvas takes a `CanvasFactory` so it is testable with `tests/helpers/fake-canvas.ts`.
 - Kiosk copy: short Korean, large touch targets: `.booth-btn-primary`/`-secondary` are ≥ 80 px tall
-  (64–80 px only when the booth is under 760 px tall), smaller controls ≥ 52 px (D88).
+  (64–80 px only when the booth is under 760 px tall), smaller controls ≥ 52 px (D88). Exception:
+  the v2 picker and options screens follow Figma (bottom bar 76 px at 768 × 1024, option buttons
+  60 px, scaled with the screen, never under 48 px).
 - Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
   backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
 - Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`; /admin opens with
