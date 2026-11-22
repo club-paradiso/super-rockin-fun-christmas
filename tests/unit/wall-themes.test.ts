@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { FRAMES, getFrame } from "@/config/frames";
+import { ALL_FRAMES as FRAMES, getFrame } from "@/config/frames";
 import {
   DEFAULT_WALL_THEME,
   WALL_THEMES,

@@ -17,8 +17,13 @@ import {
 import { shalomGrid } from "./shalom-grid";
 import { ginghamPlates, pixelWindows } from "./picked";
 import { analogFilm, jejuWinter, peaceOnEarth, vintageChristmas } from "./collection";
+import { V2_FRAMES } from "./v2";
 
 /**
+ * The frames before 「틀 선택 v2」 (2026-11-22). The booth no longer offers them (it shows the seven
+ * cards of ./v2.ts), but they stay: the phone page (D93, `app/m/[token]`) still uses exactly this
+ * list, and a photo stored with one of these ids must keep its slot data (wall, AI check).
+ *
  * Picker order: the STUDIO SHALOM 2×2 first (D77), then the STUDIO SHALOM letter set by number of
  * photos, 1 to 6 (D82), then the landscape ones (D83), then the two picked from the reference set
  * (D99), then the 2026 collection (D102), then Figma order (Template A–D). The preselected frame stays the navy strip
@@ -49,8 +54,11 @@ export const FRAMES: readonly FrameDefinition[] = [
 
 export const DEFAULT_FRAME_ID = navyStrip.id;
 
+/** Every frame a photo can have been made in: the list above and the booth's v2 frames. */
+export const ALL_FRAMES: readonly FrameDefinition[] = [...FRAMES, ...V2_FRAMES];
+
 export function getFrame(id: string | null | undefined): FrameDefinition {
-  return FRAMES.find((f) => f.id === id) ?? navyStrip;
+  return ALL_FRAMES.find((f) => f.id === id) ?? navyStrip;
 }
 
 /**
@@ -70,5 +78,5 @@ export const RETIRED_FRAME_IDS: readonly string[] = [
 
 /** True for a frame a kiosk may upload: a current one or a retired one. */
 export function isKnownFrameId(id: string): boolean {
-  return FRAMES.some((f) => f.id === id) || RETIRED_FRAME_IDS.includes(id);
+  return ALL_FRAMES.some((f) => f.id === id) || RETIRED_FRAME_IDS.includes(id);
 }
