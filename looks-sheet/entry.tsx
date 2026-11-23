@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import "@fontsource-variable/noto-sans-kr";
-import "@fontsource/cormorant-garamond/latin-500.css";
-import "@fontsource/cormorant-garamond/latin-600.css";
-import "@fontsource/nanum-myeongjo/400.css";
+import "@/looks-sheet/ui-fonts";
 import "@fontsource/caveat/latin-700.css";
 import "@fontsource/nothing-you-could-do/latin-400.css";
 import "@fontsource/reenie-beanie/latin-400.css";
@@ -38,6 +35,18 @@ import { SAMPLES, SYNTHETIC_NOTE } from "./samples";
  */
 
 const PICKS_KEY = "ftl.lookPicks";
+
+/**
+ * Where the page's files are. "" when the app serves it (absolute paths); "." when the same
+ * bundle is published as a folder of files and everything is fetched relative to the page.
+ */
+const BASE = document.getElementById("looks-sheet")?.dataset.base ?? "";
+const asset = (src: string) => BASE + src;
+const fetchText = async (url: string) => {
+  const response = await fetch(asset(url));
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return response.text();
+};
 
 function readPicks(): string[] {
   try {
@@ -146,7 +155,7 @@ function Tile({
 
 function Sheet() {
   const [looks] = useState(() => {
-    const created = createBoothLooks();
+    const created = createBoothLooks({ fetchText });
     // A handle for e2e/looks.spec.ts, which holds the GPU result to the reference arithmetic.
     (window as unknown as { __studioLooks?: BoothLooks }).__studioLooks = created;
     return created;
@@ -181,7 +190,7 @@ function Sheet() {
     });
     for (const sample of SAMPLES) {
       if (sample.src === "chart") continue;
-      void loadImageAsset(sample.src).then(
+      void loadImageAsset(asset(sample.src)).then(
         (image) => {
           if (!cancelled) setImages((all) => ({ ...all, [sample.id]: image }));
         },
@@ -411,7 +420,10 @@ function FrameSection({
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadFrameFonts(V2_FRAMES), loadFrameAssets(V2_FRAMES)]).then(([, loaded]) => {
+    void Promise.all([
+      loadFrameFonts(V2_FRAMES),
+      loadFrameAssets(V2_FRAMES, (src) => loadImageAsset(asset(src))),
+    ]).then(([, loaded]) => {
       if (!cancelled) setAssets(loaded.assets);
     });
     return () => {

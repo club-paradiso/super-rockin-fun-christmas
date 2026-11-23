@@ -8,12 +8,25 @@ const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url))
  * the booth's own iPad mini 4, where Next's browser runtime does not run. Same idea as
  * legacy-kiosk/vite.config.mts. app/looks/route.ts serves the page that loads it.
  */
+/**
+ * LOOKS_SHEET_LITE=1 LOOKS_SHEET_OUT=<dir>: the same page as a folder of files with relative
+ * addresses and few fonts, for hosting outside this app. The app's own build never sets these.
+ */
+const lite = process.env.LOOKS_SHEET_LITE === "1";
+
 export default defineConfig({
   root: fromRoot("../"),
-  base: "/looks-sheet-assets/",
+  base: lite ? "./" : "/looks-sheet-assets/",
   publicDir: false,
   envPrefix: [],
-  resolve: { alias: { "@": fromRoot("../") } },
+  resolve: {
+    alias: [
+      ...(lite
+        ? [{ find: "@/looks-sheet/ui-fonts", replacement: fromRoot("./ui-fonts-lite.ts") }]
+        : []),
+      { find: "@", replacement: fromRoot("../") },
+    ],
+  },
   define: {
     "process.env.NEXT_PUBLIC_LOOKS": JSON.stringify(""),
   },
@@ -21,7 +34,10 @@ export default defineConfig({
   build: {
     target: ["safari15", "ios15"],
     cssTarget: ["safari15.6", "ios15.6"],
-    outDir: fromRoot("../public/looks-sheet-assets"),
+    outDir:
+      lite && process.env.LOOKS_SHEET_OUT
+        ? process.env.LOOKS_SHEET_OUT
+        : fromRoot("../public/looks-sheet-assets"),
     emptyOutDir: true,
     assetsInlineLimit: 0,
     cssCodeSplit: false,

@@ -34,8 +34,8 @@ body {
   max-width: 1120px;
   margin: 0 auto;
   padding: 28px 16px 64px;
-  padding-left: max(16px, env(safe-area-inset-left));
-  padding-right: max(16px, env(safe-area-inset-right));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .sheet-head {
   border-bottom: 1px solid var(--rule);
@@ -80,7 +80,7 @@ h2 span {
 .sample-bar {
   position: -webkit-sticky;
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 2;
   display: flex;
   gap: 8px;
