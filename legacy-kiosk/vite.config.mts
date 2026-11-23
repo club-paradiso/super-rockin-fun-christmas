@@ -16,6 +16,7 @@ export default defineConfig({
     "process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS": JSON.stringify(
       process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS ?? "90",
     ),
+    "process.env.NEXT_PUBLIC_LOOKS": JSON.stringify(process.env.NEXT_PUBLIC_LOOKS ?? ""),
   },
   oxc: { jsx: { runtime: "automatic" } },
   build: {

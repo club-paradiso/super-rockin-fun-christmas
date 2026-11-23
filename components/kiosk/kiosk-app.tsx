@@ -48,6 +48,8 @@ import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/composit
 import { formatStampLabel } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
+import { createBoothLooks, seedFromText, type BoothLooks } from "@/lib/looks/booth";
+import { looksEnabled } from "@/lib/looks/config";
 import {
   canGoBack,
   capturedCount,
@@ -573,6 +575,27 @@ export function KioskApp({
     void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
   }, [renderBudget.outputScale]);
 
+  // ── Looks (lib/looks): behind a flag, off by default. While off, none of this runs and the
+  // booth composes exactly as before. Previews and the final composite share `looksRef`.
+  const looksRef = useRef<BoothLooks | null>(null);
+  const looksLoadRef = useRef<Promise<void> | null>(null);
+  // Set once the LUTs are in: the previews are drawn again with them.
+  const [looks, setLooks] = useState<BoothLooks | null>(null);
+  useEffect(() => {
+    if (!looksEnabled(window.location.search)) return;
+    const created = createBoothLooks();
+    looksRef.current = created;
+    looksLoadRef.current = created.preload(V2_FRAMES.map((frame) => frame.id));
+    void looksLoadRef.current.then(() => {
+      if (looksRef.current === created) setLooks(created);
+    });
+    return () => {
+      created.dispose();
+      looksRef.current = null;
+      looksLoadRef.current = null;
+    };
+  }, []);
+
   // ── Previews: the Figma sample photos before shooting (the guest has none yet) ─────────────
   const [samples, setSamples] = useState<ComposeImage[] | null>(null);
   useEffect(() => {
@@ -595,12 +618,13 @@ export function KioskApp({
         scale: renderBudget.thumbScale,
         legacy: legacyIOS15,
         now: clock.now(),
+        grade: looks?.graderFor(frame.id, 1),
       });
       if (url) out[card.id] = url;
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale]);
+  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale, looks]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
   const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
@@ -612,9 +636,10 @@ export function KioskApp({
       legacy: legacyIOS15,
       handFont: previewFont,
       now: clock.now(),
+      grade: looks?.graderFor(optionsFrame.id, 1),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale]);
+  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale, looks]);
 
   // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
@@ -629,8 +654,9 @@ export function KioskApp({
     const shotAt = clock.now();
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
+    const sessionForLooks = state.sessionId;
     // A font or asset that failed to load must not block the guest: compose without it.
-    void Promise.all([fontsRef.current, assetsRef.current])
+    void Promise.all([fontsRef.current, assetsRef.current, looksLoadRef.current])
       .then(async ([, loaded]) => {
         if (cancelled) return;
         const canvas = composeFrame(frame, chosen, {
@@ -642,6 +668,7 @@ export function KioskApp({
             assets: loaded ?? undefined,
           },
           scale: renderBudget.outputScale,
+          grade: looksRef.current?.graderFor(frame.id, seedFromText(sessionForLooks)),
         }) as HTMLCanvasElement;
         try {
           const blob = await canvasToBlob(
@@ -677,6 +704,7 @@ export function KioskApp({
     composeAttempt,
     legacyIOS15,
     state.frameId,
+    state.sessionId,
     state.selectedShotIndices,
     selectionKey,
     images,
