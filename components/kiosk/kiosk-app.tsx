@@ -57,6 +57,7 @@ import {
   kioskReducer,
   needsCamera,
   progressStep,
+  sessionAsksConsent,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -1360,7 +1361,7 @@ function Screen(p: ScreenProps) {
   const { state, dispatch } = p;
   const total = state.shotCount;
   const aspect = KIOSK_CONFIG.captureAspect;
-  const progress = progressStep(state.phase, p.wallSubmissionsOpen);
+  const progress = progressStep(state.phase, sessionAsksConsent(state, p.wallSubmissionsOpen));
   const sessionCode = state.sessionId.slice(0, 8);
   const t = KIOSK_COPY[state.lang];
 

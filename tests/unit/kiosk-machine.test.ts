@@ -11,6 +11,7 @@ import {
   currentPose,
   kioskReducer,
   progressStep,
+  sessionAsksConsent,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -362,6 +363,41 @@ describe("progress", () => {
     expect(progressStep("consent", true)).toEqual({ step: 5, total: 6 });
     expect(progressStep("delivery", true)).toEqual({ step: 6, total: 6 });
     expect(progressStep("delivery", false)).toEqual({ step: 5, total: 5 });
+  });
+
+  it("the dots follow what this session really does: fixed once the photos are chosen", () => {
+    // Before that, it is what would happen now (the staff switch as the booth last heard it).
+    const before = toReviewWith("lace1");
+    expect(before.consentAsked).toBeNull();
+    expect(sessionAsksConsent(before, true)).toBe(true);
+    expect(sessionAsksConsent(before, false)).toBe(false);
+
+    const chosen = run(
+      before,
+      { type: "CONFIRM_SHOTS" },
+      { type: "TOGGLE_SHOT_SELECTION", index: 0 },
+    );
+    // Asked: six dots to the end, even if staff pause submissions while the guest answers.
+    const asked = run(chosen, { type: "CONFIRM_SELECTION", askConsent: true });
+    expect([asked.phase, asked.consentAsked]).toEqual(["consent", true]);
+    expect(progressStep(asked.phase, sessionAsksConsent(asked, false))).toEqual({
+      step: 5,
+      total: 6,
+    });
+    const answered = run(asked, { type: "SET_CONSENT", consent: "no" });
+    expect(progressStep(answered.phase, sessionAsksConsent(answered, false))).toEqual({
+      step: 6,
+      total: 6,
+    });
+    // Skipped: five dots to the end, even if staff open submissions again on the QR screen.
+    const skipped = run(chosen, { type: "CONFIRM_SELECTION", askConsent: false });
+    expect([skipped.phase, skipped.consentAsked]).toEqual(["delivery", false]);
+    expect(progressStep(skipped.phase, sessionAsksConsent(skipped, true))).toEqual({
+      step: 5,
+      total: 5,
+    });
+    // The next guest starts undecided again.
+    expect(run(skipped, { type: "RESET" }).consentAsked).toBeNull();
   });
 });
 

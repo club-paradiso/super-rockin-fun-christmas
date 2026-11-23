@@ -114,6 +114,12 @@ export interface KioskState<Shot> {
   captureFailures: number;
   delivery: DeliveryState;
   consent: WallConsent;
+  /**
+   * Whether this session has a wall question: decided once, when the photos are chosen (it is
+   * skipped while staff pause submissions). Null until then. The progress dots count from it,
+   * so they do not change under the guest when staff flip the switch afterwards.
+   */
+  consentAsked: boolean | null;
   mobile: MobileState;
   /** Language of this guest's screens (D78). Per guest: RESET returns to Korean. */
   lang: KioskLang;
@@ -205,6 +211,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     captureFailures: 0,
     delivery: { status: "idle" },
     consent: null,
+    consentAsked: null,
     mobile: { status: "idle" },
     lang: "ko",
   };
@@ -431,7 +438,11 @@ export function kioskReducer<Shot>(
         state.selectedShotIndices.length === getFrame(state.frameId).slots.length &&
         new Set(state.selectedShotIndices).size === state.selectedShotIndices.length &&
         state.selectedShotIndices.every((i) => state.shots[i] !== null)
-        ? { ...state, phase: action.askConsent ? "consent" : "delivery" }
+        ? {
+            ...state,
+            phase: action.askConsent ? "consent" : "delivery",
+            consentAsked: action.askConsent,
+          }
         : state;
 
     case "DELIVERY_RETRY_COMPOSE":
@@ -513,6 +524,18 @@ function uploading<Shot>(state: KioskState<Shot>): boolean {
  * QR, six dots and no number. The options screen is still step 1. Without the wall question the
  * guest sees five. Null on the attract screen.
  */
+/**
+ * How many steps this session really has: six with the wall question, five without. Once the
+ * photos are chosen that is a fact (`consentAsked`); before, it is what would happen now
+ * (`submissionsOpen`, the staff switch as the booth last heard it).
+ */
+export function sessionAsksConsent(
+  state: Pick<KioskState<unknown>, "consentAsked">,
+  submissionsOpen: boolean,
+): boolean {
+  return state.consentAsked ?? submissionsOpen;
+}
+
 export function progressStep(
   phase: KioskPhase,
   askConsent: boolean,
