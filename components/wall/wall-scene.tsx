@@ -54,7 +54,13 @@ export function WallScene({
   return (
     <div
       className={`wall-scene absolute overflow-hidden ${lite ? "wall-lite" : ""}`}
-      style={{ width: layout.width, height: layout.height, background: theme.fallbackColor }}
+      style={{
+        width: layout.width,
+        height: layout.height,
+        // With feathered edges the scene must not paint its own fallback: the fade has to reveal
+        // the blurred picture behind it (the stage keeps the fallback underneath).
+        background: feather && (feather.x || feather.y) ? "transparent" : theme.fallbackColor,
+      }}
       data-testid="wall-scene"
       data-slots={layout.slots.length}
       data-theme={theme.id}
