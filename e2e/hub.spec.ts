@@ -173,6 +173,8 @@ test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, star
     "Mock camera",
   ]);
   await expect(panel.getByTestId("help-queue")).toContainText("없어요");
+  // Leaving fullscreen lives here: guest screens hide the switch once the booth is fullscreen.
+  await expect(panel.getByTestId("help-fullscreen")).toBeVisible();
   // Unlocking the booth menu never hands the booth a staff session.
   expect((await kiosk.context().cookies()).some((c) => c.name === "ftl_staff")).toBe(false);
 

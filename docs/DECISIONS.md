@@ -1745,7 +1745,27 @@ box into the monitor (to preview the LED). Theme data, the feed, staff settings,
 Not verified: the real LED / board and a real TV; the blur's cost on the iMac's second display
 (the image is static, so it is composited once; low-spec mode skips it).
 
-## D111 · The phone page offers the booth's own frames, and the QR screen matches Figma M1 (2026-11-23)
+## D111 · The booth's fullscreen switch disappears once the booth is fullscreen (2026-11-23)
+
+User report: after pressing "전체화면" the top of the booth still showed a fullscreen indicator.
+Two things were on screen: the browser's own "exit fullscreen" hint (no page can hide it; Chrome
+shows it for a few seconds after every `requestFullscreen`, iPad Safari keeps its own control) and
+our own "전체화면 종료" button, which stayed on every guest screen.
+
+- **Fullscreen is a setup step, not a guest control.** `KioskFullscreenControl` renders nothing
+  while the booth is in fullscreen or launched as an app (`display-mode: fullscreen|standalone`,
+  `navigator.standalone`). Leaving or re-entering fullscreen lives in the staff help menu
+  (`HelpFullscreen`, "화면" section, after the corner hold + PIN). Esc / the browser gesture still
+  work for staff.
+- **App mode is the recommended launch, because it has no hint at all.** `kiosk.webmanifest` adds
+  `display_override: ["fullscreen"]` (installed on Android/Chromium: no address bar, no status
+  bar, no hint) and keeps `display: standalone` for iPad (Add to Home Screen: no address bar; the
+  iPad status bar stays, which a web page cannot remove).
+- `requestFullscreen({ navigationUI: "hide" })`.
+
+Not verified: a real iPad and a real Android tablet launched from the home screen.
+
+## D112 · The phone page offers the booth's own frames, and the QR screen matches Figma M1 (2026-11-23)
 
 User request: the kiosk did not match the Figma file. Two leftovers named by the user:
 

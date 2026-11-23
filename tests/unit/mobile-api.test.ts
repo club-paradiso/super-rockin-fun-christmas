@@ -282,7 +282,7 @@ describe("phone upload (D66)", () => {
     };
     // A photo that is not the frame's shape would hang in the wrong box.
     expect(await refused("film3-sepia-plain", 1200, 900)).toEqual([400, "frame"]);
-    // Only the booth's own frames (D111): not one the booth dropped on 2026-11-22, not a retired
+    // Only the booth's own frames (D112): not one the booth dropped on 2026-11-22, not a retired
     // one, not the plain id, not a made-up one.
     expect(await refused("shalom-letter", 1200, 3600)).toEqual([400, "frame"]);
     expect(await refused("navy-strip", 1200, 3600)).toEqual([400, "frame"]);
