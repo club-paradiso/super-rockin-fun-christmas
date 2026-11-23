@@ -12,10 +12,14 @@ test("kiosk advertises home-screen standalone mode on the dedicated route", asyn
   expect(response.ok()).toBe(true);
   const manifest = (await response.json()) as {
     display: string;
+    display_override: string[];
     start_url: string;
     scope: string;
   };
   expect(manifest).toMatchObject({
+    // Installed on Android/Chromium: true fullscreen, no browser "exit fullscreen" hint.
+    // iPad keeps standalone (no address bar either).
+    display_override: ["fullscreen"],
     display: "standalone",
     start_url: "/kiosk",
     scope: "/kiosk",
@@ -64,6 +68,43 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   expect(fs!.x).toBeGreaterThanOrEqual(home!.x + home!.width);
 });
 
+test("once fullscreen is on, no guest screen shows a fullscreen control", async ({ page }) => {
+  await page.addInitScript(() => {
+    let element: Element | null = null;
+    Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => element,
+    });
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: function (this: HTMLElement, options?: FullscreenOptions) {
+        this.dataset.navigationUi = options?.navigationUI ?? "";
+        element = document.querySelector(".kiosk-root");
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      },
+    });
+  });
+
+  await page.goto("/kiosk?camera=mock");
+  const cover = page.getByTestId("screen-attract");
+  await cover.getByTestId("fullscreen-toggle").click();
+  await expect(page.locator(".kiosk-root")).toHaveAttribute("data-navigation-ui", "hide");
+  await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
+  await expect(cover).toBeVisible();
+  await openWelcome(page);
+  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+  await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
+  await page.getByTestId("start-camera").click();
+  const picker = page.getByTestId("screen-pick");
+  await picker.getByTestId("frame-option-lace1").click();
+  await picker.getByTestId("confirm-pick").click();
+  const ready = page.getByTestId("screen-ready");
+  await expect(ready.getByTestId("go-home")).toBeVisible();
+  await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
+});
+
 test("unsupported fullscreen offers real iPad home-screen instructions", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: false });
@@ -109,45 +150,4 @@ test("welcome and picker align their content to the real screen center", async (
       "center",
     );
   }
-});
-
-test("native fullscreen remains exit-able instead of being mistaken for an installed app", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    let fullscreenElement: Element | null = null;
-    const notifyFullscreen = (element: Element | null) => {
-      fullscreenElement = element;
-      document.dispatchEvent(new Event("fullscreenchange"));
-    };
-    Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
-    Object.defineProperty(document, "fullscreenElement", {
-      configurable: true,
-      get: () => fullscreenElement,
-    });
-    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
-      configurable: true,
-      value: function (this: HTMLElement) {
-        notifyFullscreen(this);
-        return Promise.resolve();
-      },
-    });
-    Object.defineProperty(document, "exitFullscreen", {
-      configurable: true,
-      value: () => {
-        notifyFullscreen(null);
-        return Promise.resolve();
-      },
-    });
-  });
-
-  await page.goto("/kiosk?camera=mock");
-  const control = page.getByTestId("screen-attract").getByTestId("fullscreen-toggle");
-  await expect(control).toContainText("전체화면");
-  await control.click();
-  await expect(control).toContainText("전체화면 종료");
-  await expect(control).toBeEnabled();
-  await control.click();
-  await expect(control).toContainText("전체화면");
-  await expect(control).not.toContainText("전체화면 종료");
 });
