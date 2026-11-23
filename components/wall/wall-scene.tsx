@@ -21,6 +21,7 @@ export function WallScene({
   lite,
   children,
   overlay,
+  feather = null,
 }: {
   theme: WallTheme;
   /** The screen's shape: the picture fading out is cut for it too (D91). */
@@ -29,6 +30,11 @@ export function WallScene({
   lite: boolean;
   children: ReactNode;
   overlay?: ReactNode;
+  /**
+   * Fade the picture's edges on these axes into the soft fill behind it (D106): only where the
+   * picture leaves a band, so the band reads as more of the same scene instead of an edge.
+   */
+  feather?: { x: boolean; y: boolean } | null;
 }) {
   // The picture under the current one during a change, by theme id.
   const [shown, setShown] = useState(theme.id);
@@ -43,6 +49,7 @@ export function WallScene({
     return () => clearTimeout(id);
   }, [under]);
   const underTheme = under ? fitTheme(getWallTheme(under), aspect) : null;
+  const edge = featherMask(feather);
 
   return (
     <div
@@ -63,6 +70,7 @@ export function WallScene({
           // A picture of another shape (a 32:9 theme under a 2.4:1 one, D91) is cropped, never
           // stretched, for the two seconds it fades out.
           className="absolute inset-0 h-full w-full object-cover"
+          style={edge}
         />
       )}
       {/* eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline */}
@@ -72,7 +80,9 @@ export function WallScene({
         alt=""
         aria-hidden
         className={`absolute inset-0 h-full w-full ${under ? "wall-background-in" : ""}`}
+        style={edge}
         data-testid="wall-background"
+        data-feather={feather ? `${feather.x ? "x" : ""}${feather.y ? "y" : ""}` : ""}
       />
       {theme.rope && (
         <svg
@@ -121,6 +131,26 @@ export function WallScene({
       {overlay}
     </div>
   );
+}
+
+/** Share of the picture's length that fades out at an edge with a band. */
+const FEATHER = "4%";
+
+/** CSS mask that fades the picture out at the edges of the banded axes; nothing without bands. */
+export function featherMask(feather: { x: boolean; y: boolean } | null | undefined) {
+  if (!feather || (!feather.x && !feather.y)) return undefined;
+  const ramp = (dir: string) =>
+    `linear-gradient(${dir}, transparent 0, #000 ${FEATHER}, #000 calc(100% - ${FEATHER}), transparent 100%)`;
+  const layers = [feather.x && ramp("to right"), feather.y && ramp("to bottom")].filter(Boolean);
+  const mask = layers.join(", ");
+  // Two ramps: keep only where both are opaque (corners fade on both sides).
+  const composite = layers.length === 2 ? "intersect" : undefined;
+  return {
+    maskImage: mask,
+    WebkitMaskImage: mask,
+    maskComposite: composite,
+    WebkitMaskComposite: composite ? "source-in" : undefined,
+  } as const;
 }
 
 /**

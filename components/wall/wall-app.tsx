@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
 import { fitTheme, wallPhotoShadow } from "@/lib/wall/themes";
+import { planWallFit } from "@/lib/wall/fit";
 import { framedPhotoFrame, MOBILE_FRAME_ID } from "@/config/mobile";
 import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
 import { ageWeight } from "@/lib/wall/rotation";
@@ -22,6 +23,76 @@ function reloadPage() {
     // Storage unavailable: the reload still helps.
   }
   window.location.reload();
+}
+
+interface ScreenSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The wall's own size in CSS px, kept current through everything that changes it: window resizes,
+ * entering and leaving fullscreen, the window moving to another monitor, rotation, the iPad/phone
+ * address bar (visual viewport). Measured
+ * on the wall element itself, once per animation frame at most, and only set when it changed.
+ * Null until mounted, so the server render and the first client render agree.
+ */
+function useScreenSize(ref: React.RefObject<HTMLElement | null>): ScreenSize | null {
+  const [size, setSize] = useState<ScreenSize | null>(null);
+  useEffect(() => {
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      const el = ref.current;
+      const rect = el?.getBoundingClientRect();
+      const width = Math.round(rect?.width || window.innerWidth);
+      const height = Math.round(rect?.height || window.innerHeight);
+      setSize((prev) =>
+        prev && prev.width === width && prev.height === height ? prev : { width, height },
+      );
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(read);
+    };
+    read();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
+    if (ref.current) observer?.observe(ref.current);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("orientationchange", schedule);
+    document.addEventListener("fullscreenchange", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      observer?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("orientationchange", schedule);
+      document.removeEventListener("fullscreenchange", schedule);
+      window.visualViewport?.removeEventListener("resize", schedule);
+    };
+  }, [ref]);
+  return size;
+}
+
+/**
+ * 전체보기: double-click the wall (or press F) to enter or leave fullscreen. The fit follows by
+ * itself (useScreenSize hears `fullscreenchange`). Browsers allow this only from a user gesture;
+ * a refusal changes nothing (kiosk launchers already open the wall fullscreen).
+ */
+function toggleFullscreen() {
+  const doc = document as Document & { webkitFullscreenElement?: Element | null };
+  try {
+    if (document.fullscreenElement || doc.webkitFullscreenElement) {
+      void document.exitFullscreen?.().catch(() => undefined);
+    } else {
+      const root = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => void;
+      };
+      if (root.requestFullscreen) void root.requestFullscreen().catch(() => undefined);
+      else root.webkitRequestFullscreen?.();
+    }
+  } catch {
+    // Not allowed here: nothing to do.
+  }
 }
 
 /**
@@ -48,24 +119,50 @@ export function WallApp({
   /** The theme at page load; the feed takes over from the first poll. */
   initialTheme?: string;
 }) {
-  // Measured after mount, so the server render and the first client render agree.
-  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const viewport = useScreenSize(mainRef);
   useEffect(() => {
-    const measure = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey)
+        toggleFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
   const [feed, setFeed] = useState<WallFeed | null>(null);
-  // Every theme has a fixed size and fixed slots; low-spec mode shows fewer of them. A theme cut
-  // for another screen shape (D91: a 2.4:1 board) is used when it fits this screen better.
+  // Screen-adaptive fit (D106): the wall measures the screen it is on (or the LED's input size,
+  // WALL_CANVAS / ?canvas=) and lib/wall/fit.ts picks the theme's cut (D91), the run of slots and
+  // the scale that hang the photos as large as this screen allows, the picture covering the screen.
   const themeId = feed?.theme ?? initialTheme;
   const shape = canvas ?? viewport;
   const aspect = shape ? shape.width / shape.height : null;
-  const theme = useMemo(() => fitTheme(getWallTheme(themeId), aspect), [themeId, aspect]);
+  const baseTheme = useMemo(() => getWallTheme(themeId), [themeId]);
+  // The plan on screen wins near-ties, so resizing a window does not flip between two plans.
+  // Kept as state: when a new plan wins it is stored, and the next render confirms it.
+  const [planKey, setPlanKey] = useState<string | null>(null);
+  const plan = useMemo(
+    () =>
+      shape
+        ? planWallFit(
+            baseTheme,
+            { width: shape.width, height: shape.height },
+            {
+              lite,
+              prefer: planKey,
+            },
+          )
+        : null,
+    [baseTheme, shape, lite, planKey],
+  );
+  if (plan && plan.key !== planKey) setPlanKey(plan.key);
+  // Before the first measurement: the closest cut, every slot (only for the server render).
+  const theme = useMemo(
+    () => plan?.theme ?? fitTheme(baseTheme, aspect),
+    [plan, baseTheme, aspect],
+  );
   const layout = useMemo(
-    () => wallLayout(theme.scene, lite ? theme.liteSlots : undefined),
-    [theme, lite],
+    () => plan?.layout ?? wallLayout(theme.scene, lite ? theme.liteSlots : undefined),
+    [plan, theme, lite],
   );
   const slotCount = layout.slots.length;
   const slotsRef = useRef(slotCount);
@@ -363,105 +460,167 @@ export function WallApp({
     approvedCount: eligible.length,
   });
 
-  const unit = layout.height / 1000;
-  // The scene is fitted into the screen; with WALL_CANVAS / ?canvas= into a box of the LED's input
-  // shape first (to see the letterboxing on another monitor).
+  // The stage is what the plan was made for: the LED's input size with ?canvas= / WALL_CANVAS
+  // (letterboxed into this monitor, to preview the LED), else this screen.
   const stage = canvas ?? viewport;
-  const scale =
-    stage && viewport
-      ? Math.min(stage.width / layout.width, stage.height / layout.height) *
-        (canvas ? Math.min(viewport.width / canvas.width, viewport.height / canvas.height) : 1)
+  const preview =
+    canvas && viewport
+      ? Math.min(viewport.width / canvas.width, viewport.height / canvas.height)
       : 1;
+  const banded = plan
+    ? {
+        x: plan.bands.left + plan.bands.right > 0.5,
+        y: plan.bands.top + plan.bands.bottom > 0.5,
+      }
+    : null;
+  const hasBands = !!banded && (banded.x || banded.y);
+  // Screen-relative text unit: what the scene unit was on the 3840 × 1080 LED (1.08 px), shrinking
+  // with the screen, never so small a portrait screen cannot read it, never wider than the screen.
+  const unit = stage
+    ? Math.min(
+        Math.max(
+          Math.min(stage.height, stage.width * (1080 / 3840)),
+          Math.min(stage.width, stage.height) * 0.9,
+        ) / 1000,
+        stage.width / 1100,
+      )
+    : 1;
+  // The "empty wall" note where the theme puts it, kept on screen when the picture is cropped.
+  const emptyTop =
+    plan && stage
+      ? Math.min(
+          Math.max(plan.offset.y + plan.scale * theme.emptyTextY, stage.height * 0.06),
+          stage.height * 0.86,
+        )
+      : 0;
 
   return (
     <main
+      ref={mainRef}
       data-testid="wall"
       data-wall-state={screen}
       data-wall-mode={feed?.mode ?? "boot"}
       data-wall-audience={feed?.audience ?? "unknown"}
+      data-fit={plan?.key ?? ""}
+      data-fit-scale={plan ? plan.scale.toFixed(4) : ""}
+      data-fit-coverage={plan ? plan.coverage.toFixed(4) : ""}
       style={{ background: theme.fallbackColor }}
       className="wall-stage relative h-dvh w-full cursor-none overflow-hidden"
+      onDoubleClick={toggleFullscreen}
     >
-      {viewport && (
+      {viewport && stage && plan && (
         <div
-          className="absolute"
+          data-testid="wall-stage-box"
+          className="absolute overflow-hidden"
           style={{
-            left: (viewport.width - layout.width * scale) / 2,
-            top: (viewport.height - layout.height * scale) / 2,
-            width: layout.width,
-            height: layout.height,
-            transform: `scale(${scale})`,
+            left: (viewport.width - stage.width * preview) / 2,
+            top: (viewport.height - stage.height * preview) / 2,
+            width: stage.width,
+            height: stage.height,
+            transform: preview === 1 ? undefined : `scale(${preview})`,
             transformOrigin: "0 0",
+            background: theme.fallbackColor,
           }}
         >
-          <WallScene
-            theme={theme}
-            aspect={aspect}
-            layout={layout}
-            lite={lite}
-            overlay={
-              feed?.mode === "holding" ? (
-                <div
-                  data-testid="wall-holding"
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/85 text-center"
-                  style={{ gap: unit * 30 }}
-                >
-                  <p
-                    className="text-(--wall-amber)"
-                    style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}
-                  >
-                    STUDIO SHALOM
-                  </p>
-                  <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
-                    잠시 후 다시 불을 밝힐게요
-                  </p>
-                </div>
-              ) : feed?.mode === "closed" ? (
-                <div
-                  data-testid="wall-closed"
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/70 text-center"
-                  style={{ gap: unit * 30 }}
-                >
-                  <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 60 }}>
-                    오늘의 미디어월은 여기까지예요
-                  </p>
-                  {feed.opensAt && (
-                    <p className="text-(--wall-amber)" style={{ fontSize: unit * 40 }}>
-                      {feed.opensAt}에 다시 불을 밝힐게요
-                    </p>
-                  )}
-                </div>
-              ) : screen === "EMPTY" ? (
-                <p
-                  data-testid="wall-empty"
-                  className="wall-note absolute"
-                  style={{ top: theme.emptyTextY, fontSize: unit * 40 }}
-                >
-                  사진을 찍고 미디어월에 함께해 주세요
-                </p>
-              ) : null
-            }
+          {hasBands && !lite && (
+            // The same picture, blurred and dimmed, behind the bands the photos could not avoid.
+            // eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline
+            <img
+              key={theme.background}
+              src={theme.background}
+              alt=""
+              aria-hidden
+              data-testid="wall-ambient"
+              className="wall-ambient absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          <div
+            className="absolute"
+            style={{
+              left: plan.offset.x,
+              top: plan.offset.y,
+              width: layout.width,
+              height: layout.height,
+              transform: `scale(${plan.scale})`,
+              transformOrigin: "0 0",
+            }}
           >
-            {schedule.slots.map((slot, i) => {
-              const place = layout.slots[i];
-              const url =
-                slot.photoId && allowed.has(slot.photoId) ? images.get(slot.photoId) : null;
-              if (!place || !slot.photoId || !slot.phase || !url) return null;
-              if (phonePhotos.has(slot.photoId)) {
-                const card = phoneCardBox(place);
+            <WallScene theme={theme} aspect={aspect} layout={layout} lite={lite} feather={banded}>
+              {schedule.slots.map((slot, i) => {
+                const place = layout.slots[i];
+                const url =
+                  slot.photoId && allowed.has(slot.photoId) ? images.get(slot.photoId) : null;
+                if (!place || !slot.photoId || !slot.phase || !url) return null;
+                if (phonePhotos.has(slot.photoId)) {
+                  const card = phoneCardBox(place);
+                  return (
+                    <figure
+                      key={`${i}-${slot.photoId}`}
+                      data-testid="wall-photo"
+                      data-photo-id={slot.photoId}
+                      data-phase={slot.phase}
+                      data-kind="phone"
+                      className="absolute"
+                      style={{
+                        left: card.x,
+                        top: place.y,
+                        width: card.width,
+                        height: card.height + (card.y - place.y),
+                        transform: `rotate(${place.tilt}deg)`,
+                        transformOrigin: "50% 0",
+                      }}
+                    >
+                      <div
+                        className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
+                      >
+                        <Clip theme={theme} />
+                        <div
+                          className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
+                          style={{
+                            top: card.y - place.y,
+                            padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
+                            boxShadow: wallPhotoShadow("box"),
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL from our server */}
+                          <img
+                            src={url}
+                            alt=""
+                            data-testid="wall-photo-image"
+                            className="w-full bg-(--wall-card-mat) object-contain"
+                            style={{ height: PHONE_CARD.photoHeight }}
+                          />
+                          <p
+                            className="flex flex-1 items-center justify-center font-bold text-(--wall-card-ink)"
+                            style={{ fontSize: 17, letterSpacing: "0.24em" }}
+                          >
+                            STUDIO SHALOM
+                          </p>
+                        </div>
+                      </div>
+                    </figure>
+                  );
+                }
+                // A phone photo put in a booth frame (D93) hangs exactly like that booth frame.
+                const frame = framedPhotoFrame(photoFrames.get(slot.photoId) ?? "");
+                const box =
+                  framedPhotoBox(
+                    place,
+                    { width: frame.outputWidth, height: frame.outputHeight },
+                    theme.wideMax,
+                  ) ?? place.box;
                 return (
                   <figure
                     key={`${i}-${slot.photoId}`}
                     data-testid="wall-photo"
                     data-photo-id={slot.photoId}
                     data-phase={slot.phase}
-                    data-kind="phone"
                     className="absolute"
                     style={{
-                      left: card.x,
+                      left: box.x,
                       top: place.y,
-                      width: card.width,
-                      height: card.height + (card.y - place.y),
+                      width: box.width,
+                      height: box.height + (box.y - place.y),
                       transform: `rotate(${place.tilt}deg)`,
                       transformOrigin: "50% 0",
                     }}
@@ -470,78 +629,64 @@ export function WallApp({
                       className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                     >
                       <Clip theme={theme} />
-                      <div
-                        className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
+                      {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt=""
+                        data-testid="wall-photo-image"
+                        className="h-full w-full object-contain object-top"
                         style={{
-                          top: card.y - place.y,
-                          padding: `${PHONE_CARD.margin}px ${PHONE_CARD.margin}px 0`,
-                          boxShadow: wallPhotoShadow("box"),
+                          paddingTop: box.y - place.y,
+                          filter: wallPhotoShadow("filter"),
                         }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL from our server */}
-                        <img
-                          src={url}
-                          alt=""
-                          data-testid="wall-photo-image"
-                          className="w-full bg-(--wall-card-mat) object-contain"
-                          style={{ height: PHONE_CARD.photoHeight }}
-                        />
-                        <p
-                          className="flex flex-1 items-center justify-center font-bold text-(--wall-card-ink)"
-                          style={{ fontSize: 17, letterSpacing: "0.24em" }}
-                        >
-                          STUDIO SHALOM
-                        </p>
-                      </div>
+                      />
                     </div>
                   </figure>
                 );
-              }
-              // A phone photo put in a booth frame (D93) hangs exactly like that booth frame.
-              const frame = framedPhotoFrame(photoFrames.get(slot.photoId) ?? "");
-              const box =
-                framedPhotoBox(
-                  place,
-                  { width: frame.outputWidth, height: frame.outputHeight },
-                  theme.wideMax,
-                ) ?? place.box;
-              return (
-                <figure
-                  key={`${i}-${slot.photoId}`}
-                  data-testid="wall-photo"
-                  data-photo-id={slot.photoId}
-                  data-phase={slot.phase}
-                  className="absolute"
-                  style={{
-                    left: box.x,
-                    top: place.y,
-                    width: box.width,
-                    height: box.height + (box.y - place.y),
-                    transform: `rotate(${place.tilt}deg)`,
-                    transformOrigin: "50% 0",
-                  }}
-                >
-                  <div
-                    className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
-                  >
-                    <Clip theme={theme} />
-                    {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={url}
-                      alt=""
-                      data-testid="wall-photo-image"
-                      className="h-full w-full object-contain object-top"
-                      style={{
-                        paddingTop: box.y - place.y,
-                        filter: wallPhotoShadow("filter"),
-                      }}
-                    />
-                  </div>
-                </figure>
-              );
-            })}
-          </WallScene>
+              })}
+            </WallScene>
+          </div>
+          {feed?.mode === "holding" ? (
+            <div
+              data-testid="wall-holding"
+              className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/85 text-center"
+              style={{ gap: unit * 30 }}
+            >
+              <p
+                className="text-(--wall-amber)"
+                style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}
+              >
+                STUDIO SHALOM
+              </p>
+              <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
+                잠시 후 다시 불을 밝힐게요
+              </p>
+            </div>
+          ) : feed?.mode === "closed" ? (
+            <div
+              data-testid="wall-closed"
+              className="absolute inset-0 flex flex-col items-center justify-center bg-(--wall-night)/70 text-center"
+              style={{ gap: unit * 30 }}
+            >
+              <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 60 }}>
+                오늘의 미디어월은 여기까지예요
+              </p>
+              {feed.opensAt && (
+                <p className="text-(--wall-amber)" style={{ fontSize: unit * 40 }}>
+                  {feed.opensAt}에 다시 불을 밝힐게요
+                </p>
+              )}
+            </div>
+          ) : screen === "EMPTY" ? (
+            <p
+              data-testid="wall-empty"
+              className="wall-note absolute"
+              style={{ top: emptyTop, fontSize: unit * 40 }}
+            >
+              사진을 찍고 미디어월에 함께해 주세요
+            </p>
+          ) : null}
         </div>
       )}
 
