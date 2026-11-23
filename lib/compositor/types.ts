@@ -41,7 +41,7 @@ export interface FrameSlot {
  * Done with per-pixel arithmetic (lib/compositor/tone.ts), never `ctx.filter`, so the iPad mini 4
  * (Safari 15), the preview, the saved file and the wall copy all get the same pixels.
  */
-export type PhotoTone = "mono" | "sepia" | "flash";
+export type PhotoTone = "mono" | "sepia" | "flash" | "film";
 
 export type FrameDecoration =
   | {

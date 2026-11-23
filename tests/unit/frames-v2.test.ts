@@ -53,8 +53,8 @@ const bounds = (s: (typeof V2_FRAMES)[number]["slots"][number]) => {
   };
 };
 
-describe("틀 선택 v2: the seven cards", () => {
-  it("are the seven of Figma 898:1677, in its order, 필름 3컷 preselected", () => {
+describe("틀 선택 v2: the eight cards", () => {
+  it("are the seven of Figma 898:1677 in its order, then 필름 35mm (924:2026); 필름 3컷 preselected", () => {
     expect(FRAME_CARDS.map((c) => c.id)).toEqual([
       "film3",
       "film4",
@@ -63,6 +63,7 @@ describe("틀 선택 v2: the seven cards", () => {
       "verse4",
       "check2",
       "lace1",
+      "film35",
     ]);
     expect(DEFAULT_CARD_ID).toBe("film3");
     expect(getCard("nope").id).toBe("film3");
@@ -83,10 +84,12 @@ describe("틀 선택 v2: the seven cards", () => {
       verse4: [],
       check2: [["color", ["red", "blue"]]],
       lace1: [],
+      // Three tones: an option may have more than two answers.
+      film35: [["color", ["natural", "mono", "sepia"]]],
     });
   });
 
-  it("map every option combination to its own frame (film3 4, film4 2, check2 2, others 1)", () => {
+  it("map every option combination to its own frame (film3 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
@@ -108,6 +111,9 @@ describe("틀 선택 v2: the seven cards", () => {
       "check2-red",
       "check2-blue",
       "lace1",
+      "film35-natural",
+      "film35-mono",
+      "film35-sepia",
     ]);
     expect(V2_FRAMES.map((f) => f.id)).toEqual(ids);
     for (const id of ids) expect(cardOfFrame(id)?.id).toBe(id.split("-")[0]);
@@ -116,7 +122,7 @@ describe("틀 선택 v2: the seven cards", () => {
 
   it("keep every earlier frame for the phone page and for stored photos", () => {
     expect(FRAMES).toHaveLength(20);
-    expect(ALL_FRAMES).toHaveLength(32);
+    expect(ALL_FRAMES).toHaveLength(35);
     expect(new Set(ALL_FRAMES.map((f) => f.id)).size).toBe(ALL_FRAMES.length);
     for (const f of [...FRAMES, ...V2_FRAMES]) {
       expect(isKnownFrameId(f.id)).toBe(true);
@@ -220,6 +226,39 @@ describe.each(V2_FRAMES.map((f) => [f.id, f] as const))("v2 frame %s", (_, frame
 });
 
 describe("v2 frame details (Figma measurements)", () => {
+  it("필름 35mm 4컷: four 468 × 318 photos between the sprocket holes, one tone per answer", () => {
+    for (const [answer, tone, bg] of [
+      ["natural", "film", "#17130F"],
+      ["mono", "mono", "#201B1A"],
+      ["sepia", "sepia", "#2B1D14"],
+    ] as const) {
+      const frame = getCard("film35").frame({ color: answer });
+      expect(frame.id).toBe(`film35-${answer}`);
+      expect(frame.photoTone).toBe(tone);
+      expect(frame.background).toEqual({ type: "solid", color: bg });
+      expect(frame.slots.map((s) => [s.x, s.y, s.width, s.height])).toEqual([
+        [66, 65, 468, 318],
+        [66, 427, 468, 318],
+        [66, 789, 468, 318],
+        [66, 1151, 468, 318],
+      ]);
+      // The strip art first (it is opaque), the photos over it, the logo last.
+      expect(frame.decorations.map((d) => d.type)).toEqual([
+        "image",
+        "photo",
+        "photo",
+        "photo",
+        "photo",
+        "image",
+      ]);
+    }
+    // An answer the card does not offer falls back to the first one.
+    expect(getCard("film35").frame(cleanOptions(getCard("film35"), { color: "red" })).id).toBe(
+      "film35-natural",
+    );
+    expect(defaultOptions(getCard("film35"))).toEqual({ color: "natural" });
+  });
+
   it("필름 3컷: 흑백 or 세피아 on the photo itself; the logo row shortens the photos", () => {
     expect(getFrame("film3-mono-logo").photoTone).toBe("mono");
     expect(getFrame("film3-sepia-plain").photoTone).toBe("sepia");

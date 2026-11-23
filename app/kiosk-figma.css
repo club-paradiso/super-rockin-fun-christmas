@@ -339,8 +339,10 @@
   text-align: center;
 }
 
-/* Seven cards: four, then three centred under the gaps (Figma: 149 × 357, 12 apart, rows 16
-   apart). Eight half-card tracks put the second row half a card in. */
+/* The cards, four to a row (Figma: 149 × 357, 12 apart, rows 16 apart). Eight half-card tracks:
+   a card takes two, and a last row that is one card short starts half a card in, so it sits
+   centred under the gaps as in Figma's seven-card picker (898:1677). With eight cards (필름 35mm,
+   2026-11-24) both rows are full; a ninth card would need a third row and a new Figma screen. */
 .kiosk-root .booth-screen-v2 .pick-cards {
   flex: 1 1 0;
   min-height: 0;
@@ -371,14 +373,18 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(5) {
+/* A last row that is short starts further in, so it stays centred: by half a card when one is
+   missing (seven cards, as in Figma), a whole card for two, a card and a half for three. Counted
+   from the cards themselves, so adding or removing one in config/frames/v2.ts needs no change
+   here. */
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(3) {
   grid-column: 2 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(6) {
-  grid-column: 4 / span 2;
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(2) {
+  grid-column: 3 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(7) {
-  grid-column: 6 / span 2;
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(1) {
+  grid-column: 4 / span 2;
 }
 .kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
   border-width: calc(3 * var(--fx));
@@ -433,7 +439,11 @@
 }
 .kiosk-root .booth-screen-v2 .options-row {
   display: grid;
-  grid-template-columns: calc(60 * var(--fx)) minmax(0, 1fr) minmax(0, 1fr);
+  /* The label, then one equal column per answer (two in the Figma screens, three for the 35mm
+     film's tone). */
+  grid-template-columns: calc(60 * var(--fx));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   column-gap: calc(12 * var(--fx));
   align-items: center;
 }

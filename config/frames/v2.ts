@@ -2,7 +2,7 @@ import type { FrameDecoration, FrameDefinition, FrameSlot } from "@/lib/composit
 import { HAND_TEXT } from "@/config/hand-fonts";
 
 /**
- * 「틀 선택 v2」 (2026-11-22): seven cards on the booth's frame picker, some with options (colour,
+ * 「틀 선택 v2」 (2026-11-22; 필름 35mm added 2026-11-24): eight cards on the booth's frame picker, some with options (colour,
  * logo). Each combination is its own FrameDefinition with its own id, so the server, the wall and
  * the AI check (which cut the photo up by slot) see an ordinary frame.
  *
@@ -307,6 +307,40 @@ const verse4: FrameDefinition = {
   ],
 };
 
+// ── 필름 35mm 4컷 (Figma 924:2026: 톤 = 컬러 924:1867 · 흑백 924:1946 · 세피아 924:2025) ──────
+/**
+ * One film strip in three tones. The strip (sprocket holes, the orange frame numbers 24 · 24A ·
+ * 25 · 25A, "CHRISTMAS VILLAGE 2026") is exported art; the photos and the logo are drawn here.
+ * To add a tone: one line in this table, one `PhotoTone`, the card's `values`, and its name in
+ * lib/kiosk/copy.ts (the type checker asks for each).
+ */
+const FILM35 = {
+  natural: { bg: "#17130F", tone: "film", label: "컬러", en: "Color", zh: "彩色" },
+  mono: { bg: "#201B1A", tone: "mono", label: "흑백", en: "B&W", zh: "黑白" },
+  sepia: { bg: "#2B1D14", tone: "sepia", label: "세피아", en: "Sepia", zh: "复古棕" },
+} as const;
+
+function film35(tone: keyof typeof FILM35): FrameDefinition {
+  const c = FILM35[tone];
+  return {
+    id: `film35-${tone}`,
+    name: `Film 35mm 4 · ${tone}`,
+    label: `35mm 필름 4컷 · ${c.label}`,
+    labelEn: `35mm film · 4 shots · ${c.en}`,
+    labelZh: `35mm胶片 4格 · ${c.zh}`,
+    outputWidth: 600,
+    outputHeight: 1800,
+    background: { type: "solid", color: c.bg },
+    photoTone: c.tone,
+    slots: [65, 427, 789, 1151].map((y) => slot(66, y, 468, 318)),
+    decorations: [
+      art(`film35-${tone}-base.png`, 600, 1800),
+      ...photos(4),
+      logo(180, 1585, 240, "#EFE6D6", c.bg),
+    ],
+  };
+}
+
 // ── 체크 2컷 (Figma 856:1610 빨강 · 795:383 파랑) ───────────────────────────────────────────
 const checkRed: FrameDefinition = {
   id: "check2-red",
@@ -368,6 +402,11 @@ export const FILM3_VARIANTS = {
   "sepia-plain": film3("sepia", false),
 } as const;
 export const FILM4_VARIANTS = { cream: film4("cream"), red: film4("red") } as const;
+export const FILM35_VARIANTS = {
+  natural: film35("natural"),
+  mono: film35("mono"),
+  sepia: film35("sepia"),
+} as const;
 
 /** Every v2 frame, each option combination once. */
 export const V2_FRAMES: readonly FrameDefinition[] = [
@@ -379,21 +418,23 @@ export const V2_FRAMES: readonly FrameDefinition[] = [
   checkRed,
   checkBlue,
   lace1,
+  ...Object.values(FILM35_VARIANTS),
 ];
 
-// ── The seven cards ─────────────────────────────────────────────────────────────────────────
+// ── The eight cards ─────────────────────────────────────────────────────────────────────────
 
 export type FrameCardId =
-  "film3" | "film4" | "polaroid1" | "polaroid3" | "verse4" | "check2" | "lace1";
+  "film3" | "film4" | "polaroid1" | "polaroid3" | "verse4" | "check2" | "lace1" | "film35";
 
 export type OptionKey = "color" | "logo";
-export type OptionValue = "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue";
+export type OptionValue =
+  "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue" | "natural";
 export type FrameOptions = Partial<Record<OptionKey, OptionValue>>;
 
 export interface FrameCardOption {
   key: OptionKey;
-  /** Two choices, the first is the default. */
-  values: readonly [OptionValue, OptionValue];
+  /** Two or more choices, shown in this order; the first is the default. */
+  values: readonly [OptionValue, OptionValue, ...OptionValue[]];
 }
 
 export interface FrameCard {
@@ -434,6 +475,11 @@ export const FRAME_CARDS: readonly FrameCard[] = [
     frame: (o) => (o.color === "blue" ? checkBlue : checkRed),
   },
   { id: "lace1", options: [], frame: only(lace1) },
+  {
+    id: "film35",
+    options: [{ key: "color", values: ["natural", "mono", "sepia"] }],
+    frame: (o) => FILM35_VARIANTS[o.color === "mono" || o.color === "sepia" ? o.color : "natural"],
+  },
 ];
 
 /** 필름 3컷 is preselected for every guest. */

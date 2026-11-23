@@ -12,7 +12,7 @@ test("the seven v2 cards show one persistent selection, 필름 3컷 first", asyn
 
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(7);
+  await expect(cards).toHaveCount(8);
   await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
   await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("confirm-pick")).toHaveText("다음");

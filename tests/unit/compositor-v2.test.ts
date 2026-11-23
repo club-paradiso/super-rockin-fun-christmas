@@ -93,6 +93,17 @@ describe("흑백 / 세피아 (pixel arithmetic, the same on every browser)", () 
     expect([...px]).toEqual([t.r[128], t.g[128], t.b[128], 200]);
   });
 
+  it('필름 (필름 35mm "컬러") is a slight warm lift: rising curves, red above blue, small', () => {
+    const t = toneTable("film");
+    expect(t.grey).toBe(false);
+    for (const c of [t.r, t.g, t.b]) {
+      for (let i = 1; i < 256; i++) expect(c[i]!).toBeGreaterThanOrEqual(c[i - 1]!);
+      // Never far from the photo itself (Figma: contrast +0.04, saturation +0.02).
+      for (let i = 0; i < 256; i++) expect(Math.abs(c[i]! - i)).toBeLessThanOrEqual(8);
+    }
+    expect(t.r[128]!).toBeGreaterThan(t.b[128]!);
+  });
+
   it("rewrites RGB in place and keeps alpha", () => {
     const px = new Uint8ClampedArray([255, 0, 0, 77, 10, 200, 30, 255]);
     applyTone(px, "mono");

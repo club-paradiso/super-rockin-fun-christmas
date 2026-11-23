@@ -11,6 +11,8 @@ import type { PhotoTone } from "./types";
  *    #8A5A32 in COLOR at 78 %, #2E1F14 in LIGHTEN and #F4E6CC in DARKEN.
  *  - 플래시 (polaroid 3컷, Figma 836:1680 "플래시 느낌"): exposure +0.06, contrast +0.18,
  *    saturation +0.08, temperature +0.06.
+ *  - 필름 (필름 35mm 4컷 "컬러", Figma 924:1822): contrast +0.04, saturation +0.02,
+ *    temperature +0.04.
  *
  * Figma does not publish the formulas of its image adjustments, so the curves below were
  * MEASURED (2026-11-23): the same example photo exported from Figma with and without each set of
@@ -19,6 +21,8 @@ import type { PhotoTone } from "./types";
  *    흑백 and 세피아 are then a curve of that one grey level.
  *  - 플래시 is, to within about two levels, one curve per channel (the small saturation term
  *    did not improve the fit and is left out).
+ *  - 필름 (필름 35mm 4컷 "컬러", 924:1822), measured 2026-11-24 from the frame's own example
+ *    photos: one curve per channel, mean error 0.55 of a level. It is a slight warm lift.
  * Each curve is 33 control points (input 0, 8, …, 248, 255), joined by straight lines.
  * e2e/figma-parity.spec.ts compares the result with the Figma exports.
  */
@@ -64,6 +68,25 @@ const FLASH: readonly [Curve, Curve, Curve] = [
     0.4, 7.6, 14.8, 22.8, 31.2, 39.8, 48.6, 57.3, 66.3, 74.9, 83.5, 92.2, 101.1, 110.1, 118.8,
     127.4, 135.8, 144.1, 152.2, 160.3, 168.8, 176.9, 184.5, 192.1, 199.7, 207, 214.1, 221.1, 227.7,
     233.9, 240, 246.4, 252,
+  ],
+];
+
+/** 필름 35mm "컬러" (Figma 924:1822): contrast +0.04, saturation +0.02, temperature +0.04. */
+const FILM: readonly [Curve, Curve, Curve] = [
+  [
+    3.6, 9.7, 16.6, 24.4, 32.2, 40.1, 48, 56, 64, 72, 80, 88, 96.1, 104.2, 112.3, 120.4, 128.5,
+    136.7, 144.9, 153.3, 161.6, 169.8, 178, 186.2, 194, 202, 210.1, 218, 226, 234, 241.5, 248.9,
+    255,
+  ],
+  [
+    0, 7.2, 15.6, 23.8, 31.8, 39.7, 47.5, 55.3, 63.2, 71.2, 79.2, 87.3, 95.5, 103.7, 111.9, 120,
+    128.1, 136.1, 144.2, 152.4, 160.6, 168.7, 176.9, 184.6, 192.2, 200, 208, 216, 224, 232, 240,
+    248, 255,
+  ],
+  [
+    0, 6.1, 13.6, 21.4, 29.8, 37.9, 45.6, 53.4, 61.3, 69.2, 77.2, 85.3, 93.3, 101.4, 109.4, 117.3,
+    125.3, 133.2, 141.2, 149.2, 157.2, 165.2, 173.2, 181.1, 189.1, 197.2, 205.2, 213.2, 221.1,
+    229.3, 237, 244.9, 251.7,
   ],
 ];
 
@@ -116,7 +139,7 @@ export function toneTable(tone: PhotoTone): Table {
       const c = expand(MONO);
       table = { grey: true, r: c, g: c, b: c };
     } else {
-      const [r, g, b] = tone === "sepia" ? SEPIA : FLASH;
+      const [r, g, b] = tone === "sepia" ? SEPIA : tone === "flash" ? FLASH : FILM;
       table = { grey: tone === "sepia", r: expand(r), g: expand(g), b: expand(b) };
     }
     tables.set(tone, table);

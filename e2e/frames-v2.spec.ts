@@ -1,3 +1,4 @@
+import { FRAME_CARDS } from "../config/frames/v2";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ import {
 } from "./helpers";
 
 /**
- * 「틀 선택 v2」 (2026-11-22) end to end: each of the seven cards and every option combination,
+ * 「틀 선택 v2」 (2026-11-22) end to end: each of the eight cards and every option combination,
  * from the picker to a real QR, with the mock camera. Also: the handwriting font over 20
  * sessions, the date stamp against a wrong tablet clock, and the Figma screens at three tablet
  * sizes with nothing placed on the binder rings.
@@ -42,6 +43,9 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   ["check2", {}, "check2-red", [600, 1800]],
   ["check2", { color: "blue" }, "check2-blue", [600, 1800]],
   ["lace1", {}, "lace1", [1200, 1500]],
+  ["film35", {}, "film35-natural", [600, 1800]],
+  ["film35", { color: "mono" }, "film35-mono", [600, 1800]],
+  ["film35", { color: "sepia" }, "film35-sepia", [600, 1800]],
 ];
 
 /** Nothing of "한 컷 더" or "프레임 바꾸기" on screen, in any language. */
@@ -215,7 +219,7 @@ for (const [width, height] of [
   [820, 1180],
   [1024, 1366],
 ] as const) {
-  test(`${width}×${height}: the picker and the three option screens, nothing on the rings`, async ({
+  test(`${width}×${height}: the picker and the four option screens, nothing on the rings`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
@@ -223,7 +227,7 @@ for (const [width, height] of [
     await page.addStyleTag({ content: '[data-testid="mock-badge"]{display:none!important}' });
     await openWelcome(page);
     await page.getByTestId("start-camera").click();
-    for (const c of ["film3", "film4", "polaroid1", "polaroid3", "verse4", "check2", "lace1"])
+    for (const c of FRAME_CARDS.map((card) => card.id))
       await expect(page.getByTestId(`frame-option-${c}`).locator("img")).toBeVisible();
     expect(await page.evaluate(onTheRings)).toEqual([]);
     if (SAVE)
@@ -236,6 +240,7 @@ for (const [width, height] of [
       ["film3", "2B-film3-options"],
       ["film4", "2C-film4-options"],
       ["check2", "2E-check2-options"],
+      ["film35", "2F-film35-options"],
     ] as const) {
       await page.getByTestId(`frame-option-${card}`).click();
       await page.getByTestId("confirm-pick").click();

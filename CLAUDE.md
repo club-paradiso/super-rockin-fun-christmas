@@ -50,8 +50,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
   slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
-  offers the seven cards of `config/frames/v2.ts` (Figma 898:1677); a card with options (colour,
-  logo) has an options screen; the guest then shoots six, reviews, chooses the photos. There is no
+  offers the eight cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
+  4컷, Figma 924:2026, added 2026-11-24); a card with options (colour, logo) has an options screen,
+  and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아); the guest then shoots six, reviews, chooses the photos. There is no
   "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). Every option
   combination is its own frame id. The earlier 20 frames (`FRAMES`) stay for the phone page (D93)
   and for photos already stored; the booth does not offer them.
@@ -59,8 +60,8 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
   빼기" has none, the guest's choice) in `tests/unit/frames-v2.test.ts`; mirror frame changes in
-  Figma (`design/README.md`). Photo tones (흑백/세피아, and 폴라로이드 3컷's
-  "플래시 느낌") are pixel arithmetic in `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has
+  Figma (`design/README.md`). Photo tones (흑백/세피아, 폴라로이드 3컷's
+  "플래시 느낌", 필름 35mm's "컬러") are pixel arithmetic in `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has
   none); their curves were measured from Figma exports, so change one only with a new measurement. The handwriting font is drawn
   per session (`config/hand-fonts.ts`), never the previous session's; the polaroid date stamp is the
   server's day (`lib/kiosk/clock.ts`), never the tablet clock.
@@ -190,6 +191,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   element from raw `vh`/`vw` or a fixed pixel height, never add a device-name or user-agent
   branch, never a second scroll area inside a screen. Compositions switch by shape (wide / tall /
   short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
+- **The progress dots count the steps this session really has** (a user decision, 2026-11-24):
+  six with the wall question, five when it is skipped (PAUSE SUBMISSIONS). Until the photos are
+  chosen that is the staff switch as the booth last heard it; from then on it is the fact
+  (`consentAsked` in `lib/kiosk/machine.ts`, read with `sessionAsksConsent`), so the dots never
+  change under a guest who is already past that step.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
 - **Studio props are optional pictures with a CSS stand-in** (D101): `config/studio.ts` lists
@@ -211,12 +217,14 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   upload answers carry it as `dayOrdinal`; anywhere it is missing the ticket says "오늘의 기록".
   The PNG ticket is drawn on the guest's phone (`lib/studio/ticket.ts`) and sent nowhere.
 - **Figma is the answer for the v2 frames and their four screens, and the match is measured**
-  (「Figma 일치」, 2026-11-23, `docs/FIGMA_PARITY.md`): `e2e/figma-parity.spec.ts` (12 outputs: share of
+  (「Figma 일치」, 2026-11-23, `docs/FIGMA_PARITY.md`): `e2e/figma-parity.spec.ts` (15 outputs: share of
   pixels with ΔE00 > 5 at most 1 %, photos within 1 px) and `e2e/figma-parity-screens.spec.ts`
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
+  to pass. One exception is written down: Figma's picker still has seven cards, so its second row
+  is left out of the pixel comparison until the Figma screen has the eighth (`ROW2` in the screens
+  spec). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.

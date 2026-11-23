@@ -47,6 +47,9 @@ const LIMIT = 0.01;
 /** Allowed photo offset in output pixels (spec: ±1 px of the frame = 2 output pixels at 2×). */
 const SHIFT_LIMIT = 1 * SCALE;
 
+/** The three tones of 필름 35mm show the same four example photos in Figma: one set of files. */
+const photoSet = (frameId: string) => (frameId.startsWith("film35-") ? "film35" : frameId);
+
 const ref = (name: string) =>
   REF_DIR && existsSync(join(REF_DIR, `${name}.png`))
     ? join(REF_DIR, `${name}.png`)
@@ -75,7 +78,7 @@ test.beforeAll(async () => {
 async function compose(page: Page, frameId: string, opts: { handFont: string; stamp: string }) {
   const frame = getFrame(frameId);
   const photos = await Promise.all(
-    frame.slots.map((_, i) => dataUrl(ref(`photo-${frameId}-${i + 1}`))),
+    frame.slots.map((_, i) => dataUrl(ref(`photo-${photoSet(frameId)}-${i + 1}`))),
   );
   const png = await page.evaluate(
     ([id, urls, o]) =>

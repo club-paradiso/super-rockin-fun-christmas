@@ -69,11 +69,13 @@ const ko = {
     verse4: "성경 구절 4컷",
     check2: "체크 2컷",
     lace1: "레이스 1컷",
+    film35: "35mm 필름 4컷",
   },
   hint: {
     film3: "✎ 색·로고 선택",
     film4: "✎ 크림·빨강 선택",
     check2: "✎ 빨강·파랑 선택",
+    film35: "✎ 컬러·흑백·세피아",
   },
   option: {
     titleColorLogo: "색과 로고를 골라주세요",
@@ -93,6 +95,7 @@ const ko = {
     cream: "크림",
     red: "빨강",
     blue: "파랑",
+    natural: "컬러",
   },
   camera: {
     startingTitle: "카메라를 켜고 있어요",
@@ -279,11 +282,13 @@ const en: KioskCopy = {
     verse4: "Bible verse · 4 shots",
     check2: "Plaid · 2 shots",
     lace1: "Lace · 1 shot",
+    film35: "35mm film · 4 shots",
   },
   hint: {
     film3: "✎ Color & logo",
     film4: "✎ Cream or red",
     check2: "✎ Red or blue",
+    film35: "✎ Color, B&W or sepia",
   },
   option: {
     titleColorLogo: "Choose color and logo",
@@ -303,6 +308,7 @@ const en: KioskCopy = {
     cream: "Cream",
     red: "Red",
     blue: "Blue",
+    natural: "Color",
   },
   camera: {
     startingTitle: "Turning on the camera",
@@ -483,11 +489,13 @@ const zh: KioskCopy = {
     verse4: "圣经经文 4格",
     check2: "格纹 2格",
     lace1: "蕾丝 1格",
+    film35: "35mm胶片 4格",
   },
   hint: {
     film3: "✎ 可选颜色·标志",
     film4: "✎ 可选米色·红色",
     check2: "✎ 可选红色·蓝色",
+    film35: "✎ 彩色·黑白·复古棕",
   },
   option: {
     titleColorLogo: "请选择颜色和标志",
@@ -507,6 +515,7 @@ const zh: KioskCopy = {
     cream: "米色",
     red: "红色",
     blue: "蓝色",
+    natural: "彩色",
   },
   camera: {
     startingTitle: "正在打开摄像头",

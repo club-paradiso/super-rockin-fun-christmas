@@ -41,7 +41,15 @@ const HEADER: Want[] = [
 ];
 const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 32 } };
 const CARD_X = { film3: 100, film4: 261, polaroid1: 422, polaroid3: 583 };
-const CARD_X2 = { verse4: 180.5, check2: 341.5, lace1: 502.5 };
+/**
+ * The second row. Figma's picker (898:1677) has seven cards, three centred in this row at
+ * x 180.5 / 341.5 / 502.5. The booth has an eighth since 2026-11-24 (필름 35mm, Figma 924:2026),
+ * so the row is full, on the first row's columns. Figma has no picker with eight cards yet: these
+ * positions follow from its grid, they are not read from a Figma frame, and the row is left out of
+ * the pixel comparison (ROW2). Put it back when the Figma screen is updated.
+ */
+const CARD_X2 = { verse4: 100, check2: 261, lace1: 422, film35: 583 };
+const ROW2: Rect = { x: 100, y: 539, w: 632, h: 357 };
 
 const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
   pick: {
@@ -71,18 +79,16 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       },
       {
         sel: '[data-testid="frame-option-check2"] .pick-card-name',
-        text: { cx: 416, cy: 851, size: 18 },
+        text: { cx: 335.5, cy: 851, size: 18 },
       },
       {
         sel: '[data-testid="frame-option-lace1"] .pick-card-name',
-        text: { cx: 577, cy: 871, size: 18 },
+        text: { cx: 496.5, cy: 871, size: 18 },
       },
     ],
-    // The card previews (example photos; the frame art itself is compared in figma-parity.spec).
-    masks: [
-      ...Object.values(CARD_X).map((x) => ({ x: x + 6, y: 178, w: 137, h: 303 })),
-      ...Object.values(CARD_X2).map((x) => ({ x: x + 6, y: 551, w: 137, h: 303 })),
-    ],
+    // The first row's previews (example photos; the frame art itself is compared in
+    // figma-parity.spec), and the whole second row (see ROW2).
+    masks: [...Object.values(CARD_X).map((x) => ({ x: x + 6, y: 178, w: 137, h: 303 })), ROW2],
   },
   film3: {
     wants: [

@@ -2,8 +2,8 @@
   "screen": "pick",
   "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.437,
-  "meanDeltaE": 0.303,
+  "overPct": 1.447,
+  "meanDeltaE": 0.273,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -164,6 +164,15 @@
     },
     {
       "sel": "[data-testid=\"frame-option-lace1\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film35\"]",
       "delta": [
         0.02,
         0,
