@@ -1609,11 +1609,7 @@ function Screen(p: ScreenProps) {
                       className="options-choice"
                       onClick={() => dispatch({ type: "SET_OPTION", key: option.key, value })}
                     >
-                      {on && (
-                        <span aria-hidden className="options-choice-mark">
-                          ✓{" "}
-                        </span>
-                      )}
+                      {on && <CheckMark />}
                       {t.value[value]}
                     </button>
                   );
@@ -2182,9 +2178,38 @@ function FrameCardButton({
         )}
       </span>
       <span className="pick-card-name">{t.name[card.id]}</span>
-      {hint && <span className="pick-card-hint">{hint}</span>}
+      {hint && (
+        <span className="pick-card-hint">
+          <PencilMark />
+          {hint}
+        </span>
+      )}
       <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
     </button>
+  );
+}
+
+/**
+ * The two small marks of the v2 screens, drawn instead of typed. "✓" and "✎" are not in the
+ * booth's font, so as text they came from whatever font each device had: a different shape and
+ * width on every machine (and the reason the Figma comparison differed between computers).
+ * Sizes and positions are Figma's (898:1938 "✓ 흑백", 898:1677 "✎ 색·로고 선택"); see .v2-mark.
+ */
+function CheckMark() {
+  return (
+    <svg className="v2-mark v2-mark-check" viewBox="0 0 17 19" aria-hidden focusable="false">
+      <path d="M1.5 10.8 5.7 16.4 14.9 1.6" />
+    </svg>
+  );
+}
+
+function PencilMark() {
+  return (
+    <svg className="v2-mark v2-mark-pencil" viewBox="0 0 13 10" aria-hidden focusable="false">
+      <g transform="rotate(34 6.5 5)">
+        <path d="M1.2 3.3h7.6l2.9 1.7-2.9 1.7H1.2a1 1 0 0 1-1-1V4.3a1 1 0 0 1 1-1ZM2.9 3.3v3.4M8.8 3.3v3.4" />
+      </g>
+    </svg>
   );
 }
 

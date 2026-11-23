@@ -73,7 +73,7 @@ test("English: the whole booth in English, the next guest back in Korean", async
   await page.getByRole("button", { name: /Take photos here/ }).click();
   await expect(page.getByText("Pick a frame")).toBeVisible();
   await expect(page.getByTestId("frame-option-film3")).toContainText("Film · 3 shots");
-  await expect(page.getByTestId("frame-option-film3")).toContainText("✎ Color & logo");
+  await expect(page.getByTestId("frame-option-film3")).toContainText("Color & logo");
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Choose color and logo")).toBeVisible();
   await expect(page.getByTestId("options-locked")).toHaveText(

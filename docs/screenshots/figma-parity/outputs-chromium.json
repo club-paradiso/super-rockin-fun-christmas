@@ -1,5 +1,245 @@
 [
   {
+    "frame": "film3-mono-logo",
+    "browser": "chromium",
+    "maskedOverPct": 0.609,
+    "fixedOverPct": 0.609,
+    "meanDeltaE": 0.415,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-mono-plain",
+    "browser": "chromium",
+    "maskedOverPct": 0,
+    "fixedOverPct": 0,
+    "meanDeltaE": 0.129,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-sepia-logo",
+    "browser": "chromium",
+    "maskedOverPct": 0.64,
+    "fixedOverPct": 0.64,
+    "meanDeltaE": 0.635,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-sepia-plain",
+    "browser": "chromium",
+    "maskedOverPct": 0.015,
+    "fixedOverPct": 0.015,
+    "meanDeltaE": 0.392,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film4-cream",
+    "browser": "chromium",
+    "maskedOverPct": 0.013,
+    "fixedOverPct": 0.422,
+    "meanDeltaE": 0.265,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film4-red",
+    "browser": "chromium",
+    "maskedOverPct": 0.012,
+    "fixedOverPct": 0.421,
+    "meanDeltaE": 0.201,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "polaroid1",
+    "browser": "chromium",
+    "maskedOverPct": 0.004,
+    "fixedOverPct": 0.583,
+    "meanDeltaE": 0.451,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "polaroid3",
+    "browser": "chromium",
+    "maskedOverPct": 0.338,
+    "fixedOverPct": 0.396,
+    "meanDeltaE": 0.593,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "verse4",
+    "browser": "chromium",
+    "maskedOverPct": 0.015,
+    "fixedOverPct": 0.015,
+    "meanDeltaE": 0.004,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "check2-red",
+    "browser": "chromium",
+    "maskedOverPct": 0.166,
+    "fixedOverPct": 0.166,
+    "meanDeltaE": 0.676,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "check2-blue",
+    "browser": "chromium",
+    "maskedOverPct": 0.021,
+    "fixedOverPct": 0.021,
+    "meanDeltaE": 0.551,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "lace1",
+    "browser": "chromium",
+    "maskedOverPct": 0.024,
+    "fixedOverPct": 0.024,
+    "meanDeltaE": 0.452,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
     "frame": "film35-natural",
     "browser": "chromium",
     "maskedOverPct": 0.018,
