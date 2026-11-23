@@ -112,8 +112,12 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
   FOLLOW THE LIGHTS scene: selectable, never the default. A theme may carry `variants`: the same
   picture cut for another screen shape (D91, the 2.4:1 board), derived with `recutTheme` from the
-  theme's own numbers; the wall picks the closest shape with `fitTheme` and never stretches. Every
-  variant passes the same theme tests.
+  theme's own numbers. Every variant passes the same theme tests.
+- **The wall fits any screen by itself** (D106): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
+  photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
+  Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
+  with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep
+  `tests/unit/wall-fit.test.ts` green. The wall re-plans on resize/fullscreen without a reload.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
   audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
   `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo
