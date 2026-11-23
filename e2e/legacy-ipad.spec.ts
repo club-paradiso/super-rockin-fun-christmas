@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", async ({ page }) => {
+test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 768, height: 1024 });
   const errors: string[] = [];
@@ -39,7 +39,8 @@ test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", asy
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
   expect(scripts).toContain("/kiosk-legacy-assets/entry.js");
   expect(scripts.some((path) => path.startsWith("/_next/"))).toBe(false);
-  await startSession(page, "clothesline");
+  // The sepia tone is pixel arithmetic (no ctx.filter on Safari 15), at the 1× budget.
+  await startSession(page, "film3", { color: "sepia" });
   const flash = page.getByTestId("flash-toggle");
   await flash.click();
   await expect(flash).toHaveAttribute("aria-pressed", "true");
@@ -73,14 +74,11 @@ test("iPadOS 15 profile: 6 shots + optional seventh + small composite + QR", asy
   expect(height).toBeLessThanOrEqual(1025);
 
   await expect(page.getByTestId("review-shot-5").locator("img")).toBeVisible();
-  await page.getByTestId("take-extra-shot").click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await expect(page.getByTestId("review-shot-6").locator("img")).toBeVisible();
+  // v2: six shots only, no extra.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
-  await expect(root).toHaveAttribute("data-test-flashes", "7");
   expect(
     await page
-      .getByTestId("review-shot-6")
+      .getByTestId("review-shot-5")
       .locator("img")
       .evaluate(async (img: HTMLImageElement) => {
         await img.decode();

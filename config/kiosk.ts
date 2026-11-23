@@ -15,7 +15,8 @@ export const KIOSK_CONFIG = {
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview
    * box uses the same ratio with object-fit: cover, so what the guest sees is what is saved.
-   * All frame slots must use this ratio (enforced by tests/unit/frames.test.ts).
+   * The earlier frames' slots all use this ratio (tests/unit/frames.test.ts); the v2 frames keep
+   * their Figma slot shapes and the photo is cover-cropped into them (tests/unit/frames-v2.test.ts).
    */
   captureAspect: 4 / 3,
   /** Long edge of each stored capture in pixels. */

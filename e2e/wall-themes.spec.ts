@@ -366,7 +366,7 @@ for (const theme of WALL_THEMES) {
   });
 }
 
-// D91 + D106: on a 2.4:1 board (성안교회 3096 × 1290) every theme covers the board: a theme with a
+// D91 + D110: on a 2.4:1 board (성안교회 3096 × 1290) every theme covers the board: a theme with a
 // board cut may use it, a 32:9 theme is cropped to its photos. Photos stay on screen either way.
 for (const id of ["peace-wall", "bethlehem", "sunset-window"] as const) {
   test(`board 3096x1290: ${id} covers the board, photos on screen`, async ({ browser }) => {
@@ -574,7 +574,7 @@ test("an empty public wall says so on a paper note, on any background", async ({
   });
   const note = page.getByTestId("wall-empty");
   await expect(note).toHaveText("사진을 찍고 미디어월에 함께해 주세요");
-  // On screen, whatever part of the picture the screen shows (D106).
+  // On screen, whatever part of the picture the screen shows (D110).
   const screen = (await page.getByTestId("wall").boundingBox())!;
   const box = (await note.boundingBox())!;
   expect(box.x).toBeGreaterThan(screen.x);

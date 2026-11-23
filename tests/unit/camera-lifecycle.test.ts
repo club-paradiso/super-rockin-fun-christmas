@@ -220,7 +220,7 @@ describe("camera recovery when the page is shown again", () => {
       "countdown",
       "capturing",
       "review",
-      "frame",
+      "options",
       "select",
       "consent",
       "delivery",

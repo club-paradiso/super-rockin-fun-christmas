@@ -8,6 +8,7 @@ import {
   startSession,
   storedPhotos,
   toConsent,
+  confirmFrame,
 } from "./helpers";
 
 /**
@@ -73,7 +74,7 @@ async function liveBooth(page: Page) {
   await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page);
   // The remote camera is ready only once the WebRTC link is up: the booth's own budget is a 10 s
   // connect plus retries (lib/camera/remote-camera.ts), more than the 5 s startSession allows a
   // local webcam. Wait for either outcome, then insist on the right one, so a booth that falls
@@ -94,10 +95,7 @@ async function liveBooth(page: Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("pair from /admin, preview, shoot six, take one extra, frame, consent, QR", async ({
-  browser,
-  page,
-}) => {
+test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ browser, page }) => {
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
@@ -137,14 +135,8 @@ test("pair from /admin, preview, shoot six, take one extra, frame, consent, QR",
   for (const [w, h] of sizes) expect(w / h).toBeCloseTo(4 / 3, 2);
   await expect(phone.getByTestId("shots")).toHaveText("촬영 6장");
 
-  // One extra photo goes through the phone without replacing any original frame.
-  await page.getByTestId("take-extra-shot").click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await expect(phone.getByTestId("shots")).toHaveText("촬영 7장");
-  await expect(page.getByTestId("review-shot-6")).toBeVisible();
+  // v2: no extra photo; straight on to the photo choice, consent, a real QR.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
-
-  // Existing flow after the shots: frame, photo choice, consent, a real QR.
   await toConsent(page);
   const url = await answerForQr(page, "yes");
   expect(url).toMatch(/\/p\//);

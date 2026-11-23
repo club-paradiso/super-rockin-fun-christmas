@@ -130,7 +130,7 @@ export function WallApp({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const [feed, setFeed] = useState<WallFeed | null>(null);
-  // Screen-adaptive fit (D106): the wall measures the screen it is on (or the LED's input size,
+  // Screen-adaptive fit (D110): the wall measures the screen it is on (or the LED's input size,
   // WALL_CANVAS / ?canvas=) and lib/wall/fit.ts picks the theme's cut (D91), the run of slots and
   // the scale that hang the photos as large as this screen allows, the picture covering the screen.
   const themeId = feed?.theme ?? initialTheme;

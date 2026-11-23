@@ -30,7 +30,7 @@ describe("frame definitions", () => {
     const words = frame.decorations.flatMap((d) => (d.type === "text" ? [d.text] : []));
     expect(words).toContain("Blessed are the peacemakers,");
     expect(words).toContain("for they will be called children of God.");
-    expect(words).toContain("MT 5:9");
+    expect(words).toContain("Matthew 5:9");
   });
 
   it("follows the 2×2 with the letter set, 1 to 6 photos (D82)", () => {

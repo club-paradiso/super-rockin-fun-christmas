@@ -100,12 +100,15 @@ export function ShutterButton({
   );
 }
 
-/** "3 / 6 ●●●○○○". Done steps are accent, the current one is the dark button colour. */
+/**
+ * "●○○○○○" (v2, Figma 898:1677: dots only, no "1 / 6"). Done steps are accent, the current one
+ * is the dark button colour. The count is kept for screen readers only.
+ */
 export function Stepper({ step, total }: { step: number; total: number }) {
   const t = useKioskCopy();
   return (
     <div className="booth-steps" aria-label={t.steps.of(step, total)}>
-      <span className="booth-steps-count" data-testid="step-progress">
+      <span className="booth-steps-count sr-only" data-testid="step-progress">
         {step} / {total}
       </span>
       {Array.from({ length: total }, (_, i) => (
@@ -135,11 +138,17 @@ export function BoothScreen({
   seal = false,
   header = true,
   onClick,
+  action,
 }: {
   children: React.ReactNode;
   testId: string;
   progress?: { step: number; total: number } | null;
   className?: string;
+  /**
+   * 「틀 선택 v2」 screens (Figma 898:1677 ff.): the screen's main button sits in the fixed bottom
+   * bar beside "처음으로", and the screen scales from the 768 × 1024 Figma frame.
+   */
+  action?: React.ReactNode;
   /** Press the wax seal on this sheet's corner (D79, D80: the attract screen and the QR only). */
   seal?: boolean;
   /** The attract and welcome screens have no header and no footer: the sheet is the screen. */
@@ -152,7 +161,7 @@ export function BoothScreen({
   return (
     <section
       data-testid={testId}
-      className={`booth-screen ${onClick ? "cursor-pointer" : ""}`}
+      className={`booth-screen ${action ? "booth-screen-v2" : ""} ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
       {showHeader && (
@@ -181,7 +190,7 @@ export function BoothScreen({
       >
         {children}
       </LetterSheet>
-      {header && <BoothFooter />}
+      {header && <BoothFooter action={action} />}
       {!header && (
         <div className="kiosk-fullscreen-corner">
           <KioskFullscreenControl lang={chrome?.lang ?? "ko"} />

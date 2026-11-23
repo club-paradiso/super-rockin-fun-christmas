@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { FRAMES } from "@/config/frames";
+import { ALL_FRAMES } from "@/config/frames";
 import { MODERATION_CONFIG } from "@/config/moderation";
 import { WALL_CONFIG } from "@/config/wall";
 import { getServerConfig, type AiProviderSettings } from "@/lib/server/env";
@@ -59,7 +59,7 @@ export function getAiReview(): AiReviewService {
     // Only a current frame has slot data to cut the shots out with. `getFrame` falls back to a
     // default frame, which would cut the wrong places: look the id up exactly.
     prepare: (data, mime, frameId) =>
-      prepareModerationShots(data, mime, FRAMES.find((f) => f.id === frameId) ?? null),
+      prepareModerationShots(data, mime, ALL_FRAMES.find((f) => f.id === frameId) ?? null),
     dailyLimit: ai?.dailyLimit ?? 0,
     timeoutMs: ai?.timeoutMs ?? 8000,
     timeZone: WALL_CONFIG.timeZone,

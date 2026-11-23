@@ -756,7 +756,7 @@ file sizes). The migration on a real Supabase project.
 ## D73 · The brand is STUDIO SHALOM; the flow, the rules and the wall scene do not change
 
 User decision (2026-11-11): the service is renamed from FOLLOW THE LIGHTS to **STUDIO SHALOM**
-(평화의 벽). The event is still "Christmas Village 2026". The theme verse reference is "MT 5:9";
+(평화의 벽). The event is still "Christmas Village 2026". The theme verse reference is "Matthew 5:9";
 the verse text is not decided, so it is written nowhere.
 
 What changed:
@@ -846,7 +846,7 @@ User decision (2026-11-11): replace what still spoke the star-night theme, wordi
 
 - Welcome title "별빛을 따라 오셨나요?" → "사진관에 오신 걸 환영해요" (the brand is an analogue photo
   studio; the line under it already says what the booth does).
-- Cream frame caption "별빛을 따라 오신 걸 환영해요" → "PEACEMAKERS · MT 5:9", the line the user
+- Cream frame caption "별빛을 따라 오신 걸 환영해요" → "PEACEMAKERS · Matthew 5:9", the line the user
   specified for the bottom of the STUDIO SHALOM frame. The verse text itself is still undecided
   and is written nowhere.
 - Frame picker labels drop "별빛": "포스트카드 · 2컷", "다섯 장 · 5컷". Frame ids are unchanged.
@@ -878,13 +878,13 @@ LIGHTS once did; and a STUDIO SHALOM 2×2 frame is added next to the existing fr
 - **2×2 frame** (`config/frames/shalom-grid.ts`, id `shalom-grid`): 600 × 750 (4:5, saved
   1200 × 1500), backdrop `#DDBDA1`, four 4:3 photos (252 × 189) on 6 px paper mats, the ink lockup
   (`public/frames/shalom-lockup.svg`, 104 tall) below the photos, then "Christmas Village 2026 ·
-  {date}" and "MT 5:9" in ink. It meets every frame rule; the size rule now reads "strips 600 ×
+  {date}" and "Matthew 5:9" in ink. It meets every frame rule; the size rule now reads "strips 600 ×
   1800, the 2×2 600 × 750". First in the picker; the preselected frame stays the navy strip
   (`DEFAULT_FRAME_ID`), so nothing else changes for a guest who does not pick it.
 - The Figma "10 네컷 프레임" (1200 × 1800, lockup at the top, near-square photos) was not copied:
   the photos must be 4:3 (preview = result) and the lockup must sit below the photos (never over a
   face). The 2×2 keeps the Figma idea (four photos in a grid, paper mats, backdrop colour, lockup,
-  MT 5:9) within those rules.
+  Matthew 5:9) within those rules.
 - **Wall.** A frame that is not a 1:3 strip hangs as a box at the phone card's width (340 px),
   centred on the same clip and never taller than a strip (`framedPhotoBox`, `lib/wall/layout.ts`),
   instead of shrinking inside the strip box. Strips are unchanged.
@@ -1023,14 +1023,14 @@ add trendy photo-booth templates that are not only four-cut: one, two, three and
   order: the 2×2 (D77) first, then the set by number of photos, then Template A–D. The preselected
   frame stays the navy strip.
 
-  | id                 | 이름       | 사진 | 크기 (저장은 2배) | 모양                                                   |
-  | ------------------ | ---------- | ---- | ----------------- | ------------------------------------------------------ |
-  | `shalom-single`    | 한 장      | 1    | 600 × 750         | 종이 위 사진 한 장, 아래 가는 선과 행사·날짜 한 줄     |
-  | `shalom-postcard`  | 엽서       | 2    | 900 × 600 (가로)  | 사진 두 장 나란히, 아래 POST CARD 글과 별 우표(MT 5:9) |
-  | `shalom-film`      | 필름       | 3    | 600 × 1500        | 짙은 갈색 필름, 양옆 구멍, 사진마다 01·02·03 번호      |
-  | `shalom-letter`    | 편지       | 4    | 600 × 1800        | 가는 테두리 편지지에 네 장, 로고 옆 밀랍 봉인          |
-  | `shalom-highlight` | 하이라이트 | 5    | 600 × 1050        | 큰 사진 한 장 + 작은 사진 넷, 종이 매트                |
-  | `shalom-stamps`    | 우표       | 6    | 600 × 960         | 톱니 우표 여섯 장(No.01–06), 2열 3줄                   |
+  | id                 | 이름       | 사진 | 크기 (저장은 2배) | 모양                                                        |
+  | ------------------ | ---------- | ---- | ----------------- | ----------------------------------------------------------- |
+  | `shalom-single`    | 한 장      | 1    | 600 × 750         | 종이 위 사진 한 장, 아래 가는 선과 행사·날짜 한 줄          |
+  | `shalom-postcard`  | 엽서       | 2    | 900 × 600 (가로)  | 사진 두 장 나란히, 아래 POST CARD 글과 별 우표(Matthew 5:9) |
+  | `shalom-film`      | 필름       | 3    | 600 × 1500        | 짙은 갈색 필름, 양옆 구멍, 사진마다 01·02·03 번호           |
+  | `shalom-letter`    | 편지       | 4    | 600 × 1800        | 가는 테두리 편지지에 네 장, 로고 옆 밀랍 봉인               |
+  | `shalom-highlight` | 하이라이트 | 5    | 600 × 1050        | 큰 사진 한 장 + 작은 사진 넷, 종이 매트                     |
+  | `shalom-stamps`    | 우표       | 6    | 600 × 960         | 톱니 우표 여섯 장(No.01–06), 2열 3줄                        |
 
 - **Rules kept.** Every slot is 4:3 (preview = result), square-cornered; the lockup is below the last
   photo, ≥ 38 % of the width and ≥ 80 px tall, centred; colours are only the five brand tokens
@@ -1063,11 +1063,11 @@ the real media wall screen.
 
 User request (2026-11-13): pretty landscape frames too ("가로 프레임도 이쁜것도").
 
-| id              | 이름        | 사진 | 크기 (저장은 2배) | 모양                                                                             |
-| --------------- | ----------- | ---- | ----------------- | -------------------------------------------------------------------------------- |
-| `shalom-ticket` | 티켓        | 3    | 960 × 470         | 둥근 종이 티켓, 사진 셋 한 줄, 양옆 홈과 점선 절취선, 아래 ADMIT ONE·날짜        |
-| `shalom-card`   | 카드        | 4    | 1000 × 720        | 펼친 크리스마스 카드: 가운데 2×2, 양옆 여백에 행사명·별·날짜·MT 5:9, 가는 테두리 |
-| `shalom-advent` | 대림절 달력 | 6    | 900 × 700         | 대림절 달력 문 여섯 개(DEC 01·06·12·18·24·25), 25일 문만 짙은 색                 |
+| id              | 이름        | 사진 | 크기 (저장은 2배) | 모양                                                                                  |
+| --------------- | ----------- | ---- | ----------------- | ------------------------------------------------------------------------------------- |
+| `shalom-ticket` | 티켓        | 3    | 960 × 470         | 둥근 종이 티켓, 사진 셋 한 줄, 양옆 홈과 점선 절취선, 아래 ADMIT ONE·날짜             |
+| `shalom-card`   | 카드        | 4    | 1000 × 720        | 펼친 크리스마스 카드: 가운데 2×2, 양옆 여백에 행사명·별·날짜·Matthew 5:9, 가는 테두리 |
+| `shalom-advent` | 대림절 달력 | 6    | 900 × 700         | 대림절 달력 문 여섯 개(DEC 01·06·12·18·24·25), 25일 문만 짙은 색                      |
 
 - Same rules as D82: 4:3 slots, the lockup below the last photo, centred, ≥ 38 % of the width (so a
   landscape frame needs a wide foot: 136–142 px tall at 1×), brand tokens only (the Christmas door
@@ -1708,7 +1708,7 @@ user's wording (D76). The phone page stays Korean only, as before.
 Not verified: saving with the `download` link on a real iPhone/Android (iOS shows a download
 sheet; long-press is the fallback), picking photos in several goes on iOS Safari.
 
-## D106 · The media wall fits any screen by itself: photos first, picture covers the rest (2026-11-23)
+## D110 · The media wall fits any screen by itself: photos first, picture covers the rest (2026-11-23)
 
 Context: the user asked that the wall, opened full screen ("전체보기"), fit whatever screen it is on.
 Until now the wall fitted the WHOLE picture into the screen (D65), so a screen of another shape got

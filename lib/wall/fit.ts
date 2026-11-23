@@ -2,7 +2,7 @@ import { PHONE_CARD, wallLayout, type Rect, type SceneLayout, type SlotPlace } f
 import { WALL_LIGHT, clipReach, type WallTheme, type WallThemeLook } from "./themes";
 
 /**
- * Screen-adaptive fit for the media wall (D106). The scene is still never stretched (D65), but
+ * Screen-adaptive fit for the media wall (D110). The scene is still never stretched (D65), but
  * instead of fitting the WHOLE picture into the screen (bands whenever the shapes differ), the wall
  * fits what matters, the hung photos and the wordmark, and lets the picture fill the rest of the
  * screen, cropping only scenery. Pure: the same screen always gets the same plan.

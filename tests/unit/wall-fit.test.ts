@@ -3,7 +3,7 @@ import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "@/config/wall-the
 import { WALL_FIT, planWallFit, slotEnvelope, themeCuts, wordmarkBox } from "@/lib/wall/fit";
 
 /**
- * D106: the wall fits the photos and the wordmark into the screen, never stretches, never zooms
+ * D110: the wall fits the photos and the wordmark into the screen, never stretches, never zooms
  * past covering the screen, and leaves a band only where the photos need more room than a cover
  * crop leaves. Checked for every theme on the screens a venue might plug in.
  */
@@ -24,7 +24,7 @@ const SCREENS = [
 
 const EPS = 0.5;
 
-describe("planWallFit (D106)", () => {
+describe("planWallFit (D110)", () => {
   for (const theme of WALL_THEMES) {
     for (const [width, height] of SCREENS) {
       it(`${theme.id} on ${width}x${height}: photos and wordmark on screen, never stretched`, () => {

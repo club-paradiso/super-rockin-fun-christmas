@@ -1,0 +1,317 @@
+[
+  {
+    "frame": "film3-mono-logo",
+    "browser": "webkit",
+    "maskedOverPct": 0.485,
+    "fixedOverPct": 0.485,
+    "meanDeltaE": 0.374,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-mono-plain",
+    "browser": "webkit",
+    "maskedOverPct": 0,
+    "fixedOverPct": 0,
+    "meanDeltaE": 0.129,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-sepia-logo",
+    "browser": "webkit",
+    "maskedOverPct": 0.512,
+    "fixedOverPct": 0.512,
+    "meanDeltaE": 0.606,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film3-sepia-plain",
+    "browser": "webkit",
+    "maskedOverPct": 0.015,
+    "fixedOverPct": 0.015,
+    "meanDeltaE": 0.392,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film4-cream",
+    "browser": "webkit",
+    "maskedOverPct": 0.029,
+    "fixedOverPct": 0.138,
+    "meanDeltaE": 0.032,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film4-red",
+    "browser": "webkit",
+    "maskedOverPct": 0.028,
+    "fixedOverPct": 0.149,
+    "meanDeltaE": 0.03,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "polaroid1",
+    "browser": "webkit",
+    "maskedOverPct": 0.012,
+    "fixedOverPct": 0.152,
+    "meanDeltaE": 0.084,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "polaroid3",
+    "browser": "webkit",
+    "maskedOverPct": 0.23,
+    "fixedOverPct": 0.256,
+    "meanDeltaE": 0.57,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "verse4",
+    "browser": "webkit",
+    "maskedOverPct": 0.028,
+    "fixedOverPct": 0.028,
+    "meanDeltaE": 0.006,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "check2-red",
+    "browser": "webkit",
+    "maskedOverPct": 0.166,
+    "fixedOverPct": 0.166,
+    "meanDeltaE": 0.671,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "check2-blue",
+    "browser": "webkit",
+    "maskedOverPct": 0.044,
+    "fixedOverPct": 0.044,
+    "meanDeltaE": 0.553,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "lace1",
+    "browser": "webkit",
+    "maskedOverPct": 0.038,
+    "fixedOverPct": 0.038,
+    "meanDeltaE": 0.453,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film35-natural",
+    "browser": "webkit",
+    "maskedOverPct": 0.044,
+    "fixedOverPct": 0.044,
+    "meanDeltaE": 0.281,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film35-mono",
+    "browser": "webkit",
+    "maskedOverPct": 0.042,
+    "fixedOverPct": 0.042,
+    "meanDeltaE": 0.088,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film35-sepia",
+    "browser": "webkit",
+    "maskedOverPct": 0.053,
+    "fixedOverPct": 0.053,
+    "meanDeltaE": 0.259,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  }
+]

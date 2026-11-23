@@ -31,7 +31,7 @@ export function WallScene({
   children: ReactNode;
   overlay?: ReactNode;
   /**
-   * Fade the picture's edges on these axes into the soft fill behind it (D106): only where the
+   * Fade the picture's edges on these axes into the soft fill behind it (D110): only where the
    * picture leaves a band, so the band reads as more of the same scene instead of an edge.
    */
   feather?: { x: boolean; y: boolean } | null;

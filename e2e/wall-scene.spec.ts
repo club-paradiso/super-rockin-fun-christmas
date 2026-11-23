@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome } from "./helpers";
+import { selectDefaultPhotos, openWelcome, confirmFrame } from "./helpers";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -19,7 +19,7 @@ import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
  * The Figma wall (D65: one 3840 × 1080 picture, five strips on the line) on the LED shapes we
  * might get. The real LED resolution is not known yet, so each candidate is opened with
  * ?canvas=WxH (as staff would at the LED): the scene must keep its shape (never stretched), cover
- * the screen wherever the plan says it can (D106), and hang the planned photos on screen.
+ * the screen wherever the plan says it can (D110), and hang the planned photos on screen.
  *
  * Photos: two real booth sessions (mock camera, strip and window frames) plus generated strips
  * uploaded through the kiosk API, all approved by staff. SCREENSHOTS=1 also saves full-size
@@ -30,7 +30,7 @@ test.describe.configure({ mode: "serial" });
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const PIN = "482913";
-// What lib/wall/fit.ts plans for each shape (D106): the cut (D91), the photos, whether bands remain.
+// What lib/wall/fit.ts plans for each shape (D110): the cut (D91), the photos, whether bands remain.
 const SHAPES = [
   { width: 1920, height: 1080 },
   { width: 3840, height: 1080 },
@@ -118,16 +118,14 @@ async function approve(request: APIRequestContext, sessionId: string) {
   approved++;
 }
 
-async function boothPhoto(frame: "navy-strip" | "wood-window") {
+async function boothPhoto(frame: "film4" | "polaroid3" | "check2" | "lace1") {
   await kiosk.goto("/kiosk?camera=mock");
   await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await kiosk.getByTestId(`frame-option-${frame}`).click();
-  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(kiosk, frame);
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
   await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
@@ -149,7 +147,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
   await enrollWithCode(kiosk, await createEnrollmentCode(staff, "장면 부스"));
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 
-  for (const frame of ["navy-strip", "wood-window"] as const)
+  for (const frame of ["film4", "lace1"] as const)
     await approve(staff.request, await boothPhoto(frame));
 
   for (let n = 0; n < 9; n++) {
@@ -237,7 +235,7 @@ for (const shape of SHAPES) {
   });
 }
 
-// D106: going fullscreen, leaving it, moving the window to another screen or rotating it all
+// D110: going fullscreen, leaving it, moving the window to another screen or rotating it all
 // change the window's size without a reload. The wall re-plans on the spot, photos stay on screen.
 test("the fit follows the window live: resize, fullscreen, rotate", async () => {
   test.setTimeout(120_000);
