@@ -1,0 +1,239 @@
+{
+  "screen": "pick",
+  "browser": "chromium",
+  "worstOffsetPx": 1,
+  "overPct": 1.459,
+  "meanDeltaE": 0.269,
+  "elements": [
+    {
+      "sel": "[data-testid=\"go-back\"]",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-wordmark",
+      "delta": [
+        0,
+        0.5
+      ],
+      "size": [
+        30,
+        30
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(2)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(3)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(4)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(5)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(6)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".booth-steps-dot:nth-of-type(7)",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"go-home\"]",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": ".pick-head .booth-title",
+      "delta": [
+        0,
+        -1
+      ],
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "sel": "[data-testid=\"confirm-pick\"]",
+      "delta": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film3\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film4\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-polaroid1\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-polaroid3\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-verse4\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-check2\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-lace1\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film35\"]",
+      "delta": [
+        0.02,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film3\"] .pick-card-name",
+      "delta": [
+        0.02,
+        -1
+      ],
+      "size": [
+        18,
+        18
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-film3\"] .pick-card-hint",
+      "delta": [
+        0.02,
+        0
+      ],
+      "size": [
+        14,
+        14
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-polaroid1\"] .pick-card-name",
+      "delta": [
+        0.01,
+        -1
+      ],
+      "size": [
+        18,
+        18
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-check2\"] .pick-card-name",
+      "delta": [
+        0.02,
+        -1
+      ],
+      "size": [
+        18,
+        18
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-lace1\"] .pick-card-name",
+      "delta": [
+        0.02,
+        -1
+      ],
+      "size": [
+        18,
+        18
+      ]
+    }
+  ]
+}

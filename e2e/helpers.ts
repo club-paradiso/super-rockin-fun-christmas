@@ -26,7 +26,6 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
   enrolledCookies = (await page.context().cookies()).filter((c) => c.name === "ftl_kiosk");
 }
 
-/** Attract → pick a frame (or keep the preselected one) → camera ready. */
 /**
  * The attract screen ("화면을 눌러 시작", D80) → the welcome choices. Also fine when the welcome
  * screen is already open (after "이전").
@@ -39,19 +38,38 @@ export async function openWelcome(page: Page) {
   await expect(welcome).toBeVisible();
 }
 
-export async function startSession(page: Page, frame?: string) {
+/** A card's options on the v2 options screen, e.g. `{ color: "sepia", logo: "logoOff" }`. */
+export type CardOptions = Partial<Record<"color" | "logo", string>>;
+
+/**
+ * 「틀 선택 v2」: on the picker choose a card (or keep 필름 3컷), press "다음" / "이 틀로 찍기",
+ * and on the options screen (cards with options) set them and press "이대로 찍기".
+ */
+export async function confirmFrame(page: Page, card?: string, options: CardOptions = {}) {
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  if (card) await page.getByTestId(`frame-option-${card}`).click();
+  await page.getByTestId("confirm-pick").click();
+  const options$ = page.getByTestId("screen-options");
+  const camera = page.getByTestId("screen-camera").or(page.getByTestId("screen-ready"));
+  await expect(options$.or(camera)).toBeVisible();
+  if (await options$.isVisible()) {
+    for (const [key, value] of Object.entries(options))
+      await page.getByTestId(`option-${key}-${value}`).click();
+    await page.getByTestId("confirm-options").click();
+  }
+}
+
+export async function startSession(page: Page, card?: string, options: CardOptions = {}) {
   await openWelcome(page);
   await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
-  if (frame) await page.getByTestId(`frame-option-${frame}`).click();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page, card, options);
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 }
 
-export async function shootSixWithMock(page: Page, frame?: string) {
+export async function shootSixWithMock(page: Page, card?: string, options: CardOptions = {}) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
-  await startSession(page, frame);
+  await startSession(page, card, options);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toHaveText("3");
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
@@ -60,10 +78,10 @@ export async function shootSixWithMock(page: Page, frame?: string) {
 /** Legacy test name alias; captures are now six. */
 export const shootFourWithMock = shootSixWithMock;
 
-/** Review → the frame screen again, now with the guest's photos. */
-export async function toFrame(page: Page) {
+/** Review → choosing the photos (v2: the frame was fixed before shooting). */
+export async function toSelect(page: Page) {
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-frame")).toBeVisible();
+  await expect(page.getByTestId("screen-select")).toBeVisible();
 }
 
 /** Pick the first N of six shots (N = the selected frame's number of slots). */
@@ -76,11 +94,9 @@ export async function selectDefaultPhotos(page: Page) {
   await page.getByTestId("confirm-selection").click();
 }
 
-/** Frame final → select photos → wall question. */
-export async function toConsent(page: Page, frame?: string) {
-  await toFrame(page);
-  if (frame) await page.getByTestId(`frame-option-${frame}`).click();
-  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+/** Review → select photos → wall question. */
+export async function toConsent(page: Page) {
+  await toSelect(page);
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
   await expect(page.getByTestId("final-image")).toBeVisible();

@@ -137,7 +137,7 @@ export const shalomSingle: FrameDefinition = {
       ...lockupBox(526, 120, 600),
       brand: { color: SHALOM.ink, on: SHALOM.paper },
     },
-    text("MT 5:9", 300, 700, 15, SHALOM.ink, { weight: 500, spacing: 4 }),
+    text("Matthew 5:9", 300, 700, 15, SHALOM.ink, { weight: 500, spacing: 4 }),
   ],
 };
 
@@ -171,7 +171,7 @@ export const shalomPostcard: FrameDefinition = {
     { type: "rect", ...stamp, color: SHALOM.backdrop },
     ...perforation(stamp, SHALOM.paper),
     { type: "image", src: STAR, x: stamp.x + 42.66, y: stamp.y + 30, width: 30.68, height: 48.7 },
-    text("MT 5:9", stamp.x + stamp.width / 2, stamp.y + 112, 15, SHALOM.ink, {
+    text("Matthew 5:9", stamp.x + stamp.width / 2, stamp.y + 112, 15, SHALOM.ink, {
       weight: 600,
       spacing: 2,
     }),
@@ -269,7 +269,7 @@ export const shalomLetter: FrameDefinition = {
       brand: { color: SHALOM.ink, on: SHALOM.paper },
     },
     text("Christmas Village 2026 · {date}", 300, 1730, 15, SHALOM.ink, { spacing: 1 }),
-    text("MT 5:9", 300, 1756, 13, SHALOM.ink, { weight: 600, spacing: 4 }),
+    text("Matthew 5:9", 300, 1756, 13, SHALOM.ink, { weight: 600, spacing: 4 }),
     // Decoration only: below every photo and clear of the lockup and the caption.
     { type: "image", src: SEAL, x: 462, y: 1618, width: 96, height: 96 },
   ],
@@ -403,7 +403,7 @@ export const shalomTicket: FrameDefinition = {
     text("Christmas Village 2026", 48, 384, 15, SHALOM.ink, { align: "left" }),
     text("No. {date}", 912, 340, 15, SHALOM.ink, { weight: 600, align: "right", spacing: 2 }),
     hairline(712, 356, 200, SHALOM.ink),
-    text("MT 5:9", 912, 384, 15, SHALOM.ink, { align: "right", spacing: 3 }),
+    text("Matthew 5:9", 912, 384, 15, SHALOM.ink, { align: "right", spacing: 3 }),
     {
       type: "image",
       src: INK_LOCKUP,
@@ -468,7 +468,7 @@ export const shalomCard: FrameDefinition = {
     { type: "image", src: STAR, x: rightCol - 11.34, y: 196, width: 22.68, height: 36 },
     text("{date}", rightCol, 284, 15, SHALOM.ink, { spacing: 1 }),
     hairline(rightCol - 24, 302, 48, SHALOM.accent),
-    text("MT 5:9", rightCol, 330, 15, SHALOM.ink, { weight: 600, spacing: 4 }),
+    text("Matthew 5:9", rightCol, 330, 15, SHALOM.ink, { weight: 600, spacing: 4 }),
     {
       type: "image",
       src: INK_LOCKUP,

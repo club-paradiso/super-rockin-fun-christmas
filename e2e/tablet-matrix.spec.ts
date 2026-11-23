@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { KIOSK_COPY } from "../lib/kiosk/copy";
-import { SHOOT_TIMEOUT, enrollKiosk } from "./helpers";
+import { SHOOT_TIMEOUT, enrollKiosk, confirmFrame } from "./helpers";
 
 /**
  * The booth on tablets, portrait and landscape (Chromium at tablet sizes; this is not iPad
@@ -128,7 +128,7 @@ function measureLayout(): LayoutReport {
     if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)
       out.cutLabels.push(name(el));
   }
-  for (const label of root.querySelectorAll<HTMLElement>(".pick-tile-label")) {
+  for (const label of root.querySelectorAll<HTMLElement>(".pick-tile-label, .pick-card-name")) {
     if (label.scrollWidth > label.clientWidth + 1)
       out.cutLabels.push(`tile "${label.textContent}"`);
   }
@@ -241,12 +241,30 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
     await page.getByTestId("go-back").click();
     await expect(page.getByTestId("screen-welcome")).toBeVisible();
     await page.getByTestId("start-camera").click();
-    await expect(page.getByTestId("frame-preview-image")).toBeVisible();
+    await expect(page.getByTestId("frame-option-film3").locator("img")).toBeVisible();
     await at("frame choice");
     // Every frame is on screen at once: none hidden in a scrolling list.
     for (const tile of await page.getByTestId("frame-options").getByRole("button").all())
       await expect(tile).toBeInViewport({ ratio: 1 });
-    await page.getByRole("button", { name: copy.frame.pickConfirm }).click();
+    // 필름 3컷 (options) → the options screen; each option row laid out soundly.
+    await page.getByRole("button", { name: copy.frame.next }).click();
+    await expect(page.getByTestId("screen-options")).toBeVisible();
+    await expect(page.getByTestId("frame-preview-image")).toBeVisible();
+    await at("options: film 3");
+    await page.getByTestId("option-color-sepia").click();
+    await page.getByTestId("option-logo-logoOff").click();
+    await expect(page.getByTestId("frame-preview")).toHaveAttribute(
+      "data-frame",
+      "film3-sepia-plain",
+    );
+    await at("options: film 3, sepia, no logo");
+    await page.getByTestId("go-back").click();
+    // 필름 4컷: the handwriting preview cycles while the screen is shown.
+    await page.getByTestId("frame-option-film4").click();
+    await page.getByRole("button", { name: copy.frame.next }).click();
+    await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-hand", "cycling");
+    await at("options: film 4");
+    await page.getByRole("button", { name: copy.option.shoot }).click();
   }
 
   await expect(page.getByTestId("screen-ready")).toBeVisible();
@@ -271,17 +289,6 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
   });
 
   await page.getByRole("button", { name: copy.review.confirm }).click();
-  await expect(page.getByTestId("screen-frame")).toBeVisible();
-  await expect(page.getByTestId("frame-preview-image")).toBeVisible();
-  await at("frame, with the photos");
-  // A landscape frame and a strip: the large preview shows each whole.
-  for (const frame of ["shalom-ticket", "shalom-grid"]) {
-    await page.getByTestId(`frame-option-${frame}`).click();
-    await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-frame", frame);
-    await at(`frame ${frame}`);
-  }
-
-  await page.getByRole("button", { name: copy.frame.againConfirm }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
   await at("photo selection");
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
@@ -369,7 +376,7 @@ test("camera refused: a screen with a way to try again and a way home, at tablet
     await page.goto("/kiosk");
     await page.getByTestId("attract-start").click();
     await page.getByTestId("start-camera").click();
-    await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+    await confirmFrame(page);
     await expect(page.getByTestId("screen-camera-error")).toBeVisible();
     await expectSoundLayout(page, `${viewport.width}×${viewport.height} camera error`);
     await expect(page.getByRole("button", { name: "다시 시도" })).toBeInViewport({ ratio: 1 });
@@ -383,7 +390,7 @@ test("turning the tablet: the preview stays 4:3 and on screen, both ways", async
   await page.goto("/kiosk?camera=mock");
   await page.getByTestId("attract-start").click();
   await page.getByTestId("start-camera").click();
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(page);
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   const box = page.getByTestId("camera-preview-box");
   const shape = async () => {
@@ -430,7 +437,9 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
   // A new screen starts at its top, whatever the last one was scrolled to.
   await page.getByTestId("start-camera").click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
-  await page.getByRole("button", { name: KIOSK_COPY.zh.frame.pickConfirm }).click();
+  // 폴라로이드 1컷 has no options: "이 틀로 찍기" goes straight to the camera.
+  await page.getByTestId("frame-option-polaroid1").click();
+  await page.getByRole("button", { name: KIOSK_COPY.zh.frame.shoot }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
     0,

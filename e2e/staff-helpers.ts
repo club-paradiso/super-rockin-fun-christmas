@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome } from "./helpers";
+import { confirmFrame, selectDefaultPhotos, openWelcome } from "./helpers";
 import { createClient } from "@supabase/supabase-js";
 import { expect, type Browser, type Page } from "@playwright/test";
 import { MAILPIT_URL } from "./env";
@@ -85,11 +85,10 @@ export async function kioskPhotoToQr(kiosk: Page, answer: "yes" | "no" = "no") {
   await kiosk.goto("/kiosk?camera=mock");
   await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(kiosk);
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
   await selectDefaultPhotos(kiosk);
   const consent = kiosk.getByTestId("screen-consent");
   const qr = kiosk.getByTestId("qr-code");

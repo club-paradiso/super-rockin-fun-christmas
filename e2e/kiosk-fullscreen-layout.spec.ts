@@ -45,12 +45,18 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   await openWelcome(page);
   await expect(page.getByTestId("screen-welcome").getByTestId("fullscreen-toggle")).toBeVisible();
   await page.getByTestId("start-camera").click();
+  // The v2 picker's bottom bar is Figma's: "처음으로" and the main button only.
   const picker = page.getByTestId("screen-pick");
-  await expect(picker.getByTestId("fullscreen-toggle")).toBeVisible();
   await expect(picker.getByTestId("go-home")).toBeVisible();
+  await expect(picker.getByTestId("fullscreen-toggle")).toHaveCount(0);
+  await picker.getByTestId("frame-option-lace1").click();
+  await picker.getByTestId("confirm-pick").click();
+  const ready = page.getByTestId("screen-ready");
+  await expect(ready.getByTestId("fullscreen-toggle")).toBeVisible();
+  await expect(ready.getByTestId("go-home")).toBeVisible();
   const controls = await Promise.all([
-    picker.getByTestId("fullscreen-toggle").boundingBox(),
-    picker.getByTestId("go-home").boundingBox(),
+    ready.getByTestId("fullscreen-toggle").boundingBox(),
+    ready.getByTestId("go-home").boundingBox(),
   ]);
   const [fs, home] = controls;
   expect(fs).not.toBeNull();

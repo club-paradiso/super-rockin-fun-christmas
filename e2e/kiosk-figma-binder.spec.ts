@@ -18,35 +18,53 @@ test("the Figma olive cover and edge-bound binder use different backgrounds", as
   await expect(welcome.locator(".journal-tab")).toBeHidden();
 });
 
-test("both 20-frame pickers are five columns at the Figma portrait size", async ({ page }) => {
-  await page.setViewportSize({ width: 820, height: 1180 });
+test("the v2 picker keeps Figma 898:1677's grid at 768 × 1024 (four cards to a row, eight cards)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByTestId("start-camera").click();
   const pick = page.getByTestId("screen-pick");
-  await expect(pick.locator('[data-testid^="frame-option-"]')).toHaveCount(20);
-  const grid = pick.locator(".pick-tiles");
-  const columns = await grid.evaluate(
-    (el) => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length,
+  const cards = pick.locator('[data-testid^="frame-option-"]');
+  await expect(cards).toHaveCount(8);
+  const boxes = await cards.evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.x), w: Math.round(r.width), y: Math.round(r.y) };
+    }),
   );
-  expect(columns).toBe(5);
-  const [screenBox, gridBox] = await Promise.all([pick.boundingBox(), grid.boundingBox()]);
-  expect(screenBox).not.toBeNull();
-  expect(gridBox).not.toBeNull();
-  expect(
-    Math.abs(gridBox!.x + gridBox!.width / 2 - (screenBox!.x + screenBox!.width / 2)),
-  ).toBeLessThan(8);
+  // Figma's columns: x 100 / 261 / 422 / 583, 149 wide. The Figma screen has seven cards (its
+  // second row is three, centred); with 필름 35mm the second row is full, on the same columns.
+  expect(boxes.map((b) => b.x)).toEqual(
+    [100, 261, 422, 583, 100, 261, 422, 583].map((x) => expect.closeTo(x, 0)),
+  );
+  for (const b of boxes) expect(b.w).toBeGreaterThanOrEqual(148);
+  expect(new Set(boxes.slice(0, 4).map((b) => b.y)).size).toBe(1);
+  expect(new Set(boxes.slice(4).map((b) => b.y)).size).toBe(1);
+  // The bottom bar: "처음으로" at the left, the main button to x 732, 24 above the bottom.
+  const [home, next] = await Promise.all([
+    page.getByTestId("go-home").boundingBox(),
+    page.getByTestId("confirm-pick").boundingBox(),
+  ]);
+  expect(Math.round(next!.x + next!.width)).toBeGreaterThanOrEqual(730);
+  expect(Math.round(next!.x + next!.width)).toBeLessThanOrEqual(734);
+  expect(Math.round(next!.y + next!.height)).toBeGreaterThanOrEqual(996);
+  expect(Math.round(next!.y + next!.height)).toBeLessThanOrEqual(1001);
+  expect(next!.height).toBeGreaterThanOrEqual(75);
+  expect(home!.x + home!.width).toBeLessThan(next!.x);
 });
 
-test("narrow phones retain at least four-column tappable frame choices", async ({ page }) => {
+test("narrow phones keep all eight cards tappable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByTestId("start-camera").click();
-  const grid = page.getByTestId("screen-pick").locator(".pick-tiles");
-  const columns = await grid.evaluate(
-    (el) => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length,
-  );
-  expect(columns).toBe(4);
-  await expect(page.getByTestId("frame-option-shalom-grid")).toBeVisible();
+  const cards = page.getByTestId("screen-pick").locator('[data-testid^="frame-option-"]');
+  await expect(cards).toHaveCount(8);
+  for (const card of await cards.all()) {
+    const box = (await card.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(48);
+    expect(box.height).toBeGreaterThanOrEqual(48);
+  }
 });

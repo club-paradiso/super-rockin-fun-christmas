@@ -21,7 +21,7 @@ describe("frame fonts", () => {
     expect(text("400 20px")).toContain("Matthew 5:9");
     expect(text("400 16px")).toContain("Blessed are the peacemakers,");
     expect(text("400 16px")).toContain("for they will be called children of God.");
-    expect(text("600 13px")).toContain("MT 5:9");
+    expect(text("600 13px")).toContain("Matthew 5:9");
     expect(text("500 15px")).toContain("Christmas Village 2026");
   });
 

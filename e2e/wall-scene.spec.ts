@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome } from "./helpers";
+import { selectDefaultPhotos, openWelcome, confirmFrame } from "./helpers";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -112,16 +112,14 @@ async function approve(request: APIRequestContext, sessionId: string) {
   approved++;
 }
 
-async function boothPhoto(frame: "navy-strip" | "wood-window") {
+async function boothPhoto(frame: "film4" | "polaroid3" | "check2" | "lace1") {
   await kiosk.goto("/kiosk?camera=mock");
   await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await kiosk.getByTestId(`frame-option-${frame}`).click();
-  await kiosk.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await confirmFrame(kiosk, frame);
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
-  await kiosk.getByRole("button", { name: "이 틀로 할게요" }).click();
   await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
@@ -143,7 +141,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
   await enrollWithCode(kiosk, await createEnrollmentCode(staff, "장면 부스"));
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 
-  for (const frame of ["navy-strip", "wood-window"] as const)
+  for (const frame of ["film4", "lace1"] as const)
     await approve(staff.request, await boothPhoto(frame));
 
   for (let n = 0; n < 9; n++) {

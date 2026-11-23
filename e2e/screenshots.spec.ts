@@ -1,8 +1,8 @@
 import { selectDefaultPhotos, openWelcome } from "./helpers";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { SHOOT_TIMEOUT, enrollKiosk, startSession } from "./helpers";
+import { SHOOT_TIMEOUT, enrollKiosk } from "./helpers";
 
 /**
  * Phase 4 real-resolution screenshots (SCREENSHOTS=1 only): every booth screen at 1280×800 and
@@ -20,14 +20,6 @@ const shot = (page: Page, name: string) =>
   page.screenshot({ path: `${DIR}/${name}.jpg`, type: "jpeg", quality: 82 });
 const hideMockBadge = (page: Page) =>
   page.addStyleTag({ content: '[data-testid="mock-badge"]{display:none!important}' });
-
-async function shootToReview(page: Page) {
-  await page.goto("/kiosk?camera=mock");
-  await hideMockBadge(page);
-  await startSession(page);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-}
 
 test.beforeAll(() => mkdir(DIR, { recursive: true }));
 
@@ -48,7 +40,11 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   await page.waitForTimeout(800); // frame thumbnails
   await shot(page, "booth-1280x800-02-pick");
-  await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+  await page.getByTestId("confirm-pick").click();
+  await expect(page.getByTestId("screen-options")).toBeVisible();
+  await page.waitForTimeout(800); // preview
+  await shot(page, "booth-1280x800-02b-options");
+  await page.getByTestId("confirm-options").click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   await page.waitForTimeout(800); // mock camera's first frames
   await shot(page, "booth-1280x800-03-ready");
@@ -58,10 +54,8 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await shot(page, "booth-1280x800-05-review");
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-frame")).toBeVisible();
-  await page.waitForTimeout(800); // frame thumbnails
-  await shot(page, "booth-1280x800-06-frame");
-  await page.getByRole("button", { name: "이 틀로 할게요" }).click();
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  await shot(page, "booth-1280x800-06-select");
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("final-image")).toBeVisible();
   await shot(page, "booth-1280x800-07-consent");
@@ -89,56 +83,14 @@ test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ p
   await shot(page, "booth-1920x1080-00-attract");
   await openWelcome(page);
   await shot(page, "booth-1920x1080-01-welcome");
-  await startSession(page);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-frame")).toBeVisible();
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await expect(page.getByTestId("screen-pick")).toBeVisible();
   await page.waitForTimeout(800);
-  await shot(page, "booth-1920x1080-02-frame");
+  await shot(page, "booth-1920x1080-02-pick");
 });
 
-for (const frame of [
-  "navy-strip",
-  "wood-window",
-  "clothesline",
-  "cream-strip",
-  "shalom-grid",
-  "shalom-single",
-  "shalom-postcard",
-  "shalom-film",
-  "shalom-letter",
-  "shalom-highlight",
-  "shalom-stamps",
-  "shalom-ticket",
-  "shalom-card",
-  "shalom-advent",
-  "gingham-plates",
-  "pixel-windows",
-  "vintage-christmas",
-  "peace-on-earth",
-  "analog-film",
-  "jeju-winter",
-]) {
-  test(`composite output: ${frame} at full size, as the guest receives it`, async ({ page }) => {
-    await enrollKiosk(page);
-    await shootToReview(page);
-    await page.getByRole("button", { name: "이대로 좋아요" }).click();
-    await page.getByTestId(`frame-option-${frame}`).click();
-    await page.getByRole("button", { name: "이 틀로 할게요" }).click();
-    await selectDefaultPhotos(page);
-    const img = page.getByTestId("final-image");
-    await expect(img).toBeVisible();
-    const b64 = await img.evaluate(async (el: HTMLImageElement) => {
-      const blob = await (await fetch(el.src)).blob();
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      let s = "";
-      for (const b of bytes) s += String.fromCharCode(b);
-      return btoa(s);
-    });
-    await writeFile(`${DIR}/frame-${frame}.jpg`, Buffer.from(b64, "base64"));
-  });
-}
+// The booth's own frames are the seven v2 cards: their full-size output is saved by
+// e2e/frames-v2.spec.ts into docs/screenshots/frames-v2/ (SCREENSHOTS=1).
 
 test("staff on a phone (390×844): PIN login, overview, moderation", async ({ browser }) => {
   const page = await (

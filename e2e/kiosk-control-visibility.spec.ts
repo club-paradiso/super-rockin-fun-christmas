@@ -45,8 +45,12 @@ for (const viewport of [
     await page.getByTestId("attract-start").click();
     await expectTouchable(page.getByTestId("start-camera"));
     await page.getByTestId("start-camera").click();
-    await expectTouchable(page.getByRole("button", { name: "이 틀로 찍기" }));
-    await page.getByRole("button", { name: "이 틀로 찍기" }).click();
+    await expectTouchable(page.getByTestId("confirm-pick"));
+    await page.getByTestId("confirm-pick").click();
+    await expectTouchable(page.getByTestId("option-color-sepia"));
+    await expectTouchable(page.getByTestId("option-logo-logoOff"));
+    await expectTouchable(page.getByTestId("confirm-options"));
+    await page.getByTestId("confirm-options").click();
 
     await expect(page.getByTestId("screen-ready")).toBeVisible();
     await expectTouchable(page.getByTestId("shoot-free"));
@@ -54,21 +58,12 @@ for (const viewport of [
     await expectTouchable(page.getByTestId("flash-toggle"));
     await page.getByTestId("shoot-free").click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await expectTouchable(page.getByTestId("take-extra-shot"));
-    await expectTouchable(page.getByRole("button", { name: "이대로 좋아요" }));
-
-    // The seventh photo must not push the entire action row behind the paper.
-    await page.getByTestId("take-extra-shot").click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expectTouchable(page.getByRole("button", { name: "이대로 좋아요" }));
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
-    await expectTouchable(page.getByRole("button", { name: "이 틀로 할게요" }));
-    await page.getByRole("button", { name: "이 틀로 할게요" }).click();
 
-    await expectTouchable(page.getByTestId("select-shot-6"));
-    await page.getByTestId("select-shot-6").click();
+    await expectTouchable(page.getByTestId("select-shot-5"));
+    await page.getByTestId("select-shot-5").click();
     await expectTouchable(page.getByTestId("confirm-selection"));
-    await expectTouchable(page.getByRole("button", { name: "프레임 바꾸기" }));
     // Scrolling inside the booth must never make the document itself overflow sideways.
     const xOverflow = await page.evaluate(() => {
       const d = document.documentElement;
@@ -85,7 +80,7 @@ test.describe("first touch on auto-opened review", () => {
   }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await shootSixWithMock(page);
-    await page.getByTestId("take-extra-shot").tap();
-    await expect(page.getByTestId("shot-label")).toHaveText("추가 사진 1컷");
+    await page.getByRole("button", { name: "이대로 좋아요" }).tap();
+    await expect(page.getByTestId("screen-select")).toBeVisible();
   });
 });

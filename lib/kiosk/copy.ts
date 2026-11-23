@@ -47,12 +47,55 @@ const ko = {
     of: (step: number, total: number) => `${total}단계 중 ${step}단계`,
   },
   frame: {
-    pickTitle: "마음에 드는 틀을 골라주세요",
-    againTitle: "사진을 넣어 봤어요",
-    againLead: "다른 틀이 더 잘 어울리면 바꿔도 돼요.",
+    pickTitle: "어떤 틀로 찍을까요?",
+    next: "다음",
+    shoot: "이 틀로 찍기",
     slots: (n: number) => `${n}컷 템플릿`,
-    pickConfirm: "이 틀로 찍기",
-    againConfirm: "이 틀로 할게요",
+  },
+  /**
+   * The phone page's frame step (app/m/[token], D103). These were the booth's words before
+   * 「틀 선택 v2」; the phone flow keeps them unchanged.
+   */
+  phoneFrame: {
+    pickTitle: "마음에 드는 틀을 골라주세요",
+    confirm: "이 틀로 할게요",
+    changeFrame: "프레임 바꾸기",
+  },
+  name: {
+    film3: "필름 3컷",
+    film4: "필름 4컷",
+    polaroid1: "폴라로이드 1컷",
+    polaroid3: "폴라로이드 3컷",
+    verse4: "성경 구절 4컷",
+    check2: "체크 2컷",
+    lace1: "레이스 1컷",
+    film35: "35mm 필름 4컷",
+  },
+  hint: {
+    film3: "색·로고 선택",
+    film4: "크림·빨강 선택",
+    check2: "빨강·파랑 선택",
+    film35: "컬러·흑백·세피아",
+  },
+  option: {
+    titleColorLogo: "색과 로고를 골라주세요",
+    titleColor: "색을 골라주세요",
+    locked: (frame: string) => `${frame} · 찍은 뒤에는 바꿀 수 없어요`,
+    shoot: "이대로 찍기",
+  },
+  label: {
+    color: "색",
+    logo: "로고",
+  },
+  value: {
+    mono: "흑백",
+    sepia: "세피아",
+    logoOn: "넣기",
+    logoOff: "빼기",
+    cream: "크림",
+    red: "빨강",
+    blue: "파랑",
+    natural: "컬러",
   },
   camera: {
     startingTitle: "카메라를 켜고 있어요",
@@ -80,7 +123,6 @@ const ko = {
   },
   shoot: {
     shot: (n: number) => `${n}번째 사진`,
-    extraShot: "추가 사진 1컷",
     flashOn: "화면 플래시 켜기",
     flashOff: "화면 플래시 끄기",
     lead: "카메라를 보고 웃어주세요.\n숫자가 0이 되면 찍혀요.",
@@ -93,8 +135,6 @@ const ko = {
   },
   review: {
     title: "잘 나왔나요?",
-    retake: "한 컷 더 찍기 (1회)",
-    extraDone: "추가 촬영 완료 · 총 7장",
     confirm: "이대로 좋아요",
   },
   select: {
@@ -103,7 +143,6 @@ const ko = {
       `선택한 순서대로 프레임에 들어가요. ${selected} / ${required}장 선택했어요.`,
     choose: (n: number) => `${n}번째 사진 선택`,
     unchoose: (n: number) => `${n}번째 사진 선택 해제`,
-    changeFrame: "프레임 바꾸기",
     confirm: "이 사진으로 완성하기",
   },
   consent: {
@@ -221,12 +260,55 @@ const en: KioskCopy = {
     of: (step, total) => `Step ${step} of ${total}`,
   },
   frame: {
-    pickTitle: "Choose a frame you like",
-    againTitle: "Here are your photos in each frame",
-    againLead: "If another frame suits you better, go ahead and switch.",
+    pickTitle: "Pick a frame",
+    next: "Next",
+    shoot: "Use this frame",
     slots: (n) => `${n}-photo frame`,
-    pickConfirm: "Use this frame",
-    againConfirm: "Go with this frame",
+  },
+  /**
+   * The phone page's frame step (app/m/[token], D103). These were the booth's words before
+   * 「틀 선택 v2」; the phone flow keeps them unchanged.
+   */
+  phoneFrame: {
+    pickTitle: "Choose a frame you like",
+    confirm: "Go with this frame",
+    changeFrame: "Change frame",
+  },
+  name: {
+    film3: "Film · 3 shots",
+    film4: "Film · 4 shots",
+    polaroid1: "Polaroid · 1 shot",
+    polaroid3: "Polaroid · 3 shots",
+    verse4: "Bible verse · 4 shots",
+    check2: "Plaid · 2 shots",
+    lace1: "Lace · 1 shot",
+    film35: "35mm film · 4 shots",
+  },
+  hint: {
+    film3: "Color & logo",
+    film4: "Cream or red",
+    check2: "Red or blue",
+    film35: "Color, B&W or sepia",
+  },
+  option: {
+    titleColorLogo: "Choose color and logo",
+    titleColor: "Choose a color",
+    locked: (frame) => `${frame} · Can't be changed after shooting`,
+    shoot: "Start shooting",
+  },
+  label: {
+    color: "Color",
+    logo: "Logo",
+  },
+  value: {
+    mono: "B&W",
+    sepia: "Sepia",
+    logoOn: "On",
+    logoOff: "Off",
+    cream: "Cream",
+    red: "Red",
+    blue: "Blue",
+    natural: "Color",
   },
   camera: {
     startingTitle: "Turning on the camera",
@@ -254,7 +336,6 @@ const en: KioskCopy = {
   },
   shoot: {
     shot: (n) => `Photo ${n}`,
-    extraShot: "One extra photo",
     flashOn: "Turn screen flash on",
     flashOff: "Turn screen flash off",
     lead: "Look at the camera and smile.\nThe photo is taken when the count reaches 0.",
@@ -267,8 +348,6 @@ const en: KioskCopy = {
   },
   review: {
     title: "How did they turn out?",
-    retake: "Take 1 extra photo (once)",
-    extraDone: "Extra photo taken · 7 in total",
     confirm: "Looks good",
   },
   select: {
@@ -277,7 +356,6 @@ const en: KioskCopy = {
       `They go into the frame in the order you pick them. ${selected} of ${required} picked.`,
     choose: (n) => `Pick photo ${n}`,
     unchoose: (n) => `Unpick photo ${n}`,
-    changeFrame: "Change frame",
     confirm: "Finish with these",
   },
   consent: {
@@ -389,12 +467,55 @@ const zh: KioskCopy = {
     of: (step, total) => `第 ${step} 步，共 ${total} 步`,
   },
   frame: {
-    pickTitle: "请选择你喜欢的相框",
-    againTitle: "已放入你的照片",
-    againLead: "如果其他相框更适合，也可以更换。",
+    pickTitle: "选择一个相框",
+    next: "下一步",
+    shoot: "用这个相框拍照",
     slots: (n) => `${n} 张相框`,
-    pickConfirm: "用这个相框拍照",
-    againConfirm: "就用这个相框",
+  },
+  /**
+   * The phone page's frame step (app/m/[token], D103). These were the booth's words before
+   * 「틀 선택 v2」; the phone flow keeps them unchanged.
+   */
+  phoneFrame: {
+    pickTitle: "请选择你喜欢的相框",
+    confirm: "就用这个相框",
+    changeFrame: "更换相框",
+  },
+  name: {
+    film3: "胶片 3格",
+    film4: "胶片 4格",
+    polaroid1: "拍立得 1格",
+    polaroid3: "拍立得 3格",
+    verse4: "圣经经文 4格",
+    check2: "格纹 2格",
+    lace1: "蕾丝 1格",
+    film35: "35mm胶片 4格",
+  },
+  hint: {
+    film3: "可选颜色·标志",
+    film4: "可选米色·红色",
+    check2: "可选红色·蓝色",
+    film35: "彩色·黑白·复古棕",
+  },
+  option: {
+    titleColorLogo: "请选择颜色和标志",
+    titleColor: "请选择颜色",
+    locked: (frame) => `${frame} · 拍摄后无法更改`,
+    shoot: "就这样拍",
+  },
+  label: {
+    color: "颜色",
+    logo: "标志",
+  },
+  value: {
+    mono: "黑白",
+    sepia: "复古棕",
+    logoOn: "显示",
+    logoOff: "不显示",
+    cream: "米色",
+    red: "红色",
+    blue: "蓝色",
+    natural: "彩色",
   },
   camera: {
     startingTitle: "正在打开摄像头",
@@ -422,7 +543,6 @@ const zh: KioskCopy = {
   },
   shoot: {
     shot: (n) => `第 ${n} 张照片`,
-    extraShot: "额外拍摄 1 张",
     flashOn: "开启屏幕补光",
     flashOff: "关闭屏幕补光",
     lead: "请看着镜头微笑。\n数字变成 0 就会拍下来。",
@@ -435,8 +555,6 @@ const zh: KioskCopy = {
   },
   review: {
     title: "拍得好看吗？",
-    retake: "再拍 1 张（仅限一次）",
-    extraDone: "补拍完成 · 共 7 张",
     confirm: "就这样吧",
   },
   select: {
@@ -444,7 +562,6 @@ const zh: KioskCopy = {
     lead: (selected, required) => `会按你选择的顺序放进相框。已选 ${selected} / ${required} 张。`,
     choose: (n) => `选择第 ${n} 张照片`,
     unchoose: (n) => `取消选择第 ${n} 张照片`,
-    changeFrame: "更换相框",
     confirm: "用这些照片完成",
   },
   consent: {

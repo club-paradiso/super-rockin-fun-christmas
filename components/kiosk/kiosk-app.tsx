@@ -1,5 +1,18 @@
 "use client";
 
+// The handwriting of the film 4컷 / polaroid 1컷 frames (config/hand-fonts.ts) and the polaroid
+// date stamp (VT323): bundled, so the booth draws them offline. Only the latin subset is used.
+import "@fontsource/caveat/latin-700.css";
+import "@fontsource/nothing-you-could-do/latin-400.css";
+import "@fontsource/reenie-beanie/latin-400.css";
+import "@fontsource/permanent-marker/latin-400.css";
+import "@fontsource/gloria-hallelujah/latin-400.css";
+import "@fontsource/square-peg/latin-400.css";
+import "@fontsource/rock-salt/latin-400.css";
+import "@fontsource/shadows-into-light/latin-400.css";
+import "@fontsource/covered-by-your-grace/latin-400.css";
+import "@fontsource/give-you-glory/latin-400.css";
+import "@fontsource/vt323/latin-400.css";
 import {
   Fragment,
   useCallback,
@@ -10,7 +23,16 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/config/frames";
+import { getFrame } from "@/config/frames";
+import {
+  FRAME_CARDS,
+  V2_FRAMES,
+  defaultOptions,
+  getCard,
+  usesHandwriting,
+  type FrameCard,
+  type FrameCardId,
+} from "@/config/frames/v2";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import { blobToArrayBuffer, canvasToBlob, createDomCanvas } from "@/lib/canvas";
 import {
@@ -23,9 +45,9 @@ import {
   type CapturedFrame,
 } from "@/lib/camera";
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
+import { formatStampLabel } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
-import { placeholderPhotos } from "@/lib/compositor/placeholders";
 import {
   canGoBack,
   capturedCount,
@@ -35,6 +57,7 @@ import {
   kioskReducer,
   needsCamera,
   progressStep,
+  sessionAsksConsent,
   type KioskAction,
   type KioskState,
 } from "@/lib/kiosk/machine";
@@ -72,16 +95,19 @@ import { UploadQueue, type UploadSuccess } from "@/lib/offline/upload-queue";
 import { makeQrSvg } from "@/lib/qr";
 import { HEARTBEAT_INTERVAL_MS } from "@/lib/ops/kiosks";
 import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
-import { STUDIO_ASSETS } from "@/config/studio";
 import { boothSound, type BoothSound } from "@/lib/kiosk/sound";
+import { measureSpaceEm, spaceCorrectionEm } from "@/lib/kiosk/space";
 import { cleanOrdinal } from "@/lib/studio/day";
-import {
-  TicketStampLine,
-  useAssetReady,
-  zigzagClip,
-  type TicketInfo,
-} from "@/components/studio/stamp-ticket";
+import { TicketStampLine, zigzagClip, type TicketInfo } from "@/components/studio/stamp-ticket";
 import { KioskChromeContext, KioskDialog, type KioskChrome } from "./chrome";
+import {
+  HAND_FONT_KEY,
+  loadSamplePhotos,
+  readStoredHandFont,
+  renderPreview,
+  useHandFontCycle,
+  useServerClock,
+} from "./frame-preview";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import {
   BoothScreen,
@@ -101,6 +127,9 @@ export interface Shot {
 interface FinalImage {
   frameId: string;
   selectionKey: string;
+  /** What was written on it: the session's handwriting font and the date stamp (checked in E2E). */
+  handFont: string | null;
+  stamp: string;
   blob: Blob;
   url: string;
   width: number;
@@ -149,6 +178,7 @@ export function KioskApp({
   initialAiReview = false,
   staffHelp = false,
   frontend = "modern",
+  serverNow,
 }: {
   cameraMode: CameraMode;
   frontend?: "modern" | "legacy";
@@ -160,14 +190,23 @@ export function KioskApp({
   initialAiReview?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
+  /** The server's clock at page load (lib/kiosk/bootstrap.ts): photos are dated by it. */
+  serverNow?: string;
 }) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
-      frameId: DEFAULT_FRAME_ID,
+      lastHandFont: readStoredHandFont(),
     }),
   );
+  // The previous session's handwriting font survives a reload, so the next one still differs.
+  useEffect(() => {
+    if (!state.handFont) return;
+    try {
+      localStorage.setItem(HAND_FONT_KEY, state.handFont);
+    } catch {}
+  }, [state.handFont]);
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
@@ -238,6 +277,28 @@ export function KioskApp({
     };
   }, [legacyIOS15]);
 
+  // The same font has a wider space in Chromium than in WebKit or Figma (lib/kiosk/space.ts):
+  // measure it once the fonts are in, and let the v2 screens correct by the difference.
+  useEffect(() => {
+    const root = scrollRef.current?.closest<HTMLElement>(".kiosk-root");
+    if (!root) return;
+    let live = true;
+    const apply = () => {
+      if (!live) return;
+      const family = getComputedStyle(root).fontFamily;
+      root.style.setProperty(
+        "--space-fix",
+        String(spaceCorrectionEm(measureSpaceEm(document, family))),
+      );
+    };
+    apply();
+    void document.fonts?.ready.then(apply);
+    return () => {
+      live = false;
+      root.style.removeProperty("--space-fix");
+    };
+  }, [state.lang]);
+
   const trackUrl = (url: string) => {
     urlsRef.current.add(url);
     return url;
@@ -297,7 +358,7 @@ export function KioskApp({
   }, [filming, stream]);
   // Shooting is over once the guest confirms the shots (no retake after that). Declared before
   // the camera-off effect so the file is closed while the stream is still live.
-  const shotsConfirmed = state.phase === "frame";
+  const shotsConfirmed = state.phase === "select";
   useEffect(() => {
     if (!shotsConfirmed || !recorderRef.current) return;
     const videos = videosRef.current;
@@ -366,9 +427,9 @@ export function KioskApp({
     };
   }, [state.phase, deviceId]);
 
-  // Camera off whenever it is not needed for shooting or a quick retake.
+  // Camera off whenever it is not needed for shooting (v2: no retake after the review).
   useEffect(() => {
-    if (!needsCamera(state.phase) && state.phase !== "review") cameraRef.current?.stop();
+    if (!needsCamera(state.phase)) cameraRef.current?.stop();
   }, [state.phase]);
 
   // Back from the background. A tablet browser stops or mutes the camera while the page is not in
@@ -498,51 +559,74 @@ export function KioskApp({
     [state.shots],
   );
 
-  // ── Brand font and frame artwork: loaded once, before any frame is drawn (canvas waits for
-  // neither). Both are bundled, so this is quick and works offline.
+  // ── Fonts and frame artwork: loaded once, before any frame is drawn (canvas waits for
+  // neither). Both are bundled, so this is quick and works offline. Only the booth's own frames
+  // (v2): the earlier ones are the phone page's. A 1× booth (iPad mini 4) loads the 1× art.
   const fontsRef = useRef<Promise<boolean> | null>(null);
   const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
   useEffect(() => {
-    fontsRef.current ??= loadFrameFonts(FRAMES);
-    assetsRef.current ??= loadFrameAssets(FRAMES).then((r) => r.assets);
+    fontsRef.current ??= loadFrameFonts(V2_FRAMES);
+    assetsRef.current ??= loadFrameAssets(V2_FRAMES, undefined, {
+      lowRes: renderBudget.outputScale <= 1,
+    }).then((r) => r.assets);
     void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
-  }, []);
+  }, [renderBudget.outputScale]);
 
-  // ── Frame picker thumbnails: sample photos before shooting, the guest's own after ──────────
-  const placeholders = useMemo(() => (assets ? placeholderPhotos() : null), [assets]);
-  const thumbSource =
-    state.phase === "pick" ? placeholders : state.phase === "frame" ? images : null;
-  const selectionKey = state.selectedShotIndices.join("-");
-  const thumbs = useMemo(() => {
+  // ── Previews: the Figma sample photos before shooting (the guest has none yet) ─────────────
+  const [samples, setSamples] = useState<ComposeImage[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadSamplePhotos().then((photos) => {
+      if (!cancelled) setSamples(photos);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const clock = useServerClock(serverNow);
+  const previewing = state.phase === "pick" || state.phase === "options";
+  const pickThumbs = useMemo(() => {
     const out: Record<string, string> = {};
-    if (!thumbSource || !assets) return out;
-    const context = { dateLabel: formatDateLabel(new Date()), assets };
-    for (const frame of FRAMES) {
-      let canvas: HTMLCanvasElement | undefined;
-      try {
-        canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
-          createCanvas: createDomCanvas,
-          context,
-          scale: renderBudget.thumbScale,
-        }) as HTMLCanvasElement;
-        out[frame.id] = canvas.toDataURL("image/jpeg", 0.85);
-      } catch {
-        // Older WebKit may refuse the canvas or data URL under memory pressure.
-      } finally {
-        if (canvas && legacyIOS15) canvas.width = canvas.height = 0;
-      }
+    if (!samples || !assets || !previewing) return out;
+    for (const card of FRAME_CARDS) {
+      const frame = card.frame(defaultOptions(card));
+      const url = renderPreview(frame, samples, assets, {
+        scale: renderBudget.thumbScale,
+        legacy: legacyIOS15,
+        now: clock.now(),
+      });
+      if (url) out[card.id] = url;
     }
     return out;
-  }, [thumbSource, assets, legacyIOS15, renderBudget.thumbScale]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
+  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale]);
+
+  // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
+  const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
+  const previewFont = useHandFontCycle(!!optionsFrame && usesHandwriting(optionsFrame));
+  const optionPreview = useMemo(() => {
+    if (!optionsFrame || !samples || !assets) return null;
+    return renderPreview(optionsFrame, samples, assets, {
+      scale: renderBudget.thumbScale * 1.4,
+      legacy: legacyIOS15,
+      handFont: previewFont,
+      now: clock.now(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
+  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale]);
 
   // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
+  const selectionKey = state.selectedShotIndices.join("-");
+  const handFont = state.handFont;
   useEffect(() => {
     if (!finalPhase || !images) return;
     if (finalImage?.frameId === state.frameId && finalImage.selectionKey === selectionKey) return;
     let cancelled = false;
     const frame = getFrame(state.frameId);
+    // The shooting day by the server's clock (never the tablet's own), Asia/Seoul.
+    const shotAt = clock.now();
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
     // A font or asset that failed to load must not block the guest: compose without it.
@@ -551,7 +635,12 @@ export function KioskApp({
         if (cancelled) return;
         const canvas = composeFrame(frame, chosen, {
           createCanvas: createDomCanvas,
-          context: { dateLabel: formatDateLabel(new Date()), assets: loaded ?? undefined },
+          context: {
+            dateLabel: formatDateLabel(shotAt),
+            stampLabel: formatStampLabel(shotAt),
+            handFont: handFont ?? undefined,
+            assets: loaded ?? undefined,
+          },
           scale: renderBudget.outputScale,
         }) as HTMLCanvasElement;
         try {
@@ -564,6 +653,8 @@ export function KioskApp({
           setFinalImage({
             frameId: frame.id,
             selectionKey,
+            handFont: usesHandwriting(frame) ? (handFont ?? null) : null,
+            stamp: formatStampLabel(shotAt),
             blob,
             url: trackUrl(URL.createObjectURL(blob)),
             width: canvas.width,
@@ -592,6 +683,8 @@ export function KioskApp({
     finalImage?.frameId,
     finalImage?.selectionKey,
     renderBudget.outputScale,
+    handFont,
+    clock,
   ]);
 
   // The print has come up (the wall question shows it): a soft chime. The QR ticket: a stamp.
@@ -1013,6 +1106,7 @@ export function KioskApp({
     let stopped = false;
     const beat = async () => {
       try {
+        const sentAt = Date.now();
         const res = await fetch("/api/kiosk/heartbeat", {
           method: "POST",
           credentials: "same-origin",
@@ -1024,7 +1118,9 @@ export function KioskApp({
             wallSubmissions?: "open" | "paused";
             wallPublic?: boolean;
             aiReview?: boolean;
+            serverNow?: string;
           };
+          if (typeof data.serverNow === "string") clock.update(data.serverNow, sentAt, Date.now());
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
           if (typeof data.aiReview === "boolean") setAiReview(data.aiReview);
@@ -1039,12 +1135,14 @@ export function KioskApp({
       stopped = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [clock]);
 
   return (
     <KioskChromeContext.Provider value={chrome}>
       <main
         className="kiosk-root kiosk-desk"
+        // This session's handwriting font once drawn (frames with handwriting; never personal).
+        data-hand-font={state.handFont ?? undefined}
         // iOS lets a page start sound only from a touch: the first one unlocks it (no sound here).
         onPointerDownCapture={() => sound?.unlock()}
         onKeyDownCapture={() => sound?.unlock()}
@@ -1091,7 +1189,8 @@ export function KioskApp({
             guestCameraChoice={!staffHelp}
             flashEnabled={flashEnabled}
             onToggleFlash={() => setFlashEnabled((enabled) => !enabled)}
-            thumbs={thumbs}
+            thumbs={pickThumbs}
+            optionPreview={optionPreview}
             finalImage={finalImage}
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
@@ -1211,7 +1310,10 @@ interface ScreenProps {
   guestCameraChoice: boolean;
   flashEnabled: boolean;
   onToggleFlash: () => void;
+  /** Picker previews by card id (sample photos). */
   thumbs: Record<string, string>;
+  /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
+  optionPreview: string | null;
   finalImage: FinalImage | null;
   qrSvg: string | null;
   onRetryDelivery: () => void;
@@ -1259,7 +1361,7 @@ function Screen(p: ScreenProps) {
   const { state, dispatch } = p;
   const total = state.shotCount;
   const aspect = KIOSK_CONFIG.captureAspect;
-  const progress = progressStep(state.phase, p.wallSubmissionsOpen);
+  const progress = progressStep(state.phase, sessionAsksConsent(state, p.wallSubmissionsOpen));
   const sessionCode = state.sessionId.slice(0, 8);
   const t = KIOSK_COPY[state.lang];
 
@@ -1403,92 +1505,117 @@ function Screen(p: ScreenProps) {
         <MobileScreen state={state} qrSvg={p.mobileQrSvg} onReset={p.onReset} dispatch={dispatch} />
       );
 
-    case "pick":
-    case "frame": {
-      // The chosen frame large, every frame as a small tile: all of them on screen at once,
-      // beside the preview on a wide screen and under it on a tall one.
-      const pick = state.phase === "pick";
-      const chosen = getFrame(state.frameId);
-      const chosenName = localizedLabel(chosen, state.lang);
-      const chosenIndex = FRAMES.findIndex((frame) => frame.id === chosen.id) + 1;
+    case "pick": {
+      // 「틀 선택 v2」 (Figma 898:1677): seven cards, four and three, the second row centred.
+      const card = getCard(state.cardId);
       return (
         <BoothScreen
-          testId={pick ? "screen-pick" : "screen-frame"}
+          testId="screen-pick"
           progress={progress}
-          className="pick"
+          className="pick-v2"
+          action={
+            <button
+              type="button"
+              className="booth-btn-primary"
+              data-testid="confirm-pick"
+              data-frame={state.frameId}
+              onClick={() => dispatch({ type: "CONFIRM_PICK", random: Math.random() })}
+            >
+              {card.options.length ? t.frame.next : t.frame.shoot}
+            </button>
+          }
         >
           <div className="pick-head">
-            <h1 className="booth-title">{pick ? t.frame.pickTitle : t.frame.againTitle}</h1>
-            {!pick && <p className="booth-lead">{t.frame.againLead}</p>}
+            <h1 className="booth-title">{t.frame.pickTitle}</h1>
+          </div>
+          <div className="pick-cards" data-testid="frame-options">
+            {FRAME_CARDS.map((c) => (
+              <FrameCardButton
+                key={c.id}
+                card={c}
+                selected={c.id === state.cardId}
+                thumb={p.thumbs[c.id]}
+                t={t}
+                onSelect={() => dispatch({ type: "SELECT_CARD", cardId: c.id })}
+              />
+            ))}
+          </div>
+        </BoothScreen>
+      );
+    }
+
+    case "options": {
+      // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷).
+      const card = getCard(state.cardId);
+      const title = card.options.length > 1 ? t.option.titleColorLogo : t.option.titleColor;
+      return (
+        <BoothScreen
+          testId="screen-options"
+          progress={progress}
+          className="options"
+          action={
+            <button
+              type="button"
+              className="booth-btn-primary"
+              data-testid="confirm-options"
+              data-frame={state.frameId}
+              onClick={() => dispatch({ type: "CONFIRM_OPTIONS", random: Math.random() })}
+            >
+              {t.option.shoot}
+            </button>
+          }
+        >
+          <div className="pick-head">
+            <h1 className="booth-title">{title}</h1>
+            <p className="options-locked" data-testid="options-locked">
+              {t.option.locked(t.name[card.id])}
+            </p>
           </div>
           <div
-            key={chosen.id}
-            className="pick-preview"
+            className="options-preview"
             data-testid="frame-preview"
-            data-frame={chosen.id}
+            data-frame={state.frameId}
+            data-hand={usesHandwriting(getFrame(state.frameId)) ? "cycling" : undefined}
           >
             <div className="frame-art">
-              {p.thumbs[chosen.id] ? (
+              {p.optionPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element -- generated data URL
-                <img src={p.thumbs[chosen.id]} alt="" data-testid="frame-preview-image" />
+                <img src={p.optionPreview} alt="" data-testid="frame-preview-image" />
               ) : (
                 <div className="frame-art-wait animate-pulse" />
               )}
             </div>
-            <p className="pick-preview-caption" aria-live="polite">
-              <span className="pick-preview-name">{chosenName}</span>
-              <span className="booth-caption">{t.frame.slots(chosen.slots.length)}</span>
-              <span className="pick-preview-index" data-testid="frame-index">
-                {chosenIndex} / {FRAMES.length}
-              </span>
-            </p>
           </div>
-          <DeskTray className="pick-tiles" testId="frame-options">
-            {FRAMES.map((frame) => {
-              const selected = frame.id === state.frameId;
-              return (
-                <button
-                  type="button"
-                  key={frame.id}
-                  data-testid={`frame-option-${frame.id}`}
-                  aria-pressed={selected}
-                  onClick={() => dispatch({ type: "SELECT_FRAME", frameId: frame.id })}
-                  className="pick-tile"
-                >
-                  <span className="pick-tile-tape" aria-hidden />
-                  {selected && (
-                    <span className="pick-tile-check" aria-hidden="true">
-                      ✓
-                    </span>
-                  )}
-                  <span className="frame-art">
-                    {p.thumbs[frame.id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- generated data URL
-                      <img src={p.thumbs[frame.id]} alt="" />
-                    ) : (
-                      <span className="frame-art-wait animate-pulse" />
-                    )}
-                  </span>
-                  <span className="pick-tile-label">{localizedLabel(frame, state.lang)}</span>
-                  <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
-                </button>
-              );
-            })}
-          </DeskTray>
-          <div className="pick-actions">
-            <button
-              type="button"
-              className="booth-btn-primary"
-              onClick={() =>
-                dispatch(
-                  pick
-                    ? { type: "CONFIRM_PICK" }
-                    : { type: "CONFIRM_FRAME", askConsent: p.wallSubmissionsOpen },
-                )
-              }
-            >
-              {pick ? t.frame.pickConfirm : t.frame.againConfirm}
-            </button>
+          <div className="options-rows">
+            {card.options.map((option) => (
+              <div
+                key={option.key}
+                className="options-row"
+                role="radiogroup"
+                aria-label={t.label[option.key]}
+              >
+                <span className="options-row-label" aria-hidden>
+                  {t.label[option.key]}
+                </span>
+                {option.values.map((value) => {
+                  const on = state.frameOptions[option.key] === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      data-testid={`option-${option.key}-${value}`}
+                      className="options-choice"
+                      onClick={() => dispatch({ type: "SET_OPTION", key: option.key, value })}
+                    >
+                      {on && <CheckMark />}
+                      {t.value[value]}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </BoothScreen>
       );
@@ -1562,7 +1689,7 @@ function Screen(p: ScreenProps) {
           </div>
           <div className="shoot-panel">
             <p className="booth-title" data-testid="shot-label">
-              {state.extraShotPending ? t.shoot.extraShot : t.shoot.shot(state.shotIndex + 1)}
+              {t.shoot.shot(state.shotIndex + 1)}
             </p>
             <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
             <p className="booth-lead">
@@ -1632,17 +1759,9 @@ function Screen(p: ScreenProps) {
         <BoothScreen testId="screen-review" progress={progress} className="review">
           <div className="review-head">
             <h1 className="booth-title">{t.review.title}</h1>
-            {state.shots.length > state.shotCount && (
-              <p className="booth-caption" data-testid="extra-shot-done">
-                {t.review.extraDone}
-              </p>
-            )}
           </div>
           <div className="fit-stage">
-            <div
-              className={`fit-grid review-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
-              data-testid="review-grid"
-            >
+            <div className="fit-grid review-grid" data-testid="review-grid">
               {state.shots.map((shot, i) => (
                 <div key={i} className="review-cell">
                   <div
@@ -1661,16 +1780,6 @@ function Screen(p: ScreenProps) {
             </div>
           </div>
           <div className="review-actions">
-            {state.shots.length === state.shotCount && (
-              <button
-                type="button"
-                data-testid="take-extra-shot"
-                className="booth-btn-secondary"
-                onClick={() => dispatch({ type: "TAKE_EXTRA_SHOT" })}
-              >
-                {t.review.retake}
-              </button>
-            )}
             <button
               type="button"
               className="booth-btn-primary"
@@ -1695,10 +1804,7 @@ function Screen(p: ScreenProps) {
             </p>
           </div>
           <div className="fit-stage">
-            <div
-              className={`fit-grid select-grid ${state.shots.length > state.shotCount ? "has-extra" : ""}`}
-              data-testid="select-grid"
-            >
+            <div className="fit-grid select-grid" data-testid="select-grid">
               {state.shots.map((shot, index) => {
                 const order = selected.indexOf(index);
                 return (
@@ -1726,13 +1832,6 @@ function Screen(p: ScreenProps) {
             </div>
           </div>
           <div className="select-actions">
-            <button
-              type="button"
-              className="booth-btn-secondary"
-              onClick={() => dispatch({ type: "BACK_TO_FRAME" })}
-            >
-              {t.select.changeFrame}
-            </button>
             <button
               type="button"
               data-testid="confirm-selection"
@@ -2045,6 +2144,75 @@ function MobileScreen({
   );
 }
 
+/** One card of the v2 picker: the frame with sample photos, its name, and its options hint. */
+function FrameCardButton({
+  card,
+  selected,
+  thumb,
+  t,
+  onSelect,
+}: {
+  card: FrameCard;
+  selected: boolean;
+  thumb: string | undefined;
+  t: KioskCopy;
+  onSelect: () => void;
+}) {
+  const hint = (t.hint as Partial<Record<FrameCardId, string>>)[card.id];
+  const frame = card.frame(defaultOptions(card));
+  return (
+    <button
+      type="button"
+      data-testid={`frame-option-${card.id}`}
+      data-frame={frame.id}
+      aria-pressed={selected}
+      onClick={onSelect}
+      className="pick-card"
+    >
+      <span className="pick-card-art frame-art">
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element -- generated data URL
+          <img src={thumb} alt="" />
+        ) : (
+          <span className="frame-art-wait animate-pulse" />
+        )}
+      </span>
+      <span className="pick-card-name">{t.name[card.id]}</span>
+      {hint && (
+        <span className="pick-card-hint">
+          <PencilMark />
+          {hint}
+        </span>
+      )}
+      <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
+    </button>
+  );
+}
+
+/**
+ * The two small marks of the v2 screens, drawn instead of typed. "✓" and "✎" are not in the
+ * booth's font, so as text they came from whatever font each device had: a different shape and
+ * width on every machine (and the reason the Figma comparison differed between computers).
+ * Sizes and positions are Figma's (898:1938 "✓ 흑백", 898:1677 "✎ 색·로고 선택"); see .v2-mark.
+ */
+function CheckMark() {
+  return (
+    <svg className="v2-mark v2-mark-check" viewBox="0 0 17 19" aria-hidden focusable="false">
+      <path d="M1.5 10.8 5.7 16.4 14.9 1.6" />
+    </svg>
+  );
+}
+
+function PencilMark() {
+  return (
+    <svg className="v2-mark v2-mark-pencil" viewBox="0 0 13 10" aria-hidden focusable="false">
+      <g transform="rotate(34 6.5 5)">
+        <path d="M1.2 3.3h7.6l2.9 1.7-2.9 1.7H1.2a1 1 0 0 1-1-1V4.3a1 1 0 0 1 1-1ZM2.9 3.3v3.4M8.8 3.3v3.4" />
+      </g>
+    </svg>
+  );
+}
+
 /** The finished frame, shown beside the wall question: whole, whatever its shape. */
 function FinalPreview({
   finalImage,
@@ -2067,6 +2235,8 @@ function FinalPreview({
           data-testid="final-image"
           data-width={finalImage.width}
           data-height={finalImage.height}
+          data-hand-font={finalImage.handFont ?? undefined}
+          data-stamp={finalImage.stamp}
         />
       ) : (
         <div className="frame-art-wait animate-pulse" aria-label={t.consent.making} />
@@ -2075,35 +2245,9 @@ function FinalPreview({
   );
 }
 
-/**
- * The wooden desk the frame samples lie on (public/studio/desk-bg.jpg; a dark wood token colour
- * without it). Only the picture changes with the asset: the tiles are the same.
- */
-function DeskTray({
-  className,
-  testId,
-  children,
-}: {
-  className: string;
-  testId: string;
-  children: React.ReactNode;
-}) {
-  const desk = useAssetReady(STUDIO_ASSETS.desk);
-  return (
-    <div
-      className={`${className} desk-tray`}
-      data-testid={testId}
-      data-art={desk ? "image" : "drawn"}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Six required shots, plus one pending or completed extra: never overwrite an original. */
+/** The six shots of a session (v2: no extra one). */
 function ShotStrip({ state, current }: { state: State; current: number }) {
-  const count =
-    state.shotCount + (state.extraShotPending || state.shots.length > state.shotCount ? 1 : 0);
+  const count = state.shotCount;
   return (
     <div
       className="shot-strip"

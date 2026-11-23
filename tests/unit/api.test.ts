@@ -339,11 +339,15 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
         body: JSON.stringify({ queueDepth: 4, camera: "error" }),
       }),
     );
-    expect(await beat.json()).toEqual({
+    const beatBody = (await beat.json()) as { serverNow: string };
+    expect(beatBody).toEqual({
       wallSubmissions: "open",
       wallPublic: false,
       aiReview: false,
+      // The booth dates photos by the server's clock, never the tablet's (v2 date stamp).
+      serverNow: expect.any(String),
     });
+    expect(Math.abs(Date.parse(beatBody.serverNow) - Date.now())).toBeLessThan(10_000);
     const kiosk = (await backend.kiosks.list()).find((k) => k.label === "로컬 키오스크")!;
     expect(kiosk).toMatchObject({ queueDepth: 4, cameraState: "error", enrolledVia: "code" });
 

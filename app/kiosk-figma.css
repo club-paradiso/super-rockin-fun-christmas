@@ -277,3 +277,348 @@
 .kiosk-root[data-legacy-ios15="true"] .booth-screen .journal-sheet {
   animation: none;
 }
+
+/* 「틀 선택 v2」 (2026-11-22) · Figma 898:1677 (틀 고르기), 898:1938 / 898:2006 / 898:2083 (옵션).
+   The two screens are drawn at 768 × 1024 (iPad mini, portrait) and scale with the booth:
+   --fx is one Figma pixel (the smaller of width/768 and height/1024), so every other shape keeps
+   the proportions. --ring-safe is the binder's ring column at its actual size: the background
+   photo is `cover` from 820 × 1180, where the rings end at 106.8 px (100 px at 768 × 1024). No
+   button or picture is placed inside it; the header and the bottom bar sit above and below the
+   rings, as in Figma. Touch targets never go under 48 px. */
+.kiosk-root .booth-screen {
+  /* One Figma pixel of the 768 × 1024 frames, as a length: every booth screen's header and
+     footer scale with it (「Figma 일치」, 2026-11-23). */
+  --fx: min(calc(var(--bw) * 100 / 768), calc(var(--bh) * 100 / 1024));
+}
+/* A 3:4 tablet (iPad mini, 768 × 1024): Figma lays the same 820 × 1180 binder picture at its own
+   size from the top left corner (898:1677), where the taller 820 × 1180 frame fits it exactly.
+   Only the picker and the options screen: the other screens have no Figma frame at this size, and
+   their text was placed around the rings where "cover" puts them. */
+@media (min-aspect-ratio: 73/100) and (max-aspect-ratio: 4/5) {
+  .kiosk-root .booth-screen.booth-screen-v2 {
+    background-size: calc(820 * var(--fx)) auto;
+    background-position: left top;
+  }
+}
+.kiosk-root .booth-screen.booth-screen-v2 {
+  --ring-safe: calc(106.8 * max(calc(var(--bw) * 100 / 820), calc(var(--bh) * 100 / 1180)));
+  /* Figma: the subtitle #7A450E, the card hint #6B3D0D (both between accent and ink). */
+  --v2-sub: #7a450e;
+  --v2-hint: #6b3d0d;
+  /* Figma frame: 30 from the sides and the top, 24 from the bottom. */
+  padding: max(calc(30 * var(--fx)), env(safe-area-inset-top))
+    max(calc(30 * var(--fx)), env(safe-area-inset-right))
+    max(calc(24 * var(--fx)), env(safe-area-inset-bottom))
+    max(calc(30 * var(--fx)), env(safe-area-inset-left));
+}
+.kiosk-root .booth-screen.booth-screen-v2 .booth-header {
+  margin-bottom: calc(5 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .letter-sheet.pick-v2,
+.kiosk-root .booth-screen-v2 .letter-sheet.options {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--fx));
+  /* Content x 100 → 732 of 768 (the header and the bar start at 30). */
+  padding: 0 calc(6 * var(--fx)) 0 max(0px, calc(var(--ring-safe) - 30 * var(--fx)));
+}
+.kiosk-root .booth-screen-v2 .pick-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(12 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-head .booth-title {
+  font-size: max(22px, calc(32 * var(--fx)));
+  line-height: calc(44 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-locked {
+  font-size: max(15px, calc(18 * var(--fx)));
+  line-height: calc(22 * var(--fx));
+  color: var(--v2-sub);
+  text-align: center;
+}
+
+/* The cards, four to a row (Figma: 149 × 357, 12 apart, rows 16 apart). Eight half-card tracks:
+   a card takes two, and a last row that is one card short starts half a card in, so it sits
+   centred under the gaps as in Figma's seven-card picker (898:1677). With eight cards (필름 35mm,
+   2026-11-24) both rows are full; a ninth card would need a third row and a new Figma screen. */
+.kiosk-root .booth-screen-v2 .pick-cards {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, calc(80.5 * var(--fx))) calc(68.5 * var(--fx));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  row-gap: calc(16 * var(--fx));
+  justify-content: center;
+}
+.kiosk-root .booth-screen-v2 .pick-card {
+  grid-column: span 2;
+  width: calc(149 * var(--fx));
+  min-width: 48px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6 * var(--fx));
+  /* Figma: 12 above, 6 beside, 11 below; the chosen card's 3 px stroke takes its room from the
+     padding beside and below, and pushes the content 3 px down, as in 898:2168. */
+  padding: calc(12 * var(--fx)) calc(6 * var(--fx)) calc(11 * var(--fx));
+  border: 0 solid var(--color-ink);
+  border-radius: calc(14 * var(--fx));
+  background: rgb(255 255 255 / 0.55);
+  color: var(--color-ink);
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* A last row that is short starts further in, so it stays centred: by half a card when one is
+   missing (seven cards, as in Figma), a whole card for two, a card and a half for three. Counted
+   from the cards themselves, so adding or removing one in config/frames/v2.ts needs no change
+   here. */
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(3) {
+  grid-column: 2 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(2) {
+  grid-column: 3 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(1) {
+  grid-column: 4 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
+  border-width: calc(3 * var(--fx));
+  padding: calc(12 * var(--fx)) calc(3 * var(--fx)) calc(5 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-card-name:nth-last-child(2) {
+  /* No hint under the name (the sr-only line is last): Figma leaves 14 below it. */
+  margin-bottom: calc(3 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-card:focus-visible {
+  outline: 3px solid var(--color-button);
+  outline-offset: 2px;
+}
+.kiosk-root .booth-screen-v2 .pick-card-art {
+  width: 100%;
+  filter: drop-shadow(1px 3px 3px rgb(0 0 0 / 0.18));
+}
+.kiosk-root .booth-screen-v2 .pick-card-name {
+  font-size: max(13px, calc(18 * var(--fx)));
+  font-weight: 700;
+  line-height: calc(22 * var(--fx));
+  word-break: keep-all;
+}
+.kiosk-root .booth-screen-v2 .pick-card-hint {
+  font-size: max(11px, calc(14 * var(--fx)));
+  line-height: calc(17 * var(--fx));
+  color: var(--v2-hint);
+  word-break: keep-all;
+}
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-name,
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-hint {
+  word-break: normal;
+}
+
+/* Options: the result above (changes at once), one row per option, two answers each. */
+.kiosk-root .booth-screen-v2 .options-preview {
+  flex: 1 1 0;
+  min-height: calc(160 * var(--fx));
+  display: flex;
+  /* The frame sits 6 inside the preview area, above and below (898:1948). */
+  padding-block: calc(6 * var(--fx));
+  margin-bottom: calc(2 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-preview .frame-art > img {
+  filter: drop-shadow(1px 5px 5px rgb(0 0 0 / 0.2));
+}
+.kiosk-root .booth-screen-v2 .options-rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(16 * var(--fx));
+  margin-bottom: calc(6 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-row {
+  display: grid;
+  /* The label, then one equal column per answer (two in the Figma screens, three for the 35mm
+     film's tone). */
+  grid-template-columns: calc(60 * var(--fx));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  column-gap: calc(12 * var(--fx));
+  align-items: center;
+}
+.kiosk-root .booth-screen-v2 .options-row-label {
+  font-size: max(15px, calc(20 * var(--fx)));
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.kiosk-root .booth-screen-v2 .options-choice {
+  min-height: max(48px, calc(60 * var(--fx)));
+  padding: 4px 12px;
+  /* Figma: the unchosen answer has a 2 px stroke of ink at 35 %. */
+  border: 2px solid rgb(43 26 16 / 0.35);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.7);
+  color: var(--color-ink);
+  font-size: max(17px, calc(22 * var(--fx)));
+  font-weight: 700;
+  line-height: 1.15;
+  word-break: keep-all;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.kiosk-root .booth-screen-v2 .options-choice[aria-checked="true"] {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #ffffff;
+}
+.kiosk-root .booth-screen-v2 .options-choice:focus-visible {
+  outline: 3px solid var(--color-button);
+  outline-offset: 2px;
+}
+
+/* The bottom bar: "처음으로" at the left, the main button to the right edge of the content
+   (Figma: 30 → 204 and 224 → 732, 76 tall, 24 above the bottom), 32 below the content. It stays
+   at the bottom of the booth's one scroll area if a screen ever runs long. */
+.kiosk-root .booth-screen-v2 .booth-footer.booth-footer-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: calc(20 * var(--fx));
+  margin-top: calc(28 * var(--fx));
+  padding-right: calc(6 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-chrome-btn {
+  flex: none;
+  width: calc(174 * var(--fx));
+  min-width: max-content;
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: max(56px, calc(76 * var(--fx)));
+  padding-block: 4px;
+  font-size: max(20px, calc(28 * var(--fx)));
+}
+
+/* 「Figma 일치」 (2026-11-23) · the shared header and footer at the Figma component sizes
+   (Kiosk/Header, Kiosk/Footer in 898:1677, read at 768 × 1024 and scaled by --fx):
+   "이전" and "처음으로" 75 tall, 26 px medium, 22 beside the label, 2 px ink stroke; the wordmark
+   30 px, 20 after "이전"; six 16 px dots, 14 apart. Never under the 52 px control height.
+   The header itself keeps its own minimum (--ctl-h): a screen without "이전" (review, wall
+   question, QR) has no Figma frame at this size, and a taller header there pushed the QR screen
+   into scrolling at 820 × 1060 (e2e/tablet-matrix.spec.ts). */
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen .booth-footer .booth-chrome-btn {
+  min-height: max(52px, calc(75 * var(--fx)));
+  padding: 0 max(14px, calc(22 * var(--fx) - 2px));
+  gap: max(5px, calc(8 * var(--fx)));
+  border: 2px solid var(--color-ink);
+  font-size: max(17px, calc(26 * var(--fx)));
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.kiosk-root .booth-screen .booth-header-left {
+  gap: max(10px, calc(20 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-wordmark {
+  font-size: max(18px, calc(30 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-steps {
+  gap: max(6px, calc(14 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-steps-dot {
+  width: max(8px, calc(16 * var(--fx)));
+  height: max(8px, calc(16 * var(--fx)));
+}
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn {
+  min-width: calc(109 * var(--fx));
+}
+/* Figma sets every label of these screens with no letter spacing, and its text sits one Figma
+   pixel higher in its line than a browser centres it (measured against the exports). */
+.kiosk-root .booth-screen .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen .booth-footer .booth-chrome-btn {
+  letter-spacing: 0;
+  padding-bottom: calc(2 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  letter-spacing: 0;
+  padding-bottom: calc(4 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-head .booth-title,
+.kiosk-root .booth-screen-v2 .options-locked,
+.kiosk-root .booth-screen-v2 .pick-card-name {
+  position: relative;
+  top: calc(-1 * var(--fx));
+  letter-spacing: 0;
+}
+/* The check and the pencil are drawn (components/kiosk/kiosk-app.tsx), at Figma's sizes: the
+   check 16.6 × 18.9 beside a 22 px label, 5.2 before it; the pencil 12.8 × 9.3 beside a 14 px
+   hint, 4.5 before it. Both sit a little under the label's middle, as the glyphs do in Figma. */
+.kiosk-root .booth-screen-v2 .v2-mark {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: miter;
+}
+.kiosk-root .booth-screen-v2 .v2-mark-check {
+  width: calc(16.6 * var(--fx));
+  height: calc(18.9 * var(--fx));
+  stroke-width: 2.6;
+  position: relative;
+  top: calc(1.3 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .v2-mark-pencil {
+  width: calc(12.8 * var(--fx));
+  height: calc(9.3 * var(--fx));
+  stroke-width: 1;
+  position: relative;
+  top: calc(1 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(5.2 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-card-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4.5 * var(--fx));
+}
+/* The bar's two buttons start on the same line (924); the main button is flat in Figma
+   (898:1677: a plain #412D1B pill, no bevel, no cast shadow). */
+.kiosk-root .booth-screen-v2 .booth-footer.booth-footer-bar {
+  align-items: flex-start;
+}
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary,
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary:active:not(:disabled) {
+  box-shadow: none;
+  background-image: none;
+  border: 0;
+}
+/* Figma centres "이전" (75) and the dots (16) on the wordmark's line, half a pixel above where a
+   75-tall row puts them (29.5 and 59 in 898:1677). Everything else stays on whole pixels, so
+   Chromium and WebKit round the same way. */
+.kiosk-root .booth-screen-v2 .booth-header .booth-chrome-btn,
+.kiosk-root .booth-screen-v2 .booth-header .booth-steps {
+  position: relative;
+  top: calc(-0.5 * var(--fx));
+}
+/* Figma's space in Noto Sans KR is 0.224 em. The same font file gives 0.28 em in Chromium and
+   0.227 em in WebKit, so the booth measures its own space (lib/kiosk/space.ts → --space-fix, in
+   em) and the difference is taken out here. It is set on each text itself, because an em here is
+   that text's own size and a button does not inherit word spacing. */
+.kiosk-root .booth-screen-v2 .pick-head .booth-title,
+.kiosk-root .booth-screen-v2 .options-locked,
+.kiosk-root .booth-screen-v2 .pick-card-name,
+.kiosk-root .booth-screen-v2 .pick-card-hint,
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
+  word-spacing: calc(var(--space-fix, 0) * 1em);
+}

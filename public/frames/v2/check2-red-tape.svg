@@ -1,0 +1,38 @@
+<svg width="600" height="1800" viewBox="0 0 600 1800" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g opacity="0.86" filter="url(#tape-shadow-1)">
+<g clip-path="url(#tape-clip-1)">
+<path d="M228.984 257.686L372.195 242.634L375.596 246.299L372.036 250.695L376.433 254.255L372.873 258.651L377.269 262.211L373.709 266.607L378.105 270.167L374.545 274.564L378.941 278.124L376.376 282.415L233.165 297.467L229.763 293.803L233.323 289.407L228.927 285.847L232.487 281.45L228.091 277.89L231.651 273.494L227.254 269.934L230.814 265.538L226.418 261.978L228.984 257.686Z" fill="#EFE7D6"/>
+</g>
+</g>
+<g opacity="0.86" filter="url(#tape-shadow-2)">
+<g clip-path="url(#tape-clip-2)">
+<path d="M226.989 824.261L370.441 836.812L373.081 841.058L368.747 844.694L372.383 849.028L368.05 852.664L371.686 856.997L367.353 860.633L370.989 864.967L366.655 868.603L370.292 872.936L366.954 876.66L223.502 864.109L220.862 859.863L225.196 856.227L221.56 851.893L225.893 848.257L222.257 843.924L226.59 840.288L222.954 835.954L227.288 832.318L223.651 827.985L226.989 824.261Z" fill="#EFE7D6"/>
+</g>
+</g>
+<defs>
+<filter id="tape-shadow-1" x="223" y="240.32" width="159.359" height="61.4609" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="1"/>
+<feGaussianBlur stdDeviation="1.5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.1 0 0 0 0 0.06 0 0 0 0 0.03 0 0 0 0.14 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+</filter>
+<filter id="tape-shadow-2" x="217.514" y="822" width="158.916" height="58.9219" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="1"/>
+<feGaussianBlur stdDeviation="1.5"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.1 0 0 0 0 0.06 0 0 0 0 0.03 0 0 0 0.14 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+</filter>
+<clipPath id="tape-clip-1">
+<rect width="150" height="40" fill="white" transform="translate(226 258) rotate(-6)"/>
+</clipPath>
+<clipPath id="tape-clip-2">
+<rect width="150" height="40" fill="white" transform="translate(224 824) rotate(5)"/>
+</clipPath>
+</defs>
+</svg>
