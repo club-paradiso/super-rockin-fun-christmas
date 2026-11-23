@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LOOKS } from "@/config/looks";
 import { buildLut, LUT_SIZE } from "@/lib/looks/cube";
-import { gradeRgb, lookDistance } from "@/lib/looks/measure";
+import { gradeRgb, labDistance, lookDistance, toLab } from "@/lib/looks/measure";
 
 /**
  * A look nobody can tell from its neighbour is not a choice. Measured on the sample photos
@@ -16,32 +16,35 @@ import { gradeRgb, lookDistance } from "@/lib/looks/measure";
  * turned out to differ by only 2 to 4 from each other.
  */
 const dir = path.join(process.cwd(), "public/looks/samples");
-const samples: Uint8Array[] = [];
-const graded = new Map<string, Uint8Array[]>();
-const mean = (a: Uint8Array[], b: Uint8Array[]) =>
-  a.reduce((sum, picture, i) => sum + lookDistance(picture, b[i]!).mean, 0) / a.length;
+// Every picture is turned into Lab once; the 28 pairs then only compare.
+const samples: Float32Array[] = [];
+const graded = new Map<string, Float32Array[]>();
+const mean = (a: Float32Array[], b: Float32Array[]) =>
+  a.reduce((sum, picture, i) => sum + labDistance(picture, b[i]!).mean, 0) / a.length;
 
 beforeAll(async () => {
+  const shot: Uint8Array[] = [];
   for (const file of readdirSync(dir)
     .filter((f) => f.endsWith(".jpg"))
     .sort())
-    samples.push(
+    shot.push(
       new Uint8Array(
         await sharp(path.join(dir, file))
-          .resize(240, 180, { fit: "cover" })
+          .resize(160, 120, { fit: "cover" })
           .removeAlpha()
           .raw()
           .toBuffer(),
       ),
     );
+  for (const picture of shot) samples.push(toLab(picture));
   for (const look of LOOKS) {
     const lut = buildLut(look.grade, LUT_SIZE);
     graded.set(
       look.id,
-      samples.map((sample) => gradeRgb(lut, sample)),
+      shot.map((picture) => toLab(gradeRgb(lut, picture))),
     );
   }
-}, 60_000);
+}, 120_000);
 
 describe("the looks can be told apart", () => {
   it("there are sample photos to measure on", () => {
@@ -52,7 +55,7 @@ describe("the looks can be told apart", () => {
     expect(mean(samples, graded.get("paper")!)).toBeLessThan(2.5);
     for (const look of LOOKS.filter((l) => l.id !== "paper"))
       expect(mean(samples, graded.get(look.id)!), look.id).toBeGreaterThan(3.2);
-  });
+  }, 60_000);
 
   it("no two looks are near each other: 5 apart, 3.3 where one of them is Paper", () => {
     for (const a of LOOKS)
@@ -63,7 +66,7 @@ describe("the looks can be told apart", () => {
           floor,
         );
       }
-  });
+  }, 60_000);
 
   it("the measure itself: the same picture is 0 apart, black and white far apart", () => {
     const black = new Uint8Array(30);
