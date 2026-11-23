@@ -2413,7 +2413,7 @@ main input:focus-visible,
   animation: wall-fade-in 1.2s ease-out both;
 }
 
-/* D104: STUDIO SHALOM memory journal.
+/* D110: STUDIO SHALOM memory journal.
    The Figma source uses a book cover, bound paper, numbered chapter tabs, and a QR bookmark.
    All decoration is inert. The still QR is never transformed independently of its ticket. */
 .journal-sheet {
@@ -2714,4 +2714,12 @@ main input:focus-visible,
   .journal-sheet .qr-more {
     padding-inline: clamp(18px, 3 * var(--bw), 28px);
   }
+}
+
+/* Media wall, D110: where the photos need more room than a cover crop leaves, the bands show the
+   same picture blurred and dimmed, under a feathered edge (components/wall/wall-scene.tsx), so a
+   screen of any shape reads as one scene. Static: composited once, nothing animates. */
+.wall-ambient {
+  filter: blur(48px) brightness(0.8) saturate(1.05);
+  transform: scale(1.12);
 }

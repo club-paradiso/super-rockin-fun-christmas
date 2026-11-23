@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import sharp from "sharp";
-import { DEFAULT_WALL_THEME, WALL_THEMES } from "../config/wall-themes";
+import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "../config/wall-themes";
+import { planWallFit } from "../lib/wall/fit";
 import { ENROLL_SECRET, PORT, USE_SUPABASE } from "./env";
 import { answerForQr, enrollKiosk, shootSixWithMock, toConsent } from "./helpers";
 
@@ -258,7 +259,12 @@ test("staff change the background in 설정; an open wall follows without a relo
   await form.getByTestId("wall-look-save").click();
   await expect(form.getByTestId("wall-look-message")).toContainText("저장했어요");
   await expect(scene).toHaveAttribute("data-theme", "bethlehem", { timeout: 15_000 });
-  await expect(scene).toHaveAttribute("data-slots", "4");
+  await expect(scene).toHaveAttribute(
+    "data-slots",
+    String(
+      planWallFit(getWallTheme("bethlehem"), { width: 1920, height: 540 })!.slotIndexes.length,
+    ),
+  );
   await expect(form.getByTestId("wall-look-active")).toHaveText(/베들레헴/);
 
   // Rotation: two ticked themes; the wall shows one of them, and saving needs at least two.
@@ -360,29 +366,25 @@ for (const theme of WALL_THEMES) {
   });
 }
 
-// D91: on a 2.4:1 board (성안교회 3096 × 1290) a 3:1 theme uses its board cut and fills the
-// screen; a 32:9 theme keeps its picture with bands. Photos stay inside the picture either way.
-for (const [id, cut] of [
-  ["peace-wall", true],
-  ["bethlehem", true],
-  ["sunset-window", false],
-] as const) {
-  test(`board 3096x1290: ${id} ${cut ? "fills the board" : "keeps its 32:9 picture with bands"}`, async ({
-    browser,
-  }) => {
+// D91 + D110: on a 2.4:1 board (성안교회 3096 × 1290) every theme covers the board: a theme with a
+// board cut may use it, a 32:9 theme is cropped to its photos. Photos stay on screen either way.
+for (const id of ["peace-wall", "bethlehem", "sunset-window"] as const) {
+  test(`board 3096x1290: ${id} covers the board, photos on screen`, async ({ browser }) => {
     test.setTimeout(120_000);
     await look(id);
-    const theme = WALL_THEMES.find((t) => t.id === id)!;
-    const shown = cut ? { ...theme, ...theme.variants![0]! } : theme;
     // Half size, same shape: the choice depends on the shape, not the pixel count.
-    const page = await cleanWall(browser, { width: 1548, height: 645 });
+    const size = { width: 1548, height: 645 };
+    const plan = planWallFit(getWallTheme(id), size)!;
+    const shown = plan.theme;
+    const page = await cleanWall(browser, size);
     const scene = page.getByTestId("wall-scene");
     await expect(scene).toHaveAttribute("data-theme", id, { timeout: 15_000 });
+    await expect(page.getByTestId("wall")).toHaveAttribute("data-fit", plan.key);
     await expect(scene).toHaveAttribute(
       "data-scene-size",
       `${shown.scene.width}x${shown.scene.height}`,
     );
-    await expect(scene).toHaveAttribute("data-slots", String(shown.scene.slots.length));
+    await expect(scene).toHaveAttribute("data-slots", String(plan.slotIndexes.length));
     const background = page.getByTestId("wall-background");
     expect(await background.getAttribute("src")).toBe(shown.background);
     await expect
@@ -390,24 +392,27 @@ for (const [id, cut] of [
       .toBe(shown.scene.width);
     const bg = (await background.boundingBox())!;
     expect(bg.width / bg.height).toBeCloseTo(shown.scene.width / shown.scene.height, 2);
-    expect(bg.width).toBeCloseTo(1548, 0);
-    // The board cut fills the height; the 32:9 picture leaves bands above and below.
-    if (cut) expect(bg.height).toBeCloseTo(645, 0);
-    else expect(bg.height).toBeLessThan(645 * 0.75);
+    expect(plan.coverage).toBeCloseTo(1, 6);
+    expect(bg.x).toBeLessThanOrEqual(1);
+    expect(bg.y).toBeLessThanOrEqual(1);
+    expect(bg.x + bg.width).toBeGreaterThanOrEqual(size.width - 1);
+    expect(bg.y + bg.height).toBeGreaterThanOrEqual(size.height - 1);
 
     const visible = page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]');
     await expect
       .poll(() => visible.count(), { timeout: 60_000 })
-      .toBeGreaterThanOrEqual(Math.min(shown.scene.slots.length, publicIds.length));
-    await page.waitForTimeout(2_600);
+      .toBeGreaterThanOrEqual(Math.min(plan.slotIndexes.length, publicIds.length));
+    await page.waitForTimeout(3_300);
     for (const el of await page.getByTestId("wall-photo-image").all()) {
       const b = (await el.boundingBox())!;
-      expect(b.x).toBeGreaterThanOrEqual(bg.x);
-      expect(b.x + b.width).toBeLessThanOrEqual(bg.x + bg.width);
-      expect(b.y + b.height).toBeLessThanOrEqual(bg.y + bg.height);
+      expect(b.x).toBeGreaterThanOrEqual(Math.max(bg.x, -1));
+      expect(b.x + b.width).toBeLessThanOrEqual(Math.min(bg.x + bg.width, size.width + 1));
+      expect(b.y + b.height).toBeLessThanOrEqual(Math.min(bg.y + bg.height, size.height + 1));
     }
     if (shown.wordmark) {
       const mark = (await page.getByTestId("wall-wordmark").boundingBox())!;
+      expect(mark.x).toBeGreaterThanOrEqual(-1);
+      expect(mark.x + mark.width).toBeLessThanOrEqual(size.width + 1);
       for (const el of await page.getByTestId("wall-photo").all()) {
         const b = (await el.boundingBox())!;
         const apart =
@@ -569,10 +574,13 @@ test("an empty public wall says so on a paper note, on any background", async ({
   });
   const note = page.getByTestId("wall-empty");
   await expect(note).toHaveText("사진을 찍고 미디어월에 함께해 주세요");
-  const scene = (await page.getByTestId("wall-scene").boundingBox())!;
+  // On screen, whatever part of the picture the screen shows (D110).
+  const screen = (await page.getByTestId("wall").boundingBox())!;
   const box = (await note.boundingBox())!;
-  expect(box.x).toBeGreaterThan(scene.x);
-  expect(box.x + box.width).toBeLessThan(scene.x + scene.width);
+  expect(box.x).toBeGreaterThan(screen.x);
+  expect(box.x + box.width).toBeLessThan(screen.x + screen.width);
+  expect(box.y).toBeGreaterThan(screen.y);
+  expect(box.y + box.height).toBeLessThan(screen.y + screen.height);
   await page.context().close();
 });
 
@@ -590,7 +598,10 @@ test("low-spec mode and reduced motion keep the theme and drop the swing", async
   await expect(scene).toHaveClass(/wall-lite/);
   await expect(scene).toHaveAttribute(
     "data-slots",
-    String(WALL_THEMES.find((t) => t.id === "snowy-chapel")!.liteSlots.length),
+    String(
+      planWallFit(getWallTheme("snowy-chapel"), { width: 1600, height: 450 }, { lite: true })!
+        .slotIndexes.length,
+    ),
   );
   await context.close();
 });

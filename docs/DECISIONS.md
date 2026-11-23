@@ -1707,3 +1707,40 @@ user's wording (D76). The phone page stays Korean only, as before.
 
 Not verified: saving with the `download` link on a real iPhone/Android (iOS shows a download
 sheet; long-press is the fallback), picking photos in several goes on iOS Safari.
+
+## D110 · The media wall fits any screen by itself: photos first, picture covers the rest (2026-11-23)
+
+Context: the user asked that the wall, opened full screen ("전체보기"), fit whatever screen it is on.
+Until now the wall fitted the WHOLE picture into the screen (D65), so a screen of another shape got
+bands (a 16:9 TV: half the height empty, photos at 50 %). D91 cut some themes again for a 2.4:1
+board, but only those, and only that shape.
+
+- **What must be seen is the photos and the wordmark, not the whole picture.** `lib/wall/fit.ts`
+  (`planWallFit`, pure) takes each slot's envelope (widest photo it may hold, clip, tilt, the 9°
+  settling swing, the shadow) and the wordmark, and fits that into the screen with a 3 % margin.
+  The picture is scaled the same (never stretched, D65), never past covering the screen (no
+  cropping scenery to enlarge photos, no blowing up pixels), and slid so it covers every edge it
+  can reach.
+- **Which cut and which photos:** every cut of the theme (D91) × every run of neighbouring slots
+  (at least two) is scored `photos^1.5 · scale² · coverage⁴ · shown^1.2` (coverage = share of the
+  screen the picture covers; shown = share of the picture on screen). So the LED's own 3840 × 1080
+  gets its whole picture and every slot, the board gets its board cut or a crop that covers it,
+  a 16:9 TV hangs four photos at ~78 % instead of five at 50 %, a portrait screen hangs two.
+  Ties go to more photos, then the theme's own picture, then the middle. Unit tested for every
+  theme on 12 screen shapes (`tests/unit/wall-fit.test.ts`).
+- **Bands only where the photos need them,** and then they are not black: the same picture,
+  blurred and dimmed (`.wall-ambient`), under a feathered edge of the real picture
+  (`featherMask`). Low-spec mode skips the blur (plain fallback colour).
+- **Live:** the wall measures itself (ResizeObserver, resize, fullscreenchange, visual viewport,
+  rotation) and re-plans without a reload. The plan on screen wins near-ties (× 1.08) so a resize
+  does not flip between plans; a new slot count restarts the rotation as before.
+- **전체보기 on the wall itself:** double-click or press F toggles browser fullscreen. Browsers allow
+  it only from a user gesture; the kiosk launchers already open the wall fullscreen.
+- The holding / closed / empty screens are laid out on the screen, not inside the scene, so a
+  cropped picture never cuts their text.
+
+Unchanged: `?canvas=WxH` / `WALL_CANVAS` still plan for the LED's input size and letterbox that
+box into the monitor (to preview the LED). Theme data, the feed, staff settings, rotation.
+
+Not verified: the real LED / board and a real TV; the blur's cost on the iMac's second display
+(the image is static, so it is composited once; low-spec mode skips it).

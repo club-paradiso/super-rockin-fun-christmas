@@ -10,7 +10,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { DEFAULT_WALL_THEME, getWallTheme } from "../config/wall-themes";
-import { fitTheme } from "../lib/wall/themes";
+import { planWallFit } from "../lib/wall/fit";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
 import { SHOOT_TIMEOUT } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
@@ -18,8 +18,8 @@ import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 /**
  * The Figma wall (D65: one 3840 × 1080 picture, five strips on the line) on the LED shapes we
  * might get. The real LED resolution is not known yet, so each candidate is opened with
- * ?canvas=WxH (as staff would at the LED): the scene must keep its shape, fit inside, and hang
- * five photos.
+ * ?canvas=WxH (as staff would at the LED): the scene must keep its shape (never stretched), cover
+ * the screen wherever the plan says it can (D110), and hang the planned photos on screen.
  *
  * Photos: two real booth sessions (mock camera, strip and window frames) plus generated strips
  * uploaded through the kiosk API, all approved by staff. SCREENSHOTS=1 also saves full-size
@@ -30,17 +30,23 @@ test.describe.configure({ mode: "serial" });
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const PIN = "482913";
-// The default theme cut for each shape (D91): 16:9 is closer to its 2.4:1 board picture (4 photos,
-// smaller bands) than to the 32:9 one (5 photos).
+// What lib/wall/fit.ts plans for each shape (D110): the cut (D91), the photos, whether bands remain.
 const SHAPES = [
   { width: 1920, height: 1080 },
   { width: 3840, height: 1080 },
   { width: 3840, height: 2160 },
   { width: 4000, height: 1000 },
   { width: 3096, height: 1290 },
+  { width: 1080, height: 1920 },
 ].map((s) => {
-  const { scene } = fitTheme(getWallTheme(DEFAULT_WALL_THEME), s.width / s.height);
-  return { ...s, slots: scene.slots.length, picture: scene.width / scene.height };
+  const plan = planWallFit(getWallTheme(DEFAULT_WALL_THEME), s)!;
+  const { scene } = plan.theme;
+  return {
+    ...s,
+    slots: plan.slotIndexes.length,
+    picture: scene.width / scene.height,
+    covered: plan.coverage > 0.999,
+  };
 });
 let staff: Page;
 let kiosk: Page;
@@ -181,17 +187,38 @@ for (const shape of SHAPES) {
     const scene = page.getByTestId("wall-scene");
     await expect(scene).toHaveAttribute("data-slots", String(shape.slots));
     await expect(page.getByTestId("wall-background")).toBeVisible();
-    // Fitted, never stretched: the picture keeps its shape and stays on screen.
+    // Never stretched: the picture keeps its shape. It covers the screen when the plan says so;
+    // otherwise it is centred and the band behind it shows the blurred picture.
     const box = (await page.getByTestId("wall-background").boundingBox())!;
     expect(box.width / box.height).toBeCloseTo(shape.picture, 2);
-    expect(box.width).toBeLessThanOrEqual(shape.width + 1);
-    expect(box.height).toBeLessThanOrEqual(shape.height + 1);
+    await expect(page.getByTestId("wall")).toHaveAttribute(
+      "data-fit",
+      planWallFit(getWallTheme(DEFAULT_WALL_THEME), shape)!.key,
+    );
+    if (shape.covered) {
+      expect(box.x).toBeLessThanOrEqual(1);
+      expect(box.y).toBeLessThanOrEqual(1);
+      expect(box.x + box.width).toBeGreaterThanOrEqual(shape.width - 1);
+      expect(box.y + box.height).toBeGreaterThanOrEqual(shape.height - 1);
+      await expect(page.getByTestId("wall-ambient")).toHaveCount(0);
+    } else {
+      await expect(page.getByTestId("wall-ambient")).toHaveCount(1);
+    }
     const expected = Math.min(shape.slots, approved);
     await expect
       .poll(() => page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]').count(), {
         timeout: 60_000,
       })
       .toBeGreaterThanOrEqual(expected);
+    // Every photo is on screen once it has settled.
+    await page.waitForTimeout(3_300);
+    for (const img of await page.getByTestId("wall-photo-image").all()) {
+      const b = (await img.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(-1);
+      expect(b.y).toBeGreaterThanOrEqual(-1);
+      expect(b.x + b.width).toBeLessThanOrEqual(shape.width + 1);
+      expect(b.y + b.height).toBeLessThanOrEqual(shape.height + 1);
+    }
     // The wall gets its own large copy, not the 640 px staff thumbnail.
     const first = page.getByTestId("wall-photo").first().getByTestId("wall-photo-image");
     const natural = await first.evaluate((img: HTMLImageElement) => img.naturalHeight);
@@ -208,12 +235,59 @@ for (const shape of SHAPES) {
   });
 }
 
-test("low-spec mode: four photos, fades only", async () => {
+// D110: going fullscreen, leaving it, moving the window to another screen or rotating it all
+// change the window's size without a reload. The wall re-plans on the spot, photos stay on screen.
+test("the fit follows the window live: resize, fullscreen, rotate", async () => {
+  test.setTimeout(120_000);
+  const page = await wallCtx.newPage();
+  const theme = getWallTheme(DEFAULT_WALL_THEME);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/wall");
+  await expect(page.getByTestId("wall-photo").first()).toBeVisible({ timeout: 30_000 });
+  const navigations: string[] = [];
+  page.on("framenavigated", (f) => {
+    if (f === page.mainFrame()) navigations.push(f.url());
+  });
+  for (const size of [
+    { width: 3840, height: 1080 },
+    { width: 1280, height: 720 },
+    { width: 1080, height: 1920 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect(page.getByTestId("wall")).toHaveAttribute(
+      "data-fit",
+      planWallFit(theme, size)!.key,
+    );
+    await page.waitForTimeout(3_400);
+    for (const img of await page.getByTestId("wall-photo-image").all()) {
+      const b = (await img.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(-1);
+      expect(b.x + b.width).toBeLessThanOrEqual(size.width + 1);
+      expect(b.y + b.height).toBeLessThanOrEqual(size.height + 1);
+    }
+    if (process.env.SCREENSHOTS === "1")
+      await page.screenshot({
+        path: `docs/screenshots/wall-fit-${size.width}x${size.height}.jpg`,
+        type: "jpeg",
+        quality: 80,
+      });
+  }
+  expect(navigations).toEqual([]);
+  await page.close();
+});
+
+test("low-spec mode: the low-spec slots only, fades only", async () => {
   const page = await wallCtx.newPage();
   await page.setViewportSize({ width: 1600, height: 400 });
   await page.goto("/wall?canvas=4000x1000&lite=1");
   const scene = page.getByTestId("wall-scene");
-  await expect(scene).toHaveAttribute("data-slots", "4");
+  const plan = planWallFit(
+    getWallTheme(DEFAULT_WALL_THEME),
+    { width: 4000, height: 1000 },
+    { lite: true },
+  )!;
+  await expect(scene).toHaveAttribute("data-slots", String(plan.slotIndexes.length));
   await expect(scene).toHaveClass(/wall-lite/);
   await page.close();
 });
