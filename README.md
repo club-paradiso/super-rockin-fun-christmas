@@ -132,6 +132,7 @@ page needs no camera and no HTTPS.
 # 1. edit the numbers in config/looks/index.ts
 npm run looks:build      # writes public/looks/*.cube
 npm run looks:preview    # contact sheets of every look on every sample → docs/screenshots/looks/
+npm run looks:measure    # is it still plain to see? each look against the original and the others
 UPDATE_LOOK_SNAPSHOTS=1 npx vitest run tests/unit/looks-reference.test.ts   # accept the new pictures
 npm test                 # the quality bars: skin hue, highlights, blacks, reds and greens
 ```
@@ -149,6 +150,7 @@ npm test                 # the quality bars: skin hue, highlights, blacks, reds 
 | `E2E_STORE=supabase …`  | Run the E2E suite against Supabase instead of local files (see DEPLOYMENT) |
 | `npm run looks:build`   | Write `public/looks/*.cube` from `config/looks` (`-- --check` only checks) |
 | `npm run looks:preview` | Draw every look on every sample into `docs/screenshots/looks/`             |
+| `npm run looks:measure` | How far each look is from the original and from the others (CIEDE2000)     |
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request, with no production secrets.
 

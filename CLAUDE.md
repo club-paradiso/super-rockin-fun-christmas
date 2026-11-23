@@ -61,7 +61,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   flag on by default without new Figma examples. When WebGL fails the photo keeps the frame's own
   `photoTone` and the reason goes to the console (`[looks]`): never silently, never a blocked guest.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
-  greens never more vivid, white short of clipping, black 2–12 levels). `/looks` is the comparison
+  greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
+  from the others (`tests/unit/looks-distinct.test.ts`: 5 ΔE00 apart on the samples; `npm run
+looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
   or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth

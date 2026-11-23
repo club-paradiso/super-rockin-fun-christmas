@@ -60,11 +60,17 @@ describe.each(colourLooks.map((look) => [look.id, look] as const))("%s", (_id, l
     }
   });
 
-  it("split toning is slight: a grey stays within 0.025 of neutral", () => {
+  it("a grey keeps close to neutral, and split toning is slight", () => {
+    // The whole look may be warm or cool (its white balance): up to 0.045 from neutral.
     for (let v = 0; v <= 255; v += 5) {
       const [, chroma] = lch(...grade(v / 255, v / 255, v / 255));
-      expect(chroma).toBeLessThan(0.025);
+      expect(chroma).toBeLessThan(0.045);
     }
+    // Split toning is the difference between the two ends, and that stays small.
+    const { shadowTint, highlightTint } = look.grade;
+    expect(Math.hypot(shadowTint.a - highlightTint.a, shadowTint.b - highlightTint.b)).toBeLessThan(
+      0.035,
+    );
   });
 });
 
