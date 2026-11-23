@@ -97,11 +97,14 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const guest = await phone(browser);
   await guest.goto(url);
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
-  // D103: the booth's order. First the frame, from every booth frame, the booth's default chosen.
+  // D103: the booth's order. First the frame: exactly the booth's eight cards (틀 선택 v2), the
+  // booth's default chosen. None of the frames the booth dropped on 2026-11-22.
   await expect(guest.getByTestId("mobile-step-frame")).toBeVisible();
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
-  expect(await frames.count()).toBeGreaterThanOrEqual(16);
-  // Every frame name whole on a phone, as on the booth (no "대림절 …").
+  await expect(frames).toHaveCount(8);
+  for (const old of ["navy-strip", "shalom-grid", "shalom-single", "shalom-letter"])
+    await expect(guest.locator(`[data-frame-id="${old}"]`)).toHaveCount(0);
+  // Every frame name whole on a phone, as on the booth (no "35mm 필름 …").
   const cut = await guest
     .getByTestId("mobile-frames")
     .locator("button > span")
@@ -109,15 +112,14 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
       spans.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent),
     );
   expect(cut).toEqual([]);
-  await expect(guest.locator('[data-frame-id="navy-strip"]')).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await guest.locator('[data-frame-id="shalom-single"]').click();
+  await expect(guest.locator('[data-frame-id="film3"]')).toHaveAttribute("aria-checked", "true");
+  await guest.locator('[data-frame-id="polaroid1"]').click();
   await expect(guest.getByTestId("mobile-frame-preview")).toHaveAttribute(
     "data-frame",
-    "shalom-single",
+    "polaroid1",
   );
+  // A card without options shows none.
+  await expect(guest.getByTestId("mobile-frame-options")).toHaveCount(0);
   await guest.getByTestId("mobile-frame-confirm").click();
   // Then exactly as many photos as the frame holds: one here, so it is chosen for the guest.
   await guest.getByTestId("mobile-file").setInputFiles(await photoFile(1600, 1200));
@@ -140,7 +142,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
 
   await expect(kiosk.getByTestId("mobile-received")).toBeVisible({ timeout: 15_000 });
   const row = (await db()).photos.find((p) => p.sessionId === sessionId)!;
-  expect(row).toMatchObject({ frameId: "phone-shalom-single", moderationStatus: "PENDING" });
+  expect(row).toMatchObject({ frameId: "phone-polaroid1", moderationStatus: "PENDING" });
 
   // The same QR again: the page knows the photo was sent and offers no second upload.
   await guest.reload();
@@ -151,7 +153,7 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const card = staff.locator(`[data-photo-id="${row.id}"]`);
   await expect(card).toHaveAttribute("data-source", "mobile");
   await expect(card.getByTestId("photo-source")).toHaveText("휴대폰 사진");
-  await expect(card).toContainText("휴대폰 사진 · 한 장");
+  await expect(card).toContainText("휴대폰 사진 · 폴라로이드 1컷");
   await card.getByTestId("action-approve").click();
   await expect(card).toHaveCount(0);
 
@@ -165,11 +167,11 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
     photos: { id: string; frameId: string }[];
   };
   expect(feed.photos).toContainEqual(
-    expect.objectContaining({ id: row.id, frameId: "phone-shalom-single" }),
+    expect.objectContaining({ id: row.id, frameId: "phone-polaroid1" }),
   );
   const hung = wall.locator(`[data-photo-id="${row.id}"]`);
   await expect(hung).toBeVisible({ timeout: 45_000 });
-  // Not the plain-photo card: it hangs like the booth's 한 장 frame.
+  // Not the plain-photo card: it hangs like the booth's 폴라로이드 1컷.
   await expect(hung).not.toHaveAttribute("data-kind", "phone");
 
   // Deleted on the hub: gone from the feed, and the QR cannot bring it back.
@@ -200,30 +202,37 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
 
   const guest = await phone(browser);
   await guest.goto(url);
-  // Every booth frame, in the booth's picker order, before any photo is picked.
+  // The booth's cards in the booth's order; a card's options as on the booth's options screen.
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
-  await expect(frames.first()).toHaveAttribute("data-frame-id", "shalom-grid");
-  await guest.locator('[data-frame-id="shalom-letter"]').click();
-  await expect(guest.locator('[data-frame-id="shalom-letter"]')).toHaveAttribute(
+  await expect(frames.first()).toHaveAttribute("data-frame-id", "film3");
+  await guest.locator('[data-frame-id="verse4"]').click();
+  await guest.locator('[data-frame-id="film3"]').click();
+  await expect(guest.getByTestId("mobile-option-color-mono")).toHaveAttribute(
     "aria-checked",
     "true",
   );
+  await guest.getByTestId("mobile-option-color-sepia").click();
+  await guest.getByTestId("mobile-option-logo-logoOff").click();
+  await expect(guest.getByTestId("mobile-frame-preview")).toHaveAttribute(
+    "data-frame",
+    "film3-sepia-plain",
+  );
   await guest.getByTestId("mobile-frame-confirm").click();
-  // Two photos first: the frame holds four, so the page asks for more.
+  // Two photos first: the frame holds three, so the page asks for more.
   const files = await Promise.all(
     [0, 1, 2, 3, 4].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 40 + i * 40)),
   );
   await guest.getByTestId("mobile-file").setInputFiles(files.slice(0, 2));
-  await expect(guest.getByTestId("mobile-need-more")).toContainText("2장");
+  await expect(guest.getByTestId("mobile-need-more")).toContainText("1장");
   await guest.getByTestId("mobile-choose").click({ trial: true });
   await guest.getByTestId("mobile-file").setInputFiles(files.slice(2));
-  // Five photos for four places: the guest taps them in the order they go in, as on the booth.
+  // Five photos for three places: the guest taps them in the order they go in, as on the booth.
   await expect(guest.getByTestId("mobile-select-confirm")).toBeDisabled();
-  for (const i of [4, 0, 2, 1]) await guest.getByTestId(`mobile-photo-${i}`).click();
+  for (const i of [4, 0, 2]) await guest.getByTestId(`mobile-photo-${i}`).click();
   await expect(guest.getByTestId("mobile-photo-4")).toHaveAttribute("data-order", "1");
   await expect(guest.getByTestId("mobile-photo-3")).toHaveAttribute("aria-pressed", "false");
   await guest.getByTestId("mobile-select-confirm").click();
-  // The preview is the picture that will be sent: the letter strip's 1:3 shape.
+  // The preview is the picture that will be sent: the film strip's 1:3 shape.
   await expect
     .poll(
       async () =>
@@ -240,7 +249,7 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
 
   await expect(kiosk.getByTestId("mobile-received")).toBeVisible({ timeout: 15_000 });
   const row = (await db()).photos.find((p) => p.sessionId === sessionId)!;
-  expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+  expect(row).toMatchObject({ frameId: "phone-film3-sepia-plain", moderationStatus: "PENDING" });
   const stored = (row as unknown as { objectPath: string }).objectPath;
   const meta = await sharp(await readFile(`.data-e2e/objects/${stored}`)).metadata();
   expect([meta.width, meta.height]).toEqual([1200, 3600]);
@@ -258,14 +267,14 @@ test("saying no on the phone: the guest saves the framed picture, nothing is sen
 
   const guest = await phone(browser);
   await guest.goto(url);
-  await guest.getByTestId("mobile-frame-confirm").click(); // the booth's default, four photos
+  await guest.getByTestId("mobile-frame-confirm").click(); // the booth's default, three photos
   await guest
     .getByTestId("mobile-file")
     .setInputFiles(
-      await Promise.all([0, 1, 2, 3].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 60 + i * 40))),
+      await Promise.all([0, 1, 2].map((i) => photoFile(1200, 900, `IMG_${i}.jpg`, 60 + i * 40))),
     );
-  // Exactly four for four places: chosen for the guest in the order picked.
-  await expect(guest.getByTestId("mobile-photo-3")).toHaveAttribute("data-order", "4");
+  // Exactly three for three places: chosen for the guest in the order picked.
+  await expect(guest.getByTestId("mobile-photo-2")).toHaveAttribute("data-order", "3");
   await guest.getByTestId("mobile-select-confirm").click();
   await expect(guest.getByTestId("mobile-preview")).toBeVisible({ timeout: 15_000 });
   await guest.getByTestId("mobile-no").click();
@@ -273,7 +282,7 @@ test("saying no on the phone: the guest saves the framed picture, nothing is sen
   const save = guest.getByTestId("mobile-save");
   const [download] = await Promise.all([guest.waitForEvent("download"), save.click()]);
   const saved = await sharp(await readFile((await download.path())!)).metadata();
-  // The navy strip at the booth's saved size.
+  // 필름 3컷 at the booth's saved size.
   expect([saved.width, saved.height]).toEqual([1200, 3600]);
   await guest.context().close();
 

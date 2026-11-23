@@ -35,6 +35,7 @@ export default async function MobileUploadPage({ params }: { params: Promise<{ t
       publicWall={publicWall}
       expiresAt={new Date(verified.claims.expiresAt * 1000).toISOString()}
       alreadySent={status === "received"}
+      serverNow={new Date().toISOString()}
     />
   );
 }

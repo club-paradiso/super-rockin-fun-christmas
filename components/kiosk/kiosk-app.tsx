@@ -561,7 +561,7 @@ export function KioskApp({
 
   // ── Fonts and frame artwork: loaded once, before any frame is drawn (canvas waits for
   // neither). Both are bundled, so this is quick and works offline. Only the booth's own frames
-  // (v2): the earlier ones are the phone page's. A 1× booth (iPad mini 4) loads the 1× art.
+  // (v2). A 1× booth (iPad mini 4) loads the 1× art.
   const fontsRef = useRef<Promise<boolean> | null>(null);
   const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
@@ -2131,14 +2131,15 @@ function MobileScreen({
             <Lines text={t.waiting} />
           </p>
         </div>
-        <div className="qr-more">
-          <p className="booth-caption">{t.note}</p>
-          {m.status === "ready" && m.via === "lan" && (
+        {/* Figma M1 has nothing under the card; the Wi-Fi line is only for a hub without a
+            cloud, where the phone cannot open the page any other way. */}
+        {m.status === "ready" && m.via === "lan" && (
+          <div className="qr-more">
             <p className="booth-caption text-ink" data-testid="mobile-lan-note">
               {t.lan}
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </BoothScreen>
   );

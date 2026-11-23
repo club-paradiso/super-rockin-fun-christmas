@@ -1,10 +1,15 @@
-import { FRAMES, getFrame } from "@/config/frames";
+import { ALL_FRAMES, getFrame } from "@/config/frames";
+import { V2_FRAMES } from "@/config/frames/v2";
 import type { FrameDefinition } from "@/lib/compositor/types";
 
 /**
  * "내 사진으로 참여하기" (D66, D93): a guest scans a QR on the booth, picks one to six photos on
  * their own phone, puts them in one of the booth's frames and sends that one picture to the
  * media-wall review queue. Change limits here, not inside routes or components.
+ *
+ * The phone offers exactly the booth's frames: the eight cards of 「틀 선택 v2」 with their options
+ * (`MOBILE_FRAMES` = V2_FRAMES). The frames the booth dropped on 2026-11-22 are never offered again;
+ * a photo already stored in one keeps its id and still hangs in it (`mobileBoothFrame`).
  */
 export const MOBILE_UPLOAD_CONFIG = {
   /**
@@ -67,24 +72,33 @@ export function mobileFrameId(boothFrameId: string): string {
   return `${PREFIX}${boothFrameId}`;
 }
 
+/** The frames a guest can put photos in on the phone: the booth's own (v2), nothing else. */
+export const MOBILE_FRAMES: readonly FrameDefinition[] = V2_FRAMES;
+
 /**
  * The booth frame a phone photo was composed in, or null for a plain phone photo (no frame) and
- * for anything that is not a phone photo. Only current booth frames count.
+ * for anything that is not a phone photo. Every known frame counts, so a photo stored before
+ * 「틀 선택 v2」 in one of the dropped frames still hangs in it.
  */
 export function mobileBoothFrame(frameId: string): FrameDefinition | null {
   if (!frameId.startsWith(PREFIX) || frameId === MOBILE_FRAME_ID) return null;
   const id = frameId.slice(PREFIX.length);
-  return FRAMES.find((f) => f.id === id) ?? null;
+  return ALL_FRAMES.find((f) => f.id === id) ?? null;
 }
 
-/** A frame id a phone photo may be stored with: the plain one or `phone-<current booth frame>`. */
+/** The frame a new phone upload may use (`x-frame-id`): only one the phone page offers. */
+export function mobileOfferedFrame(boothFrameId: string): FrameDefinition | null {
+  return MOBILE_FRAMES.find((f) => f.id === boothFrameId) ?? null;
+}
+
+/** A frame id a phone photo may be stored with: the plain one or `phone-<known booth frame>`. */
 export function isMobileFrameId(frameId: string): boolean {
   return frameId === MOBILE_FRAME_ID || mobileBoothFrame(frameId) !== null;
 }
 
-/** The booth frames a guest can choose on the phone for this many photos (picker order). */
+/** The frames a guest can choose on the phone for this many photos (picker order). */
 export function mobileFramesFor(count: number): FrameDefinition[] {
-  return FRAMES.filter((f) => f.slots.length === count);
+  return MOBILE_FRAMES.filter((f) => f.slots.length === count);
 }
 
 /** The frame a phone photo hangs in on the wall and is labelled with for staff. */

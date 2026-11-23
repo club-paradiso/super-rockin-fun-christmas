@@ -262,11 +262,14 @@ describe("phone upload (D66)", () => {
 
     const letter = await qr();
     const res = await upload(tokenOf(letter.url), await plain(1200, 3600), {
-      "x-frame-id": "shalom-letter",
+      "x-frame-id": "film3-sepia-plain",
     });
     expect(res.status).toBe(201);
     const row = (await getBackend().photos.findBySessionId(letter.sessionId))!;
-    expect(row).toMatchObject({ frameId: "phone-shalom-letter", moderationStatus: "PENDING" });
+    expect(row).toMatchObject({
+      frameId: "phone-film3-sepia-plain",
+      moderationStatus: "PENDING",
+    });
     const meta = await sharp((await getBackend().objects.get(row.objectPath))!).metadata();
     // Not shrunk to the plain-photo bound (2048): the strip keeps the booth's saved size.
     expect([meta.width, meta.height]).toEqual([1200, 3600]);
@@ -278,8 +281,11 @@ describe("phone upload (D66)", () => {
       return [r.status, ((await r.json()) as { error: string }).error];
     };
     // A photo that is not the frame's shape would hang in the wrong box.
-    expect(await refused("shalom-letter", 1200, 900)).toEqual([400, "frame"]);
-    // Only current booth frames: not a retired one, not the plain id, not a made-up one.
+    expect(await refused("film3-sepia-plain", 1200, 900)).toEqual([400, "frame"]);
+    // Only the booth's own frames (D111): not one the booth dropped on 2026-11-22, not a retired
+    // one, not the plain id, not a made-up one.
+    expect(await refused("shalom-letter", 1200, 3600)).toEqual([400, "frame"]);
+    expect(await refused("navy-strip", 1200, 3600)).toEqual([400, "frame"]);
     expect(await refused("six-lights", 1200, 3600)).toEqual([400, "frame"]);
     expect(await refused("photo", 1200, 900)).toEqual([400, "frame"]);
     expect(await refused("nope", 1200, 900)).toEqual([400, "frame"]);
