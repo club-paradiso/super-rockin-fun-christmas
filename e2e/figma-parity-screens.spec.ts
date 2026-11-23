@@ -158,16 +158,20 @@ async function measure(page: Page, wants: Want[]) {
   );
 }
 
-// Glyphs without hinting, as Figma draws them and as the booth's iPad does. Chromium's headless
-// shell hints fully by default (measured: 2.1-2.3 % with it, 1.6-1.8 % without, same build), and a
-// full Chromium follows the machine's fontconfig, so a CI runner and a laptop disagreed. The flag
-// makes the shell the same everywhere. (Named `run`, not Playwright's usual `use`: the React hooks
-// lint rule reads `use(` as a hook.)
+// Text as Figma draws it and as the booth's iPad does: no hinting, grey antialiasing. Chromium
+// takes both from the machine's fontconfig, so a CI runner and a laptop disagreed about the same
+// build (measured, Chromium 141):
+//   full hinting (the headless shell's default)        2.1-2.3 %
+//   LCD subpixel antialiasing (GitHub's Ubuntu runner)  2.0-2.3 %
+//   neither                                            1.6-1.8 %
+// The two flags make every machine the third case. The 2 % limit is the same everywhere.
+// (Named `run`, not Playwright's usual `use`: the React hooks lint rule reads `use(` as a hook.)
+const TEXT_FLAGS = ["--font-render-hinting=none", "--disable-lcd-text"];
 test.use({
   launchOptions: async ({ launchOptions, browserName }, run) => {
     await run(
       browserName === "chromium"
-        ? { ...launchOptions, args: [...(launchOptions.args ?? []), "--font-render-hinting=none"] }
+        ? { ...launchOptions, args: [...(launchOptions.args ?? []), ...TEXT_FLAGS] }
         : launchOptions,
     );
   },
