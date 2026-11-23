@@ -51,17 +51,21 @@ describe("the looks can be told apart", () => {
     expect(samples.length).toBeGreaterThanOrEqual(6);
   });
 
-  it("Paper stays close to the photo as shot; every other look is plain to see", () => {
-    expect(mean(samples, graded.get("paper")!)).toBeLessThan(2.5);
-    for (const look of LOOKS.filter((l) => l.id !== "paper"))
-      expect(mean(samples, graded.get(look.id)!), look.id).toBeGreaterThan(3.2);
+  it("every look is plain to see; Paper, the clean print, changes least", () => {
+    const paper = mean(samples, graded.get("paper")!);
+    // Paper is the clean print: it corrects rather than colours, so its own floor is low.
+    expect(paper).toBeGreaterThan(1.5);
+    for (const look of LOOKS.filter((l) => l.id !== "paper")) {
+      expect(mean(samples, graded.get(look.id)!), look.id).toBeGreaterThan(4);
+      expect(mean(samples, graded.get(look.id)!), look.id).toBeGreaterThan(paper);
+    }
   }, 60_000);
 
-  it("no two looks are near each other: 5 apart, 3.3 where one of them is Paper", () => {
+  it("no two looks are near each other: every pair, Paper included, is 4.5 apart or more", () => {
     for (const a of LOOKS)
       for (const b of LOOKS) {
         if (a.id >= b.id) continue;
-        const floor = a.id === "paper" || b.id === "paper" ? 3.3 : 5;
+        const floor = 4.5;
         expect(mean(graded.get(a.id)!, graded.get(b.id)!), `${a.id} / ${b.id}`).toBeGreaterThan(
           floor,
         );

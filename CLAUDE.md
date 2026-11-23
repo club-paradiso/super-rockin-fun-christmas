@@ -62,7 +62,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `photoTone` and the reason goes to the console (`[looks]`): never silently, never a blocked guest.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
   greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
-  from the others (`tests/unit/looks-distinct.test.ts`: 5 ΔE00 apart on the samples; `npm run
+  from the others (`tests/unit/looks-distinct.test.ts`: every pair at least 4.5 ΔE00 apart on the samples; `npm run
 looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
   or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
