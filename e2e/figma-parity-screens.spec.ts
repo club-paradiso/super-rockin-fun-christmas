@@ -152,13 +152,18 @@ async function measure(page: Page, wants: Want[]) {
   );
 }
 
-// The real browser, not Playwright's "headless shell": the shell places glyphs differently (the
-// same Chromium 141 measures 2.2-2.5 % as the shell and 1.6-1.8 % as the browser), and no guest
-// ever sees the shell. An explicit executable (E2E_CHROMIUM_PATH) still wins.
+// Glyphs without hinting, as Figma draws them and as the booth's iPad does. Chromium's headless
+// shell hints fully by default (measured: 2.1-2.3 % with it, 1.6-1.8 % without, same build), and a
+// full Chromium follows the machine's fontconfig, so a CI runner and a laptop disagreed. The flag
+// makes the shell the same everywhere. (Named `run`, not Playwright's usual `use`: the React hooks
+// lint rule reads `use(` as a hook.)
 test.use({
-  // Named `run`, not Playwright's usual `use`: the React hooks lint rule reads `use(` as a hook.
-  channel: async ({ browserName }, run) => {
-    await run(browserName === "chromium" ? "chromium" : undefined);
+  launchOptions: async ({ launchOptions, browserName }, run) => {
+    await run(
+      browserName === "chromium"
+        ? { ...launchOptions, args: [...(launchOptions.args ?? []), "--font-render-hinting=none"] }
+        : launchOptions,
+    );
   },
 });
 

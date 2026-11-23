@@ -64,10 +64,12 @@ PW_ENGINE=webkit npx playwright test -c playwright.dev.config.ts e2e/figma-parit
 | 필름 4컷 옵션 `898:2006` | 1 px                    | 1.464 %            | 1 px                  | 1.519 %          | 통과 |
 | 체크 2컷 옵션 `898:2083` | 1 px                    | 1.484 %            | 1 px                  | 1.505 %          | 통과 |
 
-같은 화면을 CI가 쓰는 Chromium 141(Playwright 빌드 1194)로 재면 1.57~1.78 %로 역시 기준 안이다. 단, 이 값은 **실제 브라우저
-빌드**로 잰 것이다. Playwright의 "headless shell"(테스트 전용 축소 빌드)은 같은 141 버전인데도 글자를 다른 자리에 그려
-2.2~2.5 %가 나온다. 손님이 보는 화면이 아니므로 화면 비교 테스트는 실제 브라우저 빌드를 쓰도록 고정했다
-(`e2e/figma-parity-screens.spec.ts` 의 `channel`). 기준(2 %)은 그대로다.
+같은 화면을 CI가 쓰는 Chromium 141(Playwright 빌드 1194)로 재면 1.57~1.78 %로 역시 기준 안이다. 단, 이 값은 **폰트
+힌팅을 끄고** 잰 것이다. 힌팅(작은 글자를 픽셀 격자에 맞춰 비트는 처리)은 Figma도, 대상 기기인 iPad의 Safari도 하지
+않는다. Playwright의 headless shell은 기본이 힌팅 "full"이라 같은 빌드로 2.1~2.3 %가 나오고, 일반 Chromium은 그 컴퓨터의
+fontconfig 설정을 따라가서 CI 러너와 개발 컴퓨터의 값이 달랐다(CI 2.3~2.6 %). 그래서 화면 비교 테스트는
+`--font-render-hinting=none` 으로 고정했다(`e2e/figma-parity-screens.spec.ts`). 기준(2 %)은 그대로다.
+힌팅을 켜는 Windows·Linux 브라우저에서는 글자 가장자리가 Figma와 조금 더 다르게 보인다(위 2.1~2.6 %).
 
 글자 크기는 네 화면 모두 Figma와 같다(테스트가 0.25 px 이내로 확인). 고치기 전: 최대 위치 오차 81 px(워드마크),
 차이 픽셀 16~17 %.
