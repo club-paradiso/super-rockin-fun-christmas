@@ -238,5 +238,80 @@
         0
       ]
     ]
+  },
+  {
+    "frame": "film35-natural",
+    "browser": "webkit",
+    "maskedOverPct": 0.044,
+    "fixedOverPct": 0.044,
+    "meanDeltaE": 0.281,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film35-mono",
+    "browser": "webkit",
+    "maskedOverPct": 0.042,
+    "fixedOverPct": 0.042,
+    "meanDeltaE": 0.088,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "frame": "film35-sepia",
+    "browser": "webkit",
+    "maskedOverPct": 0.053,
+    "fixedOverPct": 0.053,
+    "meanDeltaE": 0.259,
+    "slotShiftPx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
   }
 ]

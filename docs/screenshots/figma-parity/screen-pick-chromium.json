@@ -2,8 +2,8 @@
   "screen": "pick",
   "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.447,
-  "meanDeltaE": 0.273,
+  "overPct": 1.459,
+  "meanDeltaE": 0.269,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -194,7 +194,7 @@
     {
       "sel": "[data-testid=\"frame-option-film3\"] .pick-card-hint",
       "delta": [
-        -0.98,
+        0.02,
         0
       ],
       "size": [
