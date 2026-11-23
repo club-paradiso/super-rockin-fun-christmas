@@ -156,8 +156,9 @@ async function measure(page: Page, wants: Want[]) {
 // same Chromium 141 measures 2.2-2.5 % as the shell and 1.6-1.8 % as the browser), and no guest
 // ever sees the shell. An explicit executable (E2E_CHROMIUM_PATH) still wins.
 test.use({
-  channel: async ({ browserName }, use) => {
-    await use(browserName === "chromium" ? "chromium" : undefined);
+  // Named `run`, not Playwright's usual `use`: the React hooks lint rule reads `use(` as a hook.
+  channel: async ({ browserName }, run) => {
+    await run(browserName === "chromium" ? "chromium" : undefined);
   },
 });
 
