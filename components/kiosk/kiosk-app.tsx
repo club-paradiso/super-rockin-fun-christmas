@@ -1637,7 +1637,9 @@ function Screen(p: ScreenProps) {
         <BoothScreen testId="screen-camera-error" progress={progress}>
           <div className="booth-message">
             <h1 className="booth-title">{copy.title}</h1>
-            <p className="booth-lead">{copy.lead}</p>
+            <p className="booth-lead">
+              <Lines text={copy.lead} />
+            </p>
             <div className="booth-actions">
               <button
                 type="button"
@@ -2015,7 +2017,9 @@ function Screen(p: ScreenProps) {
           ) : d.status === "failed" ? (
             <div className="booth-message">
               <h1 className="booth-title">{t.delivery.failedTitle}</h1>
-              <p className="booth-lead">{t.delivery.failedLead}</p>
+              <p className="booth-lead">
+                <Lines text={t.delivery.failedLead} />
+              </p>
               <div className="booth-actions">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
                   {t.delivery.retry}

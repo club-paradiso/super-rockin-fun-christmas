@@ -1762,7 +1762,8 @@ User request: the kiosk did not match the Figma file. Two leftovers named by the
   걸려요. 회원가입이나 앱 설치는 필요 없어요.") is gone, as in Figma. The Wi-Fi line stays, only
   on a hub without a cloud (the phone cannot open the page otherwise).
 
-Not changed, because the Figma screen is older than a user-approved code change or it is not
-clear which side is newer (listed for the user to decide): M4's title (code keeps
-"미디어월 게시 신청을 잠시 멈췄어요", approved 2026-11-14), the camera-error lead, the video line on
-the shooting screen, the send-failed lead and the English welcome sub-line.
+Five more lines differed from older Figma screens. The user chose Figma for all of them
+(2026-11-23): M4's title "지금은 사진 접수를 잠시 멈췄어요" (replacing the 2026-11-14
+"미디어월 게시 신청을 잠시 멈췄어요" on that screen only; the welcome line keeps the switch's name),
+the camera-error lead (3e), the video line on the shooting screen (3b), the send-failed lead (8e)
+and the English welcome sub-line (1c). English and Chinese follow the new Korean.

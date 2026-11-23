@@ -108,7 +108,8 @@ const ko = {
     errors: {
       denied: {
         title: "카메라 사용이 허용되지 않았어요",
-        lead: "도우미에게 알려 주세요. 브라우저 설정에서 카메라를 허용해야 해요.",
+        // Figma KIOSK 3e (395:1351), chosen by the user on 2026-11-23 (D111).
+        lead: "브라우저에서 카메라 사용을 허용한 후 다시 시도해 주세요.\n어렵다면 안내 도우미에게 알려 주세요.",
       },
       missing: {
         title: "카메라를 찾을 수 없어요",
@@ -129,7 +130,8 @@ const ko = {
     free: "자유 포즈로 찍기",
     guide: "포즈 추천받고 찍기",
     plan: (seconds: number, total: number) => `${seconds}초마다 한 컷씩, 모두 ${total}컷을 찍어요`,
-    video: "촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지 않아요.",
+    // Figma KIOSK 3b (395:1204), chosen by the user on 2026-11-23 (D111).
+    video: "촬영 과정은 소리 없이 짧은 영상으로도 저장돼요.",
     pose: "추천 포즈",
     progress: (done: number, total: number) => `${total}장 중 ${done}장 촬영`,
   },
@@ -182,7 +184,8 @@ const ko = {
     retry: "다시 시도",
     failedTitle: "사진을 보내지 못했어요",
     temporaryQueue: "사진이 이 화면에만 임시로 보관돼요. 화면을 닫지 말고 도우미에게 알려 주세요.",
-    failedLead: "도우미에게 알려 주세요.",
+    // Figma KIOSK 8e (396:1569), chosen by the user on 2026-11-23 (D111).
+    failedLead: "화면을 안내 도우미에게 보여 주세요.\n전송 상태를 확인할 수 있도록 도와드릴게요.",
     home: "처음으로",
     sendingTitle: "사진을 보내고 있어요",
     sendingLead: "잠시만 기다려 주세요.",
@@ -198,8 +201,9 @@ const ko = {
         title: "지금은 인터넷이 연결되지 않았어요",
         lead: "내 사진 보내기는 인터넷이 필요해요. 사진 찍기는 지금도 할 수 있어요.",
       },
+      // Figma KIOSK M4 (396:1705), chosen by the user on 2026-11-23 (D111).
       paused: {
-        title: "미디어월 게시 신청을 잠시 멈췄어요",
+        title: "지금은 사진 접수를 잠시 멈췄어요",
         lead: "잠시 뒤 다시 시도해 주세요. 사진 찍기는 지금도 할 수 있어요.",
       },
       error: { title: "QR을 만들지 못했어요", lead: "다시 시도를 눌러 주세요." },
@@ -249,7 +253,8 @@ const en: KioskCopy = {
     title: "Make a Christmas memory together",
     lead: "Take photos and get them on your phone, or send your own photo to hang on the big screen.",
     camera: "Take photos here",
-    cameraLead: "Take six, pick your favorites, and get them on your phone",
+    // Figma KIOSK 1c (391:491), chosen by the user on 2026-11-23 (D111).
+    cameraLead: "Take photos, and get them on your phone",
     mobile: "Share a photo from your phone",
     mobileLead: "Send a photo from your phone to the media wall",
     paused: "Media wall submissions are paused right now. You can still take photos here",
@@ -323,7 +328,7 @@ const en: KioskCopy = {
     errors: {
       denied: {
         title: "Camera access isn’t allowed",
-        lead: "Please tell a helper. The camera needs to be allowed in the browser settings.",
+        lead: "Allow the camera in the browser, then try again.\nIf that doesn’t work, please tell a helper.",
       },
       missing: {
         title: "We can’t find the camera",
@@ -344,7 +349,7 @@ const en: KioskCopy = {
     free: "Pose freely",
     guide: "Get pose ideas",
     plan: (seconds, total) => `One photo every ${seconds} seconds, ${total} in all`,
-    video: "We also film a short clip while you pose. No sound is recorded.",
+    video: "A short silent clip of the session is saved too.",
     pose: "Try this pose",
     progress: (done, total) => `${done} of ${total} photos taken`,
   },
@@ -393,7 +398,8 @@ const en: KioskCopy = {
     retry: "Try again",
     failedTitle: "We couldn’t send your photo",
     temporaryQueue: "The photo is held temporarily. Keep this page open and tell a helper.",
-    failedLead: "Please tell a helper.",
+    failedLead:
+      "Please show this screen to a helper.\nThey’ll help you check how the sending went.",
     home: "Start over",
     sendingTitle: "Sending your photo",
     sendingLead: "Just a moment, please.",
@@ -410,7 +416,7 @@ const en: KioskCopy = {
         lead: "Sending your own photo needs the internet. You can still take photos here.",
       },
       paused: {
-        title: "Media wall submissions are paused right now",
+        title: "Photo submissions are paused right now",
         lead: "Please try again in a little while. You can still take photos here.",
       },
       error: { title: "We couldn’t make a QR code", lead: "Tap “Try again.”" },
@@ -529,7 +535,7 @@ const zh: KioskCopy = {
     errors: {
       denied: {
         title: "摄像头未被允许使用",
-        lead: "请告诉工作人员。需要在浏览器设置中允许使用摄像头。",
+        lead: "请在浏览器中允许使用摄像头后再试一次。\n如果还是不行，请告诉引导工作人员。",
       },
       missing: {
         title: "找不到摄像头",
@@ -550,7 +556,7 @@ const zh: KioskCopy = {
     free: "自由摆姿势",
     guide: "给我姿势建议",
     plan: (seconds, total) => `每隔 ${seconds} 秒拍一张，一共 ${total} 张`,
-    video: "拍照的过程也会录成一段短视频，不会录声音。",
+    video: "拍摄过程也会保存成一段无声短视频。",
     pose: "推荐姿势",
     progress: (done, total) => `已拍 ${done} 张，共 ${total} 张`,
   },
@@ -596,7 +602,7 @@ const zh: KioskCopy = {
     retry: "再试一次",
     failedTitle: "照片发送失败",
     temporaryQueue: "照片仅为临时保存。请保持页面开启并联系工作人员。",
-    failedLead: "请告诉工作人员。",
+    failedLead: "请把这个画面给引导工作人员看。\n我们会帮你确认发送状态。",
     home: "回到开头",
     sendingTitle: "正在发送照片",
     sendingLead: "请稍等一下。",
