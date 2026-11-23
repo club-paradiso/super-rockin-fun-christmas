@@ -7,6 +7,7 @@ import { LOOKS } from "@/config/looks";
 import { CHART_HEIGHT, CHART_WIDTH, drawChart } from "@/lib/looks/chart";
 import { buildLut, LUT_SIZE } from "@/lib/looks/cube";
 import { applyLook, grainAt, grainGeometry, grainWeight, seedOffsets } from "@/lib/looks/reference";
+import { HALATION, halationGlow, halationTaps } from "@/lib/looks/shader";
 import { renderParams, type LookRenderParams } from "@/lib/looks/types";
 
 const paper = LOOKS.find((look) => look.id === "paper")!;
@@ -17,6 +18,7 @@ const plain = (over: Partial<LookRenderParams> = {}): LookRenderParams => ({
   grainSize: 700,
   grainChroma: 0,
   vignette: 0,
+  halation: 0,
   seed: 1,
   ...over,
 });
@@ -177,6 +179,83 @@ describe("corner falloff", () => {
     expect(at(pixels, 40, 30)).toBe(at(centreOnly, 40, 30));
     expect(at(pixels, 0, 0)).toBeLessThan(at(centreOnly, 0, 0) - 8);
     expect(at(pixels, 80, 60)).toBeLessThan(at(centreOnly, 80, 60) - 8);
+  });
+});
+
+describe("halation", () => {
+  const W = 240;
+  const H = 180;
+  /** A dark picture with whatever `paint` makes white. */
+  const scene = (paint: (x: number, y: number) => boolean) => {
+    const pixels = flat(W, H, 20);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
+        if (paint(x, y)) {
+          const p = (y * W + x) * 4;
+          pixels[p] = pixels[p + 1] = pixels[p + 2] = 255;
+        }
+    return pixels;
+  };
+  const at = (pixels: Uint8ClampedArray, x: number, y: number) => {
+    const p = (y * W + x) * 4;
+    return [pixels[p]!, pixels[p + 1]!, pixels[p + 2]!];
+  };
+  const withAndWithout = (pixels: Uint8ClampedArray) => {
+    const off = new Uint8ClampedArray(pixels);
+    const on = new Uint8ClampedArray(pixels);
+    applyLook(off, W, H, paperLut, plain());
+    applyLook(on, W, H, paperLut, plain({ halation: 0.6 }));
+    return { off, on };
+  };
+
+  it("a small light gets a red-orange rim: red most, green less, blue least", () => {
+    // A bulb three pixels across in the middle of the dark.
+    const { off, on } = withAndWithout(scene((x, y) => Math.hypot(x - 120, y - 90) <= 1.6));
+    const [dx] = halationTaps(W, H);
+    const before = at(off, 120 + dx!, 90);
+    const after = at(on, 120 + dx!, 90);
+    expect(after[0]! - before[0]!).toBeGreaterThan(4);
+    expect(after[0]! - before[0]!).toBeGreaterThan(after[1]! - before[1]!);
+    expect(after[1]! - before[1]!).toBeGreaterThanOrEqual(after[2]! - before[2]!);
+    // Far from any light nothing changes.
+    expect(at(on, 20, 20)).toEqual(at(off, 20, 20));
+  });
+
+  it("a large bright area (a white backdrop) puts no rim on what stands in front of it", () => {
+    // The right half is white: the pixels just left of the edge are a head against a backdrop.
+    const { off, on } = withAndWithout(scene((x) => x >= 120));
+    for (const x of [112, 116, 119]) {
+      const before = at(off, x, 90);
+      const after = at(on, x, 90);
+      expect(after[0]! - before[0]!).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("a saturated red (an LED, an ornament) does not glow; only near-white light does", () => {
+    const pixels = flat(W, H, 20);
+    for (let y = 88; y <= 92; y++)
+      for (let x = 118; x <= 122; x++) {
+        const p = (y * W + x) * 4;
+        pixels[p] = 255;
+        pixels[p + 1] = pixels[p + 2] = 0;
+      }
+    const { off, on } = withAndWithout(pixels);
+    expect(on).toEqual(off);
+    expect(HALATION.threshold).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it("the taps: 24 whole-pixel offsets on three rings that grow with the picture", () => {
+    const small = halationTaps(300, 225);
+    const large = halationTaps(1200, 900);
+    expect(small).toHaveLength(48);
+    expect(large.every(Number.isInteger)).toBe(true);
+    expect(large[0]).toBe(Math.round(HALATION.radius * 1200));
+    expect(large[0]!).toBeGreaterThan(small[0]!);
+    expect(Math.hypot(large[32]!, large[33]!)).toBeGreaterThan(Math.hypot(large[16]!, large[17]!));
+    // Nothing found, no glow; the near rings full and the far ring dark, all of it.
+    expect(halationGlow(new Array(24).fill(0))).toBe(0);
+    expect(halationGlow([...new Array(16).fill(1), ...new Array(8).fill(0)])).toBeCloseTo(1, 6);
+    expect(halationGlow(new Array(24).fill(1))).toBe(0);
   });
 });
 

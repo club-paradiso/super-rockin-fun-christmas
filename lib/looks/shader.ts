@@ -3,6 +3,7 @@
  * both run it with the same LUT and the same uniforms, so their colours cannot differ.
  *
  * Order, per pixel:
+ *   0. halation: the glow of the near-white lights around this pixel, added in red-orange,
  *   1. corner falloff (as a lens would do it, before the "film"),
  *   2. the 3D LUT, read from a 2D strip with all eight neighbours fetched and mixed by hand
  *      (NEAREST texture: no reliance on the GPU's own filtering, so every GPU gives one answer),
@@ -27,9 +28,15 @@ void main() {
 export const GRAIN = {
   /** Second layer of grain: this many times finer, this much weaker. */
   octave: 2.3,
-  octaveGain: 0.6,
-  /** Brings the two layers together to a standard deviation of 1 (measured: raw 0.2498). */
-  normalise: 4.0,
+  octaveGain: 0.9,
+  /** Brings the layers together to a standard deviation of 1 (measured: raw 0.2919). */
+  normalise: 3.43,
+  /**
+   * Grain gathers in clumps: its amount swells and thins over patches this many times larger than
+   * a grain, by this much either way. Even grain is what a noise overlay looks like.
+   */
+  clumpScale: 0.17,
+  clumpDepth: 0.9,
   /** Grain that black and white still get, as a share of the mid-tone amount. */
   floor: 0.15,
   /**
@@ -42,6 +49,78 @@ export const GRAIN = {
   /** Corner falloff starts here (0 = centre, 1 = corner, squared distance). */
   vignetteStart: 0.2,
 } as const;
+
+/** Shared numbers of the halation arithmetic (shader and reference). */
+export const HALATION = {
+  /** A light starts to glow when its dimmer of red and green passes this level. */
+  threshold: 0.9,
+  /** The glow is gathered on rings; the innermost is this share of the long edge away. */
+  radius: 0.007,
+  /** The rings, as multiples of that radius: two that gather the glow, one that measures the light. */
+  rings: [1, 2.2, 5],
+  /** How much the second ring counts beside the first. */
+  outerWeight: 0.6,
+  /**
+   * A small light glows; a large bright area (a white backdrop, a window) must not put a red rim
+   * on the head in front of it: the booth's own scene is people before a paper backdrop. When this
+   * share of the far ring is bright the glow starts to fade, and at the second share it is gone.
+   * The price: the edge of a large blown-out lamp does not glow either. Bulbs and string lights do.
+   */
+  largeFrom: 0.1,
+  largeTo: 0.3,
+  /** The colour of the glow, as film shows it. */
+  colour: [1, 0.3, 0.08],
+  /** Eight directions, turned a sixteenth of a turn on every other ring. */
+  directions: [
+    [1, 0],
+    [0.7071, 0.7071],
+    [0, 1],
+    [-0.7071, 0.7071],
+    [-1, 0],
+    [-0.7071, -0.7071],
+    [0, -1],
+    [0.7071, -0.7071],
+    [0.9239, 0.3827],
+    [0.3827, 0.9239],
+    [-0.3827, 0.9239],
+    [-0.9239, 0.3827],
+    [-0.9239, -0.3827],
+    [-0.3827, -0.9239],
+    [0.3827, -0.9239],
+    [0.9239, -0.3827],
+  ],
+} as const;
+
+export const HALATION_TAPS = 24;
+
+/**
+ * The taps as whole-pixel offsets for a picture of this size: eight per ring. Whole pixels,
+ * worked out once on the CPU, so the shader and the reference read exactly the same pixels.
+ */
+export function halationTaps(width: number, height: number): number[] {
+  const radius = Math.max(1, HALATION.radius * Math.max(width, height));
+  const taps: number[] = [];
+  HALATION.rings.forEach((ring, r) => {
+    for (let i = 0; i < 8; i++) {
+      const [dx, dy] = HALATION.directions[(r % 2) * 8 + i]!;
+      taps.push(Math.round(dx * radius * ring), Math.round(dy * radius * ring));
+    }
+  });
+  return taps;
+}
+
+/** The glow at a pixel from what its 24 taps found (each 0–1), before the look's own amount. */
+export function halationGlow(found: ArrayLike<number>): number {
+  let near = 0;
+  let far = 0;
+  for (let i = 0; i < 8; i++) near += found[i]! + HALATION.outerWeight * found[8 + i]!;
+  for (let i = 16; i < 24; i++) far += found[i]!;
+  const large = Math.min(
+    1,
+    Math.max(0, (far / 8 - HALATION.largeFrom) / (HALATION.largeTo - HALATION.largeFrom)),
+  );
+  return (near / (8 * (1 + HALATION.outerWeight))) * (1 - large * large * (3 - 2 * large));
+}
 
 export const LOOK_FRAGMENT_SHADER = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -60,7 +139,15 @@ uniform float uGrainChroma;
 uniform float uGrainFade;
 uniform vec2 uGrainCells;
 uniform vec2 uSeed;
+uniform float uHalation;
+uniform vec2 uTexel;
+uniform vec2 uTaps[24];
 varying vec2 vUv;
+
+float glowAt(vec2 uv) {
+  vec3 c = texture2D(uImage, uv).rgb;
+  return smoothstep(${HALATION.threshold.toFixed(2)}, 1.0, min(c.r, c.g));
+}
 
 vec3 lutAt(float r, float g, float b) {
   float n = uLutSize;
@@ -99,15 +186,31 @@ float valueNoise(vec2 p) {
 }
 
 float grainAt(vec2 cell, vec2 seed) {
-  return (valueNoise(cell + seed) + ${GRAIN.octaveGain.toFixed(2)} * valueNoise(cell * ${GRAIN.octave.toFixed(2)} + seed.yx + 17.0)) * ${GRAIN.normalise.toFixed(2)};
+  float clump = 1.0 + ${GRAIN.clumpDepth.toFixed(2)} * valueNoise(cell * ${GRAIN.clumpScale.toFixed(2)} + seed + 59.0);
+  return (valueNoise(cell + seed) + ${GRAIN.octaveGain.toFixed(2)} * valueNoise(cell * ${GRAIN.octave.toFixed(2)} + seed.yx + 17.0)) * ${GRAIN.normalise.toFixed(2)} * clump;
 }
 
 void main() {
   vec3 shot = texture2D(uImage, vUv).rgb;
 
+  vec3 lit = shot;
+  if (uHalation > 0.0) {
+    float near = 0.0;
+    float far = 0.0;
+    for (int i = 0; i < 24; i++) {
+      float found = glowAt(vUv + uTaps[i] * uTexel);
+      if (i < 8) near += found;
+      else if (i < 16) near += ${HALATION.outerWeight.toFixed(2)} * found;
+      else far += found;
+    }
+    float glow = (near / ${(8 * (1 + HALATION.outerWeight)).toFixed(2)}) *
+      (1.0 - smoothstep(${HALATION.largeFrom.toFixed(2)}, ${HALATION.largeTo.toFixed(2)}, far / 8.0));
+    lit = shot + vec3(${HALATION.colour.map((c) => c.toFixed(2)).join(", ")}) * (uHalation * glow);
+  }
+
   vec2 d = (vUv - 0.5) * 2.0;
   float corner = smoothstep(${GRAIN.vignetteStart.toFixed(2)}, 1.0, dot(d, d) * 0.5);
-  vec3 graded = applyLut(shot * pow(1.0 - uVignette * corner, 0.4545));
+  vec3 graded = applyLut(lit * pow(1.0 - uVignette * corner, 0.4545));
 
   vec3 color = mix(shot, graded, uStrength);
 

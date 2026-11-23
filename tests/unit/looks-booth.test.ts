@@ -3,7 +3,7 @@ import { V2_FRAMES } from "@/config/frames/v2";
 import { LOOKS } from "@/config/looks";
 import { composeFrame } from "@/lib/compositor/compose";
 import type { ComposeImage } from "@/lib/compositor/types";
-import { createBoothLooks, seedFromText } from "@/lib/looks/booth";
+import { createBoothLooks, LOOKS_WAIT_MS, seedFromText, settleWithin } from "@/lib/looks/booth";
 import { buildLut, serializeCube } from "@/lib/looks/cube";
 import { LookUnavailableError, type GlCanvas } from "@/lib/looks/renderer";
 import { FakeCanvas, fakeCanvasFactory } from "../helpers/fake-canvas";
@@ -130,6 +130,28 @@ describe("createBoothLooks", () => {
     await looks.preload(["verse4"]);
     expect(looks.graderFor("verse4", 1)).toBeUndefined();
     expect(String(log.mock.calls[0]![1])).toMatch(/Expected 27 rows/);
+  });
+
+  it("a LUT that never arrives does not hold a finished session: the wait ends by itself", async () => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const never = new Promise<void>(() => undefined);
+      void settleWithin(never, LOOKS_WAIT_MS).then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(LOOKS_WAIT_MS - 1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      // Work that fails, work that is done and no work at all end the wait at once.
+      await expect(
+        settleWithin(Promise.reject(new Error("offline")), 60_000),
+      ).resolves.toBeUndefined();
+      await expect(settleWithin(Promise.resolve(), 60_000)).resolves.toBeUndefined();
+      await expect(settleWithin(null, 60_000)).resolves.toBeUndefined();
+      expect(LOOKS_WAIT_MS).toBeLessThanOrEqual(2000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("the same session always gets the same grain seed, another session another", () => {

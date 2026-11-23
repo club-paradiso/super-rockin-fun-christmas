@@ -36,6 +36,7 @@ export interface LookOverride {
   strength?: number;
   grainAmount?: number;
   vignette?: number;
+  halation?: number;
 }
 
 export interface BoothLooksDeps {
@@ -110,6 +111,7 @@ export function createBoothLooks({
           const params = renderParams(entry.look, seed * 31 + slotIndex, strength);
           if (override?.grainAmount !== undefined) params.grainAmount = override.grainAmount;
           if (override?.vignette !== undefined) params.vignette = override.vignette;
+          if (override?.halation !== undefined) params.halation = override.halation;
           return renderer.render(
             photo as unknown as TexImageSource,
             width,
@@ -132,6 +134,25 @@ export function createBoothLooks({
       renderer = null;
     },
   };
+}
+
+/**
+ * How long a finished session waits for the LUTs before it is composed without a look. A LUT that
+ * has not arrived by then (a slow or dropped connection to the hub) must not hold a guest up.
+ */
+export const LOOKS_WAIT_MS = 1500;
+
+/** Resolves when `work` does, or after `ms`, whichever is first. Never rejects. */
+export function settleWithin(work: Promise<unknown> | null | undefined, ms: number): Promise<void> {
+  if (!work) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    work.then(done, done);
+  });
 }
 
 /** A session id (or any text) as a grain seed. */

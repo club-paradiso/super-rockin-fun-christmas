@@ -1,6 +1,6 @@
 import { sampleLut, type Lut3D } from "./cube";
 import { smoothstep } from "./color";
-import { GRAIN } from "./shader";
+import { GRAIN, HALATION, HALATION_TAPS, halationGlow, halationTaps } from "./shader";
 import type { LookRenderParams } from "./types";
 
 /**
@@ -47,11 +47,16 @@ function valueNoise(x: number, y: number): number {
 
 /** One grain value (mean 0, standard deviation about 1) at a place in grain cells. */
 export function grainAt(cellX: number, cellY: number, seedX: number, seedY: number): number {
+  const clump =
+    1 +
+    GRAIN.clumpDepth *
+      valueNoise(cellX * GRAIN.clumpScale + seedX + 59, cellY * GRAIN.clumpScale + seedY + 59);
   return (
     (valueNoise(cellX + seedX, cellY + seedY) +
       GRAIN.octaveGain *
         valueNoise(cellX * GRAIN.octave + seedY + 17, cellY * GRAIN.octave + seedX + 17)) *
-    GRAIN.normalise
+    GRAIN.normalise *
+    clump
   );
 }
 
@@ -87,6 +92,16 @@ export function applyLook(
   params: LookRenderParams,
 ): void {
   const q = quantiseLut(lut);
+  // Halation reads the neighbours as shot, so it needs the picture before this loop changes it.
+  const shot = params.halation > 0 ? Uint8ClampedArray.from(pixels) : null;
+  const taps = halationTaps(width, height);
+  const found = new Float64Array(HALATION_TAPS);
+  const glowAt = (x: number, y: number) => {
+    const cx = Math.min(width - 1, Math.max(0, x));
+    const cy = Math.min(height - 1, Math.max(0, y));
+    const at = (cy * width + cx) * 4;
+    return smoothstep(HALATION.threshold, 1, Math.min(shot![at]!, shot![at + 1]!) / 255);
+  };
   const { cellsX, cellsY, fade } = grainGeometry(width, height, params.grainSize);
   const [seedX, seedY] = seedOffsets(params.seed);
   const out = [0, 0, 0];
@@ -102,9 +117,21 @@ export function applyLook(
       const g = pixels[p + 1]! / 255;
       const b = pixels[p + 2]! / 255;
 
+      let lr = r;
+      let lg = g;
+      let lb = b;
+      if (shot) {
+        for (let i = 0; i < HALATION_TAPS; i++)
+          found[i] = glowAt(x + taps[i * 2]!, y + taps[i * 2 + 1]!);
+        const k = params.halation * halationGlow(found);
+        lr = r + HALATION.colour[0] * k;
+        lg = g + HALATION.colour[1] * k;
+        lb = b + HALATION.colour[2] * k;
+      }
+
       const corner = smoothstep(GRAIN.vignetteStart, 1, (dx * dx + dy * dy) * 0.5);
       const fall = (1 - params.vignette * corner) ** 0.4545;
-      sampleLut(q, r * fall, g * fall, b * fall, out);
+      sampleLut(q, lr * fall, lg * fall, lb * fall, out);
 
       let cr = r + (out[0]! - r) * s;
       let cg = g + (out[1]! - g) * s;

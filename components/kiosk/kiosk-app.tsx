@@ -48,7 +48,13 @@ import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/composit
 import { formatStampLabel } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
-import { createBoothLooks, seedFromText, type BoothLooks } from "@/lib/looks/booth";
+import {
+  createBoothLooks,
+  LOOKS_WAIT_MS,
+  seedFromText,
+  settleWithin,
+  type BoothLooks,
+} from "@/lib/looks/booth";
 import { looksEnabled } from "@/lib/looks/config";
 import {
   canGoBack,
@@ -656,7 +662,12 @@ export function KioskApp({
     if (chosen.length !== frame.slots.length) return;
     const sessionForLooks = state.sessionId;
     // A font or asset that failed to load must not block the guest: compose without it.
-    void Promise.all([fontsRef.current, assetsRef.current, looksLoadRef.current])
+    // The LUTs are waited for only briefly: without them the frame keeps its own tone.
+    void Promise.all([
+      fontsRef.current,
+      assetsRef.current,
+      settleWithin(looksLoadRef.current, LOOKS_WAIT_MS),
+    ])
       .then(async ([, loaded]) => {
         if (cancelled) return;
         const canvas = composeFrame(frame, chosen, {

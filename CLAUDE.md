@@ -53,7 +53,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `docs/research/`): eight looks, each the house stock (`HOUSE` in `config/looks/index.ts`) plus
   differences, baked to `public/looks/<id>.cube` by `npm run looks:build` (never hand-edit a
   `.cube`; `tests/unit/looks-cube.test.ts` fails while file and numbers disagree). One WebGL1 shader
-  (`lib/looks/shader.ts`) applies the LUT, strength, grain and corner falloff; the frame previews
+  (`lib/looks/shader.ts`) applies halation (small lights only), the LUT, strength, grain and corner falloff; the frame previews
   and the final composite pass the same `grade` to `composeFrame`, so their colours cannot differ.
   Which frame gets which look is `config/looks/frame-looks.json`, never code. With the flag off
   (`looksEnabled`: `NEXT_PUBLIC_LOOKS=1` or `?looks=1`) the booth fetches no LUT, creates no WebGL

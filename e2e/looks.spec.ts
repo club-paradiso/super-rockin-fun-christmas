@@ -25,7 +25,7 @@ async function gpuRender(
   width: number,
   height: number,
   lookId: string,
-  override: { strength?: number; grainAmount?: number; vignette?: number },
+  override: { strength?: number; grainAmount?: number; vignette?: number; halation?: number },
   seed = 7,
 ): Promise<number[]> {
   return page.evaluate(
@@ -212,13 +212,14 @@ test.describe("the shader against the reference arithmetic", () => {
     }) => {
       await openSheet(page);
       for (const strength of [1, 0.5]) {
-        const override = { strength, grainAmount: 0, vignette: 0 };
+        const override = { strength, grainAmount: 0, vignette: 0, halation: 0 };
         const gpu = await gpuRender(page, chart, CHART_WIDTH, CHART_HEIGHT, look.id, override);
         const want = new Uint8ClampedArray(chart);
         applyLook(want, CHART_WIDTH, CHART_HEIGHT, luts.get(look.id)!, {
           ...renderParams(look, 7 * 31, strength),
           grainAmount: 0,
           vignette: 0,
+          halation: 0,
         });
         const { worst, overShare } = compare(gpu, want);
         expect(worst, `strength ${strength}`).toBeLessThanOrEqual(2);
@@ -230,16 +231,58 @@ test.describe("the shader against the reference arithmetic", () => {
   test("corner falloff on the GPU matches the reference", async ({ page }) => {
     await openSheet(page);
     const look = LOOKS.find((l) => l.id === "flash")!;
-    const override = { strength: 1, grainAmount: 0, vignette: look.vignette };
+    const override = { strength: 1, grainAmount: 0, vignette: look.vignette, halation: 0 };
     const gpu = await gpuRender(page, chart, CHART_WIDTH, CHART_HEIGHT, look.id, override);
     const want = new Uint8ClampedArray(chart);
     applyLook(want, CHART_WIDTH, CHART_HEIGHT, luts.get(look.id)!, {
       ...renderParams(look, 7 * 31, 1),
       grainAmount: 0,
+      halation: 0,
     });
     const { worst, overShare } = compare(gpu, want);
     expect(worst).toBeLessThanOrEqual(3);
     expect(overShare).toBeLessThan(0.02);
+  });
+
+  test("halation on the GPU matches the reference: same pixels read, same glow", async ({
+    page,
+  }) => {
+    await openSheet(page);
+    // Night with lights: one small bulb, a strip light, and a large white area with a dark edge.
+    const width = 240;
+    const height = 180;
+    const scene: number[] = [];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const bulb = Math.hypot(x - 60, y - 50) <= 2;
+        const strip = Math.abs(y - 120) <= 1 && x > 30 && x < 90;
+        const wall = x >= 170;
+        const v = bulb || strip || wall ? 255 : 24 + ((x * 7 + y * 3) % 40);
+        scene.push(v, v, bulb || strip || wall ? 250 : v, 255);
+      }
+    for (const lookId of ["lamp", "ink"]) {
+      const look = LOOKS.find((l) => l.id === lookId)!;
+      const override = { strength: 1, grainAmount: 0, vignette: 0, halation: 0.6 };
+      const gpu = await gpuRender(page, scene, width, height, look.id, override);
+      const want = new Uint8ClampedArray(scene);
+      applyLook(want, width, height, luts.get(look.id)!, {
+        ...renderParams(look, 7 * 31, 1),
+        grainAmount: 0,
+        vignette: 0,
+        halation: 0.6,
+      });
+      const { worst, overShare } = compare(gpu, want);
+      expect(worst, lookId).toBeLessThanOrEqual(3);
+      expect(overShare, lookId).toBeLessThan(0.02);
+      // And it is really there: the same picture without halation differs around the lights.
+      const none = await gpuRender(page, scene, width, height, look.id, {
+        ...override,
+        halation: 0,
+      });
+      let changed = 0;
+      for (let p = 0; p < gpu.length; p += 4) if (Math.abs(gpu[p]! - none[p]!) > 3) changed++;
+      expect(changed, lookId).toBeGreaterThan(40);
+    }
   });
 
   test("grain on the GPU: no brightness shift, strongest in the mid-tones, new per photo", async ({
@@ -263,8 +306,8 @@ test.describe("the shader against the reference arithmetic", () => {
       const n = pixels.length / 4;
       return { mean: sum / n, spread: Math.sqrt(squares / n - (sum / n) ** 2) };
     };
-    const grainy = { strength: 1, grainAmount: 0.03, vignette: 0 };
-    const clean = { strength: 1, grainAmount: 0, vignette: 0 };
+    const grainy = { strength: 1, grainAmount: 0.03, vignette: 0, halation: 0 };
+    const clean = { strength: 1, grainAmount: 0, vignette: 0, halation: 0 };
     const render = (level: number, override: typeof grainy, seed = 7) =>
       gpuRender(page, flat(level), width, height, "paper", override, seed);
 

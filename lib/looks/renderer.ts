@@ -1,6 +1,6 @@
 import { lutToStrip, type Lut3D } from "./cube";
 import { grainGeometry, seedOffsets } from "./reference";
-import { LOOK_FRAGMENT_SHADER, LOOK_VERTEX_SHADER } from "./shader";
+import { halationTaps, LOOK_FRAGMENT_SHADER, LOOK_VERTEX_SHADER } from "./shader";
 import type { LookRenderParams } from "./types";
 
 /** WebGL is missing, the context was lost, or the shader would not build. */
@@ -25,6 +25,9 @@ const UNIFORMS = [
   "uGrainFade",
   "uGrainCells",
   "uSeed",
+  "uHalation",
+  "uTexel",
+  "uTaps[0]",
 ] as const;
 
 /**
@@ -180,6 +183,9 @@ export class LookRenderer {
     gl.uniform1f(u("uGrainFade"), grain.fade);
     gl.uniform2f(u("uGrainCells"), grain.cellsX, grain.cellsY);
     gl.uniform2f(u("uSeed"), seedX, seedY);
+    gl.uniform1f(u("uHalation"), params.halation);
+    gl.uniform2f(u("uTexel"), 1 / width, 1 / height);
+    gl.uniform2fv(u("uTaps[0]"), new Float32Array(halationTaps(width, height)));
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     const error = gl.getError();

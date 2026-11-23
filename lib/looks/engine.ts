@@ -128,6 +128,8 @@ export function createGrade(grade: LookGrade): (r: number, g: number, b: number)
     const colourful = Math.min(1, chroma / 0.25);
     L *= 1 - grade.density * colourful;
     L += light * Math.min(1, chroma / 0.12);
+    // Skin that is already bright is left where it is: lifted further it washes out to paper.
+    L += grade.skinLight * skin * (1 - smoothstep(0.7, 0.95, levelOut));
 
     // Tints: white balance in the middle, split toning at the two ends.
     const shadow = 1 - smoothstep(0, 0.5, levelOut);

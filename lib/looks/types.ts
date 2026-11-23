@@ -67,6 +67,8 @@ export interface LookGrade {
   skinEven: number;
   /** Chroma of skin is multiplied by this (1 = unchanged). A warm look uses it to stay off orange. */
   skinChroma: number;
+  /** Added to the lightness of skin, less and less as it nears white (0.01 is a visible lift). */
+  skinLight: number;
   /**
    * Black and white: the photo becomes one grey level, mixed from linear R, G, B with these
    * weights (they are normalised), then toned by `curve` and the two tints.
@@ -99,6 +101,12 @@ export interface LookDefinition {
   grain: LookGrain;
   /** Darkening of the corners (0–1), applied before the LUT like a lens would. */
   vignette: number;
+  /**
+   * Halation (0–1): the red-orange glow film shows around lights that are bright enough to pass
+   * through it and bounce back. Only around near-white sources (bulbs, lamps), never from a
+   * saturated red, and before the LUT, as it happens in the film and not on the print.
+   */
+  halation: number;
   /** Strength the booth uses unless the frame says otherwise (0–1). */
   strength: number;
 }
@@ -111,6 +119,7 @@ export interface LookRenderParams {
   grainSize: number;
   grainChroma: number;
   vignette: number;
+  halation: number;
   /** Any number: a different one gives different grain (one per photo, never a fixed pattern). */
   seed: number;
 }
@@ -126,6 +135,7 @@ export function renderParams(
     grainSize: look.grain.size,
     grainChroma: look.grain.chroma,
     vignette: look.vignette,
+    halation: look.halation,
     seed,
   };
 }

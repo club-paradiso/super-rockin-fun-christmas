@@ -76,6 +76,8 @@ describe("the looks", () => {
       expect(look.grain.amount).toBeLessThanOrEqual(0.03);
       expect(look.vignette).toBeGreaterThanOrEqual(0);
       expect(look.vignette).toBeLessThanOrEqual(0.4);
+      expect(look.halation).toBeGreaterThanOrEqual(0);
+      expect(look.halation).toBeLessThanOrEqual(0.8);
     }
   });
 
