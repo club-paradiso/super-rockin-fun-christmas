@@ -4,6 +4,7 @@
   "short_name": "STUDIO SHALOM",
   "start_url": "/kiosk",
   "scope": "/kiosk",
+  "display_override": ["fullscreen"],
   "display": "standalone",
   "background_color": "#f2e5d8",
   "theme_color": "#ddbda1",

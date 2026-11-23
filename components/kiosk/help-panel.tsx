@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import type { CameraDevice } from "@/lib/camera";
+import { HelpFullscreen } from "./fullscreen";
 import {
   HELP_CLOSED,
   HELP_PIN_LENGTH,
@@ -299,6 +300,8 @@ function HelpMenu(p: {
           </select>
         )}
       </section>
+
+      <HelpFullscreen />
 
       {p.onToggleSound && (
         <section className="flex flex-col gap-2">
