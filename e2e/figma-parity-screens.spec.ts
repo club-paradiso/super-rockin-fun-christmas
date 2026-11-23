@@ -152,6 +152,15 @@ async function measure(page: Page, wants: Want[]) {
   );
 }
 
+// The real browser, not Playwright's "headless shell": the shell places glyphs differently (the
+// same Chromium 141 measures 2.2-2.5 % as the shell and 1.6-1.8 % as the browser), and no guest
+// ever sees the shell. An explicit executable (E2E_CHROMIUM_PATH) still wins.
+test.use({
+  channel: async ({ browserName }, use) => {
+    await use(browserName === "chromium" ? "chromium" : undefined);
+  },
+});
+
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
   await page.setViewportSize({ width: 768, height: 1024 });

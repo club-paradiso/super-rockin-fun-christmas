@@ -64,6 +64,11 @@ PW_ENGINE=webkit npx playwright test -c playwright.dev.config.ts e2e/figma-parit
 | 필름 4컷 옵션 `898:2006` | 1 px                    | 1.464 %            | 1 px                  | 1.519 %          | 통과 |
 | 체크 2컷 옵션 `898:2083` | 1 px                    | 1.484 %            | 1 px                  | 1.505 %          | 통과 |
 
+같은 화면을 CI가 쓰는 Chromium 141(Playwright 빌드 1194)로 재면 1.57~1.78 %로 역시 기준 안이다. 단, 이 값은 **실제 브라우저
+빌드**로 잰 것이다. Playwright의 "headless shell"(테스트 전용 축소 빌드)은 같은 141 버전인데도 글자를 다른 자리에 그려
+2.2~2.5 %가 나온다. 손님이 보는 화면이 아니므로 화면 비교 테스트는 실제 브라우저 빌드를 쓰도록 고정했다
+(`e2e/figma-parity-screens.spec.ts` 의 `channel`). 기준(2 %)은 그대로다.
+
 글자 크기는 네 화면 모두 Figma와 같다(테스트가 0.25 px 이내로 확인). 고치기 전: 최대 위치 오차 81 px(워드마크),
 차이 픽셀 16~17 %.
 
@@ -104,8 +109,8 @@ PW_ENGINE=webkit npx playwright test -c playwright.dev.config.ts e2e/figma-parit
 
 ### 저장소의 기준 그림은 압축본이다
 
-`tests/fixtures/figma-parity/`는 WebP(손실 압축, 15 MB)라서 그 자체가 차이를 조금 만든다. 그래서 같은 코드도
-압축본으로 재면 값이 더 크게 나온다(잰 값 최대 약 0.8 %, 기준 1 % 안. 민감한 3종은 품질을 높여 넣었다). 위 표는 무손실 PNG로 잰 값이고, 무손실 PNG는 용량(약 150 MB)
+`tests/fixtures/figma-parity/`의 결과물 기준 그림과 예시 사진은 WebP(손실 압축)라서 그 자체가 차이를 조금 만든다. 그래서 같은 코드도
+압축본으로 재면 값이 더 크게 나온다(잰 값 최대 약 0.8 %, 기준 1 % 안. 민감한 3종은 품질을 높여 넣었다). 화면 4개의 기준 그림은 무손실 WebP라 이 문제가 없다(폴더 전체 약 17 MB). 위 표는 무손실 PNG로 잰 값이고, 무손실 PNG는 용량(약 150 MB)
 때문에 저장소에 넣지 않았다. `PARITY_REF_DIR=<무손실 PNG 폴더>`를 주면 그쪽으로 잰다.
 
 ## 4. Figma 레이어 전수 대조: 결과물 12종
