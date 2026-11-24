@@ -656,6 +656,7 @@ export class MemorySettingsRepository implements SettingsRepository {
     wallPublic: false,
     wallLook: defaultWallLook(),
     moderationMode: "manual",
+    photoLooks: false,
     updatedAt: now(),
     updatedBy: null,
   };
@@ -676,6 +677,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         wall_public: s.wallPublic,
         wall_look: s.wallLook,
         moderation_mode: s.moderationMode,
+        photo_looks: s.photoLooks,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
@@ -691,6 +693,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         ? { ...patch.wallLook, rotation: [...patch.wallLook.rotation] }
         : before.wallLook,
       moderationMode: patch.moderationMode ?? before.moderationMode,
+      photoLooks: patch.photoLooks ?? before.photoLooks,
       updatedAt: now(),
       updatedBy: staffUserId,
     };

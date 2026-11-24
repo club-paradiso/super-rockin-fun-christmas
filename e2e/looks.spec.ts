@@ -427,6 +427,65 @@ test.describe("the booth with looks", () => {
     expect(Buffer.from(await copy.body()).equals(Buffer.from(preview))).toBe(true);
   });
 
+  test("the staff switch arrives mid-session: this guest keeps what they started with, the next gets the look", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await enrollKiosk(page);
+    // The switch as the booth hears it with its heartbeat, turned here without a staff page.
+    let heard = false;
+    await page.route("**/api/kiosk/heartbeat", async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({ response, json: { ...body, photoLooks: heard } });
+    });
+    await page.clock.install();
+    await page.goto("/kiosk?camera=mock");
+    await startSession(page, "film35", { color: "mono" });
+    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+
+    heard = true;
+    const beat = page.waitForResponse("**/api/kiosk/heartbeat");
+    await page.clock.fastForward(46_000);
+    await beat;
+    // Heard, and not applied: nothing changes under a guest.
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("review-shot-0").locator("img")).toHaveAttribute("src", /^blob:/);
+    await toSelect(page);
+    await selectDefaultPhotos(page);
+    await answerForQr(page, "no");
+    await page.getByRole("button", { name: "다 받았어요" }).click();
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+
+    await startSession(page, "film35", { color: "mono" });
+    await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-look-view", "mono");
+  });
+
+  test("looks on, a colour frame: the camera view is left alone and the shots are graded", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await enrollKiosk(page);
+    await page.goto("/kiosk?camera=mock&looks=1");
+    await startSession(page, "film4");
+    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    for (const index of [0, 5])
+      await expect(page.getByTestId(`review-shot-${index}`).locator("img")).toHaveAttribute(
+        "src",
+        /^data:image\/jpeg/,
+      );
+    await toSelect(page);
+    await expect(page.getByTestId("select-shot-0").locator("img")).toHaveAttribute(
+      "src",
+      /^data:image\/jpeg/,
+    );
+  });
+
   test("?looks=1 without WebGL: the session finishes with the frame's own tone, and says why", async ({
     page,
   }) => {

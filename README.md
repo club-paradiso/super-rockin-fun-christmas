@@ -91,7 +91,9 @@ in production. Deployment (Vercel + Supabase) is described in [`docs/DEPLOYMENT.
 Eight candidate looks for the guest's photos ("one film, several developments"), each a 3D LUT
 applied by one WebGL1 shader. They are **behind a flag and off by default**: the booth composes
 exactly as before until `NEXT_PUBLIC_LOOKS=1` is set at build time, or `?looks=1` is added to the
-booth address on one tablet (`/kiosk?looks=1`). Research and audit:
+booth address on one tablet (`/kiosk?looks=1`), or staff turn on **사진 색 보정** in `/admin`
+(every booth, from its next guest; see [docs/ADMIN.md](docs/ADMIN.md)). Guests never pick a look:
+the frame decides it. Research and audit:
 [`docs/research/color-market-research.md`](docs/research/color-market-research.md),
 [`docs/research/existing-filter-audit.md`](docs/research/existing-filter-audit.md).
 

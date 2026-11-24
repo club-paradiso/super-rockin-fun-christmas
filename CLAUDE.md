@@ -55,10 +55,18 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `.cube`; `tests/unit/looks-cube.test.ts` fails while file and numbers disagree). One WebGL1 shader
   (`lib/looks/shader.ts`) applies halation (small lights only), the LUT, strength, grain and corner falloff; the frame previews
   and the final composite pass the same `grade` to `composeFrame`, so their colours cannot differ.
-  Which frame gets which look is `config/looks/frame-looks.json`, never code. With the flag off
-  (`looksEnabled`: `NEXT_PUBLIC_LOOKS=1` or `?looks=1`) the booth fetches no LUT, creates no WebGL
-  context and composes as before; that is what the Figma parity tests measure, so do not turn the
-  flag on by default without new Figma examples. When WebGL fails the photo keeps the frame's own
+  Which frame gets which look is `config/looks/frame-looks.json`, never code. With looks off the booth fetches no LUT, creates no WebGL
+  context and composes as before; that is what the Figma parity tests measure, so do not turn them
+  on by default without new Figma examples. What turns them on (`looksActive`): the address
+  (`?looks=1` / `?looks=0`, which wins), else the build (`NEXT_PUBLIC_LOOKS=1`) or the staff switch
+  「사진 색 보정」 (`settings.photoLooks`, audited through `ftl_settings_set_looks`, default off). The
+  switch reaches a booth with its heartbeat and is taken up only on "화면을 눌러 시작"
+  (`sessionLooks`): never under a guest. **There is no screen where a guest picks a look**: the
+  frame decides it. With looks on, the six shots on the review and choice screens are shown in the
+  frame's look (`gradedShots`, the same grader as the print), and the live camera picture of a
+  black-and-white or sepia frame is shown that way with a CSS filter on the `<video>` only
+  (`lookViewForFrame`); a colour look never changes the camera view. Staff read the state on the
+  booth in the help menu (`lib/looks/status.ts`). When WebGL fails the photo keeps the frame's own
   `photoTone` and the reason goes to the console (`[looks]`): never silently, never a blocked guest.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
   greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell

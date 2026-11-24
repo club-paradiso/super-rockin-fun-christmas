@@ -1095,6 +1095,15 @@ body {
     border-radius: 2px;
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
   }
+  /* A black-and-white frame with 「사진 색 보정」 on: the guest sees themselves that way before
+     the shot. An element filter (Safari 15 has it), on the view only: the shot is never taken
+     from this element, and the print's tone is the look's own arithmetic (lib/looks). */
+  .camera-preview video[data-look-view="mono"] {
+    filter: grayscale(1) contrast(1.06);
+  }
+  .camera-preview video[data-look-view="sepia"] {
+    filter: grayscale(1) sepia(0.32) contrast(1.04);
+  }
   @supports (container-type: size) {
     .camera-preview {
       width: min(100cqw, calc(100cqh * var(--aspect, 1.3333)));

@@ -142,6 +142,16 @@ lasts the normal link lifetime, but never past the photo's retention date.
 
 While any switch is on, a red banner appears on every admin page.
 
+Under the three switches is **사진 색 보정** (`settings.photoLooks`, off by default; not an emergency
+switch, so no banner). On: every booth applies each frame's look (`config/looks/frame-looks.json`)
+to the photos it saves, shows the six shots in that look on the review and choice screens, and
+shows the camera picture of a black-and-white or sepia frame that way. A booth hears the change
+with its next heartbeat (within 45 s) and takes it up when the next guest starts; the guest at the
+booth finishes as they began. The change is audited (`update_settings`). On a booth, the staff help
+menu shows the state under 「사진 색 보정」: 켜짐 / 꺼짐 / 준비 중 / 적용 안 됨 with the reason (a
+tablet without WebGL keeps the old colours). `?looks=0` or `?looks=1` in one tablet's address
+overrides the switch for that tablet.
+
 ## 미디어월 사진 속도 (설정, D92)
 
 - **한 장이 떠 있는 시간**: 5–120 s (default 14 s). Shorter turns photos over faster.

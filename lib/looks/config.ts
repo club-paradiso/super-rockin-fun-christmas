@@ -57,8 +57,44 @@ export function frameLookProblems(
  * does not load a LUT, does not create a WebGL context and composes exactly as before.
  */
 export function looksEnabled(search?: string): boolean {
+  return looksOverride(search) ?? process.env.NEXT_PUBLIC_LOOKS === "1";
+}
+
+/** What the address says about looks: `?looks=1` true, `?looks=0` false, anything else null. */
+export function looksOverride(search?: string): boolean | null {
   const query = search === undefined ? null : new URLSearchParams(search).get("looks");
-  if (query === "1") return true;
-  if (query === "0") return false;
-  return process.env.NEXT_PUBLIC_LOOKS === "1";
+  return query === "1" ? true : query === "0" ? false : null;
+}
+
+/**
+ * Whether this booth applies looks: the address if it says, otherwise the build flag or the staff
+ * switch (`settings.photoLooks`, 「사진 색 보정」 in /admin). The address wins over the switch so
+ * one tablet can be tried, or held back, without touching the others.
+ */
+export function looksActive(search: string | undefined, staffSwitch: boolean): boolean {
+  return looksOverride(search) ?? (process.env.NEXT_PUBLIC_LOOKS === "1" || staffSwitch);
+}
+
+/**
+ * The staff switch reaches a booth with its heartbeat, at any moment; the booth takes it up only
+ * on "화면을 눌러 시작" (phase `attract`). A guest who has started keeps what they started with,
+ * so their thumbnails, camera view and print agree to the end.
+ */
+export function sessionLooks(phase: string, current: boolean, heard: boolean): boolean {
+  return phase === "attract" ? heard : current;
+}
+
+/**
+ * How the live camera picture is shown while a frame's look is on: a black-and-white frame shows
+ * the guest in black and white before the shot, so the print is no surprise. Only the two looks
+ * without colour change the view; a colour look is too subtle to be worth imitating in CSS, and
+ * an imitation that differs from the print would be worse than none.
+ */
+export type LookView = "mono" | "sepia" | null;
+
+export function lookViewForFrame(frameId: string, map: FrameLookMap = FRAME_LOOKS): LookView {
+  const entry = lookForFrame(frameId, map);
+  if (!entry?.look.grade.mono || entry.strength * entry.look.strength < 0.5) return null;
+  // A toned black and white (walnut) has a warm shadow tint; a neutral one (ink) has almost none.
+  return entry.look.grade.shadowTint.b > 0.01 ? "sepia" : "mono";
 }
