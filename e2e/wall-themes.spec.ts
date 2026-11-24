@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import sharp from "sharp";
+import { getFrame } from "../config/frames";
 import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "../config/wall-themes";
 import { planWallFit } from "../lib/wall/fit";
 import { ENROLL_SECRET, PORT, USE_SUPABASE } from "./env";
@@ -24,8 +25,11 @@ test.skip(USE_SUPABASE, "reads photo ids from the local store");
 test.describe.configure({ mode: "serial" });
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
-const PUBLIC_FRAMES = ["navy-strip", "shalom-grid", "shalom-card", "shalom-film", "wood-window"];
-const VENUE_FRAMES = ["shalom-letter", "shalom-ticket"];
+// The booth's frames (틀 선택 v2): the Figma results the booth is measured against
+// (tests/fixtures/figma-parity/ref-*.webp, the booth's own output size), so the wall hangs exactly
+// what a guest takes. Strips, the polaroid (1200 × 1459) and the lace oval (1200 × 1500).
+const PUBLIC_FRAMES = ["polaroid1", "film35-natural", "lace1", "verse4", "check2-red"];
+const VENUE_FRAMES = ["film4-cream", "polaroid3"];
 let admin: APIRequestContext;
 let booth: Page;
 const publicIds: string[] = [];
@@ -49,8 +53,8 @@ async function photoId(sessionId: string) {
 /** One approved wall photo, consented with or without the public-wall notice. */
 async function approvedPhoto(frame: string, scope: "public" | "venue") {
   const sessionId = randomUUID();
-  const data = await sharp(await readFile(`docs/screenshots/frame-${frame}.jpg`))
-    .jpeg({ quality: 86 })
+  const data = await sharp(await readFile(`tests/fixtures/figma-parity/ref-${frame}.webp`))
+    .jpeg({ quality: 92 })
     .toBuffer();
   const up = await booth.request.post("/api/photos", {
     data,
@@ -175,7 +179,7 @@ test("hiding or deleting a photo takes it off the public wall within one poll", 
   expect((await anon.request.get(`/api/wall/photos/${victim}/image`)).status()).toBe(200);
 
   // Deleted: terminal, and refused for good.
-  const doomed = await approvedPhoto("cream-strip", "public");
+  const doomed = await approvedPhoto("film3-mono-logo", "public");
   await expect
     .poll(async () =>
       (
@@ -326,8 +330,12 @@ for (const theme of WALL_THEMES) {
     const photos = await page.getByTestId("wall-photo-image").evaluateAll((imgs) =>
       (imgs as HTMLImageElement[]).map((img) => {
         const r = img.getBoundingClientRect();
+        // Layout size, before the slot's tilt and the scene's scale (a turned box is wider).
+        const pad = parseFloat(getComputedStyle(img).paddingTop) || 0;
         return {
+          frameId: img.closest("figure")?.dataset.frameId ?? "",
           natural: img.naturalWidth / img.naturalHeight,
+          box: img.offsetWidth / (img.offsetHeight - pad),
           left: r.left,
           right: r.right,
           top: r.top,
@@ -339,6 +347,12 @@ for (const theme of WALL_THEMES) {
     expect(photos.length).toBeGreaterThan(0);
     for (const p of photos) {
       expect(p.fit).toBe("contain"); // never stretched, never cropped
+      // The booth's frame, recognised: the picture is the booth's output at its own shape, and
+      // the wall gives it a box of exactly that shape (no stamp inside a strip box, no bars).
+      const frame = getFrame(p.frameId);
+      expect(p.frameId, "the wall knows the booth frame").toBe(frame.id);
+      expect(p.natural).toBeCloseTo(frame.outputWidth / frame.outputHeight, 2);
+      expect(Math.abs(p.box / p.natural - 1), `${p.frameId} box shape`).toBeLessThan(0.03);
       expect(p.left).toBeGreaterThanOrEqual(bg.x);
       expect(p.right).toBeLessThanOrEqual(bg.x + bg.width);
       expect(p.bottom).toBeLessThanOrEqual(bg.y + bg.height);

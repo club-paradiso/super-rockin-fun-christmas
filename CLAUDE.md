@@ -161,6 +161,9 @@ looks:measure`). `/looks` is the comparison
   theme's own numbers. Every variant passes the same theme tests.
 - **The wall fits any screen by itself** (D110): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
   photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
+  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at the top centre of the screen
+  (`plan.mark`, D112), so every theme keeps its whole band free of photos and clips. A screen that
+  enlarges the scene gets the theme's `background2x`; low-spec mode never does.
   Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
   with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep
   `tests/unit/wall-fit.test.ts` green. The wall re-plans on resize/fullscreen without a reload.

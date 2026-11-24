@@ -19,6 +19,7 @@ import {
   type Rect,
 } from "@/lib/wall/layout";
 import { readFileSync } from "node:fs";
+import { slotEnvelope, wordmarkBox } from "@/lib/wall/fit";
 import {
   ROTATE_MINUTES,
   activeThemeId,
@@ -61,6 +62,12 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect([theme.scene.width, theme.scene.height]).toEqual(isCut ? [3096, 1290] : [3840, 1080]);
     const bg = await sharp(file(theme.background)).metadata();
     expect([bg.width, bg.height]).toEqual([theme.scene.width, theme.scene.height]);
+    // The 2× picture for screens that enlarge the scene: the same picture at twice the pixels.
+    if (theme.status === "current") {
+      expect(theme.background2x, "2× picture").toBeTruthy();
+      const hd = await sharp(file(theme.background2x!)).metadata();
+      expect([hd.width, hd.height]).toEqual([2 * theme.scene.width, 2 * theme.scene.height]);
+    }
     const preview = await sharp(file(theme.preview)).metadata();
     expect([preview.width, preview.height]).toEqual([640, 180]);
     if (theme.hang.kind === "clip") expect(existsSync(file(theme.hang.image))).toBe(true);
@@ -120,32 +127,48 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(b.width).toBeGreaterThan(layout.slots[0]!.box.width * 1.5);
   });
 
-  it("keeps the wordmark clear of every photo and inside the picture", () => {
+  it("keeps the whole band of the logo clear of every photo and clip, inside the picture", () => {
     if (!theme.wordmark) {
       expect(theme.status).toBe("legacy"); // only the old picture carries its own wordmark
       return;
     }
-    const { x, y, size, tone } = theme.wordmark;
-    // "STUDIO SHALOM | 평화의 벽" on one line is about 10.5 × the font size wide; the paper tag
-    // adds its padding (0.75em each side, 0.3em above and below).
-    const pad = tone === "label" ? { x: size * 0.75, y: size * 0.3 } : { x: 0, y: 0 };
-    const mark: Rect = {
-      x: x - size * 5.25 - pad.x,
-      y: y - 4,
-      width: size * 10.5 + 2 * pad.x,
-      height: size + 8 + 2 * pad.y,
-    };
-    expect(mark.x).toBeGreaterThan(0);
-    expect(mark.x + mark.width).toBeLessThan(layout.width);
-    expect(mark.y).toBeGreaterThanOrEqual(0);
-    expect(mark.y + mark.height).toBeLessThan(layout.height);
-    expect(size).toBeGreaterThanOrEqual(56); // readable across a room on a 1080-line wall
+    // The wall centres the logo on the screen (planWallFit), over the photos it hangs (at least
+    // two neighbours, WALL_FIT.minSlots): so it may sit anywhere between the middle of the first
+    // two slots and the middle of the last two, and nothing may reach it there.
+    const box = wordmarkBox(theme, layout.width / 2)!;
+    const xs = layout.slots.map((p) => p.x);
+    const first = (xs[0]! + xs[1]!) / 2;
+    const last = (xs.at(-2)! + xs.at(-1)!) / 2;
+    const centres = Array.from({ length: 41 }, (_, k) => first + ((last - first) * k) / 40);
+    const bands: Rect[] = centres.map((c) => {
+      const b = wordmarkBox(theme, c)!;
+      return { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 };
+    });
+    const band = bands[20]!;
+    expect(box.x).toBeGreaterThan(0);
+    expect(box.x + box.width).toBeLessThan(layout.width);
+    expect(band.y).toBeGreaterThanOrEqual(0);
+    // At the top: never further down than a fifth of the picture.
+    expect(box.y).toBeLessThan(layout.height * 0.2);
+    // Readable across a room on a 1080-line wall (a tag's paper adds contrast, so it may be smaller).
+    expect(theme.wordmark.size).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 72 : 76);
+    // Pegs painted in the picture hang all along the line, not only at the slots.
+    if (theme.hang.kind === "in-picture") {
+      for (const b of bands)
+        for (let x = b.x; x <= b.x + b.width; x += 10)
+          expect(lineYAt(theme.scene.line, x) - clipReach(theme.hang)).toBeGreaterThan(
+            b.y + b.height,
+          );
+    }
     layout.slots.forEach((place, i) => {
-      for (const b of boxesIn(i)) {
-        // The photo box plus what holds it (the clip reaches above the line, plus a margin).
-        const reach = clipReach(theme.hang) + 4;
-        const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
-        expect(overlaps(mark, withClip)).toBe(false);
+      for (const band of bands) {
+        expect(overlaps(band, slotEnvelope(place, theme))).toBe(false);
+        for (const b of boxesIn(i)) {
+          // The photo box plus what holds it (the clip reaches above the line, plus a margin).
+          const reach = clipReach(theme.hang) + 4;
+          const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
+          expect(overlaps(band, withClip)).toBe(false);
+        }
       }
     });
   });
@@ -216,9 +239,10 @@ describe("a theme cut for the screen's shape (D91)", () => {
           6,
         );
       }
-      // Photos keep their size; the wordmark keeps its size.
+      // Photos keep their size; the logo keeps its size and stays at the top.
       expect(cut.scene.strip).toEqual(base.scene.strip);
       expect(cut.wordmark!.size).toBe(base.wordmark!.size);
+      expect(cut.wordmark!.y).toBeLessThanOrEqual(k * (base.wordmark!.y + top));
     }
   });
 

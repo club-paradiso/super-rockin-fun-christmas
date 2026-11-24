@@ -25,8 +25,11 @@ export const WALL_FIT = {
    * does not flip between two near-equal plans (each flip restarts the photo rotation).
    */
   stickiness: 1.08,
-  /** Wordmark box in em of its font size (STUDIO SHALOM + rule + 평화의 벽, label padding included). */
-  wordmarkEm: { width: 15.5, height: 1.9 },
+  /**
+   * The logo (public/frames/v2/logo-*.svg, 170 × 40): width per unit of height, and the paper
+   * tag's padding around it for a `label` theme, as a share of the logo's height.
+   */
+  logo: { aspect: 170 / 40, labelPad: { x: 0.5, y: 0.3 } },
   /**
    * Bands cost: score × coverage^bandWeight (coverage = share of the screen the picture covers).
    */
@@ -69,6 +72,11 @@ export interface WallFitPlan {
   offset: { x: number; y: number };
   /** What must stay visible (photos at full swing, wordmark), in scene px. */
   safe: Rect;
+  /**
+   * The logo's box in scene px (label padding included), centred on the screen: top centre of
+   * what the wall shows, never outside the picture. Null for a theme without one.
+   */
+  mark: Rect | null;
   /** The part of the scene that is on screen, in scene px. */
   visible: Rect;
   /** Screen px the picture leaves uncovered on each side (the renderer fills them). */
@@ -108,17 +116,18 @@ export function slotEnvelope(place: SlotPlace, theme: WallTheme, lite = false): 
   };
 }
 
-/** The wordmark's box (scene px), estimated from its font size: it is real text (D73). */
-export function wordmarkBox(theme: WallTheme): Rect | null {
+/**
+ * The logo's box (scene px), label padding included, centred on `centerX` (default: the theme's
+ * own `x`).
+ */
+export function wordmarkBox(theme: WallTheme, centerX?: number): Rect | null {
   const mark = theme.wordmark;
   if (!mark) return null;
-  const width = mark.size * WALL_FIT.wordmarkEm.width;
-  return {
-    x: mark.x - width / 2,
-    y: mark.y,
-    width,
-    height: mark.size * WALL_FIT.wordmarkEm.height,
-  };
+  const { aspect, labelPad } = WALL_FIT.logo;
+  const pad = mark.tone === "label" ? labelPad : { x: 0, y: 0 };
+  const width = mark.size * (aspect + 2 * pad.x);
+  const height = mark.size * (1 + 2 * pad.y);
+  return { x: (centerX ?? mark.x) - width / 2, y: mark.y - mark.size * pad.y, width, height };
 }
 
 /** The theme and each of its cuts (D91), as full themes. */
@@ -150,11 +159,11 @@ function planFor(
   const { width: W, height: H } = screen;
   const scene = theme.scene;
   const layout = wallLayout(scene, slotIndexes);
-  const mark = wordmarkBox(theme);
-  const safe = union([
-    ...layout.slots.map((p) => slotEnvelope(p, theme, lite)),
-    ...(mark ? [mark] : []),
-  ]);
+  const photos = union(layout.slots.map((p) => slotEnvelope(p, theme, lite)));
+  // The logo goes to the top centre of the screen; what matters is centred on screen, so it is
+  // planned above the middle of the photos.
+  const planned = wordmarkBox(theme, photos.x + photos.width / 2);
+  const safe = union([photos, ...(planned ? [planned] : [])]);
 
   const m = WALL_FIT.margin * Math.min(W, H);
   const fit = Math.min((W - 2 * m) / safe.width, (H - 2 * m) / safe.height);
@@ -187,6 +196,13 @@ function planFor(
   const coverage = (Math.min(W, drawnW) * Math.min(H, drawnH)) / (W * H);
   const vx = Math.max(0, -x / scale);
   const vy = Math.max(0, -y / scale);
+  // Top centre of the screen, kept inside the picture (only matters next to a band).
+  let mark: Rect | null = null;
+  if (planned) {
+    const half = planned.width / 2;
+    const centre = Math.min(Math.max((W / 2 - x) / scale, half), scene.width - half);
+    mark = { ...planned, x: centre - half };
+  }
   return {
     key: `${cut}:${slotIndexes.join(",")}`,
     theme,
@@ -196,6 +212,7 @@ function planFor(
     scale,
     offset: { x, y },
     safe,
+    mark,
     visible: {
       x: vx,
       y: vy,

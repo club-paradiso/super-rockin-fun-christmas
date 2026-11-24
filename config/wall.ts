@@ -50,8 +50,11 @@ export const WALL_CONFIG = {
   },
   /** Low-spec mode (?lite=1 or WALL_LITE=1): fades only, and these four slots (no middle one). */
   liteSlots: [0, 1, 3, 4],
-  /** Long edge of the wall image (px). Above the photo height on a 2160-line LED. */
-  imageLongEdge: 1400,
+  /**
+   * Long edge of the wall image (px). Above the tallest photo on a 2160-line screen (a strip on a
+   * 4K TV is about 1000 px tall), so the screen only shrinks it.
+   */
+  imageLongEdge: 1800,
   watchdog: {
     /** No animation frame for this long while visible → reload the page. */
     stallMs: 10_000,
