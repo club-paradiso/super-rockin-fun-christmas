@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MOBILE_UPLOAD_CONFIG, mobileBoothFrame, mobileFrameId } from "@/config/mobile";
+import { MOBILE_UPLOAD_CONFIG, mobileFrameId, mobileOfferedFrame } from "@/config/mobile";
 import { matchesFrameShape, normalizeMobilePhoto, UnreadableImageError } from "@/lib/mobile/image";
 import { readUploadToken } from "@/lib/mobile/server";
 import { getServerConfig } from "@/lib/server/env";
@@ -52,9 +52,10 @@ export const POST = route("mobile_upload", async (request: Request) => {
   if (!perQr.take(sessionId)) return jsonError(429, "too many requests");
   if (request.headers.get("x-wall-consent") !== "yes") return jsonError(400, "consent required");
 
-  // A framed picture (D93): only a current booth frame, stored as phone-<frame id>.
+  // A framed picture (D93): only a frame the phone page offers (the booth's v2 frames), stored
+  // as phone-<frame id>. The frames dropped on 2026-11-22 are refused.
   const frameHeader = request.headers.get("x-frame-id");
-  const frame = frameHeader ? mobileBoothFrame(mobileFrameId(frameHeader)) : null;
+  const frame = frameHeader ? mobileOfferedFrame(frameHeader) : null;
   if (frameHeader && !frame) return jsonError(400, "frame");
 
   const mime = request.headers.get("content-type")?.split(";")[0]?.trim() ?? "";

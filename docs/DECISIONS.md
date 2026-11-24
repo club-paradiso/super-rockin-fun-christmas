@@ -1810,3 +1810,26 @@ User request: the wall looked broken up (화질이 깨짐), the clothespins look
 
 Not verified: a real 4K TV, the church board and the LED; how a low-power wall PC copes with a
 7680 × 2160 picture (low-spec mode never loads it).
+
+## D113 · The phone page offers the booth's own frames, and the QR screen matches Figma M1 (2026-11-23)
+
+User request: the kiosk did not match the Figma file. Two leftovers named by the user:
+
+- **Phone frames.** 「내 사진으로 참여하기」 still listed the 20 frames the booth dropped on
+  2026-11-22 (`FRAMES`, D93). The phone page now offers exactly the booth's eight cards of
+  `config/frames/v2.ts`, with the same options (colour, logo, tone) on the frame step, the same
+  sample photos, a handwriting font drawn once per guest, and the date stamp from the server's
+  day (`serverNow` from the page). `MOBILE_FRAMES = V2_FRAMES`; `/api/mobile/upload` accepts only
+  those (`mobileOfferedFrame`) and refuses a dropped frame with 400 `frame`. A photo already
+  stored as `phone-<old frame>` keeps its id and still hangs in that frame
+  (`mobileBoothFrame` reads every known frame).
+- **The booth's QR screen** (Figma KIOSK `M1 · 내 사진으로 참여하기 · QR`, 396:1633): the three
+  steps are Figma's wording, and the line under the QR card ("운영팀이 확인한 사진만 미디어월에
+  걸려요. 회원가입이나 앱 설치는 필요 없어요.") is gone, as in Figma. The Wi-Fi line stays, only
+  on a hub without a cloud (the phone cannot open the page otherwise).
+
+Five more lines differed from older Figma screens. The user chose Figma for all of them
+(2026-11-23): M4's title "지금은 사진 접수를 잠시 멈췄어요" (replacing the 2026-11-14
+"미디어월 게시 신청을 잠시 멈췄어요" on that screen only; the welcome line keeps the switch's name),
+the camera-error lead (3e), the video line on the shooting screen (3b), the send-failed lead (8e)
+and the English welcome sub-line (1c). English and Chinese follow the new Korean.
