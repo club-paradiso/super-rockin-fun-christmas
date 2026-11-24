@@ -137,29 +137,16 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(b.width).toBeGreaterThan(layout.slots[0]!.box.width * 1.5);
   });
 
-  it("keeps the whole band of the logo clear of every photo and clip, inside the picture", () => {
-    if (!theme.wordmark) {
-      expect(theme.status).toBe("legacy"); // only the old picture carries its own wordmark
-      return;
-    }
-    // The wall centres the logo on the screen (planWallFit), over the photos it hangs (at least
-    // two neighbours, WALL_FIT.minSlots): so it may sit anywhere between the middle of the first
-    // two slots and the middle of the last two, and nothing may reach it there.
-    const box = wordmarkBox(theme, layout.width / 2)!;
-    const xs = layout.slots.map((p) => p.x);
-    const first = (xs[0]! + xs[1]!) / 2;
-    const last = (xs.at(-2)! + xs.at(-1)!) / 2;
-    const centres = Array.from({ length: 41 }, (_, k) => first + ((last - first) * k) / 40);
-    const bands: Rect[] = centres.map((c) => {
-      const b = wordmarkBox(theme, c)!;
-      return { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 };
-    });
-    const band = bands[20]!;
-    expect(box.x).toBeGreaterThan(0);
-    expect(box.x + box.width).toBeLessThan(layout.width);
+  it("keeps the logo at its own place, clear of every photo and clip, inside the picture", () => {
+    if (!theme.wordmark) return;
+    // The logo belongs to the picture (D116): it stays where the theme puts it, on every screen.
+    const box = wordmarkBox(theme)!;
+    const band = { x: box.x - 4, y: box.y - 4, width: box.width + 8, height: box.height + 8 };
+    const bands: Rect[] = [band];
+    expect(band.x).toBeGreaterThanOrEqual(0);
+    expect(band.x + band.width).toBeLessThanOrEqual(layout.width);
     expect(band.y).toBeGreaterThanOrEqual(0);
-    // At the top: never further down than a fifth of the picture.
-    expect(box.y).toBeLessThan(layout.height * 0.2);
+    expect(band.y + band.height).toBeLessThanOrEqual(layout.height);
     // Readable across a room on a 1080-line wall (a tag's paper adds contrast, so it may be smaller).
     expect(theme.wordmark.size).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 72 : 76);
     // Pegs painted in the picture hang all along the line, not only at the slots.
@@ -249,10 +236,11 @@ describe("a theme cut for the screen's shape (D91)", () => {
           6,
         );
       }
-      // Photos keep their size; the logo keeps its size and stays at the top.
+      // Photos keep their size; the logo keeps its size and the same point of the picture.
       expect(cut.scene.strip).toEqual(base.scene.strip);
       expect(cut.wordmark!.size).toBe(base.wordmark!.size);
-      expect(cut.wordmark!.y).toBeLessThanOrEqual(k * (base.wordmark!.y + top));
+      expect(cut.wordmark!.x).toBeCloseTo(k * base.wordmark!.x - left, -0.5);
+      expect(cut.wordmark!.y).toBeCloseTo(k * (base.wordmark!.y + top), -0.5);
     }
   });
 
@@ -275,9 +263,9 @@ describe("wall theme registry", () => {
     const ids = WALL_THEMES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(getWallTheme(DEFAULT_WALL_THEME).status).toBe("current");
-    expect(WALL_THEMES.filter((t) => t.status === "legacy").map((t) => t.id)).toEqual([
-      "night-window",
-    ]);
+    // The old FOLLOW THE LIGHTS night scene was removed (D116): every theme is a current one.
+    expect(WALL_THEMES.filter((t) => t.status === "legacy")).toEqual([]);
+    expect(getWallTheme("night-window").id).toBe(DEFAULT_WALL_THEME);
     expect(WALL_THEMES.filter((t) => t.status === "current")).toHaveLength(8);
     // An id nobody knows (a removed theme, a typo in stored settings) falls back to the default.
     expect(getWallTheme("gone").id).toBe(DEFAULT_WALL_THEME);

@@ -155,14 +155,17 @@ looks:measure`). `/looks` is the comparison
   (`scripts/wall-backgrounds.mjs`). Never branch on a theme id in `components/wall`. Every theme
   must pass `tests/unit/wall-themes.test.ts` (every frame format inside the picture, neighbours
   apart, wordmark never behind a photo). The active theme comes from the feed
-  (`activeThemeId`, a function of the staff setting and the clock). `night-window` is the old
-  FOLLOW THE LIGHTS scene: selectable, never the default. A theme may carry `variants`: the same
+  (`activeThemeId`, a function of the staff setting and the clock). The old FOLLOW THE LIGHTS
+  scene (`night-window`) was removed (D116): a stored id that no longer exists falls back to the
+  default theme. A theme may carry `variants`: the same
   picture cut for another screen shape (D91, the 2.4:1 board), derived with `recutTheme` from the
   theme's own numbers. Every variant passes the same theme tests.
 - **The wall fits any screen by itself** (D110): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
   photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
-  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at the top centre of the screen
-  (`plan.mark`, D112), so every theme keeps its whole band free of photos and clips. A screen that
+  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at its own place in each picture
+  (`theme.wordmark`, `plan.mark`, D116: under a star, painted on plaster, burned into a sill, a tag
+  on a garland), moving with the picture, never with the screen, and clear of every photo and clip
+  on every screen. Nothing hangs a clip over the line elsewhere: every theme uses tape (D115). A screen that
   enlarges the scene gets the theme's `background2x`; low-spec mode never does.
   Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
   with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep

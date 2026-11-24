@@ -73,8 +73,8 @@ export interface WallFitPlan {
   /** What must stay visible (photos at full swing, wordmark), in scene px. */
   safe: Rect;
   /**
-   * The logo's box in scene px (label padding included), centred on the screen: top centre of
-   * what the wall shows, never outside the picture. Null for a theme without one.
+   * The logo's box in scene px (label padding included), at the theme's own place in its picture
+   * (D116), fitted on screen like the photos. Null for a theme without one.
    */
   mark: Rect | null;
   /** The part of the scene that is on screen, in scene px. */
@@ -160,9 +160,8 @@ function planFor(
   const scene = theme.scene;
   const layout = wallLayout(scene, slotIndexes);
   const photos = union(layout.slots.map((p) => slotEnvelope(p, theme, lite)));
-  // The logo goes to the top centre of the screen; what matters is centred on screen, so it is
-  // planned above the middle of the photos.
-  const planned = wordmarkBox(theme, photos.x + photos.width / 2);
+  // The logo has its own place in each picture (D116), so it is fitted like the photos.
+  const planned = wordmarkBox(theme);
   const safe = union([photos, ...(planned ? [planned] : [])]);
 
   const m = WALL_FIT.margin * Math.min(W, H);
@@ -196,13 +195,7 @@ function planFor(
   const coverage = (Math.min(W, drawnW) * Math.min(H, drawnH)) / (W * H);
   const vx = Math.max(0, -x / scale);
   const vy = Math.max(0, -y / scale);
-  // Top centre of the screen, kept inside the picture (only matters next to a band).
-  let mark: Rect | null = null;
-  if (planned) {
-    const half = planned.width / 2;
-    const centre = Math.min(Math.max((W / 2 - x) / scale, half), scene.width - half);
-    mark = { ...planned, x: centre - half };
-  }
+  const mark: Rect | null = planned;
   return {
     key: `${cut}:${slotIndexes.join(",")}`,
     theme,

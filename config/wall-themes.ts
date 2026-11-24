@@ -1,4 +1,3 @@
-import { WALL_CONFIG } from "./wall";
 import {
   HALF_LIFE_MINUTES,
   ROTATE_MINUTES,
@@ -86,6 +85,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 440,
+    // The logo is painted on the plaster above the rope, in the sunlight through the leaves.
     wordmark: { x: 1920, y: 48, size: 104, tone: "ink" },
     emptyTextY: 620,
     motion: "none",
@@ -117,7 +117,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 380,
-    wordmark: { x: 1920, y: 40, size: 104, tone: "ink" },
+    // The logo is in the sky above the chapel, between the rope and the chapel's cross.
+    wordmark: { x: 3090, y: 248, size: 84, tone: "ink" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -149,6 +150,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 440,
+    // The logo is right under the star.
     wordmark: { x: 1920, y: 118, size: 76, tone: "ink" },
     emptyTextY: 700,
     motion: "none",
@@ -181,7 +183,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1920, y: 48, size: 104, tone: "cream" },
+    // The logo is under the star of Bethlehem (measured at x 2575, y 50), like starlight.
+    wordmark: { x: 2575, y: 120, size: 92, tone: "cream" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -211,7 +214,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is burned into the front of the wooden window sill, under the photos.
+    wordmark: { x: 1920, y: 898, size: 76, tone: "ink" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -241,7 +245,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is painted on the plaster under the window.
+    wordmark: { x: 1920, y: 892, size: 80, tone: "ink" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -271,7 +276,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is a paper tag hung from the garland under its right-hand poinsettia.
+    wordmark: { x: 2940, y: 92, size: 76, tone: "label" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -301,27 +307,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 528, x2: 3172, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is a paper tag hung from the garland near the left end of the window.
+    wordmark: { x: 860, y: 92, size: 76, tone: "label" },
     emptyTextY: 600,
-    motion: "none",
-  },
-  {
-    id: "night-window",
-    name: "제주 밤 11시 창가 (이전 장면)",
-    note: "FOLLOW THE LIGHTS 때의 밤 장면. 기록용으로 남겨 뒀어요",
-    source: "Figma FTL · 미디어월 (Wall / Composite preview v3)",
-    status: "legacy",
-    background: WALL_CONFIG.scene.background,
-    preview: "/wall/themes/night-window.preview.jpg",
-    fallbackColor: "#0B0806",
-    tone: "dark",
-    scene: WALL_CONFIG.scene,
-    liteSlots: WALL_CONFIG.liteSlots,
-    hang: TAPE,
-    rope: null,
-    wideMax: 340,
-    wordmark: null,
-    emptyTextY: WALL_CONFIG.scene.line.y0 + 281,
     motion: "none",
   },
 ];
@@ -354,8 +342,7 @@ const BOARD_CUTS: Record<
 > = {
   "peace-wall": { top: 150, left: 778 },
   "snowy-chapel": { top: 100, left: 778 },
-  // The logo stays under the star, which moves down with the picture.
-  "star-of-peace": { top: 60, left: 200, wordmarkY: 166 },
+  "star-of-peace": { top: 60, left: 200 },
   bethlehem: {
     top: 100,
     left: 778,

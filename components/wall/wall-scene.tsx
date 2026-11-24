@@ -9,7 +9,7 @@ import { WALL_LIGHT, clipImage, fitTheme, type WallTheme } from "@/lib/wall/them
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
- * STUDIO SHALOM logo at the top centre of the screen (`mark`, from the fit plan), and the hung
+ * STUDIO SHALOM logo at its place in the picture (`mark`, from the fit plan, D116), and the hung
  * photos on top. Drawn in scene pixels
  * (3840 × 1080, or the size of the theme's cut for this screen shape, D91); the parent scales it
  * to the screen. Nothing comes from the internet.

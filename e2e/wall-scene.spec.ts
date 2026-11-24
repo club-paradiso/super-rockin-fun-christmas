@@ -209,12 +209,11 @@ for (const shape of SHAPES) {
     const src = (await page.getByTestId("wall-background").getAttribute("src"))!;
     if (plan.scale > 1.05) expect(src).toBe(plan.theme.background2x);
     else expect(src).toBe(plan.theme.background);
-    // The logo: top centre of the screen (of the picture, where a band is left above it).
+    // The logo: at its own place in the picture (D116), wherever the screen puts the picture.
     const logo = (await page.getByTestId("wall-wordmark").boundingBox())!;
-    expect(Math.abs(logo.x + logo.width / 2 - shape.width / 2)).toBeLessThan(2);
-    expect(logo.y).toBeLessThan(
-      Math.max(0, plan.offset.y) + 0.2 * plan.theme.scene.height * plan.scale,
-    );
+    const mark = plan.mark!;
+    expect(Math.abs(logo.x - (plan.offset.x + plan.scale * mark.x))).toBeLessThan(2);
+    expect(Math.abs(logo.y - (plan.offset.y + plan.scale * mark.y))).toBeLessThan(2);
     const expected = Math.min(shape.slots, approved);
     await expect
       .poll(() => page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]').count(), {

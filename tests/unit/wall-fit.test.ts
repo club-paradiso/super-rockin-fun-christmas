@@ -60,14 +60,16 @@ describe("planWallFit (D110)", () => {
           expect(my + s * mark.height).toBeLessThanOrEqual(height + EPS);
           expect(mark.x).toBeGreaterThanOrEqual(-EPS);
           expect(mark.x + mark.width).toBeLessThanOrEqual(scene.width + EPS);
-          // Centred on the screen unless that would push it off the picture (next to a band).
-          if (plan.bands.left + plan.bands.right < EPS)
-            expect(mx + (s * mark.width) / 2).toBeCloseTo(width / 2, 3);
+          // At the theme's own place in the picture (D116), whatever the screen.
+          expect(mark).toEqual(wordmarkBox(plan.theme));
           // Clear of every photo, its clip and its swing.
           for (const p of plan.layout.slots) {
             const e = slotEnvelope(p, plan.theme);
             const apart =
-              e.y >= mark.y + mark.height || e.x >= mark.x + mark.width || mark.x >= e.x + e.width;
+              e.y >= mark.y + mark.height ||
+              mark.y >= e.y + e.height ||
+              e.x >= mark.x + mark.width ||
+              mark.x >= e.x + e.width;
             expect(apart).toBe(true);
           }
         }
