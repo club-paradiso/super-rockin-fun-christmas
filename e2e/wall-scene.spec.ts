@@ -204,14 +204,29 @@ for (const shape of SHAPES) {
     } else {
       await expect(page.getByTestId("wall-ambient")).toHaveCount(1);
     }
+    // A screen that enlarges the scene gets the 2× picture; the LED at 1:1 keeps the 1× one.
+    const plan = planWallFit(getWallTheme(DEFAULT_WALL_THEME), shape)!;
+    const src = (await page.getByTestId("wall-background").getAttribute("src"))!;
+    if (plan.scale > 1.05) expect(src).toBe(plan.theme.background2x);
+    else expect(src).toBe(plan.theme.background);
+    // The logo: top centre of the screen (of the picture, where a band is left above it).
+    const logo = (await page.getByTestId("wall-wordmark").boundingBox())!;
+    expect(Math.abs(logo.x + logo.width / 2 - shape.width / 2)).toBeLessThan(2);
+    expect(logo.y).toBeLessThan(
+      Math.max(0, plan.offset.y) + 0.2 * plan.theme.scene.height * plan.scale,
+    );
     const expected = Math.min(shape.slots, approved);
     await expect
       .poll(() => page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]').count(), {
         timeout: 60_000,
       })
       .toBeGreaterThanOrEqual(expected);
-    // Every photo is on screen once it has settled.
+    // Every photo is on screen once it has settled, below the logo.
     await page.waitForTimeout(3_300);
+    for (const clip of await page.getByTestId("wall-clip").all()) {
+      const c = (await clip.boundingBox())!;
+      expect(c.y).toBeGreaterThan(logo.y + logo.height);
+    }
     for (const img of await page.getByTestId("wall-photo-image").all()) {
       const b = (await img.boundingBox())!;
       expect(b.x).toBeGreaterThanOrEqual(-1);

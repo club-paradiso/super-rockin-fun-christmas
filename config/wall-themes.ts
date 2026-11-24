@@ -29,17 +29,20 @@ import {
  */
 const CANVAS = { width: 3840, height: 1080 } as const;
 /**
- * The wooden clothespin (the user's own picture, 2026-11): 323 × 1975 cut to 105 × 640 WebP.
- * Drawn 23 × 140. The photo's weight pulls it down, so the line rests at the top of its notch
- * (78.5 % down) and the jaw ends 30 px below the line, over the strip top.
+ * A strip of cream masking tape folded over the line and pressed onto the photo's top (user's
+ * choice, 2026-11-24, replacing the wooden clothespin: the same paper tape as the booth's journal,
+ * D104). Drawn 44 × 96: the line crosses it 34 px below its top, and it reaches 62 px under the
+ * line, over the strip's top edge (strips hang `drop` 12–20 px below the line). Turned a little on
+ * each slot so the tapes do not look stamped.
  */
-const PEG: WallClip = {
+const TAPE: WallClip = {
   kind: "clip",
-  image: "/wall/peg-wood.webp",
-  width: 23,
-  height: 140,
-  centerX: 11.5,
-  lineY: 110,
+  image: "/wall/tape-washi.svg",
+  width: 44,
+  height: 96,
+  centerX: 22,
+  lineY: 34,
+  tilts: [-4, 3, -2, 5, -3],
 };
 /**
  * The old brass clip, where it has always been drawn: 37 × 70, a 22.4 × 56 clip at (7, 2.8) whose
@@ -64,6 +67,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · S03 (354:28)`,
     status: "current",
     background: "/wall/themes/peace-wall.jpg",
+    background2x: "/wall/themes/peace-wall@2x.jpg",
     preview: "/wall/themes/peace-wall.preview.jpg",
     fallbackColor: "#E9C79B",
     tone: "light",
@@ -80,10 +84,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 3, 4],
-    hang: PEG,
+    hang: TAPE,
     rope: null,
     wideMax: 440,
-    wordmark: { x: 1960, y: 84, size: 64, tone: "ink" },
+    wordmark: { x: 1920, y: 48, size: 104, tone: "ink" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -94,6 +98,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · S01 (354:20)`,
     status: "current",
     background: "/wall/themes/snowy-chapel.jpg",
+    background2x: "/wall/themes/snowy-chapel@2x.jpg",
     preview: "/wall/themes/snowy-chapel.preview.jpg",
     fallbackColor: "#E2B79C",
     tone: "light",
@@ -110,10 +115,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 3, 4],
-    hang: PEG,
+    hang: TAPE,
     rope: null,
     wideMax: 380,
-    wordmark: { x: 1960, y: 64, size: 60, tone: "ink" },
+    wordmark: { x: 1920, y: 40, size: 104, tone: "ink" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -124,6 +129,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · S02 (354:24)`,
     status: "current",
     background: "/wall/themes/star-of-peace.jpg",
+    background2x: "/wall/themes/star-of-peace@2x.jpg",
     preview: "/wall/themes/star-of-peace.preview.jpg",
     fallbackColor: "#CDB3B4",
     tone: "light",
@@ -142,7 +148,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: { kind: "in-picture" },
     rope: null,
     wideMax: 440,
-    wordmark: { x: 1920, y: 950, size: 56, tone: "label" },
+    wordmark: { x: 1920, y: 168, size: 104, tone: "ink" },
     emptyTextY: 700,
     motion: "none",
   },
@@ -153,6 +159,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · S04 (354:32)`,
     status: "current",
     background: "/wall/themes/bethlehem.jpg",
+    background2x: "/wall/themes/bethlehem@2x.jpg",
     preview: "/wall/themes/bethlehem.preview.jpg",
     fallbackColor: "#6B5A7E",
     tone: "dark",
@@ -171,7 +178,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: { kind: "in-picture" },
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1920, y: 52, size: 60, tone: "cream" },
+    wordmark: { x: 1920, y: 48, size: 104, tone: "cream" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -182,6 +189,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · C01 (354:3)`,
     status: "current",
     background: "/wall/themes/sunset-window.jpg",
+    background2x: "/wall/themes/sunset-window@2x.jpg",
     preview: "/wall/themes/sunset-window.preview.jpg",
     fallbackColor: "#A8543A",
     tone: "dark",
@@ -197,10 +205,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    hang: PEG,
+    hang: TAPE,
     rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 2070, y: 916, size: 60, tone: "cream" },
+    wordmark: { x: 1920, y: 44, size: 104, tone: "label" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -211,6 +219,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · C02 (354:7)`,
     status: "current",
     background: "/wall/themes/pastel-coast.jpg",
+    background2x: "/wall/themes/pastel-coast@2x.jpg",
     preview: "/wall/themes/pastel-coast.preview.jpg",
     fallbackColor: "#D9A98F",
     tone: "light",
@@ -226,10 +235,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    hang: PEG,
+    hang: TAPE,
     rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 2015, y: 900, size: 60, tone: "ink" },
+    wordmark: { x: 1920, y: 40, size: 104, tone: "label" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -240,6 +249,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · C03 (354:11)`,
     status: "current",
     background: "/wall/themes/festive-lights.jpg",
+    background2x: "/wall/themes/festive-lights@2x.jpg",
     preview: "/wall/themes/festive-lights.preview.jpg",
     fallbackColor: "#C99A78",
     tone: "light",
@@ -255,10 +265,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    hang: PEG,
+    hang: TAPE,
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1860, y: 906, size: 60, tone: "ink" },
+    wordmark: { x: 1920, y: 44, size: 104, tone: "label" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -269,6 +279,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     source: `${FIGMA} · C04 (354:15)`,
     status: "current",
     background: "/wall/themes/winter-sea.jpg",
+    background2x: "/wall/themes/winter-sea@2x.jpg",
     preview: "/wall/themes/winter-sea.preview.jpg",
     fallbackColor: "#C9B3B5",
     tone: "light",
@@ -284,10 +295,10 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    hang: PEG,
+    hang: TAPE,
     rope: { x1: 528, x2: 3172, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1850, y: 936, size: 60, tone: "ink" },
+    wordmark: { x: 1920, y: 40, size: 104, tone: "label" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -332,11 +343,17 @@ const ORIGINAL_3x1 = { width: 2048, height: 682 } as const;
 const BOARD_SCALE = BOARD.height / ORIGINAL_3x1.height / (CANVAS.width / ORIGINAL_3x1.width); // ≈ 1.0088
 const BOARD_CUTS: Record<
   string,
-  { top: number; left: number; slots?: readonly { x: number; tilt: number }[] }
+  {
+    top: number;
+    left: number;
+    slots?: readonly { x: number; tilt: number }[];
+    wordmarkY?: number;
+  }
 > = {
   "peace-wall": { top: 150, left: 778 },
   "snowy-chapel": { top: 100, left: 778 },
-  "star-of-peace": { top: 60, left: 200 },
+  // The logo stays under the star, which moves down with the picture.
+  "star-of-peace": { top: 60, left: 200, wordmarkY: 230 },
   bethlehem: {
     top: 100,
     left: 778,
@@ -357,6 +374,7 @@ export const WALL_THEMES: readonly WallTheme[] = BASE_THEMES.map((theme) => {
     ...cut,
     scale: BOARD_SCALE,
     background: `/wall/themes/${theme.id}.board.jpg`,
+    background2x: `/wall/themes/${theme.id}.board@2x.jpg`,
   });
   return { ...theme, variants: [board] };
 });

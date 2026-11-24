@@ -19,6 +19,7 @@ import {
   type Rect,
 } from "@/lib/wall/layout";
 import { readFileSync } from "node:fs";
+import { slotEnvelope, wordmarkBox } from "@/lib/wall/fit";
 import {
   ROTATE_MINUTES,
   activeThemeId,
@@ -61,6 +62,12 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect([theme.scene.width, theme.scene.height]).toEqual(isCut ? [3096, 1290] : [3840, 1080]);
     const bg = await sharp(file(theme.background)).metadata();
     expect([bg.width, bg.height]).toEqual([theme.scene.width, theme.scene.height]);
+    // The 2× picture for screens that enlarge the scene: the same picture at twice the pixels.
+    if (theme.status === "current") {
+      expect(theme.background2x, "2× picture").toBeTruthy();
+      const hd = await sharp(file(theme.background2x!)).metadata();
+      expect([hd.width, hd.height]).toEqual([2 * theme.scene.width, 2 * theme.scene.height]);
+    }
     const preview = await sharp(file(theme.preview)).metadata();
     expect([preview.width, preview.height]).toEqual([640, 180]);
     if (theme.hang.kind === "clip") expect(existsSync(file(theme.hang.image))).toBe(true);
@@ -120,32 +127,28 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(b.width).toBeGreaterThan(layout.slots[0]!.box.width * 1.5);
   });
 
-  it("keeps the wordmark clear of every photo and inside the picture", () => {
+  it("keeps the whole band of the logo clear of every photo and clip, inside the picture", () => {
     if (!theme.wordmark) {
       expect(theme.status).toBe("legacy"); // only the old picture carries its own wordmark
       return;
     }
-    const { x, y, size, tone } = theme.wordmark;
-    // "STUDIO SHALOM | 평화의 벽" on one line is about 10.5 × the font size wide; the paper tag
-    // adds its padding (0.75em each side, 0.3em above and below).
-    const pad = tone === "label" ? { x: size * 0.75, y: size * 0.3 } : { x: 0, y: 0 };
-    const mark: Rect = {
-      x: x - size * 5.25 - pad.x,
-      y: y - 4,
-      width: size * 10.5 + 2 * pad.x,
-      height: size + 8 + 2 * pad.y,
-    };
-    expect(mark.x).toBeGreaterThan(0);
-    expect(mark.x + mark.width).toBeLessThan(layout.width);
-    expect(mark.y).toBeGreaterThanOrEqual(0);
-    expect(mark.y + mark.height).toBeLessThan(layout.height);
-    expect(size).toBeGreaterThanOrEqual(56); // readable across a room on a 1080-line wall
+    // The wall centres the logo on the screen (planWallFit), so it may sit at any x: the whole
+    // band from its top to its bottom must be free of photos, clips and their swing.
+    const box = wordmarkBox(theme, layout.width / 2)!;
+    const band: Rect = { x: 0, y: box.y - 4, width: layout.width, height: box.height + 8 };
+    expect(box.x).toBeGreaterThan(0);
+    expect(box.x + box.width).toBeLessThan(layout.width);
+    expect(band.y).toBeGreaterThanOrEqual(0);
+    // At the top: never further down than a fifth of the picture.
+    expect(box.y).toBeLessThan(layout.height * 0.2);
+    expect(theme.wordmark.size).toBeGreaterThanOrEqual(96); // readable across a room on a 1080-line wall
     layout.slots.forEach((place, i) => {
+      expect(overlaps(band, slotEnvelope(place, theme))).toBe(false);
       for (const b of boxesIn(i)) {
         // The photo box plus what holds it (the clip reaches above the line, plus a margin).
         const reach = clipReach(theme.hang) + 4;
         const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
-        expect(overlaps(mark, withClip)).toBe(false);
+        expect(overlaps(band, withClip)).toBe(false);
       }
     });
   });
@@ -216,9 +219,10 @@ describe("a theme cut for the screen's shape (D91)", () => {
           6,
         );
       }
-      // Photos keep their size; the wordmark keeps its size.
+      // Photos keep their size; the logo keeps its size and stays at the top.
       expect(cut.scene.strip).toEqual(base.scene.strip);
       expect(cut.wordmark!.size).toBe(base.wordmark!.size);
+      expect(cut.wordmark!.y).toBeLessThanOrEqual(k * (base.wordmark!.y + top));
     }
   });
 

@@ -474,6 +474,13 @@ export function WallApp({
       }
     : null;
   const hasBands = !!banded && (banded.x || banded.y);
+  // The 2× picture only where the screen shows the scene enlarged (a 16:9 TV), never in low-spec
+  // mode: it costs four times the memory.
+  const hiDpi =
+    !lite &&
+    !!plan &&
+    plan.scale * preview * (typeof window === "undefined" ? 1 : window.devicePixelRatio || 1) >
+      1.05;
   // Screen-relative text unit: what the scene unit was on the 3840 × 1080 LED (1.08 px), shrinking
   // with the screen, never so small a portrait screen cannot read it, never wider than the screen.
   const unit = stage
@@ -545,7 +552,15 @@ export function WallApp({
               transformOrigin: "0 0",
             }}
           >
-            <WallScene theme={theme} aspect={aspect} layout={layout} lite={lite} feather={banded}>
+            <WallScene
+              theme={theme}
+              aspect={aspect}
+              layout={layout}
+              lite={lite}
+              feather={banded}
+              mark={plan.mark}
+              hiDpi={hiDpi}
+            >
               {schedule.slots.map((slot, i) => {
                 const place = layout.slots[i];
                 const url =
@@ -573,7 +588,7 @@ export function WallApp({
                       <div
                         className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                       >
-                        <Clip theme={theme} />
+                        <Clip theme={theme} slot={i} />
                         <div
                           className="absolute inset-x-0 bottom-0 flex flex-col bg-(--wall-card)"
                           style={{
@@ -591,10 +606,11 @@ export function WallApp({
                             style={{ height: PHONE_CARD.photoHeight }}
                           />
                           <p
-                            className="flex flex-1 items-center justify-center font-bold text-(--wall-card-ink)"
-                            style={{ fontSize: 17, letterSpacing: "0.24em" }}
+                            className="flex flex-1 items-center justify-center text-(--wall-card-ink)"
+                            role="img"
+                            aria-label="STUDIO SHALOM"
                           >
-                            STUDIO SHALOM
+                            <span className="wall-logo-mark" style={{ width: 102, height: 24 }} />
                           </p>
                         </div>
                       </div>
@@ -628,7 +644,7 @@ export function WallApp({
                     <div
                       className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
                     >
-                      <Clip theme={theme} />
+                      <Clip theme={theme} slot={i} />
                       {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -655,9 +671,11 @@ export function WallApp({
             >
               <p
                 className="text-(--wall-amber)"
-                style={{ fontSize: unit * 44, letterSpacing: "0.3em" }}
+                role="img"
+                aria-label="STUDIO SHALOM"
+                style={{ width: unit * 340, height: unit * 80 }}
               >
-                STUDIO SHALOM
+                <span className="wall-logo-mark" />
               </p>
               <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
                 잠시 후 다시 불을 밝힐게요

@@ -251,42 +251,25 @@ body {
 .wall-scene[data-tone="light"] {
   --wall-photo-shadow: rgba(43, 26, 16, 0.4);
 }
-.wall-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.42em;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  line-height: 1;
+/* The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-2b1a10.svg) at the top centre
+   of the wall, painted in the tone's colour through the logo as a mask: one file, any colour. */
+.wall-logo {
   color: #2b1a10;
 }
-.wall-wordmark[data-tone="cream"] {
+.wall-logo[data-tone="cream"] {
   color: var(--wall-cream);
 }
-.wall-wordmark[data-tone="label"] {
-  padding: 0.3em 0.75em;
+.wall-logo[data-tone="label"] {
   background: var(--wall-card);
   box-shadow: 6px 9px 18px var(--wall-photo-shadow);
 }
-.wall-wordmark-name {
-  font-family: var(--font-display);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  /* letter-spacing adds space after the last letter too: pull the rule back in. */
-  margin-right: -0.16em;
-}
-.wall-wordmark-rule {
-  width: 1px;
-  height: 0.72em;
-  background: currentColor;
-  opacity: 0.55;
-}
-.wall-wordmark-sub {
-  font-family: var(--font-myeongjo);
-  font-size: 0.52em;
-  letter-spacing: 0.3em;
-  margin-right: -0.3em;
+.wall-logo-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: currentColor;
+  -webkit-mask: url("/frames/v2/logo-2b1a10.svg") center / contain no-repeat;
+  mask: url("/frames/v2/logo-2b1a10.svg") center / contain no-repeat;
 }
 /* The "empty wall" line: a paper note, readable on every theme. */
 .wall-note {

@@ -1764,3 +1764,38 @@ our own "전체화면 종료" button, which stayed on every guest screen.
 - `requestFullscreen({ navigationUI: "hide" })`.
 
 Not verified: a real iPad and a real Android tablet launched from the home screen.
+
+## D112 · Media wall: sharper pictures, masking tape instead of clothespins, the logo at the top centre (2026-11-24)
+
+User request: the wall looked broken up (화질이 깨짐), the clothespins looked a little off, and
+"STUDIO SHALOM" should be the logo we made, centred at the top.
+
+- **Why it looked broken up.** The Figma backgrounds are only 2048 px wide and heavily compressed
+  (195 KB for S03). They were enlarged 1.9× to 3840 × 1080 and saved at JPEG 80; a 16:9 4K TV then
+  shows the scene up to 2× again (`planWallFit` scale 1.57 on the board cut, 2.0 on the 32:9
+  themes), so the screen saw the original's JPEG blocks enlarged 3–4×.
+- **What changed.** The originals were enlarged 4× with Real-ESRGAN x4plus (the official
+  weights, converted to ONNX and run on this machine; no picture was sent to a service) and every
+  picture is written twice: 1× for the LED at 1:1 and `@2x` for screens that enlarge the scene
+  (`background2x`). The wall uses the 2× picture only when `plan.scale × devicePixelRatio > 1.05`
+  and never in low-spec mode (four times the memory). JPEG 88, colour at full resolution (4:4:4).
+  An AI enlargement invents fine texture; it does not recover the designer's original detail. A
+  real high-resolution export from the designer still replaces these files.
+  `festive-lights` (its 8720 px repaint is not in Figma) got its 2× from its own 1× picture.
+- **The photos.** The wall copy is now 1800 px on the long edge, JPEG 90, 4:4:4 (was 1400, 84,
+  4:2:0, which smeared the logo and red-on-cream edges). It is a new file (`.wall-hd.jpg`), so a
+  hub that made the old copy makes the new one on first request; deleting a photo removes both.
+- **Masking tape.** The six themes that drew a wooden clothespin now draw a strip of cream paper
+  tape folded over the line (`public/wall/tape-washi.svg`, the user's choice among tape, a brass
+  clip and a smaller clothespin), turned a few degrees differently on each slot. The two themes
+  with pegs painted in the picture (`star-of-peace`, `bethlehem`) keep them.
+- **The logo.** The text wordmark is replaced by the Figma logo (`public/frames/v2/logo-*.svg`,
+  STUDIO / SHALOM with the star in the O), painted in the theme's colour through a CSS mask. It
+  sits at the top centre of the screen: `planWallFit` returns `mark`, centred on the screen (kept
+  inside the picture next to a band). Because it moves with the screen, each theme keeps the whole
+  band of the logo free of photos and clips (tests/unit/wall-themes.test.ts). Height 104 scene px;
+  `ink` / `cream` on a calm sky or wall, a paper tag (`label`) under the coast themes' garland;
+  under the star on `star-of-peace`. Board cuts keep the logo's distance from the top.
+
+Not verified: a real 4K TV, the church board and the LED; how a low-power wall PC copes with a
+7680 × 2160 picture (low-spec mode never loads it).
