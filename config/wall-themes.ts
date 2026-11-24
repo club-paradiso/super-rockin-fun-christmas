@@ -29,15 +29,26 @@ import {
  */
 const CANVAS = { width: 3840, height: 1080 } as const;
 /**
- * A strip of cream masking tape folded over the line and pressed onto the photo's top (user's
- * choice, 2026-11-24, replacing the wooden clothespin: the same paper tape as the booth's journal,
- * D104). Drawn 44 × 96: the line crosses it 34 px below its top, and it reaches 62 px under the
- * line, over the strip's top edge (strips hang `drop` 12–20 px below the line). Turned a little on
- * each slot so the tapes do not look stamped.
+ * A strip of masking tape folded over the line and pressed onto the photo's top (user's choice,
+ * 2026-11-24, replacing the wooden clothespin; same idea as the booth's journal tape, D104). The
+ * pictures are the user's own generated paper tapes (Figma SS 03E `Wall/Tape · 마스킹테이프 6종`),
+ * stood upright, trimmed and set in one 44 × 96 box (PNG at 3×, transparent, a faint shadow to
+ * +x +y and the fold where it wraps the line baked in). The line crosses every one 34 px below its
+ * top, and it reaches 62 px under the line, over the strip's top edge (strips hang `drop` 12–20 px
+ * below the line). Each slot gets the next colour and a small turn, so the tapes do not look
+ * stamped.
  */
 const TAPE: WallClip = {
   kind: "clip",
-  image: "/wall/tape-washi.svg",
+  image: "/wall/tapes/tape-cream.png",
+  images: [
+    "/wall/tapes/tape-cream.png",
+    "/wall/tapes/tape-berry.png",
+    "/wall/tapes/tape-kraft.png",
+    "/wall/tapes/tape-cream-2.png",
+    "/wall/tapes/tape-pine.png",
+    "/wall/tapes/tape-kraft-2.png",
+  ],
   width: 44,
   height: 96,
   centerX: 22,

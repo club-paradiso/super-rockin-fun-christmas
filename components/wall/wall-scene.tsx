@@ -5,7 +5,7 @@ import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
 import { WALL_FIT } from "@/lib/wall/fit";
 import type { Rect } from "@/lib/wall/layout";
-import { WALL_LIGHT, fitTheme, type WallTheme } from "@/lib/wall/themes";
+import { WALL_LIGHT, clipImage, fitTheme, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
@@ -178,7 +178,8 @@ export function featherMask(feather: { x: boolean; y: boolean } | null | undefin
  * What holds a photo: the theme's clip picture (a strip of masking tape folded over the line),
  * drawn in the photo's box, whose top is the line at the hang point. Placed by its own numbers
  * (`WallClip`): the line crosses it `lineY` px below its top. A clip with `tilts` is turned a little
- * differently on each slot, about where it crosses the line, so the tapes do not look stamped.
+ * differently on each slot, about where it crosses the line, and a clip with `images` gets a
+ * different picture on each slot, so the tapes do not look stamped.
  * Nothing for a theme whose pegs are already in the picture.
  */
 export function Clip({ theme, slot = 0 }: { theme: WallTheme; slot?: number }) {
@@ -188,7 +189,7 @@ export function Clip({ theme, slot = 0 }: { theme: WallTheme; slot?: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline
     <img
-      src={hang.image}
+      src={clipImage(hang, slot)}
       alt=""
       aria-hidden
       draggable={false}

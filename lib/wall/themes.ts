@@ -198,13 +198,22 @@ export function fitTheme(theme: WallTheme, aspect: number | null | undefined): W
  */
 export interface WallClip {
   kind: "clip";
+  /** The clip picture. With `images`, the picture for a slot that `images` does not cover. */
   image: string;
+  /** Pictures given to the slots in turn (slot i gets `images[i % length]`), all drawn at the same
+   * size and with the line at the same `lineY`, so swapping one never moves a photo. */
+  images?: readonly string[];
   width: number;
   height: number;
   centerX: number;
   lineY: number;
   /** Small turns (degrees) given to the clip slot by slot, in turn; none = always upright. */
   tilts?: readonly number[];
+}
+
+/** The clip picture for a slot: `images` in turn, else `image`. */
+export function clipImage(hang: WallClip, slot: number): string {
+  return hang.images?.length ? hang.images[slot % hang.images.length]! : hang.image;
 }
 
 /** How far a clip reaches above the line (scene px); 0 for a picture with its own pegs. */
