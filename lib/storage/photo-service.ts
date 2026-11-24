@@ -40,7 +40,11 @@ export interface PhotoServiceOptions {
 }
 
 /** Derived objects that live next to a photo and must go when it goes. */
-const derivedPath = (objectPath: string, kind: "thumb" | "wall") =>
+/**
+ * `wall-hd` is the wall copy since 2026-11-24 (1800 px, quality 90, 4:4:4); `wall` is the older,
+ * smaller copy, no longer served but still removed with the photo on hubs that made one.
+ */
+const derivedPath = (objectPath: string, kind: "thumb" | "wall" | "wall-hd") =>
   `${objectPath.replace(/\.[a-z]+$/, "")}.${kind}.jpg`;
 
 /**
@@ -821,7 +825,7 @@ export class PhotoService {
     const row = await this.backend.photos.getById(photoId);
     if (!row || isGone(row) || !isWallEligible(row)) return null;
     if (publicOnly && !isPublicWallEligible(row)) return null;
-    const path = derivedPath(row.objectPath, "wall");
+    const path = derivedPath(row.objectPath, "wall-hd");
     const cached = await this.backend.objects.get(path);
     if (cached) return { data: cached, mime: "image/jpeg" };
     const original = await this.backend.objects.get(row.objectPath);
@@ -857,6 +861,7 @@ export class PhotoService {
     // Lazily generated copies use these derived paths even if the row never recorded them.
     await this.backend.objects.remove(derivedPath(row.objectPath, "thumb"));
     await this.backend.objects.remove(derivedPath(row.objectPath, "wall"));
+    await this.backend.objects.remove(derivedPath(row.objectPath, "wall-hd"));
     // The session video goes wherever the photo goes (D72): both names, recorded or not.
     for (const mime of VIDEO_MIMES)
       await this.backend.objects.remove(videoPath(row.objectPath, mime));
