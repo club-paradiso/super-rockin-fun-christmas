@@ -64,7 +64,7 @@ import {
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
 import { kioskRenderBudget, legacyIOS15InBrowser } from "@/lib/kiosk/legacy-ios";
 import { runPhotoStages, type PhotoStages } from "@/lib/kiosk/photo-stages";
-import type { RetouchLevelId } from "@/config/retouch";
+import { RETOUCH_LEVEL_IDS, type RetouchLevelId } from "@/config/retouch";
 import { RetouchHud, useSkinRetouch } from "./skin-retouch";
 import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
@@ -207,6 +207,7 @@ export function KioskApp({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       lastHandFont: readStoredHandFont(),
+      retouch: skinRetouch,
     }),
   );
   // The previous session's handwriting font survives a reload, so the next one still differs.
@@ -627,7 +628,7 @@ export function KioskApp({
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
-  const retouch = useSkinRetouch(skinRetouch);
+  const retouch = useSkinRetouch(skinRetouch !== "off", state.retouch);
   const photoStages = useMemo<PhotoStages>(
     () => ({ "skin-retouch": retouch.stage }),
     [retouch.stage],
@@ -1224,6 +1225,7 @@ export function KioskApp({
             optionPreview={optionPreview}
             finalImage={finalImage}
             developing={retouch.developing}
+            retouchOffered={retouch.offered}
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
@@ -1324,7 +1326,9 @@ export function KioskApp({
             onToggleSound={sound ? () => sound.setMuted(!muted) : null}
           />
         )}
-        {retouchHud && skinRetouch !== "off" && <RetouchHud metrics={retouch.metrics} />}
+        {retouchHud && skinRetouch !== "off" && (
+          <RetouchHud metrics={retouch.metrics} level={state.retouch} />
+        )}
       </main>
     </KioskChromeContext.Provider>
   );
@@ -1350,6 +1354,8 @@ interface ScreenProps {
   finalImage: FinalImage | null;
   /** The chosen photos are being retouched: the print's place says "현상 중…". */
   developing: boolean;
+  /** Skin retouch is on and working: the photo-selection screen offers its three levels. */
+  retouchOffered: boolean;
   qrSvg: string | null;
   onRetryDelivery: () => void;
   onDiscard: () => void;
@@ -1830,7 +1836,11 @@ function Screen(p: ScreenProps) {
       const required = getFrame(state.frameId).slots.length;
       const selected = state.selectedShotIndices;
       return (
-        <BoothScreen testId="screen-select" progress={progress} className="select">
+        <BoothScreen
+          testId="screen-select"
+          progress={progress}
+          className={p.retouchOffered ? "select select-has-retouch" : "select"}
+        >
           <div className="select-head">
             <h1 className="booth-title">{t.select.title(required, state.shots.length)}</h1>
             <p className="booth-lead" data-testid="select-required" data-required={required}>
@@ -1866,6 +1876,40 @@ function Screen(p: ScreenProps) {
               })}
             </div>
           </div>
+          {p.retouchOffered && (
+            // 피부 보정: answered here, with the photos, and final once they are chosen.
+            <div className="select-retouch" data-testid="retouch-row">
+              <div className="select-retouch-head">
+                <span className="select-retouch-label" id="retouch-label">
+                  {t.retouch.label}
+                </span>
+                <span className="select-retouch-note">{t.retouch.note}</span>
+              </div>
+              <div
+                className="select-retouch-choices"
+                role="radiogroup"
+                aria-labelledby="retouch-label"
+              >
+                {RETOUCH_LEVEL_IDS.map((level) => {
+                  const on = state.retouch === level;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      data-testid={`retouch-${level}`}
+                      className="select-retouch-choice"
+                      onClick={() => dispatch({ type: "SET_RETOUCH", level })}
+                    >
+                      {on && <CheckMark />}
+                      {t.retouch.level[level]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="select-actions">
             <button
               type="button"

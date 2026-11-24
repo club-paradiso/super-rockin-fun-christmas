@@ -236,8 +236,14 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   2026-11-24, `docs/research/skin-retouch-audit.md`). It is one photo stage,
   `runPhotoStages` in `lib/kiosk/photo-stages.ts`, called once right before `composeFrame`:
   촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성. A new stage is an implementation for an id of
-  that file, never an edit to the compositor or a second call site. The level comes from the
-  server (`SKIN_RETOUCH`, or `?retouch=` on the booth URL): `off` loads nothing at all. Every
+  that file, never an edit to the compositor or a second call site. The booth's setting comes
+  from the server (`SKIN_RETOUCH`, or `?retouch=` on the booth URL): `off` loads nothing at all
+  and asks the guest nothing. With it on, the guest answers 끄기 / 자연스럽게 / 뽀샤시 on the
+  photo-selection screen (Figma `962:1639`, `design/README.md` 「피부 보정」): a view in
+  `lib/kiosk/machine.ts` (`retouch`, `SET_RETOUCH`) that starts at the booth's setting, is final
+  once the photos are chosen and never carries over to the next guest. No new step: the
+  progress dots do not change. The chosen answer is filled like the frame options' (a state, not
+  a second action). If the model has not loaded, the choice is not offered. Every
   number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. Never add a
   mesh warp (eyes, jaw, nose). Never smooth the finest band at 자연스럽게 (`fine: 0`), never
   whiten (the only brightening is 뽀샤시's `lift`, a gain with a highlight roll-off), and never

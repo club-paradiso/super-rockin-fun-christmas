@@ -59,7 +59,7 @@ test("촬영 → 현상 중 → 보정 → 합성 → QR: the faces are retouche
   ).toBe("현상 중…");
   // Four photos in this frame, one face in each, each retouched; no failure line.
   const hud = await page.getByTestId("retouch-hud").innerText();
-  expect(hud).toContain("피부 보정 4장");
+  expect(hud).toContain("피부 보정(natural) 4장");
   expect(hud).toMatch(/얼굴 1\/1 1\/1 1\/1 1\/1/);
   expect(hud).not.toMatch(/번 사진:/);
   const size = await page

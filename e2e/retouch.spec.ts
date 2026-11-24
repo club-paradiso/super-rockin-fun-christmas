@@ -7,6 +7,7 @@ import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
+  openWelcome,
   selectDefaultPhotos,
   shootSixWithMock,
   startSession,
@@ -319,6 +320,123 @@ test("the lab page at the iPad mini 4's size: panes, sliders, mask, frames, timi
   }
 });
 
+test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진 고르기 · 피부 보정」)", () => {
+  for (const [width, height] of [
+    [768, 1024],
+    [820, 1180],
+    [1024, 768],
+    [1180, 820],
+  ] as const) {
+    test(`${width} × ${height}: three answers, the booth's setting chosen, nothing cut off`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await enrollKiosk(page);
+      await page.goto("/kiosk?camera=mock&retouch=natural");
+      await startSession(page);
+      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+      await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+      await toSelect(page);
+
+      const row = page.getByTestId("retouch-row");
+      await expect(row).toBeVisible();
+      await expect(row).toContainText("피부 보정");
+      const choices = ["off", "natural", "glow"].map((level) =>
+        page.getByTestId(`retouch-${level}`),
+      );
+      await expect(choices[0]!).toHaveText("끄기");
+      await expect(choices[1]!).toHaveText("자연스럽게");
+      await expect(choices[2]!).toHaveText("뽀샤시");
+      // The booth's setting is the guest's starting point.
+      await expect(choices[1]!).toHaveAttribute("aria-checked", "true");
+      await expect(choices[0]!).toHaveAttribute("aria-checked", "false");
+
+      // Touch targets (D88: smaller controls at least 52 px), equal width, text inside.
+      const boxes = await Promise.all(choices.map((c) => c.boundingBox()));
+      for (const [i, box] of boxes.entries()) {
+        expect(box!.height, "height").toBeGreaterThanOrEqual(52);
+        expect(Math.abs(box!.width - boxes[0]!.width), "equal widths").toBeLessThanOrEqual(1);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+        expect(
+          await choices[i]!.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+          "label fits",
+        ).toBe(true);
+      }
+      // The row, the photos and the main button are all on screen without scrolling.
+      const confirm = await page.getByTestId("confirm-selection").boundingBox();
+      const rowBox = await row.boundingBox();
+      expect(confirm!.y + confirm!.height).toBeLessThanOrEqual(height);
+      expect(rowBox!.y).toBeGreaterThan(0);
+      expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(height);
+      // Above the main button (tall screens) or beside it, under the photos (wide ones):
+      // never on top of it.
+      const above = rowBox!.y + rowBox!.height <= confirm!.y + 1;
+      const beside = rowBox!.x + rowBox!.width <= confirm!.x + 1;
+      expect(above || beside, "the answers do not overlap the main button").toBe(true);
+      expect(
+        await page.locator(".kiosk-scroll").evaluate((el) => el.scrollHeight - el.clientHeight),
+      ).toBeLessThanOrEqual(1);
+      const grid = await page.getByTestId("select-grid").boundingBox();
+      expect(grid!.height).toBeGreaterThan(height * 0.25);
+
+      // One answer at a time.
+      await choices[2]!.click();
+      await expect(choices[2]!).toHaveAttribute("aria-checked", "true");
+      await expect(choices[1]!).toHaveAttribute("aria-checked", "false");
+      if (SAVE) {
+        await mkdir(OUT, { recursive: true });
+        await page.getByTestId("select-shot-0").click();
+        await choices[1]!.click();
+        await page.screenshot({ path: path.join(OUT, `select-${width}x${height}.png`) });
+      }
+    });
+  }
+
+  test("끄기: the guest's photos go into the frame as shot", async ({ page }) => {
+    await enrollKiosk(page);
+    const urls: string[] = [];
+    await page.goto("/kiosk?camera=mock&retouch=glow&retouchHud=1");
+    await startSession(page);
+    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await toSelect(page);
+    await expect(page.getByTestId("retouch-glow")).toHaveAttribute("aria-checked", "true");
+    await page.getByTestId("retouch-off").click();
+    page.on("request", (r) => urls.push(new URL(r.url()).pathname));
+    await selectDefaultPhotos(page);
+    await expect(page.getByTestId("final-image")).toBeVisible({ timeout: 30_000 });
+    // Nothing was retouched, and "현상 중…" never came up.
+    await expect(page.getByTestId("retouch-hud")).toContainText(
+      "피부 보정(off): 아직 처리한 사진 없음",
+    );
+    await expect(page.getByTestId("developing")).toHaveCount(0);
+    await answerForQr(page, "no");
+    // The next guest starts at the booth's setting again, not at this guest's answer.
+    await page.getByRole("button", { name: "다 받았어요" }).click();
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+    await expect(page.getByTestId("retouch-hud")).toContainText("피부 보정(glow)");
+  });
+
+  test("the answers are in the guest's own language", async ({ page }) => {
+    await enrollKiosk(page);
+    await page.goto("/kiosk?camera=mock&retouch=natural");
+    await openWelcome(page);
+    await page.getByTestId("lang-en").click();
+    await page.getByRole("button", { name: /Take photos here/ }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Start shooting" }).click();
+    await page.getByRole("button", { name: "Pose freely" }).click();
+    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await page.getByRole("button", { name: "Looks good" }).click();
+    const row = page.getByTestId("retouch-row");
+    await expect(row).toContainText("Skin retouch");
+    await expect(page.getByTestId("retouch-off")).toHaveText("Off");
+    await expect(page.getByTestId("retouch-natural")).toHaveText("Natural");
+    await expect(page.getByTestId("retouch-glow")).toHaveText("Glow");
+    expect(await row.innerText()).not.toMatch(/[가-힣]/);
+  });
+});
+
 test.describe("the booth", () => {
   /** Requests for the face model and its runtime. */
   function watchRetouchRequests(page: Page): string[] {
@@ -337,6 +455,8 @@ test.describe("the booth", () => {
     const urls = watchRetouchRequests(page);
     await shootSixWithMock(page);
     await toSelect(page);
+    // The guest is not asked about a feature that is off.
+    await expect(page.getByTestId("retouch-row")).toHaveCount(0);
     await selectDefaultPhotos(page);
     await expect(page.getByTestId("final-image")).toBeVisible();
     await answerForQr(page, "no");
@@ -387,6 +507,8 @@ test.describe("the booth", () => {
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await toSelect(page);
+    // The model never loaded: the guest is not offered a choice that would do nothing.
+    await expect(page.getByTestId("retouch-row")).toHaveCount(0);
     await selectDefaultPhotos(page);
     // The guest is not held up: the print is made from the photos as shot.
     await expect(page.getByTestId("final-image")).toBeVisible({ timeout: 30_000 });

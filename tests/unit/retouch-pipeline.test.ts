@@ -355,7 +355,8 @@ describe("failures never block the guest (lib/retouch/pipeline.ts)", () => {
     expect(result.metrics.error).toBe("init-failed");
     expect(errors).toEqual(["init-failed"]);
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("[skin-retouch] init-failed"));
-    await expect(retoucher.warmUp()).resolves.toBeUndefined();
+    // Warming up never rejects: it answers whether the model is there.
+    await expect(retoucher.warmUp()).resolves.toBe(false);
     spy.mockRestore();
   });
 

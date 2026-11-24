@@ -103,11 +103,11 @@ export class SkinRetoucher {
     this.deps.onError?.(code, detail);
   }
 
-  /** Starts loading the face finder. Never rejects; failures are reported. */
-  warmUp(): Promise<void> {
+  /** Starts loading the face finder. Never rejects (failures are reported): true = it is there. */
+  warmUp(): Promise<boolean> {
     return this.ready().then(
-      () => undefined,
-      () => undefined,
+      () => true,
+      () => false,
     );
   }
 

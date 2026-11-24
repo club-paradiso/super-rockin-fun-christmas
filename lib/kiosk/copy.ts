@@ -145,6 +145,13 @@ const ko = {
     unchoose: (n: number) => `${n}번째 사진 선택 해제`,
     confirm: "이 사진으로 완성하기",
   },
+  // 피부 보정 (skin retouch on): on the photo-selection screen. Written by Claude (2026-11-24),
+  // not yet the user's wording (D76). The level names are the user's (끄기 / 자연스럽게 / 뽀샤시).
+  retouch: {
+    label: "피부 보정",
+    note: "얼굴 모양은 그대로 두고 피부만 살짝 다듬어요.",
+    level: { off: "끄기", natural: "자연스럽게", glow: "뽀샤시" },
+  },
   consent: {
     title: "이 사진을 미디어월에\n띄워도 될까요?",
     lead: "미디어월에 다른 분들 사진과 함께 돌아가며 보여요.\n아니요를 눌러도 사진은 받을 수 있어요.",
@@ -360,6 +367,11 @@ const en: KioskCopy = {
     unchoose: (n) => `Unpick photo ${n}`,
     confirm: "Finish with these",
   },
+  retouch: {
+    label: "Skin retouch",
+    note: "Faces keep their shape. Only the skin is evened a little.",
+    level: { off: "Off", natural: "Natural", glow: "Glow" },
+  },
   consent: {
     title: "Can we show this photo\non the media wall?",
     lead: "It will take turns on the wall with other guests’ photos.\nYou still get your photo if you say no.",
@@ -566,6 +578,11 @@ const zh: KioskCopy = {
     choose: (n) => `选择第 ${n} 张照片`,
     unchoose: (n) => `取消选择第 ${n} 张照片`,
     confirm: "用这些照片完成",
+  },
+  retouch: {
+    label: "皮肤修饰",
+    note: "不改变脸型，只让皮肤更均匀一点。",
+    level: { off: "关闭", natural: "自然", glow: "柔光" },
   },
   consent: {
     title: "可以把这张照片\n放到媒体墙上吗？",
