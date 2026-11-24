@@ -179,7 +179,7 @@ test("hiding or deleting a photo takes it off the public wall within one poll", 
   expect((await anon.request.get(`/api/wall/photos/${victim}/image`)).status()).toBe(200);
 
   // Deleted: terminal, and refused for good.
-  const doomed = await approvedPhoto("cream-strip", "public");
+  const doomed = await approvedPhoto("film3-mono-logo", "public");
   await expect
     .poll(async () =>
       (
@@ -330,12 +330,12 @@ for (const theme of WALL_THEMES) {
     const photos = await page.getByTestId("wall-photo-image").evaluateAll((imgs) =>
       (imgs as HTMLImageElement[]).map((img) => {
         const r = img.getBoundingClientRect();
+        // Layout size, before the slot's tilt and the scene's scale (a turned box is wider).
         const pad = parseFloat(getComputedStyle(img).paddingTop) || 0;
-        const scale = r.width / img.offsetWidth || 1;
         return {
           frameId: img.closest("figure")?.dataset.frameId ?? "",
           natural: img.naturalWidth / img.naturalHeight,
-          box: r.width / (r.height - pad * scale),
+          box: img.offsetWidth / (img.offsetHeight - pad),
           left: r.left,
           right: r.right,
           top: r.top,
