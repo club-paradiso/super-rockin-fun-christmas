@@ -42,6 +42,11 @@ export interface WallTheme {
   status: "current" | "legacy";
   /** 3840 × 1080, bundled (no request leaves the venue). */
   background: string;
+  /**
+   * The same picture at twice the pixels, for a screen that shows the scene enlarged (a 16:9 4K
+   * TV draws it up to 2×). Optional: without it the 1× picture is used everywhere.
+   */
+  background2x?: string;
   /** 640 × 180 thumbnail for the staff picker. */
   preview: string;
   /** Shown behind the picture while it loads, or if it fails to load: the static fallback. */
@@ -54,9 +59,11 @@ export interface WallTheme {
   /**
    * How a photo is held. `clip`: a clip picture is drawn at the hang point (the line is in the
    * background picture, or drawn by `rope`). `in-picture`: the picture already has pegs at the
-   * slot positions; nothing is drawn and the photo's top edge meets the peg.
+   * slot positions; nothing is drawn and the photo's top edge meets the peg. `reach`: how far
+   * the painted pegs rise above the hang point (measured in the picture), so nothing is planned
+   * over them (the logo, D112).
    */
-  hang: WallClip | { kind: "in-picture" };
+  hang: WallClip | { kind: "in-picture"; reach: number };
   /** A twine line drawn by the app along `scene.line`, for pictures that have no line. */
   rope: { x1: number; x2: number; color: string; width: number } | null;
   /**
@@ -65,10 +72,13 @@ export interface WallTheme {
    */
   wideMax: number;
   /**
-   * The STUDIO SHALOM wordmark as real text, where no photo can reach it: `x` is its centre, `y`
-   * its top. `ink` / `cream` = the text colour on a calm part of the picture; `label` = ink on a
-   * paper tag, for a picture with no calm spot. Null = the picture already carries the wordmark
-   * (legacy scene).
+   * The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-*.svg), at the top centre of
+   * the screen, above every clip: `y` is its top, `size` its height (its width is
+   * `WALL_LOGO.aspect` × size). `x` is where it sits when the whole picture is on screen; the wall
+   * centres it on the screen (`planWallFit`), so every theme keeps the whole band from `y` to
+   * `y + size` free of photos and clips. `ink` / `cream` = the logo colour on a calm part of the
+   * picture; `label` = ink on a paper tag, for a busy top. Null = the picture already carries the
+   * wordmark (legacy scene).
    */
   wordmark: { x: number; y: number; size: number; tone: "ink" | "cream" | "label" } | null;
   /** Baseline of the "empty wall" line of text. */
@@ -85,7 +95,14 @@ export interface WallTheme {
 /** What changes when the same theme is cut for another screen shape. */
 export type WallThemeLook = Pick<
   WallTheme,
-  "background" | "scene" | "liteSlots" | "rope" | "wideMax" | "wordmark" | "emptyTextY"
+  | "background"
+  | "background2x"
+  | "scene"
+  | "liteSlots"
+  | "rope"
+  | "wideMax"
+  | "wordmark"
+  | "emptyTextY"
 >;
 
 /**
@@ -95,6 +112,7 @@ export type WallThemeLook = Pick<
  */
 export interface Recut {
   background: string;
+  background2x?: string;
   width: number;
   height: number;
   scale: number;
@@ -105,13 +123,19 @@ export interface Recut {
    * Only those whose widest photo stays inside the variant picture are kept.
    */
   slots?: readonly { x: number; tilt: number }[];
+  /**
+   * The logo's top in the variant. Default: as far from the top edge as in the theme's own
+   * picture (the logo stays at the top of the screen; the photos only move down, away from it).
+   */
+  wordmarkY?: number;
 }
 
 /**
  * The theme's numbers carried into a recut picture (D91). Pure arithmetic on numbers measured
  * once in Figma: nothing is measured again, so a variant keeps the designer's placement.
- * Photos keep their pixel size (strip, wideMax, phone card); the line, the slots, the wordmark
- * and the empty-wall text move with the picture.
+ * Photos keep their pixel size (strip, wideMax, phone card); the line, the slots and the
+ * empty-wall text move with the picture. The logo keeps its size and its distance from the top
+ * (`wordmarkY` overrides that).
  */
 export function recutTheme(theme: WallTheme, cut: Recut): WallThemeLook {
   const { scale, left, top } = cut;
@@ -126,6 +150,7 @@ export function recutTheme(theme: WallTheme, cut: Recut): WallThemeLook {
   const liteSlots = all.length === 5 ? [0, 1, 3, 4] : all.slice(0, 4);
   return {
     background: cut.background,
+    background2x: cut.background2x,
     scene: {
       width: cut.width,
       height: cut.height,
@@ -146,8 +171,8 @@ export function recutTheme(theme: WallTheme, cut: Recut): WallThemeLook {
     wideMax: theme.wideMax,
     wordmark: theme.wordmark && {
       ...theme.wordmark,
-      x: Math.round(x(theme.wordmark.x)),
-      y: Math.round(y(theme.wordmark.y)),
+      x: Math.round(cut.width / 2),
+      y: cut.wordmarkY ?? theme.wordmark.y,
     },
     emptyTextY: Math.round(y(theme.emptyTextY)),
   };
@@ -178,11 +203,13 @@ export interface WallClip {
   height: number;
   centerX: number;
   lineY: number;
+  /** Small turns (degrees) given to the clip slot by slot, in turn; none = always upright. */
+  tilts?: readonly number[];
 }
 
 /** How far a clip reaches above the line (scene px); 0 for a picture with its own pegs. */
 export function clipReach(hang: WallTheme["hang"]): number {
-  return hang.kind === "clip" ? hang.lineY : 0;
+  return hang.kind === "clip" ? hang.lineY : hang.reach;
 }
 
 /** Staff setting: which theme, and whether the wall changes background by itself. */

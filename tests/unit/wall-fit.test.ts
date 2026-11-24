@@ -47,10 +47,29 @@ describe("planWallFit (D110)", () => {
           expect(env.x).toBeGreaterThanOrEqual(plan.safe.x - EPS);
           expect(env.x + env.width).toBeLessThanOrEqual(plan.safe.x + plan.safe.width + EPS);
         }
-        const mark = wordmarkBox(plan.theme);
+        // The logo: at the top centre of the screen, wholly on screen and inside the picture.
+        const mark = plan.mark;
+        expect(!!mark).toBe(!!plan.theme.wordmark);
         if (mark) {
-          expect(mark.x).toBeGreaterThanOrEqual(plan.safe.x - EPS);
-          expect(mark.y + mark.height).toBeLessThanOrEqual(plan.safe.y + plan.safe.height + EPS);
+          expect(mark.width).toBeCloseTo(wordmarkBox(plan.theme)!.width, 6);
+          const mx = plan.offset.x + s * mark.x;
+          const my = plan.offset.y + s * mark.y;
+          expect(mx).toBeGreaterThanOrEqual(-EPS);
+          expect(mx + s * mark.width).toBeLessThanOrEqual(width + EPS);
+          expect(my).toBeGreaterThanOrEqual(-EPS);
+          expect(my + s * mark.height).toBeLessThanOrEqual(height + EPS);
+          expect(mark.x).toBeGreaterThanOrEqual(-EPS);
+          expect(mark.x + mark.width).toBeLessThanOrEqual(scene.width + EPS);
+          // Centred on the screen unless that would push it off the picture (next to a band).
+          if (plan.bands.left + plan.bands.right < EPS)
+            expect(mx + (s * mark.width) / 2).toBeCloseTo(width / 2, 3);
+          // Clear of every photo, its clip and its swing.
+          for (const p of plan.layout.slots) {
+            const e = slotEnvelope(p, plan.theme);
+            const apart =
+              e.y >= mark.y + mark.height || e.x >= mark.x + mark.width || mark.x >= e.x + e.width;
+            expect(apart).toBe(true);
+          }
         }
 
         // The picture covers every edge it can: a band exists only on an axis where the drawn
