@@ -61,9 +61,15 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   (`?looks=1` / `?looks=0`, which wins), else the build (`NEXT_PUBLIC_LOOKS=1`) or the staff switch
   「사진 색 보정」 (`settings.photoLooks`, audited through `ftl_settings_set_looks`, default off). The
   switch reaches a booth with its heartbeat and is taken up only on "화면을 눌러 시작"
-  (`sessionLooks`): never under a guest. **There is no screen where a guest picks a look**: the
-  frame decides it. With looks on, the six shots on the review and choice screens are shown in the
-  frame's look (`gradedShots`, the same grader as the print), and the live camera picture of a
+  (`sessionLooks`): never under a guest. **The guest may change the look on the photo choice screen, and nowhere
+  else** (a user decision, 2026-11-24, Figma 956:1589 / 956:1715): a row of the eight looks, four at
+  a time with "다음" (`LOOKS_PER_PAGE`, `LookRow`), each on the guest's own first shot, opening on
+  the frame's own look, which stays the answer if the guest touches nothing. No extra screen and no
+  extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
+  for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
+  is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
+  gives wording). With looks on, the six shots on the review and choice screens are shown in the
+  session's look (`gradedShots`, the same grader as the print; `chosenLook`), and the live camera picture of a
   black-and-white or sepia frame is shown that way with a CSS filter on the `<video>` only
   (`lookViewForFrame`); a colour look never changes the camera view. Staff read the state on the
   booth in the help menu (`lib/looks/status.ts`). When WebGL fails the photo keeps the frame's own

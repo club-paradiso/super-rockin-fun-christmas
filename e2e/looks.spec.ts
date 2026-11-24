@@ -486,6 +486,112 @@ test.describe("the booth with looks", () => {
     );
   });
 
+  /** Largest gap between channels in the middle of an <img>: 0 is grey. */
+  const colourSpread = (page: Page, selector: string) =>
+    page.locator(selector).evaluate(async (el: HTMLImageElement) => {
+      await el.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = 40;
+      canvas.height = 30;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(
+        el,
+        el.naturalWidth * 0.3,
+        el.naturalHeight * 0.1,
+        el.naturalWidth * 0.4,
+        el.naturalHeight * 0.1,
+        0,
+        0,
+        40,
+        30,
+      );
+      const { data } = ctx.getImageData(0, 0, 40, 30);
+      let spread = 0;
+      for (let p = 0; p < data.length; p += 4)
+        spread = Math.max(
+          spread,
+          Math.max(data[p]!, data[p + 1]!, data[p + 2]!) -
+            Math.min(data[p]!, data[p + 1]!, data[p + 2]!),
+        );
+      return spread;
+    });
+
+  for (const [shape, width, height] of [
+    ["portrait", 768, 1024],
+    ["landscape", 1024, 768],
+  ] as const)
+    test(`the guest picks a colour (${shape}): four looks, "다음" for the rest, shots and print follow`, async ({
+      browser,
+    }) => {
+      test.setTimeout(150_000);
+      const context = await browser.newContext({ viewport: { width, height } });
+      const page = await context.newPage();
+      await enrollKiosk(page);
+      await page.goto("/kiosk?camera=mock&looks=1");
+      await startSession(page, "film4");
+      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+      await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+      await toSelect(page);
+
+      // Four of eight, opening on the frame's own look (필름 4컷 크림: linen), which is chosen.
+      const row = page.getByTestId("look-row");
+      await expect(row).toBeVisible();
+      await expect(row.getByRole("radio")).toHaveCount(4);
+      await expect(page.getByTestId("look-page")).toHaveText("1 / 2");
+      await expect(page.getByTestId("look-linen")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("look-turn")).toHaveText("다음 ›");
+
+      // Nothing runs off the screen and every control is a touch target.
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      for (const control of [
+        ...(await row.getByRole("radio").all()),
+        page.getByTestId("look-turn"),
+      ]) {
+        const box = (await control.boundingBox())!;
+        expect(box.height).toBeGreaterThanOrEqual(52);
+        expect(box.width).toBeGreaterThanOrEqual(52);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(box.y + box.height).toBeLessThanOrEqual(height);
+      }
+      const confirm = (await page.getByTestId("confirm-selection").boundingBox())!;
+      expect(confirm.y + confirm.height).toBeLessThanOrEqual(height);
+
+      // The other four, and back.
+      await page.getByTestId("look-turn").click();
+      await expect(page.getByTestId("look-page")).toHaveText("2 / 2");
+      await expect(page.getByTestId("look-ink")).toBeVisible();
+      await expect(page.getByTestId("look-linen")).toHaveCount(0);
+      await expect(page.getByTestId("look-turn")).toHaveText("‹ 이전");
+
+      // Black and white: the six shots turn grey at once, and so does the finished photo.
+      const before = await page.getByTestId("select-shot-0").locator("img").getAttribute("src");
+      await page.getByTestId("look-ink").click();
+      await expect(page.getByTestId("look-ink")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("select-shot-0").locator("img")).not.toHaveAttribute(
+        "src",
+        before!,
+      );
+      await selectDefaultPhotos(page);
+      await expect(page.getByTestId("screen-consent")).toBeVisible();
+      await expect(page.getByTestId("final-image")).toBeVisible();
+      expect(await colourSpread(page, '[data-testid="final-image"]')).toBeLessThanOrEqual(14);
+      await context.close();
+    });
+
+  test("looks off: the choice screen has no colour row", async ({ page }) => {
+    test.setTimeout(120_000);
+    await enrollKiosk(page);
+    await page.goto("/kiosk?camera=mock");
+    await startSession(page, "film4");
+    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await toSelect(page);
+    await expect(page.getByTestId("select-shot-0")).toBeVisible();
+    await expect(page.getByTestId("look-row")).toHaveCount(0);
+  });
+
   test("?looks=1 without WebGL: the session finishes with the frame's own tone, and says why", async ({
     page,
   }) => {

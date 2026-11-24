@@ -144,7 +144,8 @@ While any switch is on, a red banner appears on every admin page.
 
 Under the three switches is **사진 색 보정** (`settings.photoLooks`, off by default; not an emergency
 switch, so no banner). On: every booth applies each frame's look (`config/looks/frame-looks.json`)
-to the photos it saves, shows the six shots in that look on the review and choice screens, and
+to the photos it saves, lets the guest change it on the photo choice screen (eight looks, four at a
+time), shows the six shots in that look on the review and choice screens, and
 shows the camera picture of a black-and-white or sepia frame that way. A booth hears the change
 with its next heartbeat (within 45 s) and takes it up when the next guest starts; the guest at the
 booth finishes as they began. The change is audited (`update_settings`). On a booth, the staff help

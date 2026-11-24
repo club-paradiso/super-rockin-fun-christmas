@@ -98,3 +98,30 @@ export function lookViewForFrame(frameId: string, map: FrameLookMap = FRAME_LOOK
   // A toned black and white (walnut) has a warm shadow tint; a neutral one (ink) has almost none.
   return entry.look.grade.shadowTint.b > 0.01 ? "sepia" : "mono";
 }
+
+/** How many looks the photo choice screen shows at a time (Figma 956:1589: four, then "다음"). */
+export const LOOKS_PER_PAGE = 4;
+
+/** The look a session's photos get: the guest's choice, else the one the frame comes with. */
+export function sessionLookId(
+  frameId: string,
+  chosen: string | null,
+  map: FrameLookMap = FRAME_LOOKS,
+): string | null {
+  if (chosen && getLook(chosen)) return chosen;
+  return lookForFrame(frameId, map)?.look.id ?? null;
+}
+
+/** The pages of the colour row, in the order of config/looks. */
+export function lookPages(lookIds: readonly string[] = LOOK_IDS): string[][] {
+  const pages: string[][] = [];
+  for (let i = 0; i < lookIds.length; i += LOOKS_PER_PAGE)
+    pages.push(lookIds.slice(i, i + LOOKS_PER_PAGE));
+  return pages;
+}
+
+/** The page a look is on: the row opens where the frame's own look is. */
+export function lookPageOf(lookId: string | null, lookIds: readonly string[] = LOOK_IDS): number {
+  const index = lookId ? lookIds.indexOf(lookId) : -1;
+  return index < 0 ? 0 : Math.floor(index / LOOKS_PER_PAGE);
+}

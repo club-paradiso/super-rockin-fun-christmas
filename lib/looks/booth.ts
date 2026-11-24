@@ -39,6 +39,14 @@ export interface LookOverride {
   halation?: number;
 }
 
+/**
+ * What to hand `graderFor` for the look a guest chose on the photo choice screen. Nothing when it
+ * is the frame's own look (or none was chosen): the frame's mapped strength then applies as ever.
+ */
+export function chosenLook(frameId: string, lookId: string | null): LookOverride | undefined {
+  return lookId && lookForFrame(frameId)?.look.id !== lookId ? { lookId } : undefined;
+}
+
 export interface BoothLooksDeps {
   fetchText?: (url: string) => Promise<string>;
   createGlCanvas?: () => GlCanvas;

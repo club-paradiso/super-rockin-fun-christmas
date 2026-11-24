@@ -15,6 +15,14 @@
 휴대폰 참여 페이지(`app/m/[token]`, D93)가 그대로 쓰고, 그 틀로 저장된 사진의 칸 정보(미디어월·AI 확인)도
 그대로 필요하다. 부스 화면에서만 빠졌다.
 
+**색감 고르기 (2026-11-24):** Figma `ZbeBrS0o5012SNFrGZNyIU` 의 `6 · 사진 고르기` 구역에
+`iPad mini 768×1024 · 6-B 사진 고르기 + 색감 1/2`(956:1589), `2/2`(956:1715)를 더했다. 사진 여섯 장
+아래에 색감 8개를 4개씩 보여 주고 "다음 ›"으로 넘긴다. 코드: `LookRow`(`components/kiosk/kiosk-app.tsx`),
+`.look-*`(`app/globals.css`), 이름은 `lib/kiosk/copy.ts` 의 `select.looks`(임시 문구).
+Figma와 다른 점: 미리보기 색은 Figma 이미지 조정으로 흉내 낸 것이고 실제 색은 LUT다. 코드의 세로
+화면은 아래 "처음으로" 줄 때문에 사진 여섯 장이 Figma보다 작다. 가로 화면(색감 2 × 2)은 Figma에 없다.
+머리줄의 "4 / 7"은 공통 Header 컴포넌트 값이고 코드는 점 6개다.
+
 편집 가능한 원본은 Figma 파일 하나다. 2026-11-11부터 브랜드는 **STUDIO SHALOM** 이다(D73).
 
 - 파일: https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB (file key `S5hz7sZaXXB2kNc9YrB3cB`)

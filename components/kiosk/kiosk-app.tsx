@@ -49,14 +49,24 @@ import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/composit
 import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
+import { LOOK_IDS } from "@/config/looks";
 import {
+  chosenLook,
   createBoothLooks,
   LOOKS_WAIT_MS,
   seedFromText,
   settleWithin,
   type BoothLooks,
 } from "@/lib/looks/booth";
-import { looksActive, lookViewForFrame, sessionLooks, type LookView } from "@/lib/looks/config";
+import {
+  looksActive,
+  lookPageOf,
+  lookPages,
+  lookViewForFrame,
+  sessionLookId,
+  sessionLooks,
+  type LookView,
+} from "@/lib/looks/config";
 import {
   canGoBack,
   capturedCount,
@@ -172,6 +182,14 @@ function useBoothSound(): { sound: BoothSound | null; muted: boolean } {
   return { sound, muted };
 }
 
+/** One look of the colour row: its id and the guest's first shot in it. */
+export interface LookChip {
+  id: string;
+  url: string;
+}
+/** Longest edge of the picture on a look chip. */
+const LOOK_CHIP_EDGE = 280;
+
 /** Longest edge of a graded shot on the review and choice screens: they are shown small. */
 const GRADED_SHOT_EDGE = 480;
 
@@ -180,9 +198,14 @@ const GRADED_SHOT_EDGE = 480;
  * screen then shows the shot as taken). The grader's canvas is shared, so the picture is copied
  * out of it at once.
  */
-function gradedShotUrl(shot: CapturedFrame, grade: PhotoGrader, index: number): string | null {
+function gradedShotUrl(
+  shot: CapturedFrame,
+  grade: PhotoGrader,
+  index: number,
+  edge = GRADED_SHOT_EDGE,
+): string | null {
   try {
-    const scale = Math.min(1, GRADED_SHOT_EDGE / Math.max(shot.width, shot.height));
+    const scale = Math.min(1, edge / Math.max(shot.width, shot.height));
     const width = Math.max(1, Math.round(shot.width * scale));
     const height = Math.max(1, Math.round(shot.height * scale));
     const small = document.createElement("canvas");
@@ -202,6 +225,23 @@ function gradedShotUrl(shot: CapturedFrame, grade: PhotoGrader, index: number): 
   } catch {
     return null;
   }
+}
+
+/** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
+function lookChipsFor(
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  shot: CapturedFrame,
+): LookChip[] {
+  const chips: LookChip[] = [];
+  for (const lookId of LOOK_IDS) {
+    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
+    const url = grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+    if (!url) return [];
+    chips.push({ id: lookId, url });
+  }
+  return chips;
 }
 
 function readStoredDevice(): string | undefined {
@@ -655,12 +695,23 @@ export function KioskApp({
   const gradedShots = useMemo(() => {
     const out: (string | null)[] = [];
     if (!looks || !lookFrameId) return out;
-    const grade = looks.graderFor(lookFrameId, lookSeed);
+    const grade = looks.graderFor(lookFrameId, lookSeed, chosenLook(lookFrameId, state.lookId));
     if (!grade) return out;
     for (const [index, shot] of state.shots.entries())
       out.push(shot ? gradedShotUrl(shot.frame, grade, index) : null);
     return out;
-  }, [looks, lookFrameId, lookSeed, state.shots]);
+  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId]);
+  // The colour row of the choice screen: the guest's first shot in each of the eight looks.
+  // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
+  const lookRowFrameId = state.phase === "select" ? state.frameId : null;
+  const firstShot = state.shots[0] ?? null;
+  const lookChips = useMemo(
+    () =>
+      looks && lookRowFrameId && firstShot
+        ? lookChipsFor(looks, lookRowFrameId, lookSeed, firstShot.frame)
+        : [],
+    [looks, lookRowFrameId, lookSeed, firstShot],
+  );
   // The live camera picture of a black-and-white frame is black and white too.
   const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
 
@@ -723,6 +774,7 @@ export function KioskApp({
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
     const sessionForLooks = state.sessionId;
+    const lookForFinal = state.lookId;
     // A font or asset that failed to load must not block the guest: compose without it.
     // The LUTs are waited for only briefly: without them the frame keeps its own tone.
     void Promise.all([
@@ -741,7 +793,11 @@ export function KioskApp({
             assets: loaded ?? undefined,
           },
           scale: renderBudget.outputScale,
-          grade: looksRef.current?.graderFor(frame.id, seedFromText(sessionForLooks)),
+          grade: looksRef.current?.graderFor(
+            frame.id,
+            seedFromText(sessionForLooks),
+            chosenLook(frame.id, lookForFinal),
+          ),
         }) as HTMLCanvasElement;
         try {
           const blob = await canvasToBlob(
@@ -774,6 +830,8 @@ export function KioskApp({
     };
   }, [
     finalPhase,
+    // Fixed once the photos are confirmed (lib/kiosk/machine.ts): never changes in this phase.
+    state.lookId,
     composeAttempt,
     legacyIOS15,
     state.frameId,
@@ -1295,6 +1353,7 @@ export function KioskApp({
             thumbs={pickThumbs}
             optionPreview={optionPreview}
             gradedShots={gradedShots}
+            lookChips={lookChips}
             lookView={lookView}
             finalImage={finalImage}
             qrSvg={qrSvg}
@@ -1422,6 +1481,8 @@ interface ScreenProps {
   gradedShots: readonly (string | null)[];
   /** How the live camera picture is shown (a black-and-white frame: black and white). */
   lookView: LookView;
+  /** The colour row of the choice screen: every look on the first shot. Empty: no row. */
+  lookChips: readonly LookChip[];
   /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
   optionPreview: string | null;
   finalImage: FinalImage | null;
@@ -1910,7 +1971,11 @@ function Screen(p: ScreenProps) {
       const required = getFrame(state.frameId).slots.length;
       const selected = state.selectedShotIndices;
       return (
-        <BoothScreen testId="screen-select" progress={progress} className="select">
+        <BoothScreen
+          testId="screen-select"
+          progress={progress}
+          className={p.lookChips.length ? "select has-looks" : "select"}
+        >
           <div className="select-head">
             <h1 className="booth-title">{t.select.title(required, state.shots.length)}</h1>
             <p className="booth-lead" data-testid="select-required" data-required={required}>
@@ -1946,6 +2011,15 @@ function Screen(p: ScreenProps) {
               })}
             </div>
           </div>
+          {p.lookChips.length > 0 && (
+            <LookRow
+              key={state.sessionId}
+              chips={p.lookChips}
+              chosen={sessionLookId(state.frameId, state.lookId)}
+              onChoose={(lookId) => dispatch({ type: "SET_LOOK", lookId })}
+              t={t}
+            />
+          )}
           <div className="select-actions">
             <button
               type="button"
@@ -2361,6 +2435,74 @@ function FinalPreview({
 }
 
 /** The six shots of a session (v2: no extra one). */
+/**
+ * The colour row of the photo choice screen (Figma 956:1589): eight looks, four at a time, each on
+ * the guest's own first shot. It opens on the page of the look the frame comes with; "다음" shows
+ * the rest. Choosing one redraws the six shots above in it; the print gets the same.
+ */
+function LookRow({
+  chips,
+  chosen,
+  onChoose,
+  t,
+}: {
+  chips: readonly LookChip[];
+  chosen: string | null;
+  onChoose: (lookId: string) => void;
+  t: KioskCopy;
+}) {
+  const ids = chips.map((chip) => chip.id);
+  const pages = lookPages(ids);
+  const [page, setPage] = useState(() => lookPageOf(chosen, ids));
+  const shown = pages[Math.min(page, pages.length - 1)] ?? [];
+  const last = page >= pages.length - 1;
+  return (
+    <div className="look-row" data-testid="look-row">
+      <div className="look-head">
+        <p className="look-title">
+          <span>{t.select.lookTitle}</span>
+          <span className="look-page" data-testid="look-page">
+            {/* Numbers only: the same in every language, like the step count. */}
+            {page + 1} / {pages.length}
+          </span>
+        </p>
+        {pages.length > 1 && (
+          <button
+            type="button"
+            className="booth-btn-m look-turn"
+            data-testid="look-turn"
+            onClick={() => setPage(last ? page - 1 : page + 1)}
+          >
+            {last ? `‹ ${t.select.lookPrev}` : `${t.select.lookNext} ›`}
+          </button>
+        )}
+      </div>
+      <div className="look-chips" role="radiogroup" aria-label={t.select.lookTitle}>
+        {shown.map((id) => {
+          const chip = chips.find((c) => c.id === id)!;
+          const name = t.select.looks[id] ?? id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={chosen === id}
+              aria-label={t.select.lookChoose(name)}
+              data-testid={`look-${id}`}
+              className="look-chip"
+              onClick={() => onChoose(id)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+              <img src={chip.url} alt="" />
+              <span className="look-name">{name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ShotStrip({ state, current }: { state: State; current: number }) {
   const count = state.shotCount;
   return (

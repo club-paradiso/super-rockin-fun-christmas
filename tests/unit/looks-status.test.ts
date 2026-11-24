@@ -4,9 +4,15 @@ import {
   looksActive,
   looksEnabled,
   looksOverride,
+  lookPageOf,
+  lookPages,
   lookViewForFrame,
+  sessionLookId,
   sessionLooks,
 } from "@/lib/looks/config";
+import { chosenLook } from "@/lib/looks/booth";
+import { KIOSK_COPY } from "@/lib/kiosk/copy";
+import { LOOK_IDS } from "@/config/looks";
 import { looksStatus, type LooksStatusInput } from "@/lib/looks/status";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -129,5 +135,37 @@ describe("the staff line in the booth's help menu", () => {
     });
     expect(line({ override: true, loaded: true }).text).toContain("?looks=1");
     expect(line({ buildFlag: true, loaded: true })).toEqual({ state: "on", text: "켜짐" });
+  });
+});
+
+describe("the colour row of the photo choice screen", () => {
+  it("shows the eight looks four at a time, in the order of config/looks", () => {
+    expect(lookPages()).toEqual([LOOK_IDS.slice(0, 4), LOOK_IDS.slice(4, 8)]);
+    expect(lookPages().flat()).toHaveLength(8);
+  });
+
+  it("opens on the page of the frame's own look", () => {
+    expect(lookPageOf(sessionLookId("film4-cream", null))).toBe(0); // linen
+    expect(lookPageOf(sessionLookId("film35-mono", null))).toBe(1); // ink
+    expect(lookPageOf(null)).toBe(0);
+    expect(lookPageOf("no-such-look")).toBe(0);
+  });
+
+  it("the session's look is the guest's choice, else the frame's; never an unknown one", () => {
+    expect(sessionLookId("film4-cream", null)).toBe("linen");
+    expect(sessionLookId("film4-cream", "pine")).toBe("pine");
+    expect(sessionLookId("film4-cream", "sparkle")).toBe("linen");
+  });
+
+  it("choosing the frame's own look keeps the frame's mapped strength (no override)", () => {
+    expect(chosenLook("film4-red", null)).toBeUndefined();
+    expect(chosenLook("film4-red", "lamp")).toBeUndefined();
+    expect(chosenLook("film4-red", "ink")).toEqual({ lookId: "ink" });
+  });
+
+  it("every look has a name in every booth language", () => {
+    for (const lang of ["ko", "en", "zh"] as const)
+      for (const id of LOOK_IDS)
+        expect(KIOSK_COPY[lang].select.looks[id], `${lang} ${id}`).toBeTruthy();
   });
 });
