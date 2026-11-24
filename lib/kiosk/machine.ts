@@ -12,6 +12,7 @@ import {
   type OptionValue,
 } from "@/config/frames/v2";
 import { getHandFont, pickHandFont } from "@/config/hand-fonts";
+import { LOOK_IDS } from "@/config/looks";
 import { parseRetouchLevel, type RetouchLevelId } from "@/config/retouch";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskLang } from "@/lib/kiosk/copy";
@@ -111,6 +112,12 @@ export interface KioskState<Shot> {
   /** The previous session's font: this session never gets the same one. Survives RESET. */
   lastHandFont: string | null;
   selectedShotIndices: number[];
+  /**
+   * The colour look the guest chose on the photo choice screen (config/looks), or null: the one
+   * the frame comes with (config/looks/frame-looks.json). Only a view of the photos: it changes
+   * no rule of shooting, choosing, consent or upload.
+   */
+  lookId: string | null;
   cameraError: CameraErrorKind | null;
   captureFailures: number;
   delivery: DeliveryState;
@@ -156,6 +163,8 @@ export type KioskAction<Shot> =
   | { type: "CAPTURE_FAILED" }
   | { type: "CONFIRM_SHOTS" }
   | { type: "TOGGLE_SHOT_SELECTION"; index: number }
+  /** Another colour look for this session's photos; only while choosing the photos. */
+  | { type: "SET_LOOK"; lookId: string }
   /** The photos are chosen. askConsent is false while staff pause wall submissions. */
   | { type: "CONFIRM_SELECTION"; askConsent: boolean }
   | { type: "DELIVERY_QR_PENDING" }
@@ -220,6 +229,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     handFont: null,
     lastHandFont: getHandFont(init.lastHandFont)?.id ?? null,
     selectedShotIndices: [],
+    lookId: null,
     cameraError: null,
     captureFailures: 0,
     delivery: { status: "idle" },
@@ -440,7 +450,13 @@ export function kioskReducer<Shot>(
       return state.phase === "review" &&
         state.shots.length === state.shotCount &&
         capturedCount(state) === state.shotCount
-        ? { ...state, phase: "select", selectedShotIndices: [] }
+        ? { ...state, phase: "select", selectedShotIndices: [], lookId: null }
+        : state;
+
+    case "SET_LOOK":
+      // Fixed with the photos: once they are confirmed the picture is being made and uploaded.
+      return state.phase === "select" && LOOK_IDS.includes(action.lookId)
+        ? { ...state, lookId: action.lookId }
         : state;
 
     case "TOGGLE_SHOT_SELECTION": {

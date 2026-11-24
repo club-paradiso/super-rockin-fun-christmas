@@ -3,17 +3,17 @@ import type { ComposeImage } from "@/lib/compositor/types";
 /**
  * What happens to the guest's chosen photos between shooting and the frame:
  *
- *   촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성
+ *   촬영 완료 → [피부 보정] → [색감] → 틀 합성
  *
- * This file is the one place that order is written down. The booth calls `runPhotoStages` once,
- * right before `composeFrame` (components/kiosk/kiosk-app.tsx, "Final composite"); a stage is
- * added by giving the booth an implementation for its id, never by editing the compositor.
+ * The booth calls `runPhotoStages` once, right before `composeFrame` (components/kiosk/kiosk-app.tsx,
+ * "Final composite"); a stage is added by giving the booth an implementation for its id.
  *
  *  - "skin-retouch": components/kiosk/skin-retouch.tsx (off unless the flag is on).
- *  - "colour-filter": reserved for the colour filter (LUT) work. No implementation here.
+ *  - "colour-filter": unused. The colour looks (lib/looks, merged 2026-11-24 in PR #79) are
+ *    applied by `composeFrame` itself (`grade`), to each photo as it is drawn into its slot.
  *
- * The tones a frame carries itself (흑백, 세피아, 플래시, 필름) are applied inside the compositor,
- * so they come after both stages.
+ * Everything the compositor does to a photo (the look's `grade`, or a frame's own tone: 흑백,
+ * 세피아, 플래시, 필름) therefore comes after every stage here: the order above holds.
  */
 export const PHOTO_STAGE_ORDER = ["skin-retouch", "colour-filter"] as const;
 export type PhotoStageId = (typeof PHOTO_STAGE_ORDER)[number];

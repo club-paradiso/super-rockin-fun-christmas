@@ -265,11 +265,14 @@ export function CameraPreview({
   stream,
   aspect,
   mirror,
+  lookView = null,
   children,
 }: {
   stream: MediaStream | null;
   aspect: number;
   mirror: boolean;
+  /** A black-and-white frame with looks on shows the live picture that way (lib/looks/config.ts). */
+  lookView?: "mono" | "sepia" | null;
   children?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -295,6 +298,7 @@ export function CameraPreview({
       <video
         ref={videoRef}
         data-testid="camera-preview"
+        data-look-view={lookView ?? undefined}
         muted
         playsInline
         autoPlay

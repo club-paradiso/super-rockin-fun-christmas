@@ -427,6 +427,48 @@ describe("reset", () => {
   });
 });
 
+describe("the colour look a guest chooses with the photos", () => {
+  const choosing = () => run(toReviewWith("verse4"), { type: "CONFIRM_SHOTS" });
+
+  it("starts as the frame's own (null) and takes any of the looks while choosing", () => {
+    const s = choosing();
+    expect(s.lookId).toBeNull();
+    expect(run(s, { type: "SET_LOOK", lookId: "ink" }).lookId).toBe("ink");
+    expect(
+      run(s, { type: "SET_LOOK", lookId: "ink" }, { type: "SET_LOOK", lookId: "lamp" }).lookId,
+    ).toBe("lamp");
+  });
+
+  it("refuses a look that does not exist", () => {
+    const s = choosing();
+    expect(run(s, { type: "SET_LOOK", lookId: "sparkle" })).toBe(s);
+  });
+
+  it("changes nothing else: the chosen photos stay chosen", () => {
+    const s = run(choosing(), { type: "TOGGLE_SHOT_SELECTION", index: 2 });
+    const changed = run(s, { type: "SET_LOOK", lookId: "pine" });
+    expect(changed).toEqual({ ...s, lookId: "pine" });
+  });
+
+  it("is fixed with the photos: never before the choice screen, never after it", () => {
+    const review = toReviewWith("verse4");
+    expect(run(review, { type: "SET_LOOK", lookId: "ink" })).toBe(review);
+    const done = run(
+      choosing(),
+      { type: "SET_LOOK", lookId: "ink" },
+      ...[0, 1, 2, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      { type: "CONFIRM_SELECTION", askConsent: true },
+    );
+    expect([done.phase, done.lookId]).toEqual(["consent", "ink"]);
+    expect(run(done, { type: "SET_LOOK", lookId: "lamp" })).toBe(done);
+  });
+
+  it("does not follow the guest into the next session", () => {
+    const next = run(choosing(), { type: "SET_LOOK", lookId: "ink" }, { type: "RESET" });
+    expect(next.lookId).toBeNull();
+  });
+});
+
 describe("ordered selection", () => {
   const prepare = (cardId = "verse4") => run(toReviewWith(cardId), { type: "CONFIRM_SHOTS" });
   it("cannot confirm early and preserves selection order", () => {

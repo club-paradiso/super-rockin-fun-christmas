@@ -435,6 +435,77 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
     await expect(page.getByTestId("retouch-glow")).toHaveText("Glow");
     expect(await row.innerText()).not.toMatch(/[가-힣]/);
   });
+
+  // The colour looks (PR #79) put their own row on this screen. Neither design has both; this
+  // holds the rule both keep: every control on screen, a touch target, nothing on top of anything.
+  for (const [width, height] of [
+    [768, 1024],
+    [820, 1180],
+    [1024, 768],
+    [1180, 820],
+  ] as const) {
+    test(`${width} × ${height}: with the colour looks on too, both rows fit and nothing overlaps`, async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      await page.setViewportSize({ width, height });
+      await enrollKiosk(page);
+      await page.goto("/kiosk?camera=mock&looks=1&retouch=natural");
+      await startSession(page, "film4");
+      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+      await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+      await toSelect(page);
+
+      const looks = page.getByTestId("look-row");
+      const retouch = page.getByTestId("retouch-row");
+      await expect(looks).toBeVisible();
+      await expect(retouch).toBeVisible();
+      if (SAVE) {
+        await mkdir(OUT, { recursive: true });
+        await page.screenshot({ path: path.join(OUT, `select-looks-${width}x${height}.png`) });
+      }
+
+      const boxes = {
+        looks: (await looks.boundingBox())!,
+        retouch: (await retouch.boundingBox())!,
+        confirm: (await page.getByTestId("confirm-selection").boundingBox())!,
+        grid: (await page.getByTestId("select-grid").boundingBox())!,
+      };
+      const apart = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
+        a.x + a.width <= b.x + 1 ||
+        b.x + b.width <= a.x + 1 ||
+        a.y + a.height <= b.y + 1 ||
+        b.y + b.height <= a.y + 1;
+      const names = Object.keys(boxes) as (keyof typeof boxes)[];
+      for (const [i, a] of names.entries())
+        for (const b of names.slice(i + 1))
+          expect(apart(boxes[a], boxes[b]), `${a} and ${b} do not overlap`).toBe(true);
+      for (const box of Object.values(boxes)) {
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(height);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+      }
+      // No "nothing scrolls" rule here: with the colour looks alone (main, 2026-11-24) the
+      // choice screen is already taller than a 1024 × 768 screen (the sheet ends at 871 px,
+      // measured), and that layout is not this feature's to change. The rule kept is the colour
+      // looks' own (e2e/looks.spec.ts): every control and the main button on screen.
+      // Cramped, and written down as such (docs/STATUS.md): at 768 × 1024 the prints shrink to
+      // about 15 % of the height (measured 2026-11-24: 155 px), smaller than the colour chips.
+      // This holds that state from getting worse; it is not a quality bar.
+      expect(boxes.grid.height).toBeGreaterThan(height * 0.14);
+      for (const control of [
+        ...(await looks.getByRole("radio").all()),
+        ...(await retouch.getByRole("radio").all()),
+      ]) {
+        const box = (await control.boundingBox())!;
+        expect(box.height).toBeGreaterThanOrEqual(52);
+        expect(
+          await control.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+          "label fits",
+        ).toBe(true);
+      }
+    });
+  }
 });
 
 test.describe("the booth", () => {

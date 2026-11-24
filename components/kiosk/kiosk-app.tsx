@@ -32,10 +32,29 @@ import {
   type CameraProvider,
   type CapturedFrame,
 } from "@/lib/camera";
+import type { CanvasLike } from "@/lib/canvas";
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
-import { formatStampLabel } from "@/lib/compositor/compose";
+import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
+import { LOOK_IDS } from "@/config/looks";
+import {
+  chosenLook,
+  createBoothLooks,
+  LOOKS_WAIT_MS,
+  seedFromText,
+  settleWithin,
+  type BoothLooks,
+} from "@/lib/looks/booth";
+import {
+  looksActive,
+  lookPageOf,
+  lookPages,
+  lookViewForFrame,
+  sessionLookId,
+  sessionLooks,
+  type LookView,
+} from "@/lib/looks/config";
 import {
   canGoBack,
   capturedCount,
@@ -154,6 +173,68 @@ function useBoothSound(): { sound: BoothSound | null; muted: boolean } {
   return { sound, muted };
 }
 
+/** One look of the colour row: its id and the guest's first shot in it. */
+export interface LookChip {
+  id: string;
+  url: string;
+}
+/** Longest edge of the picture on a look chip. */
+const LOOK_CHIP_EDGE = 280;
+
+/** Longest edge of a graded shot on the review and choice screens: they are shown small. */
+const GRADED_SHOT_EDGE = 480;
+
+/**
+ * One shot in its frame's look, as a small JPEG data URL, or null when it could not be made (the
+ * screen then shows the shot as taken). The grader's canvas is shared, so the picture is copied
+ * out of it at once.
+ */
+function gradedShotUrl(
+  shot: CapturedFrame,
+  grade: PhotoGrader,
+  index: number,
+  edge = GRADED_SHOT_EDGE,
+): string | null {
+  try {
+    const scale = Math.min(1, edge / Math.max(shot.width, shot.height));
+    const width = Math.max(1, Math.round(shot.width * scale));
+    const height = Math.max(1, Math.round(shot.height * scale));
+    const small = document.createElement("canvas");
+    small.width = width;
+    small.height = height;
+    const ctx = small.getContext("2d");
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(shot.canvas as unknown as CanvasImageSource, 0, 0, width, height);
+    const graded = grade(small as unknown as CanvasLike, width, height, index);
+    if (!graded) return null;
+    ctx.drawImage(graded, 0, 0, width, height);
+    const url = small.toDataURL("image/jpeg", 0.85);
+    small.width = small.height = 0;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
+function lookChipsFor(
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  shot: CapturedFrame,
+): LookChip[] {
+  const chips: LookChip[] = [];
+  for (const lookId of LOOK_IDS) {
+    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
+    const url = grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+    if (!url) return [];
+    chips.push({ id: lookId, url });
+  }
+  return chips;
+}
+
 function readStoredDevice(): string | undefined {
   try {
     return localStorage.getItem(DEVICE_KEY) ?? undefined;
@@ -167,6 +248,7 @@ export function KioskApp({
   initialWallSubmissions = "open",
   initialWallPublic = false,
   initialAiReview = false,
+  initialPhotoLooks = false,
   staffHelp = false,
   frontend = "modern",
   serverNow,
@@ -181,6 +263,8 @@ export function KioskApp({
   initialWallPublic?: boolean;
   /** Staff have the automatic check on (D95): the QR screen then says how the check is going. */
   initialAiReview?: boolean;
+  /** Staff have 「사진 색 보정」 on (lib/looks): each frame's look is applied to its photos. */
+  initialPhotoLooks?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
   /** The server's clock at page load (lib/kiosk/bootstrap.ts): photos are dated by it. */
@@ -571,6 +655,64 @@ export function KioskApp({
     void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
   }, [renderBudget.outputScale]);
 
+  // ── Looks (lib/looks): behind a flag, off by default. While off, none of this runs and the
+  // booth composes exactly as before. Previews and the final composite share `looksRef`.
+  const looksRef = useRef<BoothLooks | null>(null);
+  const looksLoadRef = useRef<Promise<void> | null>(null);
+  // Set once the LUTs are in: the previews are drawn again with them.
+  const [looks, setLooks] = useState<BoothLooks | null>(null);
+  // The staff switch as the booth last heard it, and the answer this guest's session runs with.
+  // A change is taken up only on "화면을 눌러 시작": never under a guest, whose thumbnails, camera
+  // view and print would otherwise stop agreeing half way.
+  const [photoLooks, setPhotoLooks] = useState(initialPhotoLooks);
+  const [looksNow, setLooksNow] = useState(initialPhotoLooks);
+  const looksNext = sessionLooks(state.phase, looksNow, photoLooks);
+  if (looksNext !== looksNow) setLooksNow(looksNext);
+  useEffect(() => {
+    if (!looksActive(window.location.search, looksNow)) return;
+    const created = createBoothLooks();
+    looksRef.current = created;
+    looksLoadRef.current = created.preload(V2_FRAMES.map((frame) => frame.id));
+    void looksLoadRef.current.then(() => {
+      if (looksRef.current === created) setLooks(created);
+    });
+    return () => {
+      created.dispose();
+      looksRef.current = null;
+      looksLoadRef.current = null;
+      setLooks(null);
+    };
+  }, [looksNow]);
+
+  // The six shots on the review and choice screens, in the look of the frame they were taken
+  // for: what the guest chooses from is what the print will show. Small copies, made once per
+  // session; a shot that could not be graded keeps its own picture.
+  const choosing = state.phase === "review" || state.phase === "select";
+  const lookFrameId = choosing ? state.frameId : null;
+  const lookSeed = seedFromText(state.sessionId);
+  const gradedShots = useMemo(() => {
+    const out: (string | null)[] = [];
+    if (!looks || !lookFrameId) return out;
+    const grade = looks.graderFor(lookFrameId, lookSeed, chosenLook(lookFrameId, state.lookId));
+    if (!grade) return out;
+    for (const [index, shot] of state.shots.entries())
+      out.push(shot ? gradedShotUrl(shot.frame, grade, index) : null);
+    return out;
+  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId]);
+  // The colour row of the choice screen: the guest's first shot in each of the eight looks.
+  // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
+  const lookRowFrameId = state.phase === "select" ? state.frameId : null;
+  const firstShot = state.shots[0] ?? null;
+  const lookChips = useMemo(
+    () =>
+      looks && lookRowFrameId && firstShot
+        ? lookChipsFor(looks, lookRowFrameId, lookSeed, firstShot.frame)
+        : [],
+    [looks, lookRowFrameId, lookSeed, firstShot],
+  );
+  // The live camera picture of a black-and-white frame is black and white too.
+  const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
+
   // ── Previews: the Figma sample photos before shooting (the guest has none yet) ─────────────
   const [samples, setSamples] = useState<ComposeImage[] | null>(null);
   useEffect(() => {
@@ -593,12 +735,13 @@ export function KioskApp({
         scale: renderBudget.thumbScale,
         legacy: legacyIOS15,
         now: clock.now(),
+        grade: looks?.graderFor(frame.id, 1),
       });
       if (url) out[card.id] = url;
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale]);
+  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale, looks]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
   const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
@@ -610,9 +753,10 @@ export function KioskApp({
       legacy: legacyIOS15,
       handFont: previewFont,
       now: clock.now(),
+      grade: looks?.graderFor(optionsFrame.id, 1),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale]);
+  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale, looks]);
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
@@ -635,10 +779,19 @@ export function KioskApp({
     const shotAt = clock.now();
     const chosen = state.selectedShotIndices.map((index) => images[index]!);
     if (chosen.length !== frame.slots.length) return;
+    const sessionForLooks = state.sessionId;
+    const lookForFinal = state.lookId;
     // A font or asset that failed to load must not block the guest: compose without it.
-    void Promise.all([fontsRef.current, assetsRef.current])
+    // The LUTs are waited for only briefly: without them the frame keeps its own tone.
+    void Promise.all([
+      fontsRef.current,
+      assetsRef.current,
+      settleWithin(looksLoadRef.current, LOOKS_WAIT_MS),
+    ])
       .then(async ([, loaded]) => {
         if (cancelled) return;
+        // Skin retouch runs here, before the frame; the colour look (`grade`, lib/looks) is
+        // applied by composeFrame to each photo as it is drawn: 촬영 → 피부 보정 → 색감 → 틀.
         // A stage that fails hands the photos back as they were: the frame is always made.
         const staged = await runPhotoStages(chosen, photoStages);
         let canvas: HTMLCanvasElement;
@@ -653,6 +806,11 @@ export function KioskApp({
               assets: loaded ?? undefined,
             },
             scale: renderBudget.outputScale,
+            grade: looksRef.current?.graderFor(
+              frame.id,
+              seedFromText(sessionForLooks),
+              chosenLook(frame.id, lookForFinal),
+            ),
           }) as HTMLCanvasElement;
         } finally {
           staged.release();
@@ -688,9 +846,12 @@ export function KioskApp({
     };
   }, [
     finalPhase,
+    // Fixed once the photos are confirmed (lib/kiosk/machine.ts): never changes in this phase.
+    state.lookId,
     composeAttempt,
     legacyIOS15,
     state.frameId,
+    state.sessionId,
     state.selectedShotIndices,
     selectionKey,
     images,
@@ -1138,12 +1299,14 @@ export function KioskApp({
             wallSubmissions?: "open" | "paused";
             wallPublic?: boolean;
             aiReview?: boolean;
+            photoLooks?: boolean;
             serverNow?: string;
           };
           if (typeof data.serverNow === "string") clock.update(data.serverNow, sentAt, Date.now());
           if (data.wallSubmissions) setWallSubmissions(data.wallSubmissions);
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
           if (typeof data.aiReview === "boolean") setAiReview(data.aiReview);
+          if (typeof data.photoLooks === "boolean") setPhotoLooks(data.photoLooks);
         }
       } catch {
         // Offline: the queue badge already tells staff; the next beat will retry.
@@ -1211,6 +1374,9 @@ export function KioskApp({
             onToggleFlash={() => setFlashEnabled((enabled) => !enabled)}
             thumbs={pickThumbs}
             optionPreview={optionPreview}
+            gradedShots={gradedShots}
+            lookChips={lookChips}
+            lookView={lookView}
             finalImage={finalImage}
             developing={retouch.developing}
             retouchOffered={retouch.offered}
@@ -1312,6 +1478,7 @@ export function KioskApp({
             onReset={reset}
             soundMuted={muted}
             onToggleSound={sound ? () => sound.setMuted(!muted) : null}
+            looks={{ staffSwitch: photoLooks, session: looksNow, booth: looks }}
           />
         )}
         {retouchHud && skinRetouch !== "off" && (
@@ -1337,6 +1504,12 @@ interface ScreenProps {
   onToggleFlash: () => void;
   /** Picker previews by card id (sample photos). */
   thumbs: Record<string, string>;
+  /** The shots in their frame's look (lib/looks), by index; empty or null where there is none. */
+  gradedShots: readonly (string | null)[];
+  /** How the live camera picture is shown (a black-and-white frame: black and white). */
+  lookView: LookView;
+  /** The colour row of the choice screen: every look on the first shot. Empty: no row. */
+  lookChips: readonly LookChip[];
   /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
   optionPreview: string | null;
   finalImage: FinalImage | null;
@@ -1698,7 +1871,12 @@ function Screen(p: ScreenProps) {
           className={shooting ? "shoot shoot-live" : "shoot"}
         >
           <div className="shoot-stage">
-            <CameraPreview stream={p.stream} aspect={aspect} mirror={KIOSK_CONFIG.mirror}>
+            <CameraPreview
+              stream={p.stream}
+              aspect={aspect}
+              mirror={KIOSK_CONFIG.mirror}
+              lookView={p.lookView}
+            >
               <div className="absolute inset-0 flex items-center justify-center">
                 {state.phase === "countdown" ? (
                   <span
@@ -1803,7 +1981,7 @@ function Screen(p: ScreenProps) {
                     <PhotoCorners />
                     {shot && (
                       // eslint-disable-next-line @next/next/no-img-element -- local object URL
-                      <img src={shot.url} alt={t.shoot.shot(i + 1)} />
+                      <img src={p.gradedShots[i] ?? shot.url} alt={t.shoot.shot(i + 1)} />
                     )}
                   </div>
                 </div>
@@ -1829,7 +2007,13 @@ function Screen(p: ScreenProps) {
         <BoothScreen
           testId="screen-select"
           progress={progress}
-          className={p.retouchOffered ? "select select-has-retouch" : "select"}
+          className={[
+            "select",
+            p.lookChips.length ? "has-looks" : "",
+            p.retouchOffered ? "select-has-retouch" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <div className="select-head">
             <h1 className="booth-title">{t.select.title(required, state.shots.length)}</h1>
@@ -1857,7 +2041,7 @@ function Screen(p: ScreenProps) {
                     <span className="block" style={{ aspectRatio: String(aspect) }}>
                       {shot && (
                         // eslint-disable-next-line @next/next/no-img-element -- captured local object URL
-                        <img src={shot.url} alt="" />
+                        <img src={p.gradedShots[index] ?? shot.url} alt="" />
                       )}
                     </span>
                     <span className="select-badge">{order >= 0 ? order + 1 : index + 1}</span>
@@ -1866,6 +2050,15 @@ function Screen(p: ScreenProps) {
               })}
             </div>
           </div>
+          {p.lookChips.length > 0 && (
+            <LookRow
+              key={state.sessionId}
+              chips={p.lookChips}
+              chosen={sessionLookId(state.frameId, state.lookId)}
+              onChoose={(lookId) => dispatch({ type: "SET_LOOK", lookId })}
+              t={t}
+            />
+          )}
           {p.retouchOffered && (
             // 피부 보정: answered here, with the photos, and final once they are chosen.
             <div className="select-retouch" data-testid="retouch-row">
@@ -2335,6 +2528,74 @@ function FinalPreview({
 }
 
 /** The six shots of a session (v2: no extra one). */
+/**
+ * The colour row of the photo choice screen (Figma 956:1589): eight looks, four at a time, each on
+ * the guest's own first shot. It opens on the page of the look the frame comes with; "다음" shows
+ * the rest. Choosing one redraws the six shots above in it; the print gets the same.
+ */
+function LookRow({
+  chips,
+  chosen,
+  onChoose,
+  t,
+}: {
+  chips: readonly LookChip[];
+  chosen: string | null;
+  onChoose: (lookId: string) => void;
+  t: KioskCopy;
+}) {
+  const ids = chips.map((chip) => chip.id);
+  const pages = lookPages(ids);
+  const [page, setPage] = useState(() => lookPageOf(chosen, ids));
+  const shown = pages[Math.min(page, pages.length - 1)] ?? [];
+  const last = page >= pages.length - 1;
+  return (
+    <div className="look-row" data-testid="look-row">
+      <div className="look-head">
+        <p className="look-title">
+          <span>{t.select.lookTitle}</span>
+          <span className="look-page" data-testid="look-page">
+            {/* Numbers only: the same in every language, like the step count. */}
+            {page + 1} / {pages.length}
+          </span>
+        </p>
+        {pages.length > 1 && (
+          <button
+            type="button"
+            className="booth-btn-m look-turn"
+            data-testid="look-turn"
+            onClick={() => setPage(last ? page - 1 : page + 1)}
+          >
+            {last ? `‹ ${t.select.lookPrev}` : `${t.select.lookNext} ›`}
+          </button>
+        )}
+      </div>
+      <div className="look-chips" role="radiogroup" aria-label={t.select.lookTitle}>
+        {shown.map((id) => {
+          const chip = chips.find((c) => c.id === id)!;
+          const name = t.select.looks[id] ?? id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={chosen === id}
+              aria-label={t.select.lookChoose(name)}
+              data-testid={`look-${id}`}
+              className="look-chip"
+              onClick={() => onChoose(id)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+              <img src={chip.url} alt="" />
+              <span className="look-name">{name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ShotStrip({ state, current }: { state: State; current: number }) {
   const count = state.shotCount;
   return (

@@ -49,6 +49,9 @@ app has not been deployed or tried on real devices, and it is not production-rea
 | `/admin`        | Staff        | Control panel: moderation, sessions, kiosks, wall background, emergency, audit. Opens with the kiosk enrollment password (D84) — see [`docs/ADMIN.md`](docs/ADMIN.md)                 |
 | `/wall`         | Anyone       | Media wall. Opens without enrollment (D86): an enrolled display gets every approved photo, anyone else only photos agreed to for the public wall, and none while 공개 미디어월 is off |
 
+`/looks` is a staff tool, not a guest surface: the colour-look comparison sheet (sample photos
+only), described under [Looks](#looks-colour-filters) below.
+
 ## Quick start (development)
 
 Kiosk only (local file store, no Docker):
@@ -83,6 +86,59 @@ npm run dev   # → /admin/login; the 6-digit code arrives in Mailpit: http://12
 To skip kiosk enrollment while developing, set `KIOSK_AUTH_DISABLED=1`. The server refuses this
 in production. Deployment (Vercel + Supabase) is described in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
+## Looks (colour filters)
+
+Eight candidate looks for the guest's photos ("one film, several developments"), each a 3D LUT
+applied by one WebGL1 shader. They are **behind a flag and off by default**: the booth composes
+exactly as before until `NEXT_PUBLIC_LOOKS=1` is set at build time, or `?looks=1` is added to the
+booth address on one tablet (`/kiosk?looks=1`), or staff turn on **사진 색 보정** in `/admin`
+(every booth, from its next guest; see [docs/ADMIN.md](docs/ADMIN.md)). Guests never pick a look:
+the frame decides it. Research and audit:
+[`docs/research/color-market-research.md`](docs/research/color-market-research.md),
+[`docs/research/existing-filter-audit.md`](docs/research/existing-filter-audit.md).
+
+| What                        | Where                                                                    |
+| --------------------------- | ------------------------------------------------------------------------ |
+| The looks, as numbers       | `config/looks/index.ts` (edit, then `npm run looks:build`)               |
+| Which frame gets which look | `config/looks/frame-looks.json`                                          |
+| The generated LUTs          | `public/looks/<id>.cube` (33³, Adobe/Resolve `.cube`; never hand-edited) |
+| Look arithmetic and shader  | `lib/looks/` (`engine.ts`, `cube.ts`, `shader.ts`, `renderer.ts`)        |
+| Comparison sheet            | `/looks` (source: `looks-sheet/`)                                        |
+
+**Open the comparison sheet on this computer**
+
+```bash
+npm install
+npm run dev            # no .env needed for this page
+# http://localhost:3000/looks
+```
+
+**Open it on an iPad on the same Wi-Fi** (works on the iPad mini 4, Safari 15)
+
+```bash
+npm run dev -- -H 0.0.0.0
+# Find this computer's address on the Wi-Fi:
+#   macOS    ipconfig getifaddr en0
+#   Windows  ipconfig        (the "IPv4 Address" of the Wi-Fi adapter)
+#   Linux    hostname -I
+# On the iPad, in Safari:  http://<that address>:3000/looks      e.g. http://192.168.0.23:3000/looks
+```
+
+If the page does not open: both devices must be on the same network (not a guest network that
+isolates devices), and the computer's firewall must allow incoming connections to port 3000. The
+page needs no camera and no HTTPS.
+
+**Change a look**
+
+```bash
+# 1. edit the numbers in config/looks/index.ts
+npm run looks:build      # writes public/looks/*.cube
+npm run looks:preview    # contact sheets of every look on every sample → docs/screenshots/looks/
+npm run looks:measure    # is it still plain to see? each look against the original and the others
+UPDATE_LOOK_SNAPSHOTS=1 npx vitest run tests/unit/looks-reference.test.ts   # accept the new pictures
+npm test                 # the quality bars: skin hue, highlights, blacks, reds and greens
+```
+
 ## Scripts
 
 | Command                 | Does                                                                       |
@@ -94,12 +150,15 @@ in production. Deployment (Vercel + Supabase) is described in [`docs/DEPLOYMENT.
 | `npm run test:e2e`      | Playwright: production build, kiosk auth on, mock camera + fake webcam     |
 | `npm run test:supabase` | Integration tests against a local Supabase stack (`npx supabase start`)    |
 | `E2E_STORE=supabase …`  | Run the E2E suite against Supabase instead of local files (see DEPLOYMENT) |
+| `npm run looks:build`   | Write `public/looks/*.cube` from `config/looks` (`-- --check` only checks) |
+| `npm run looks:preview` | Draw every look on every sample into `docs/screenshots/looks/`             |
+| `npm run looks:measure` | How far each look is from the original and from the others (CIEDE2000)     |
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request, with no production secrets.
 
 ## 피부 보정 (skin retouch)
 
-고른 사진의 얼굴 피부를 합성 직전에 한 번 다듬는다: 촬영 완료 → **피부 보정** → 색감 필터(자리만 있음) → 틀 합성
+고른 사진의 얼굴 피부를 합성 직전에 한 번 다듬는다: 촬영 완료 → **피부 보정** → 색감 룩(합성기의 `grade`, 위 Looks) → 틀 합성
 (`lib/kiosk/photo-stages.ts`). 얼굴 형태는 건드리지 않는다. 전부 기기 안에서 계산하고, 얼굴 좌표·마스크는 서버로
 가지 않고 저장되지도 않는다. 조사와 근거는 `docs/research/skin-retouch-market-research.md`,
 `docs/research/skin-retouch-audit.md`.
@@ -176,6 +235,7 @@ RETOUCH_LAB=1 npx next start -H 0.0.0.0 -p 3000
 ## Docs
 
 - [`docs/PRD.md`](docs/PRD.md) — product requirements
+- [`docs/research/color-market-research.md`](docs/research/color-market-research.md) — colour market research (2026-11-23), [`existing-filter-audit.md`](docs/research/existing-filter-audit.md) — audit of the current tones
 - [`docs/ADMIN.md`](docs/ADMIN.md) — staff guide for `/admin`
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how it fits together
 - [`docs/SECURITY.md`](docs/SECURITY.md) — threat model, kiosk auth, private delivery

@@ -13,6 +13,7 @@ const config = [
       "public/kiosk-legacy-assets/**",
       "public/retouch-lab-assets/**",
       "public/retouch/mediapipe/**",
+      "public/looks-sheet-assets/**",
       "next-env.d.ts",
       // Agent worktrees are whole copies of the repository (with their own builds).
       ".claude/**",
