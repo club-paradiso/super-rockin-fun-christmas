@@ -53,9 +53,18 @@ describe("the ten handwriting fonts (Figma 895:1405)", () => {
       expect(css).toContain(`font-family: '${family}'`);
       const file = /url\(\.\/(files\/[^)]+\.woff2)\)/.exec(css)![1]!;
       expect(existsSync(join(dir, file))).toBe(true);
-      expect(readFileSync(join("components/kiosk/kiosk-app.tsx"), "utf8")).toContain(
+      expect(readFileSync(join("components/frame-fonts.ts"), "utf8")).toContain(
         `@fontsource/${slug}/latin-${weight}.css`,
       );
+    },
+  );
+
+  // Both pages that compose a v2 frame declare the faces (D113); loadFrameFonts alone would
+  // silently fall back on a page that did not.
+  it.each(["components/kiosk/kiosk-app.tsx", "app/m/[token]/mobile-upload.tsx"])(
+    "%s loads the frame fonts",
+    (file) => {
+      expect(readFileSync(file, "utf8")).toContain('import "@/components/frame-fonts";');
     },
   );
 });

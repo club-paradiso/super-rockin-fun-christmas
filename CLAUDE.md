@@ -54,8 +54,8 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   4컷, Figma 924:2026, added 2026-11-24); a card with options (colour, logo) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아); the guest then shoots six, reviews, chooses the photos. There is no
   "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). Every option
-  combination is its own frame id. The earlier 20 frames (`FRAMES`) stay for the phone page (D93)
-  and for photos already stored; the booth does not offer them.
+  combination is its own frame id. The earlier 20 frames (`FRAMES`) stay only for photos already
+  stored; neither the booth nor the phone page offers them (D113).
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
@@ -146,8 +146,8 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   nothing and both answers can save the framed picture on the phone. Never make the wall answer a
   condition for getting the picture, and never send it without "yes".
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
-  (`config/mobile.ts`): `phone-<booth frame id>` when the guest put 1–6 photos in a current booth
-  frame on the phone (D93: composed there with `composeFrame`, shape checked on the server, hung on
+  (`config/mobile.ts`): `phone-<booth frame id>` when the guest put photos in one of the booth's
+  v2 frames on the phone (D93, D113: the booth's eight cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
   the wall like that frame), `phone-photo` for a plain photo from a page older than D93. Test a phone
   photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
