@@ -1848,3 +1848,23 @@ PNG) and asked for them in place of the drawn tape of D112, first in Figma, then
   the slots the colours in turn (`clipImage`); every picture keeps the same size and `lineY`, so
   no photo moves and `planWallFit` is unchanged. `tape-washi.svg` is gone; the two themes with
   pegs painted in the picture keep them.
+
+## D115 · No clothespin anywhere: tape on every theme and on frame C (2026-11-24)
+
+The user asked for every clothespin to become tape ("빨래집게는 싹다 테이프로 교체").
+
+- **Wall pictures.** `star-of-peace` and `bethlehem` had eight wooden pegs painted on the rope. They
+  were painted out in all five pictures of each theme (1×, @2x, board 1× and 2×, preview): each peg's
+  box is filled with the real texture beside it (rope twist and sky grain, the rope moved column by
+  column onto the line between the box's edges), its low frequencies replaced by a blend of the
+  box's own edges, then feathered in. Both themes now hang with `TAPE` and their `line` follows the
+  rope (a quadratic fitted to the rope's centre, s.d. under 2 px); `strip.drop` is 16 like the other
+  taped themes. The `in-picture` hang stays in the type for a picture that brings its own clips.
+- **Old scene.** `night-window` hangs with `TAPE` too; the brass clip (`clip-brass.svg`, `BRASS`,
+  `WALL_CONFIG.scene.clip`) is gone.
+- **Frame C (빨랫줄).** The four wooden clothespins (`clothespin.svg`) are the wall's tapes
+  (`public/frames/tape-*.png`: cream, berry, kraft, pine), 30 px wide, crossing the line at their
+  centre, tilted −4°, 3°, −2°, 5°. Only photos already stored use this frame (D113).
+- **Figma.** `Template/C · Clothesline` (SS 02) has `Wall/Tape` layers (the pins are hidden and
+  renamed, not deleted), and the KIOSK thumbnails follow; SS 03 S02·S04 and SS 03E S02·S04 carry
+  `집게 지움 패치 8개` over their pictures; the hidden `05` parts in SS 03E S01–S04 hold tapes.

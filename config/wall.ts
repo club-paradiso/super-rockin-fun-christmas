@@ -34,7 +34,6 @@ export const WALL_CONFIG = {
     width: 3840,
     height: 1080,
     background: "/wall/background-v3.jpg",
-    clip: "/wall/clip-brass.svg",
     /** Height of the line at x: y0 − curve · (x − midX)². */
     line: { midX: 1900, y0: 304, curve: 3.03e-5 },
     /** A hung strip: a 1:3 four-cut, its top this far below the line. */
