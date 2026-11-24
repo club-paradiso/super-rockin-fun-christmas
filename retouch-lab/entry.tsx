@@ -10,6 +10,7 @@ import {
   RETOUCH_LEVELS,
   RETOUCH_LEVEL_LABELS,
   type RetouchConfig,
+  type RetouchLevel,
   type RetouchLevelId,
 } from "@/config/retouch";
 import { createDomCanvas, get2d } from "@/lib/canvas";
@@ -482,6 +483,8 @@ function Lab() {
           model?: Model;
           strength?: number;
           tiles?: boolean;
+          /** A level's numbers to try in place of the configured ones (tuning runs). */
+          numbers?: RetouchLevel;
         } = {},
       ) {
         const base = await loadShot(`/retouch/samples/${file}`, opts.size ?? 960);
@@ -492,7 +495,7 @@ function Lab() {
           const result = await r.retouchPhoto(
             { source: base, width: base.width, height: base.height },
             level,
-            { strength: opts.strength },
+            { strength: opts.strength, level: opts.numbers },
           );
           const after = result.image.source as HTMLCanvasElement;
           return {

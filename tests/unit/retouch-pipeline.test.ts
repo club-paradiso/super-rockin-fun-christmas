@@ -187,7 +187,12 @@ describe("what the retouch does to a face (CPU engine)", () => {
       return Math.sqrt(removed / pattern);
     };
     expect(removedShare(faint)).toBeGreaterThan(0.1);
-    expect(removedShare(strong)).toBeLessThan(removedShare(faint) * 0.7);
+    // Measured 2026-11-24 with the levels as chosen: faint 0.146, strong 0.111. The faint
+    // pattern is only a few levels deep, so what is taken out of it moves in whole 8-bit steps
+    // and did not grow when 자연스럽게 was raised (0.146 before and after), while the strong one
+    // grew with the level (0.086 → 0.111). Hence a limit on the ratio and one on the share itself.
+    expect(removedShare(strong)).toBeLessThan(removedShare(faint) * 0.8);
+    expect(removedShare(strong)).toBeLessThan(0.125);
   });
 
   it("does nothing to skin that is already even (a child's face)", async () => {

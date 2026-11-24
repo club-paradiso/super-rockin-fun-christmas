@@ -52,21 +52,38 @@ export interface RetouchLevel {
   lift: number;
 }
 
+/**
+ * The two levels, chosen 2026-11-24 from side-by-side sheets of the fifteen samples (three
+ * candidates per level, desktop Chromium, 960 × 720; docs/research/skin-retouch-audit.md 「강도
+ * 결정」). Still to be confirmed by a person on the lab page and on the iPad mini 4.
+ *
+ * 자연스럽게: uneven tone goes, everything that makes the face stays. The first numbers (bands
+ * 0.3 / 0.55 / 0.5 / 0.15) could hardly be told from the original; half as much again was the
+ * first set that showed, and lines, moles, freckles and stubble were all still there. The widest
+ * band stays low: it carries the shading that gives a face its shape.
+ *
+ * 뽀샤시: brighter and more even, not a wrinkle eraser. It stays about where it was: at × 1.4
+ * cheeks went waxy and smile lines disappeared, on a child too. The bands moved up only enough
+ * to stay above 자연스럽게 in every band, and `keepAbove` came down a little so that folds keep
+ * their shape. The lift stays at 0.035: at 0.045 and 0.05 the two hard-lit samples (older-woman,
+ * glasses-man) gained clipped highlights beyond the limit of e2e/retouch.spec.ts (the roll-off
+ * looks at luma, and on skin the red channel clips first).
+ */
 export const RETOUCH_LEVELS: Record<Exclude<RetouchLevelId, "off">, RetouchLevel> = {
   natural: {
     strength: 1,
     fine: 0,
-    bands: [0.3, 0.55, 0.5, 0.15],
+    bands: [0.42, 0.75, 0.7, 0.2],
     keepAbove: [0.03, 0.045, 0.06, 0.08],
-    underEye: 0.25,
-    redness: 0.2,
+    underEye: 0.3,
+    redness: 0.25,
     lift: 0,
   },
   glow: {
     strength: 1,
-    fine: 0.12,
-    bands: [0.55, 0.8, 0.7, 0.25],
-    keepAbove: [0.045, 0.065, 0.08, 0.1],
+    fine: 0.1,
+    bands: [0.6, 0.85, 0.75, 0.25],
+    keepAbove: [0.04, 0.055, 0.07, 0.09],
     underEye: 0.4,
     redness: 0.35,
     lift: 0.035,
