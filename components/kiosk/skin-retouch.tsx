@@ -24,7 +24,9 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
     last: null,
   });
   const [developing, setDeveloping] = useState(false);
-  // False once the model has failed to load: the booth then stops offering the choice.
+  // False once the model has failed to load, or the retoucher has switched itself off after
+  // failures in a row: the booth then stops offering the choice and hands every photo straight
+  // through (never another wait under "현상 중…" for something that will not work).
   const [usable, setUsable] = useState(true);
   const [metrics, setMetrics] = useState<BatchMetrics | null>(null);
 
@@ -55,12 +57,16 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
     return {
       async run(images) {
         const load = retoucherRef.current;
-        if (!load || level === "off") return { images: images.slice(), release: () => undefined };
+        if (!load || !usable || level === "off")
+          return { images: images.slice(), release: () => undefined };
         setDeveloping(true);
         try {
           const retoucher = await load;
           const { results, metrics: batch } = await retoucher.retouchBatch(images, level);
           setMetrics(batch);
+          // Three photos in a row failed: the retoucher is off until the page reloads, so the
+          // next guest is not offered it.
+          if (retoucher.isDisabled()) setUsable(false);
           return {
             images: results.map((r) => r.image as ComposeImage),
             release: () => {
@@ -81,7 +87,7 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
         }
       },
     };
-  }, [active, level]);
+  }, [active, level, usable]);
 
   return {
     stage,

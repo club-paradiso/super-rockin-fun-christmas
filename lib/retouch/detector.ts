@@ -49,15 +49,33 @@ interface VisionModule {
   };
 }
 
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+/**
+ * `work`, or "init-timeout" after `ms`. What `work` delivers after the timeout is nobody's: it
+ * goes to `discard` (the face finder is closed), so a slow load that the booth has given up on
+ * does not stay in the memory of a 2 GB tablet while the next attempt loads another one.
+ */
+export function withTimeout<T>(
+  work: Promise<T>,
+  ms: number,
+  discard: (late: T) => void,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new RetouchError("init-timeout")), ms);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      reject(new RetouchError("init-timeout"));
+    }, ms);
     work.then(
       (value) => {
+        if (timedOut) {
+          discard(value);
+          return;
+        }
         clearTimeout(timer);
         resolve(value);
       },
       (error: unknown) => {
+        if (timedOut) return;
         clearTimeout(timer);
         reject(error);
       },
@@ -102,6 +120,7 @@ export async function createMediaPipeFinder(
     if (model === "detector") {
       return { model, detect: detectPoints!, detectPoints, dispose: () => detector!.close() };
     }
+    // The detector is already up: if the landmarker does not come, close it rather than leave it.
     const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: d.landmarkerModelPath, delegate: "CPU" },
       runningMode: "IMAGE",
@@ -111,6 +130,9 @@ export async function createMediaPipeFinder(
       minFacePresenceConfidence: d.minPresenceConfidence,
       outputFaceBlendshapes: false,
       outputFacialTransformationMatrixes: false,
+    }).catch((error: unknown) => {
+      detector?.close();
+      throw error;
     });
     return {
       model,
@@ -126,7 +148,7 @@ export async function createMediaPipeFinder(
     };
   };
   try {
-    return await withTimeout(load(), d.initTimeoutMs);
+    return await withTimeout(load(), d.initTimeoutMs, (late) => late.dispose());
   } catch (error) {
     if (error instanceof RetouchError) throw error;
     throw new RetouchError("init-failed", error instanceof Error ? error.message : String(error));
