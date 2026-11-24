@@ -45,7 +45,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   await confirmFrame(page);
   // The guest is told before shooting, in one line.
   await expect(page.getByTestId("video-notice")).toHaveText(
-    "촬영하는 모습을 짧은 영상으로도 담아요. 소리는 담지 않아요.",
+    "촬영 과정은 소리 없이 짧은 영상으로도 저장돼요.",
   );
   // The booth never asks for a microphone.
   const audioTracks = await page.evaluate(() => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FRAMES, RETIRED_FRAME_IDS } from "@/config/frames";
+import { ALL_FRAMES, FRAMES, RETIRED_FRAME_IDS } from "@/config/frames";
+import { V2_FRAMES } from "@/config/frames/v2";
 import {
   framedPhotoFrame,
   isMobileFrameId,
@@ -8,7 +9,9 @@ import {
   MOBILE_UPLOAD_CONFIG,
   mobileBoothFrame,
   mobileFrameId,
+  MOBILE_FRAMES,
   mobileFramesFor,
+  mobileOfferedFrame,
   photoSource,
 } from "@/config/mobile";
 import { limitPicked, settleSelection, toggleOrdered } from "@/lib/mobile/prepare";
@@ -17,7 +20,7 @@ import { matchesFrameShape } from "@/lib/mobile/image";
 /** D93: a phone photo can be put in any booth frame; its stored id says which. */
 describe("phone photos in booth frames (D93)", () => {
   it("no booth frame id could be mistaken for a phone photo", () => {
-    for (const id of [...FRAMES.map((f) => f.id), ...RETIRED_FRAME_IDS]) {
+    for (const id of [...ALL_FRAMES.map((f) => f.id), ...RETIRED_FRAME_IDS]) {
       expect(id.startsWith(MOBILE_UPLOAD_CONFIG.frameIdPrefix), id).toBe(false);
       expect(id, id).not.toBe("photo");
       // Stored ids must pass the database check `^[a-z0-9-]{1,64}$`.
@@ -25,10 +28,18 @@ describe("phone photos in booth frames (D93)", () => {
     }
   });
 
-  it("every number of photos from 1 to the maximum has at least one frame", () => {
-    for (let n = 1; n <= MOBILE_UPLOAD_CONFIG.maxPhotos; n++)
+  it("the phone offers exactly the booth's frames (틀 선택 v2), never the dropped ones", () => {
+    expect(MOBILE_FRAMES).toEqual(V2_FRAMES);
+    for (const f of FRAMES) {
+      expect(mobileOfferedFrame(f.id), f.id).toBeNull();
+      expect(MOBILE_FRAMES).not.toContain(f);
+    }
+    for (const f of V2_FRAMES) expect(mobileOfferedFrame(f.id)).toBe(f);
+    for (const n of [1, 2, 3, 4])
       expect(mobileFramesFor(n).length, `${n} photos`).toBeGreaterThan(0);
-    expect(mobileFramesFor(MOBILE_UPLOAD_CONFIG.maxPhotos + 1)).toEqual([]);
+    // A guest may pick more photos than any frame holds, and chooses among them.
+    for (const f of MOBILE_FRAMES)
+      expect(f.slots.length).toBeLessThanOrEqual(MOBILE_UPLOAD_CONFIG.maxPhotos);
   });
 
   it("plain and framed phone photos are both phone photos; booth photos are not", () => {
@@ -38,9 +49,9 @@ describe("phone photos in booth frames (D93)", () => {
     expect(photoSource({ frameId: "phone-shalom-grid" })).toBe("mobile");
   });
 
-  it("only current booth frames are accepted, and the wall hangs each one in its frame", () => {
+  it("a stored phone photo in any known frame (also a dropped one) hangs in that frame", () => {
     expect(isMobileFrameId(MOBILE_FRAME_ID)).toBe(true);
-    for (const f of FRAMES) {
+    for (const f of ALL_FRAMES) {
       expect(isMobileFrameId(mobileFrameId(f.id))).toBe(true);
       expect(mobileBoothFrame(mobileFrameId(f.id))).toBe(f);
       expect(framedPhotoFrame(mobileFrameId(f.id))).toBe(f);
@@ -52,7 +63,7 @@ describe("phone photos in booth frames (D93)", () => {
   });
 
   it("the composed picture fits the server's framed bound at the booth's saved size", () => {
-    for (const f of FRAMES)
+    for (const f of MOBILE_FRAMES)
       expect(Math.max(f.outputWidth, f.outputHeight) * 2).toBeLessThanOrEqual(
         MOBILE_UPLOAD_CONFIG.framedLongEdge,
       );

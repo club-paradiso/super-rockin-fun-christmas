@@ -244,7 +244,7 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
     .jpeg()
     .toBuffer();
   // D103: frame first (the one-photo frame), then the photo, then "yes".
-  await guest.locator('[data-frame-id="shalom-single"]').click();
+  await guest.locator('[data-frame-id="polaroid1"]').click();
   await guest.getByTestId("mobile-frame-confirm").click();
   await guest
     .getByTestId("mobile-file")
@@ -265,7 +265,7 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
       },
       { timeout: 30_000 },
     )
-    .toBe("phone-shalom-single/PENDING/true");
+    .toBe("phone-polaroid1/PENDING/true");
   // The cloud keeps nothing once the hub has it.
   await expect
     .poll(async () => (await cloudRow(sessionId))?.moderationStatus, { timeout: 30_000 })

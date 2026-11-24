@@ -614,9 +614,8 @@ describe("language (D78): a view, per guest", () => {
           : o && typeof o === "object"
             ? Object.entries(o).flatMap(([k, v]) => strings(v, `${path}.${k}`))
             : [];
-    // Korean only where it names something Korean on purpose: the language picker's own label
-    // and the phone page's button, quoted with its English meaning.
-    const allowed = new Set([".langGroup", ".mobile.steps.2"]);
+    // Korean only where it names something Korean on purpose: the language picker's own label.
+    const allowed = new Set([".langGroup"]);
     for (const [path, text] of strings(KIOSK_COPY.en))
       if (!allowed.has(path)) expect(hangul.test(text), `${path}: ${text}`).toBe(false);
     // The Chinese screens are Chinese, not English: every string has Han characters, except
@@ -626,8 +625,8 @@ describe("language (D78): a view, per guest", () => {
     for (const [path, text] of strings(KIOSK_COPY.zh))
       if (!notChinese.has(path)) {
         expect(han.test(text), `${path}: ${text}`).toBe(true);
-        // No Korean either, except the phone page's button, quoted with its Chinese meaning.
-        if (path !== ".mobile.steps.2") expect(hangul.test(text), `${path}: ${text}`).toBe(false);
+        // No Korean either.
+        expect(hangul.test(text), `${path}: ${text}`).toBe(false);
       }
   });
 });

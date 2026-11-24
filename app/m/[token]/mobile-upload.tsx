@@ -1,17 +1,30 @@
 "use client";
 
+import "@/components/frame-fonts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "@/components/brand";
 import { StampTicket } from "@/components/studio/stamp-ticket";
 import { cleanOrdinal } from "@/lib/studio/day";
-import { DEFAULT_FRAME_ID, FRAMES, getFrame } from "@/config/frames";
+import {
+  DEFAULT_CARD_ID,
+  FRAME_CARDS,
+  cleanOptions,
+  defaultOptions,
+  getCard,
+  usesHandwriting,
+  type FrameCard,
+  type FrameCardId,
+  type FrameOptions,
+  type OptionValue,
+} from "@/config/frames/v2";
+import { pickHandFont } from "@/config/hand-fonts";
 import { KIOSK_CONFIG } from "@/config/kiosk";
-import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
+import { MOBILE_FRAMES, MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import { canvasToBlob, createDomCanvas } from "@/lib/canvas";
 import { loadFrameAssets } from "@/lib/compositor/assets";
-import { composeFrame, formatDateLabel } from "@/lib/compositor/compose";
+import { composeFrame, formatDateLabel, formatStampLabel } from "@/lib/compositor/compose";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
-import { placeholderPhotos } from "@/lib/compositor/placeholders";
+import { loadSamplePhotos, useServerClock } from "@/components/kiosk/frame-preview";
 import type { ComposeImage } from "@/lib/compositor/types";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
@@ -27,6 +40,10 @@ import {
  * The phone page goes in the booth's order (D103): choose a frame, choose exactly as many photos
  * as it holds in the order they go in, then answer the media-wall question with two equal answers.
  * Either way the guest can save the finished picture; only a "yes" sends it anywhere.
+ *
+ * The frames are the booth's own: the eight cards of 「틀 선택 v2」 and their options (colour,
+ * logo, tone), each combination its own frame id, exactly as on the booth. The frames the booth
+ * dropped on 2026-11-22 are never offered here.
  */
 type Phase =
   | { name: "frame" }
@@ -142,8 +159,11 @@ export function MobileUpload({
   publicWall,
   expiresAt,
   alreadySent,
+  serverNow,
 }: {
   token: string;
+  /** The server's time when the page was made: the date stamp is the server's day, never the phone's. */
+  serverNow?: string;
   /** Staff have the public wall on: say so in the consent text and send that scope. */
   publicWall: boolean;
   expiresAt: string;
@@ -152,14 +172,22 @@ export function MobileUpload({
   const [phase, setPhase] = useState<Phase>(
     alreadySent ? { name: "done", ordinal: null } : { name: "frame" },
   );
-  // The booth preselects the same frame.
-  const [frameId, setFrameId] = useState<string>(DEFAULT_FRAME_ID);
+  // The booth preselects the same card (필름 3컷) with its default options.
+  const [cardId, setCardId] = useState<FrameCardId>(DEFAULT_CARD_ID);
+  const [options, setOptions] = useState<FrameOptions>(() =>
+    defaultOptions(getCard(DEFAULT_CARD_ID)),
+  );
+  // The handwriting font is drawn once per guest, as on the booth (config/hand-fonts.ts).
+  const [handFont] = useState(() => pickHandFont(null, Math.random()).id);
+  const clock = useServerClock(serverNow);
   // Every photo the guest has picked so far, already shrunk (MOBILE_UPLOAD_CONFIG.sourceLongEdge),
   // and which of them go into the frame, in order (indices into `pool`).
   const [pool, setPool] = useState<ComposeImage[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [dropped, setDropped] = useState(0);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
+  // The booth's own sample photos (public/frames/v2/samples) for the frame picker.
+  const [samples, setSamples] = useState<ComposeImage[] | null>(null);
   // The encoded picture, with the frame and photo list it was made from: composing is async, so
   // the guest's current choice can be ahead of it for a moment.
   const [preview, setPreview] = useState<{
@@ -171,7 +199,8 @@ export function MobileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const sending = useRef(false);
 
-  const frame = getFrame(frameId);
+  const card = getCard(cardId);
+  const frame = card.frame(cleanOptions(card, options));
   const required = frame.slots.length;
   const chosen = useMemo(() => selected.map((i) => pool[i]!), [selected, pool]);
 
@@ -195,8 +224,14 @@ export function MobileUpload({
   // as the booth does. A font or picture that fails to load never blocks the guest.
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadFrameFonts(FRAMES), loadFrameAssets(FRAMES)]).then(([, loaded]) => {
-      if (!cancelled) setAssets(loaded.assets);
+    void Promise.all([
+      loadFrameFonts(MOBILE_FRAMES),
+      loadFrameAssets(MOBILE_FRAMES),
+      loadSamplePhotos(),
+    ]).then(([, loaded, photos]) => {
+      if (cancelled) return;
+      setSamples(photos);
+      setAssets(loaded.assets);
     });
     return () => {
       cancelled = true;
@@ -210,58 +245,68 @@ export function MobileUpload({
   }, [pool]);
   useEffect(() => () => release(poolRef.current), []);
 
-  const dateLabel = useMemo(() => formatDateLabel(new Date()), []);
+  // The day on the frame is the server's (Asia/Seoul), as on the booth.
+  const [labels] = useState(() => {
+    const now = clock.now();
+    return { dateLabel: formatDateLabel(now), stampLabel: formatStampLabel(now) };
+  });
+  const context = useMemo(
+    () => (assets ? { ...labels, handFont, assets } : null),
+    [assets, labels, handFont],
+  );
 
-  // The frame picker shows sample photos until the guest has their own, then their own (as the
-  // booth does after shooting), repeated to fill frames that hold more than they picked.
-  const samples = useMemo(() => (assets ? placeholderPhotos() : null), [assets]);
+  // The frame picker shows the booth's sample photos until the guest has their own, then their
+  // own, repeated to fill frames that hold more than they picked.
   const thumbSource = useMemo(() => {
     if (!samples) return null;
     if (pool.length === 0) return samples;
-    return samples.map((_, i) => pool[i % pool.length]!);
+    return [0, 1, 2, 3].map((i) => pool[i % pool.length]!);
   }, [samples, pool]);
+  const fill = (f: { slots: readonly unknown[] }, photos: readonly ComposeImage[]) =>
+    f.slots.map((_, i) => photos[i % photos.length]!);
 
   const onFrameScreen = phase.name === "frame";
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
-    if (!assets || !thumbSource || !onFrameScreen) return out;
-    for (const f of FRAMES) {
-      const canvas = composeFrame(f, thumbSource.slice(0, f.slots.length), {
+    if (!context || !thumbSource || !onFrameScreen) return out;
+    for (const c of FRAME_CARDS) {
+      const f = c.frame(defaultOptions(c));
+      const canvas = composeFrame(f, fill(f, thumbSource), {
         createCanvas: createDomCanvas,
-        context: { dateLabel, assets },
+        context,
         scale: KIOSK_CONFIG.thumbScale / 2,
       }) as HTMLCanvasElement;
-      out[f.id] = canvas.toDataURL("image/jpeg", 0.8);
+      out[c.id] = canvas.toDataURL("image/jpeg", 0.8);
       canvas.width = canvas.height = 0;
     }
     return out;
-  }, [assets, thumbSource, dateLabel, onFrameScreen]);
+  }, [context, thumbSource, onFrameScreen]);
 
   // The chosen frame, larger, above the tiles.
   const framePreview = useMemo(() => {
-    if (!assets || !thumbSource || !onFrameScreen) return null;
-    const canvas = composeFrame(frame, thumbSource.slice(0, frame.slots.length), {
+    if (!context || !thumbSource || !onFrameScreen) return null;
+    const canvas = composeFrame(frame, fill(frame, thumbSource), {
       createCanvas: createDomCanvas,
-      context: { dateLabel, assets },
+      context,
       scale: 0.5,
     }) as HTMLCanvasElement;
     const url = canvas.toDataURL("image/jpeg", 0.85);
     canvas.width = canvas.height = 0;
     return url;
-  }, [assets, thumbSource, frame, dateLabel, onFrameScreen]);
+  }, [context, thumbSource, frame, onFrameScreen]);
 
   // The JPEG that will be saved or sent: the chosen photos in the chosen frame at the booth's
   // saved size. Preview = result.
   const composing = phase.name === "consent" || phase.name === "uploading";
   useEffect(() => {
-    if (!assets || !composing || chosen.length !== required) return;
+    if (!context || !composing || chosen.length !== required) return;
     if (preview && preview.frameId === frame.id && preview.photos === chosen) return;
     let cancelled = false;
     (async () => {
       try {
         const canvas = composeFrame(frame, chosen, {
           createCanvas: createDomCanvas,
-          context: { dateLabel, assets },
+          context: { ...context, handFont: usesHandwriting(frame) ? handFont : undefined },
           scale: KIOSK_CONFIG.outputScale,
         }) as HTMLCanvasElement;
         const blob = await canvasToBlob(
@@ -279,7 +324,7 @@ export function MobileUpload({
     return () => {
       cancelled = true;
     };
-  }, [assets, composing, chosen, required, frame, dateLabel, preview]);
+  }, [context, composing, chosen, required, frame, handFont, preview]);
 
   // Only a picture made from what is on screen now may be saved or sent: never an older frame's
   // picture under the new frame's id (the server would refuse it), never an older choice.
@@ -410,16 +455,29 @@ export function MobileUpload({
                 <span className="h-[38dvh]" aria-hidden />
               )}
               <figcaption className="text-lg font-bold text-ink">
-                {frame.label}{" "}
+                {BOOTH.name[card.id]}{" "}
                 <span className="text-base font-normal text-ink/75">
                   {BOOTH.frame.slots(required)}
                 </span>
               </figcaption>
             </figure>
+            <CardOptions
+              card={card}
+              options={cleanOptions(card, options)}
+              onChange={(key, value) => setOptions((o) => ({ ...o, [key]: value }))}
+            />
             <FramePicker
-              frames={FRAMES.map((f) => ({ id: f.id, label: f.label, thumb: thumbs[f.id] }))}
-              selected={frame.id}
-              onSelect={setFrameId}
+              frames={FRAME_CARDS.map((c) => ({
+                id: c.id,
+                label: BOOTH.name[c.id],
+                thumb: thumbs[c.id],
+              }))}
+              selected={card.id}
+              onSelect={(id) => {
+                const next = getCard(id);
+                setCardId(next.id);
+                setOptions(defaultOptions(next));
+              }}
             />
             <button
               type="button"
@@ -441,7 +499,7 @@ export function MobileUpload({
             </h2>
             <p className="text-base leading-relaxed text-ink/75" data-testid="mobile-select-lead">
               {pool.length === 0
-                ? `휴대폰에 있는 사진을 골라 주세요. ${frame.label} 틀에 ${required}장이 들어가요.`
+                ? `휴대폰에 있는 사진을 골라 주세요. ${BOOTH.name[card.id]} 틀에 ${required}장이 들어가요.`
                 : BOOTH.select.lead(selected.length, required)}
             </p>
             {pool.length > 0 && (
@@ -711,22 +769,72 @@ function SavePicture({ url }: { url: string }) {
   );
 }
 
-/** Every booth frame, each with sample photos (or the guest's own) in it, in picker order. */
+/**
+ * A card's options (colour, logo, tone) as the booth's options screen has them: one row per
+ * option, every answer a button of the same size, the chosen one filled. Nothing for a card
+ * without options.
+ */
+function CardOptions({
+  card,
+  options,
+  onChange,
+}: {
+  card: FrameCard;
+  options: FrameOptions;
+  onChange: (key: FrameCard["options"][number]["key"], value: OptionValue) => void;
+}) {
+  if (card.options.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3" data-testid="mobile-frame-options">
+      {card.options.map((o) => (
+        <div
+          key={o.key}
+          role="radiogroup"
+          aria-label={BOOTH.label[o.key]}
+          className="flex flex-col gap-1.5"
+        >
+          <span className="text-center text-base font-semibold text-ink">{BOOTH.label[o.key]}</span>
+          <div className="flex justify-center gap-2">
+            {o.values.map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={options[o.key] === v}
+                data-testid={`mobile-option-${o.key}-${v}`}
+                onClick={() => onChange(o.key, v)}
+                className={`min-h-12 min-w-20 rounded-full px-4 text-base font-semibold ${
+                  options[o.key] === v
+                    ? "bg-button text-button-text"
+                    : "border border-ink/40 text-ink"
+                }`}
+              >
+                {BOOTH.value[v]}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The booth's eight cards, each with sample photos (or the guest's own) in it, in picker order. */
 function FramePicker({
   frames,
   selected,
   onSelect,
 }: {
-  frames: { id: string; label: string; thumb: string | undefined }[];
+  frames: { id: FrameCardId; label: string; thumb: string | undefined }[];
   selected: string;
-  onSelect: (id: string) => void;
+  onSelect: (id: FrameCardId) => void;
 }) {
   return (
     <div
       role="radiogroup"
       aria-label="틀 고르기"
-      // Three across keeps the longest name ("대림절 달력") whole at 360 px.
-      className="grid grid-cols-3 gap-2"
+      // Two across keeps the longest name ("35mm 필름 4컷") whole at 360 px.
+      className="grid grid-cols-2 gap-2"
       data-testid="mobile-frames"
     >
       {frames.map((f) => (

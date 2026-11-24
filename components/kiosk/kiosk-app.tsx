@@ -1,18 +1,6 @@
 "use client";
 
-// The handwriting of the film 4컷 / polaroid 1컷 frames (config/hand-fonts.ts) and the polaroid
-// date stamp (VT323): bundled, so the booth draws them offline. Only the latin subset is used.
-import "@fontsource/caveat/latin-700.css";
-import "@fontsource/nothing-you-could-do/latin-400.css";
-import "@fontsource/reenie-beanie/latin-400.css";
-import "@fontsource/permanent-marker/latin-400.css";
-import "@fontsource/gloria-hallelujah/latin-400.css";
-import "@fontsource/square-peg/latin-400.css";
-import "@fontsource/rock-salt/latin-400.css";
-import "@fontsource/shadows-into-light/latin-400.css";
-import "@fontsource/covered-by-your-grace/latin-400.css";
-import "@fontsource/give-you-glory/latin-400.css";
-import "@fontsource/vt323/latin-400.css";
+import "@/components/frame-fonts";
 import {
   Fragment,
   useCallback,
@@ -561,7 +549,7 @@ export function KioskApp({
 
   // ── Fonts and frame artwork: loaded once, before any frame is drawn (canvas waits for
   // neither). Both are bundled, so this is quick and works offline. Only the booth's own frames
-  // (v2): the earlier ones are the phone page's. A 1× booth (iPad mini 4) loads the 1× art.
+  // (v2). A 1× booth (iPad mini 4) loads the 1× art.
   const fontsRef = useRef<Promise<boolean> | null>(null);
   const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
@@ -1637,7 +1625,9 @@ function Screen(p: ScreenProps) {
         <BoothScreen testId="screen-camera-error" progress={progress}>
           <div className="booth-message">
             <h1 className="booth-title">{copy.title}</h1>
-            <p className="booth-lead">{copy.lead}</p>
+            <p className="booth-lead">
+              <Lines text={copy.lead} />
+            </p>
             <div className="booth-actions">
               <button
                 type="button"
@@ -2015,7 +2005,9 @@ function Screen(p: ScreenProps) {
           ) : d.status === "failed" ? (
             <div className="booth-message">
               <h1 className="booth-title">{t.delivery.failedTitle}</h1>
-              <p className="booth-lead">{t.delivery.failedLead}</p>
+              <p className="booth-lead">
+                <Lines text={t.delivery.failedLead} />
+              </p>
               <div className="booth-actions">
                 <button type="button" className="booth-btn-primary" onClick={p.onRetryDelivery}>
                   {t.delivery.retry}
@@ -2131,14 +2123,15 @@ function MobileScreen({
             <Lines text={t.waiting} />
           </p>
         </div>
-        <div className="qr-more">
-          <p className="booth-caption">{t.note}</p>
-          {m.status === "ready" && m.via === "lan" && (
+        {/* Figma M1 has nothing under the card; the Wi-Fi line is only for a hub without a
+            cloud, where the phone cannot open the page any other way. */}
+        {m.status === "ready" && m.via === "lan" && (
+          <div className="qr-more">
             <p className="booth-caption text-ink" data-testid="mobile-lan-note">
               {t.lan}
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </BoothScreen>
   );
