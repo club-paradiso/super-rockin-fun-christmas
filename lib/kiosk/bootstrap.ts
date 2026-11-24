@@ -11,6 +11,7 @@ export async function kioskBootstrap(camera?: string) {
     initialWallSubmissions: settings.pauseSubmissions ? ("paused" as const) : ("open" as const),
     initialWallPublic: settings.wallPublic,
     initialAiReview: await getAiReview().active(),
+    initialPhotoLooks: settings.photoLooks,
     staffHelp: getServerConfig().staffAuth?.mode === "pin",
     // The server's clock at page load: the booth dates photos by it, never by the tablet's own.
     serverNow: new Date().toISOString(),

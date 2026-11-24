@@ -147,6 +147,8 @@ const toSettings = (r: Row): EventSettings => ({
   wallLook: normalizeLook(r.wall_look, WALL_THEMES, DEFAULT_WALL_THEME),
   // Absent before the D95 migration: a person approves every photo.
   moderationMode: r.moderation_mode === "auto" ? "auto" : "manual",
+  // Absent before the looks migration: off.
+  photoLooks: r.photo_looks === true,
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -539,6 +541,16 @@ class SupabaseSettingsRepository implements SettingsRepository {
     return toSettings(data);
   }
   async update(patch: SettingsPatch, staffUserId: string) {
+    // Looks have their own audited function (its own migration), so the call below keeps the
+    // signature that exists with or without that migration.
+    const { photoLooks, ...rest } = patch;
+    if (photoLooks !== undefined) {
+      const changed = await rpcRows(this.db, "ftl_settings_set_looks", {
+        p_enabled: photoLooks,
+        p_actor_id: staffUserId,
+      });
+      if (Object.keys(rest).length === 0) return toSettings(changed[0]!);
+    }
     const rows = await rpcRows(this.db, "ftl_settings_update", {
       p_pause_submissions: patch.pauseSubmissions ?? null,
       p_pause_wall: patch.pauseWall ?? null,

@@ -11,3 +11,4 @@ docs/measurements/raw/
 public/kiosk-legacy-assets/
 # Written by the Figma parity specs (PARITY_SAVE=1).
 docs/screenshots/figma-parity/*.json
+public/looks-sheet-assets/

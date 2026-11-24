@@ -3,6 +3,9 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import type { CameraDevice } from "@/lib/camera";
+import type { BoothLooks } from "@/lib/looks/booth";
+import { looksOverride } from "@/lib/looks/config";
+import { looksStatus } from "@/lib/looks/status";
 import { HelpFullscreen } from "./fullscreen";
 import {
   HELP_CLOSED,
@@ -11,6 +14,13 @@ import {
   type HelpDenial,
   type HelpStaff,
 } from "@/lib/kiosk/help";
+
+/** 「사진 색 보정」 as the booth knows it (lib/looks/status.ts turns it into one line). */
+export interface HelpLooks {
+  staffSwitch: boolean;
+  session: boolean;
+  booth: BoothLooks | null;
+}
 
 export interface HelpQueueView {
   uploads: { sessionId: string; attempts: number; lastError: string | null; state: string }[];
@@ -43,6 +53,8 @@ export function HelpPanel(p: {
   /** Booth sounds (lib/kiosk/sound.ts); the switch is kept on this device. */
   soundMuted: boolean;
   onToggleSound: (() => void) | null;
+  /** 「사진 색 보정」: what staff set, what this guest's session runs with, and the loaded looks. */
+  looks: HelpLooks;
 }) {
   const [state, dispatch] = useReducer(helpReducer, HELP_CLOSED);
   const cornerRef = useRef<HTMLDivElement>(null);
@@ -263,12 +275,23 @@ function HelpMenu(p: {
   onReset: () => void;
   soundMuted: boolean;
   onToggleSound: (() => void) | null;
+  /** 「사진 색 보정」: what staff set, what this guest's session runs with, and the loaded looks. */
+  looks: HelpLooks;
   onClose: () => void;
 }) {
   const [devices, setDevices] = useState<CameraDevice[] | null>(null);
   const [queue, setQueue] = useState<HelpQueueView | null>(null);
   const [sending, setSending] = useState(false);
   const { listDevices, loadQueue } = p;
+  // The menu only exists after a hold and a PIN, so the address can be read here.
+  const looksLine = looksStatus({
+    staffSwitch: p.looks.staffSwitch,
+    session: p.looks.session,
+    override: looksOverride(window.location.search),
+    buildFlag: process.env.NEXT_PUBLIC_LOOKS === "1",
+    loaded: p.looks.booth !== null,
+    problem: p.looks.booth?.problem() ?? null,
+  });
 
   useEffect(() => {
     void listDevices()
@@ -317,6 +340,13 @@ function HelpMenu(p: {
           </button>
         </section>
       )}
+
+      <section className="flex flex-col gap-2" data-testid="help-looks">
+        <h3 className="text-2xl font-bold">사진 색 보정</h3>
+        <p className="text-xl" data-testid="help-looks-status" data-state={looksLine.state}>
+          {looksLine.text}
+        </p>
+      </section>
 
       <section className="flex flex-col gap-2" data-testid="help-queue">
         <h3 className="text-2xl font-bold">보내지 못한 것</h3>

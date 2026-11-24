@@ -21,7 +21,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The look LUTs are plain text (about 750 KB each): say so, and they are sent compressed.
+      {
+        source: "/looks/:name.cube",
+        headers: [{ key: "Content-Type", value: "text/plain; charset=utf-8" }],
+      },
+    ];
   },
   async rewrites() {
     return { beforeFiles: wallHostRewrites(wallHosts), afterFiles: [], fallback: [] };

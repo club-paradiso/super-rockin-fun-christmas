@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:kiosk-legacy && next build",
+    "build": "npm run build:kiosk-legacy && npm run build:looks-sheet && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -20,8 +20,12 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "test:supabase": "bash scripts/test-supabase.sh",
     "staff:add": "node scripts/staff-add.mjs",
+    "looks:build": "node scripts/looks-build.mjs",
+    "looks:preview": "node scripts/looks-preview.mjs",
+    "looks:measure": "node scripts/looks-measure.mjs",
     "build:kiosk-legacy": "vite build --config legacy-kiosk/vite.config.mts",
-    "predev": "npm run build:kiosk-legacy"
+    "build:looks-sheet": "vite build --config looks-sheet/vite.config.mts",
+    "predev": "npm run build:kiosk-legacy && npm run build:looks-sheet"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-kr": "^5.3.1",

@@ -1,0 +1,20 @@
+{
+  "default": { "look": "paper", "strength": 1 },
+  "frames": {
+    "film3-mono-logo": { "look": "ink", "strength": 1 },
+    "film3-mono-plain": { "look": "ink", "strength": 1 },
+    "film3-sepia-logo": { "look": "walnut", "strength": 1 },
+    "film3-sepia-plain": { "look": "walnut", "strength": 1 },
+    "film4-cream": { "look": "linen", "strength": 1 },
+    "film4-red": { "look": "lamp", "strength": 0.9 },
+    "polaroid1": { "look": "album", "strength": 1 },
+    "polaroid3": { "look": "flash", "strength": 1 },
+    "verse4": { "look": "paper", "strength": 1 },
+    "film35-natural": { "look": "linen", "strength": 1 },
+    "film35-mono": { "look": "ink", "strength": 1 },
+    "film35-sepia": { "look": "walnut", "strength": 1 },
+    "check2-red": { "look": "lamp", "strength": 0.9 },
+    "check2-blue": { "look": "pine", "strength": 1 },
+    "lace1": { "look": "album", "strength": 0.9 }
+  }
+}
