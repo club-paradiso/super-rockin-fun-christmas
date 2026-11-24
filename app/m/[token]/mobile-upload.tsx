@@ -1,5 +1,6 @@
 "use client";
 
+import "@/components/frame-fonts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLockup } from "@/components/brand";
 import { StampTicket } from "@/components/studio/stamp-ticket";
