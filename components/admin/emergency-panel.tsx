@@ -62,7 +62,7 @@ export function EmergencyPanel({
     router.refresh();
   }
 
-  async function toggle(key: (typeof SWITCHES)[number]["key"]) {
+  async function toggle(key: (typeof SWITCHES)[number]["key"] | "photoLooks") {
     setBusy(key);
     setError(null);
     const res = await postJson("/api/admin/settings", { [key]: !settings[key] });
@@ -111,6 +111,30 @@ export function EmergencyPanel({
           );
         })}
       </div>
+      {/* Not an emergency: a look for the booth's photos. Same switch, without the warning tint. */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={settings.photoLooks}
+        disabled={busy !== null}
+        onClick={() => toggle("photoLooks")}
+        data-testid="switch-photoLooks"
+        className="admin-switch-row w-full border-t border-ink/10"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold">사진 색 보정</span>
+          <span className="admin-help mt-0.5 block">
+            부스 사진에 틀마다 정해 둔 색감을 입혀요. 끄면 예전 그대로 나가요. 다음 손님부터
+            바뀌어요.
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-center gap-1">
+          <span className="admin-switch-track" data-on={settings.photoLooks} aria-hidden />
+          <span className="text-[13px] leading-none font-semibold text-ink/75">
+            {busy === "photoLooks" ? "…" : settings.photoLooks ? "켜짐" : "꺼짐"}
+          </span>
+        </span>
+      </button>
       <div className="flex flex-col gap-3 border-t border-ink/10 p-4" data-testid="wall-force">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h3 className="text-base font-semibold">미디어월 켜기/끄기</h3>

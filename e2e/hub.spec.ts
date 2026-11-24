@@ -183,6 +183,89 @@ test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, star
   await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
 });
 
+/** Whether the middle of a picture has no colour: every channel within a few levels. */
+async function isGrey(page: Page, testId: string) {
+  return page
+    .getByTestId(testId)
+    .locator("img")
+    .evaluate(async (el: HTMLImageElement) => {
+      await el.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = 40;
+      canvas.height = 30;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(el, 0, 0, 40, 30);
+      const { data } = ctx.getImageData(0, 0, 40, 30);
+      let spread = 0;
+      for (let p = 0; p < data.length; p += 4)
+        spread = Math.max(
+          spread,
+          Math.max(data[p]!, data[p + 1]!, data[p + 2]!) -
+            Math.min(data[p]!, data[p + 1]!, data[p + 2]!),
+        );
+      return spread <= 12;
+    });
+}
+
+test("사진 색 보정: staff switch it on, a black-and-white frame is black and white from the camera view to the choice", async () => {
+  test.setTimeout(150_000);
+  await staff.goto("/admin");
+  const toggle = staff.getByTestId("switch-photoLooks");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+  // Off (the default): the booth as it was. Colour camera view, the shots as taken.
+  await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await confirmFrame(kiosk, "film35", { color: "mono" });
+  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+  await expect(kiosk.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await staff.goto("/admin/audit");
+  await expect(staff.getByTestId("audit-item").first()).toHaveAttribute(
+    "data-action",
+    "update_settings",
+  );
+
+  // On: the next guest (a fresh page here) sees themselves in black and white before the shot.
+  await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await confirmFrame(kiosk, "film35", { color: "mono" });
+  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+  const view = kiosk.getByTestId("camera-preview");
+  await expect(view).toHaveAttribute("data-look-view", "mono");
+  expect(await view.evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale(1)");
+
+  // Staff can read on the booth itself that it is on.
+  await holdCorner(kiosk, 3_300);
+  const panel = kiosk.getByTestId("help-panel");
+  await panel.getByRole("button", { name: "현장 책임자" }).click();
+  await typePin(kiosk, ADMIN_PIN);
+  await expect(panel.getByTestId("help-looks-status")).toHaveText("켜짐");
+  await expect(panel.getByTestId("help-looks-status")).toHaveAttribute("data-state", "on");
+  await panel.getByTestId("help-reset").click();
+
+  // And the six shots they choose from are already in the frame's look.
+  await openWelcome(kiosk);
+  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await confirmFrame(kiosk, "film35", { color: "mono" });
+  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
+  await expect(kiosk.getByTestId("review-shot-0").locator("img")).toHaveAttribute(
+    "src",
+    /^data:image\/jpeg/,
+  );
+  expect(await isGrey(kiosk, "review-shot-0")).toBe(true);
+  expect(await isGrey(kiosk, "review-shot-5")).toBe(true);
+
+  await staff.goto("/admin");
+  await staff.getByTestId("switch-photoLooks").click();
+  await expect(staff.getByTestId("switch-photoLooks")).toHaveAttribute("aria-checked", "false");
+});
+
 test("signing out ends the staff session", async () => {
   await staff.getByRole("button", { name: "로그아웃" }).click();
   await expect(staff).toHaveURL(/\/admin\/login/);

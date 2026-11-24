@@ -49,6 +49,37 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
   slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
+- **Looks are candidates behind a flag, off by default** (2026-11-23, `lib/looks`,
+  `docs/research/`): eight looks, each the house stock (`HOUSE` in `config/looks/index.ts`) plus
+  differences, baked to `public/looks/<id>.cube` by `npm run looks:build` (never hand-edit a
+  `.cube`; `tests/unit/looks-cube.test.ts` fails while file and numbers disagree). One WebGL1 shader
+  (`lib/looks/shader.ts`) applies halation (small lights only), the LUT, strength, grain and corner falloff; the frame previews
+  and the final composite pass the same `grade` to `composeFrame`, so their colours cannot differ.
+  Which frame gets which look is `config/looks/frame-looks.json`, never code. With looks off the booth fetches no LUT, creates no WebGL
+  context and composes as before; that is what the Figma parity tests measure, so do not turn them
+  on by default without new Figma examples. What turns them on (`looksActive`): the address
+  (`?looks=1` / `?looks=0`, which wins), else the build (`NEXT_PUBLIC_LOOKS=1`) or the staff switch
+  「사진 색 보정」 (`settings.photoLooks`, audited through `ftl_settings_set_looks`, default off). The
+  switch reaches a booth with its heartbeat and is taken up only on "화면을 눌러 시작"
+  (`sessionLooks`): never under a guest. **The guest may change the look on the photo choice screen, and nowhere
+  else** (a user decision, 2026-11-24, Figma 956:1589 / 956:1715): a row of the eight looks, four at
+  a time with "다음" (`LOOKS_PER_PAGE`, `LookRow`), each on the guest's own first shot, opening on
+  the frame's own look, which stays the answer if the guest touches nothing. No extra screen and no
+  extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
+  for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
+  is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
+  gives wording). With looks on, the six shots on the review and choice screens are shown in the
+  session's look (`gradedShots`, the same grader as the print; `chosenLook`), and the live camera picture of a
+  black-and-white or sepia frame is shown that way with a CSS filter on the `<video>` only
+  (`lookViewForFrame`); a colour look never changes the camera view. Staff read the state on the
+  booth in the help menu (`lib/looks/status.ts`). When WebGL fails the photo keeps the frame's own
+  `photoTone` and the reason goes to the console (`[looks]`): never silently, never a blocked guest.
+  Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
+  greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
+  from the others (`tests/unit/looks-distinct.test.ts`: every pair at least 4.5 ΔE00 apart on the samples; `npm run
+looks:measure`). `/looks` is the comparison
+  sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
+  or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
   offers the eight cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
   4컷, Figma 924:2026, added 2026-11-24); a card with options (colour, logo) has an options screen,
@@ -307,6 +338,11 @@ lib/remote-camera      Remote Camera: protocol, shutter (host/client), chunked t
 app/camera/remote      the iPhone's page · app/api/camera + app/api/kiosk/camera (signaling, status, link)
                        · app/api/admin/remote-camera (staff: pair, commands, revoke) · /admin/remote-camera
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
+lib/looks              colour looks (flag, off by default): look arithmetic (engine.ts), .cube + LUT
+                       sampling (cube.ts), WebGL1 shader + renderer, reference arithmetic for tests,
+                       frame → look mapping + flag (config.ts), booth loader (booth.ts)
+looks-sheet            /looks comparison sheet: stand-alone Safari 15 bundle (vite), served by
+                       app/looks/route.ts; samples in public/looks/samples (synthetic)
 lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client,
                        booth copy in Korean and English (copy.ts, D78),
                        session video recorder (injected MediaRecorder, D72)
@@ -322,7 +358,7 @@ ops                    desktop-icon wrappers: start-hub / restore-backup / event
                        start-wall
 config/moderation.ts   AI review knobs, category codes and their staff Korean (D95)
 config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71),
-                       wall themes (wall-themes.ts, D85)
+                       wall themes (wall-themes.ts, D85), looks (looks/index.ts, frame-looks.json)
 design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)
 tests/integration      real Supabase (npm run test:supabase)

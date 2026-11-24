@@ -1154,6 +1154,15 @@ body {
     border-radius: 2px;
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
   }
+  /* A black-and-white frame with 「사진 색 보정」 on: the guest sees themselves that way before
+     the shot. An element filter (Safari 15 has it), on the view only: the shot is never taken
+     from this element, and the print's tone is the look's own arithmetic (lib/looks). */
+  .camera-preview video[data-look-view="mono"] {
+    filter: grayscale(1) contrast(1.06);
+  }
+  .camera-preview video[data-look-view="sepia"] {
+    filter: grayscale(1) sepia(0.32) contrast(1.04);
+  }
   @supports (container-type: size) {
     .camera-preview {
       width: min(100cqw, calc(100cqh * var(--aspect, 1.3333)));
@@ -1435,6 +1444,85 @@ body {
   }
   .select-actions > * {
     flex: 1 1 auto;
+  }
+  /* The colour row of the choice screen (Figma 956:1589): a title with the page, "다음", and four
+     looks on the guest's own first shot. The chosen one is filled, as on the options screen: a
+     state, not a second action. Every size is a token; a chip is never under a touch target. */
+  .look-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-s);
+    min-width: 0;
+  }
+  .look-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-s);
+  }
+  .look-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    font-size: var(--fs-lead);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--color-ink);
+  }
+  .look-page {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+  }
+  .look-turn {
+    flex: none;
+    min-width: 5.5em;
+  }
+  .look-chips {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--gap-s);
+  }
+  .look-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3em;
+    min-width: 0;
+    min-height: var(--ctl-h);
+    padding: 5px 5px 0.45em;
+    border: 1px solid color-mix(in srgb, var(--color-ink) 25%, transparent);
+    border-radius: 14px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-size: var(--ctl-fs);
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: center;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    transition: transform 90ms ease-out;
+  }
+  .look-chip:active {
+    transform: scale(0.97);
+  }
+  .look-chip[aria-checked="true"] {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .look-chip img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 9px;
+    object-fit: cover;
+  }
+  .look-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* 1b · 4 · Frame choice: the chosen frame large, all frames as small tiles. Nothing is cut
@@ -1775,6 +1863,17 @@ body {
       grid-area: actions;
       align-self: start;
       min-width: 0;
+    }
+    /* Beside the prints the colour row sits between the title and the button, two looks a row. */
+    .select.has-looks {
+      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+      grid-template-areas: "stage head" "stage looks" "stage actions";
+    }
+    .look-row {
+      grid-area: looks;
+    }
+    .look-chips {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .review-actions > * {
       flex-basis: 100%;

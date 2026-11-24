@@ -345,6 +345,12 @@ export interface EventSettings {
    * person. There is no mode without review.
    */
   moderationMode: ModerationMode;
+  /**
+   * Colour looks on the booth's photos (lib/looks). Off (default): every photo keeps its frame's
+   * own tone, as before looks existed. Staff turn it on after seeing it under the venue's own
+   * light, and off again from anywhere if it goes wrong. Takes effect at the next session.
+   */
+  photoLooks: boolean;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -360,6 +366,7 @@ export type SettingsPatch = Partial<
     | "wallPublic"
     | "wallLook"
     | "moderationMode"
+    | "photoLooks"
   >
 >;
 

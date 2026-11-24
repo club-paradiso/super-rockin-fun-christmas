@@ -13,11 +13,28 @@ import type {
   Rotation,
 } from "./types";
 
+/**
+ * A look for the guest's photos (lib/looks). It is handed each photo already cover-cropped at the
+ * size it will be drawn, and returns the graded picture, or null when it could not grade it (then
+ * the frame's own `photoTone` is used, as if no look had been asked for).
+ */
+export type PhotoGrader = (
+  photo: CanvasLike,
+  width: number,
+  height: number,
+  slotIndex: number,
+) => CanvasImageSource | null;
+
 export interface ComposeOptions {
   createCanvas: CanvasFactory;
   context: ComposeContext;
   /** Render at a fraction of full size (frame-picker thumbnails). Default 1. */
   scale?: number;
+  /**
+   * Optional look (feature flag `looksEnabled`, lib/looks/config.ts). The preview and the final
+   * composite pass the same grader, so both get the same colours. It replaces `photoTone`.
+   */
+  grade?: PhotoGrader;
 }
 
 export class CompositionError extends Error {}
@@ -29,7 +46,7 @@ export class CompositionError extends Error {}
 export function composeFrame(
   frame: FrameDefinition,
   images: readonly ComposeImage[],
-  { createCanvas, context, scale = 1 }: ComposeOptions,
+  { createCanvas, context, scale = 1, grade }: ComposeOptions,
 ): CanvasLike {
   if (images.length !== frame.slots.length) {
     throw new CompositionError(
@@ -49,12 +66,13 @@ export function composeFrame(
   ctx.imageSmoothingQuality = "high";
 
   drawBackground(ctx, frame.background, frame.outputWidth, frame.outputHeight);
-  const tone = frame.photoTone ? { tone: frame.photoTone, createCanvas, scale } : null;
+  const tone =
+    frame.photoTone || grade ? { tone: frame.photoTone, createCanvas, scale, grade } : null;
   const placed = photoLayers(frame);
-  if (!placed) frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!, tone, scale));
+  if (!placed) frame.slots.forEach((slot, i) => drawPhoto(ctx, slot, images[i]!, tone, scale, i));
   for (const deco of frame.decorations) {
     if (deco.type === "photo")
-      drawPhoto(ctx, frame.slots[deco.slot]!, images[deco.slot]!, tone, scale);
+      drawPhoto(ctx, frame.slots[deco.slot]!, images[deco.slot]!, tone, scale, deco.slot);
     else drawDecoration(ctx, deco, context, scale);
   }
 
@@ -142,9 +160,10 @@ function slotPath(ctx: CanvasRenderingContext2D, slot: FrameSlot) {
 }
 
 interface ToneJob {
-  tone: PhotoTone;
+  tone: PhotoTone | undefined;
   createCanvas: CanvasFactory;
   scale: number;
+  grade?: PhotoGrader;
 }
 
 /**
@@ -157,7 +176,8 @@ function tonedPhoto(
   crop: { x: number; y: number; width: number; height: number },
   slot: FrameSlot,
   job: ToneJob,
-): CanvasLike | null {
+  slotIndex: number,
+): { source: CanvasImageSource; width: number; height: number; release(): void } | null {
   const w = Math.max(1, Math.round(slot.width * job.scale));
   const h = Math.max(1, Math.round(slot.height * job.scale));
   const canvas = job.createCanvas(w, h);
@@ -165,11 +185,25 @@ function tonedPhoto(
   tctx.imageSmoothingEnabled = true;
   tctx.imageSmoothingQuality = "high";
   tctx.drawImage(image.source, crop.x, crop.y, crop.width, crop.height, 0, 0, w, h);
+  // Hand the pixels back at once (older WebKit keeps canvas memory until then).
+  const release = () => {
+    canvas.width = canvas.height = 0;
+  };
+  const plain = { source: canvas as unknown as CanvasImageSource, width: w, height: h, release };
+  if (job.grade) {
+    const graded = job.grade(canvas, w, h, slotIndex);
+    // The graded picture lives in the grader's own canvas: the copy made here is done with.
+    if (graded) return { ...plain, source: graded };
+  }
+  if (!job.tone) return job.grade ? plain : null;
   const pixels = tctx.getImageData(0, 0, w, h) as ImageData | undefined;
-  if (!pixels?.data) return null;
+  if (!pixels?.data) {
+    release();
+    return null;
+  }
   applyTone(pixels.data, job.tone);
   tctx.putImageData(pixels, 0, 0);
-  return canvas;
+  return plain;
 }
 
 function drawPhoto(
@@ -178,16 +212,17 @@ function drawPhoto(
   image: ComposeImage,
   tone: ToneJob | null = null,
   scale = 1,
+  slotIndex = 0,
 ) {
   const crop = coverCrop(image.width, image.height, slot.width / slot.height);
-  const toned = tone ? tonedPhoto(image, crop, slot, tone) : null;
+  const toned = tone ? tonedPhoto(image, crop, slot, tone, slotIndex) : null;
   ctx.save();
   rotate(ctx, slot.rotation, slot);
   slotPath(ctx, slot);
   ctx.clip();
   if (toned) {
     ctx.drawImage(
-      toned as unknown as CanvasImageSource,
+      toned.source,
       0,
       0,
       toned.width,
@@ -197,8 +232,7 @@ function drawPhoto(
       slot.width,
       slot.height,
     );
-    // Hand the pixels back at once (older WebKit keeps canvas memory until then).
-    toned.width = toned.height = 0;
+    toned.release();
   } else {
     ctx.drawImage(
       image.source,

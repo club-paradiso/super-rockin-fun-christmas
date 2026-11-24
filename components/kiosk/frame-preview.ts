@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createDomCanvas } from "@/lib/canvas";
-import { composeFrame, formatDateLabel, formatStampLabel } from "@/lib/compositor/compose";
+import {
+  composeFrame,
+  formatDateLabel,
+  formatStampLabel,
+  type PhotoGrader,
+} from "@/lib/compositor/compose";
 import { loadImageAsset } from "@/lib/compositor/assets";
 import { placeholderPhotos } from "@/lib/compositor/placeholders";
 import type { ComposeImage, FrameDefinition } from "@/lib/compositor/types";
@@ -30,7 +35,7 @@ export function renderPreview(
   frame: FrameDefinition,
   samples: readonly ComposeImage[],
   assets: ReadonlyMap<string, ComposeImage>,
-  opts: { scale: number; legacy: boolean; handFont?: string; now: Date },
+  opts: { scale: number; legacy: boolean; handFont?: string; now: Date; grade?: PhotoGrader },
 ): string | null {
   const photos = frame.slots.map((_, i) => samples[i % samples.length]!);
   let canvas: HTMLCanvasElement | undefined;
@@ -44,6 +49,7 @@ export function renderPreview(
         assets,
       },
       scale: opts.scale,
+      grade: opts.grade,
     }) as HTMLCanvasElement;
     return canvas.toDataURL("image/jpeg", 0.85);
   } catch {
