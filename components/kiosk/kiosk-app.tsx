@@ -63,6 +63,9 @@ import {
 } from "@/lib/kiosk/machine";
 import { newSessionId, releaseUrls } from "@/lib/kiosk/session";
 import { kioskRenderBudget, legacyIOS15InBrowser } from "@/lib/kiosk/legacy-ios";
+import { runPhotoStages, type PhotoStages } from "@/lib/kiosk/photo-stages";
+import type { RetouchLevelId } from "@/config/retouch";
+import { RetouchHud, useSkinRetouch } from "./skin-retouch";
 import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
 import {
@@ -179,6 +182,8 @@ export function KioskApp({
   staffHelp = false,
   frontend = "modern",
   serverNow,
+  skinRetouch = "off",
+  retouchHud = false,
 }: {
   cameraMode: CameraMode;
   frontend?: "modern" | "legacy";
@@ -192,6 +197,10 @@ export function KioskApp({
   staffHelp?: boolean;
   /** The server's clock at page load (lib/kiosk/bootstrap.ts): photos are dated by it. */
   serverNow?: string;
+  /** Skin retouch level (config/retouch.ts). "off" loads nothing. */
+  skinRetouch?: RetouchLevelId;
+  /** Show the retouch timings on screen (measuring a device; never for guests). */
+  retouchHud?: boolean;
 }) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
@@ -616,6 +625,14 @@ export function KioskApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
   }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale]);
 
+  // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
+  // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
+  const retouch = useSkinRetouch(skinRetouch);
+  const photoStages = useMemo<PhotoStages>(
+    () => ({ "skin-retouch": retouch.stage }),
+    [retouch.stage],
+  );
+
   // ── Final composite: made as soon as the frame is final, uploaded while the guest answers ──
   const finalPhase = state.phase === "consent" || state.phase === "delivery";
   const selectionKey = state.selectedShotIndices.join("-");
@@ -633,16 +650,24 @@ export function KioskApp({
     void Promise.all([fontsRef.current, assetsRef.current])
       .then(async ([, loaded]) => {
         if (cancelled) return;
-        const canvas = composeFrame(frame, chosen, {
-          createCanvas: createDomCanvas,
-          context: {
-            dateLabel: formatDateLabel(shotAt),
-            stampLabel: formatStampLabel(shotAt),
-            handFont: handFont ?? undefined,
-            assets: loaded ?? undefined,
-          },
-          scale: renderBudget.outputScale,
-        }) as HTMLCanvasElement;
+        // A stage that fails hands the photos back as they were: the frame is always made.
+        const staged = await runPhotoStages(chosen, photoStages);
+        let canvas: HTMLCanvasElement;
+        try {
+          if (cancelled) return;
+          canvas = composeFrame(frame, staged.images, {
+            createCanvas: createDomCanvas,
+            context: {
+              dateLabel: formatDateLabel(shotAt),
+              stampLabel: formatStampLabel(shotAt),
+              handFont: handFont ?? undefined,
+              assets: loaded ?? undefined,
+            },
+            scale: renderBudget.outputScale,
+          }) as HTMLCanvasElement;
+        } finally {
+          staged.release();
+        }
         try {
           const blob = await canvasToBlob(
             canvas,
@@ -685,6 +710,7 @@ export function KioskApp({
     renderBudget.outputScale,
     handFont,
     clock,
+    photoStages,
   ]);
 
   // The print has come up (the wall question shows it): a soft chime. The QR ticket: a stamp.
@@ -1094,6 +1120,10 @@ export function KioskApp({
   }, [state.lang]);
 
   // ── Heartbeat: operational state only (never photos) so staff can see this kiosk ─────────
+  const retouchFailuresRef = useRef(retouch.takeFailures);
+  useEffect(() => {
+    retouchFailuresRef.current = retouch.takeFailures;
+  });
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
   useEffect(() => {
     heartbeatRef.current = {
@@ -1111,7 +1141,8 @@ export function KioskApp({
           method: "POST",
           credentials: "same-origin",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(heartbeatRef.current),
+          // Retouch failures since the last beat (a code and a count), so they reach the log.
+          body: JSON.stringify({ ...heartbeatRef.current, ...retouchFailuresRef.current() }),
         });
         if (!stopped && res.ok) {
           const data = (await res.json()) as {
@@ -1192,6 +1223,7 @@ export function KioskApp({
             thumbs={pickThumbs}
             optionPreview={optionPreview}
             finalImage={finalImage}
+            developing={retouch.developing}
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
@@ -1292,6 +1324,7 @@ export function KioskApp({
             onToggleSound={sound ? () => sound.setMuted(!muted) : null}
           />
         )}
+        {retouchHud && skinRetouch !== "off" && <RetouchHud metrics={retouch.metrics} />}
       </main>
     </KioskChromeContext.Provider>
   );
@@ -1315,6 +1348,8 @@ interface ScreenProps {
   /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
   optionPreview: string | null;
   finalImage: FinalImage | null;
+  /** The chosen photos are being retouched: the print's place says "현상 중…". */
+  developing: boolean;
   qrSvg: string | null;
   onRetryDelivery: () => void;
   onDiscard: () => void;
@@ -1856,7 +1891,12 @@ function Screen(p: ScreenProps) {
           // A notice line above the answers takes its room from the preview (app/globals.css).
           className={`consent consent-notes-${Number(p.wallPublic)}`}
         >
-          <FinalPreview finalImage={p.finalImage} frameId={state.frameId} t={t} />
+          <FinalPreview
+            finalImage={p.finalImage}
+            frameId={state.frameId}
+            developing={p.developing}
+            t={t}
+          />
           <div className="consent-body">
             <h1 className="booth-title">
               <Lines text={t.consent.title} />
@@ -2217,10 +2257,12 @@ function PencilMark() {
 function FinalPreview({
   finalImage,
   frameId,
+  developing,
   t,
 }: {
   finalImage: FinalImage | null;
   frameId: string;
+  developing: boolean;
   t: KioskCopy;
 }) {
   return (
@@ -2239,7 +2281,17 @@ function FinalPreview({
           data-stamp={finalImage.stamp}
         />
       ) : (
-        <div className="frame-art-wait animate-pulse" aria-label={t.consent.making} />
+        <div
+          className="frame-art-wait animate-pulse"
+          aria-label={developing ? t.consent.developing : t.consent.making}
+          data-developing={developing || undefined}
+        >
+          {developing && (
+            <span className="frame-art-developing" data-testid="developing">
+              {t.consent.developing}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

@@ -97,6 +97,73 @@ in production. Deployment (Vercel + Supabase) is described in [`docs/DEPLOYMENT.
 
 CI (`.github/workflows/ci.yml`) runs all of these on every pull request, with no production secrets.
 
+## 피부 보정 (skin retouch)
+
+고른 사진의 얼굴 피부를 합성 직전에 한 번 다듬는다: 촬영 완료 → **피부 보정** → 색감 필터(자리만 있음) → 틀 합성
+(`lib/kiosk/photo-stages.ts`). 얼굴 형태는 건드리지 않는다. 전부 기기 안에서 계산하고, 얼굴 좌표·마스크는 서버로
+가지 않고 저장되지도 않는다. 조사와 근거는 `docs/research/skin-retouch-market-research.md`,
+`docs/research/skin-retouch-audit.md`.
+
+**기본값은 꺼짐이다.** 켜는 방법은 둘:
+
+| 방법                          | 값                         | 쓰임                                            |
+| ----------------------------- | -------------------------- | ----------------------------------------------- |
+| 서버 환경 변수 `SKIN_RETOUCH` | `off` / `natural` / `glow` | 그 서버에 붙는 모든 부스(다시 빌드할 필요 없음) |
+| 부스 주소에 `?retouch=`       | 같은 값                    | 그 탭만. 환경 변수보다 우선                     |
+
+- `natural` = 자연스럽게, `glow` = 뽀샤시. 모든 수치는 `config/retouch.ts` 에 있다.
+- `?retouchHud=1` 을 붙이면 부스 화면 왼쪽 아래에 검출·보정 시간, 네 장 합계, 메모리 추정이 뜬다(개발 서버에서는
+  보정이 켜져 있으면 항상 뜬다). 손님용 화면이 아니다.
+- 한 장이 실패하거나 4초를 넘기면 그 장은 보정 없이 나간다. 사유는 브라우저 콘솔(`[skin-retouch] …`)과 서버 로그
+  (`kiosk_retouch_failed`, 코드와 횟수만)에 남는다.
+- 얼굴 모델(MediaPipe 0.10.21 non-SIMD)과 런타임은 `public/retouch/` 에서 이 서버가 직접 준다. CDN을 쓰지 않는다.
+
+### 비교 페이지 `/retouch-lab`
+
+샘플마다 원본 / 자연스럽게 / 뽀샤시를 나란히 놓고, 단계별 강도 슬라이더, 확대, 마스크 보기, 틀에 얹은 모습,
+그리고 **그 페이지를 연 기기의 실제 처리 시간**을 보여 준다. 미리 구운 그림이 아니라 그 자리에서 계산한다.
+Safari 15용으로 따로 빌드한 페이지라 iPad mini 4에서 열린다.
+
+- 개발 서버와 Vercel 미리보기 배포에서는 그냥 열린다. 그 밖의 곳에서는 `RETOUCH_LAB=1` 일 때만 열린다(없으면 404).
+- 샘플 사진의 출처와 라이선스: `public/retouch/samples/README.md`.
+
+### iPad mini 4에서 재기 (같은 와이파이)
+
+이 리포의 자동 시험은 데스크톱 Chromium에서 돈다. **iPad mini 4의 속도와 메모리는 사람이 실기기로 재야 한다.**
+비교 페이지는 카메라를 쓰지 않으므로 https 없이 열 수 있다.
+
+```bash
+npm ci
+```
+
+```bash
+RETOUCH_LAB=1 npm run build
+```
+
+```bash
+RETOUCH_LAB=1 npx next start -H 0.0.0.0 -p 3000
+```
+
+1. 맥과 iPad를 같은 와이파이에 붙인다. 맥의 IP를 확인한다(시스템 설정 → 네트워크, 또는 `ipconfig getifaddr en0`).
+2. iPad Safari에서 `http://<맥 IP>:3000/retouch-lab` 을 연다. (`.env.local` 이 없어도 이 페이지는 열린다.)
+3. 아래 표를 채운다. 기기 OS 버전과 배포 커밋을 함께 적는다.
+
+| #   | 할 일                                             | 볼 것                                                                           | 결과 |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------- | ---- |
+| 1   | 페이지를 연다                                     | 「이 기기」에 WebGL 1 됨, SIMD 없음으로 나오는지                                |      |
+| 2   | 첫 샘플의 보정이 뜰 때까지 기다린다               | 뜨는지. 안 뜨면 맨 아래 빨간 오류 문구를 그대로 적는다(`init-failed` 등)        |      |
+| 3   | 「이 사진의 수치」                                | 모델을 올리는 데 걸린 시간, 검출·보정 시간, 엔진(webgl / cpu)                   |      |
+| 4   | 크기 `960 (iPad mini 4)` 로 「자연스럽게로 측정」 | 네 장 합계(목표 6초), 장별 시간, 메모리 추정                                    |      |
+| 5   | 「가벼운 6점」으로 바꿔 4번을 다시                | 합계가 얼마나 줄어드는지. 랜드마크 모드가 목표를 넘으면 이쪽이 후보다           |      |
+| 6   | 엔진을 `CPU` 로 바꿔 4번을 다시                   | WebGL과의 차이                                                                  |      |
+| 7   | 4번을 연달아 10번                                 | 탭이 다시 로드되는지(메모리), 시간이 점점 늘어나는지                            |      |
+| 8   | 샘플을 하나씩 넘기며 「얼굴」 확대로 본다         | 결이 남는지, 눈·눈썹·입술·안경테·수염 경계가 번지는지, 어두운 피부가 탁해지는지 |      |
+| 9   | 단체사진 샘플                                     | 작은 얼굴이 뭉개지는지, 「건너뜀」에 `too-small` 이 어떻게 나오는지             |      |
+| 10  | 「틀에 얹어 보기」                                | 인화 크기에서 보정이 티가 나는지                                                |      |
+
+부스 흐름 전체(카메라 포함)는 https가 있어야 하므로 미리보기 배포나 허브에서 `…/kiosk?retouch=natural&retouchHud=1`
+로 연다(`docs/PREVIEW_DEVICE_TEST.md`, `docs/IPAD_MINI4_COMPAT.md`). 열 번 연속 촬영해 탭이 다시 로드되지 않는지 본다.
+
 ## Hardware
 
 - **Path A — self-built (reference):** any PC or tablet with a USB/web camera, a light and a stand,

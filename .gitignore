@@ -42,6 +42,7 @@ supabase/.temp
 
 # Standalone kiosk assets (generated before dev and production builds)
 public/kiosk-legacy-assets/
+public/retouch-lab-assets/
 
 # Written by `next dev` / `next build` (agent rules for Next.js); not part of this project.
 /AGENTS.md

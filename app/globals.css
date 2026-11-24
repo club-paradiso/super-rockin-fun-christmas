@@ -1442,6 +1442,18 @@ body {
     transform: translateX(-50%);
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
   }
+  /* "현상 중…" in the print's place while the photos are retouched (skin retouch on). */
+  .frame-art-developing {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--gap-s);
+    color: var(--color-ink);
+    font-size: var(--fs-caption);
+    text-align: center;
+  }
   .pick-preview-caption {
     display: flex;
     flex-wrap: wrap;

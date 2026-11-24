@@ -3,6 +3,7 @@ import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/se
 import { getAiReview, sweepAiReviewSoon } from "@/lib/moderation/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
+import { logEvent } from "@/lib/server/log";
 import { RateLimiter } from "@/lib/server/rate-limit";
 import { isSameOrigin } from "@/lib/server/request";
 import { getBackend } from "@/lib/storage/server";
@@ -15,6 +16,8 @@ export const maxDuration = 30;
 
 const limiter = new RateLimiter(12, 60_000);
 const CAMERA: CameraState[] = ["ok", "error", "unknown"];
+/** The codes of lib/retouch/types.ts `RetouchErrorCode`: short lower-case words, nothing else. */
+const RETOUCH_ERROR = /^[a-z]+(?:-[a-z]+){0,3}$/;
 
 /**
  * Enrolled kiosk → "I'm alive". Carries only operational state (queue depth, camera state,
@@ -36,7 +39,28 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     camera?: unknown;
     frameRate?: unknown;
     memoryMb?: unknown;
+    retouchFailures?: unknown;
+    retouchError?: unknown;
   };
+  // Skin retouch failed on that booth since its last beat: a code and a count for the log, so a
+  // booth that is quietly sending unretouched photos is seen (nothing about a face is sent).
+  if (
+    typeof body.retouchFailures === "number" &&
+    Number.isInteger(body.retouchFailures) &&
+    body.retouchFailures > 0 &&
+    typeof body.retouchError === "string" &&
+    RETOUCH_ERROR.test(body.retouchError)
+  ) {
+    logEvent(
+      "kiosk_retouch_failed",
+      {
+        kioskId: auth.kioskId ?? "dev",
+        code: body.retouchError,
+        count: Math.min(body.retouchFailures, 1000),
+      },
+      "warn",
+    );
+  }
   // Wall displays only (docs/ARCHITECTURE.md 1.8). Anything odd is dropped, not stored.
   const frameRate =
     typeof body.frameRate === "number" && body.frameRate >= 0 && body.frameRate <= 240

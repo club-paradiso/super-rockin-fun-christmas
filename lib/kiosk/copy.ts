@@ -158,6 +158,8 @@ const ko = {
     publicNote: "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.",
     finished: "완성된 사진",
     making: "사진을 만들고 있어요",
+    // Shown in the print's place while the photos are retouched (the user's wording, 2026-11-24).
+    developing: "현상 중…",
   },
   delivery: {
     title: "휴대폰으로 사진을 받아 가세요",
@@ -367,6 +369,7 @@ const en: KioskCopy = {
     publicNote: "The media wall is shown on the screen here and at its web address.",
     finished: "Your finished photo",
     making: "Making your photo",
+    developing: "Developing…",
   },
   delivery: {
     title: "Get your photo on your phone",
@@ -573,6 +576,7 @@ const zh: KioskCopy = {
     publicNote: "媒体墙会同时显示在活动现场的屏幕和网络地址上。",
     finished: "完成的照片",
     making: "正在制作照片",
+    developing: "冲洗中……",
   },
   delivery: {
     title: "请用手机领取照片",

@@ -232,6 +232,28 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.
+- **Skin retouch is off by default, on the device, and never reshapes a face** (「피부 보정」,
+  2026-11-24, `docs/research/skin-retouch-audit.md`). It is one photo stage,
+  `runPhotoStages` in `lib/kiosk/photo-stages.ts`, called once right before `composeFrame`:
+  촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성. A new stage is an implementation for an id of
+  that file, never an edit to the compositor or a second call site. The level comes from the
+  server (`SKIN_RETOUCH`, or `?retouch=` on the booth URL): `off` loads nothing at all. Every
+  number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. Never add a
+  mesh warp (eyes, jaw, nose). Never smooth the finest band at 자연스럽게 (`fine: 0`), never
+  whiten (the only brightening is 뽀샤시's `lift`, a gain with a highlight roll-off), and never
+  judge skin by a fixed colour range: the colour model is each face's own (`lib/retouch/skin.ts`).
+  The live preview is never retouched. Face points, masks and regions stay in the page: never
+  send, store or log them (failures reach the server as a code and a count through the
+  heartbeat). A photo that fails or runs over its time goes on unretouched, whole, and says so on
+  the console and in the server log; never leave a photo half retouched and never let the feature
+  hold up the print, the upload, the wall question or the QR. The face model is MediaPipe
+  **0.10.21** with its non-SIMD build, served from `public/retouch` (never a CDN): Safari 15 has
+  no WebAssembly SIMD and 1.2.2+ ship a SIMD-only binary, so do not raise the version without
+  reading the audit (`tests/unit/retouch-assets.test.ts` holds the files). The filter has two
+  engines doing the same 8-bit arithmetic, WebGL 1 (`gl.ts`, RGBA8 only, no extensions) and typed
+  arrays (`cpu.ts`); a change to one is a change to both (`e2e/retouch.spec.ts` compares them).
+  `/retouch-lab` (standalone, Safari 15) is the acceptance tool; iPad mini 4 timings are a
+  person's measurement, never a desktop number.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
@@ -304,6 +326,13 @@ lib/remote-camera      Remote Camera: protocol, shutter (host/client), chunked t
 app/camera/remote      the iPhone's page · app/api/camera + app/api/kiosk/camera (signaling, status, link)
                        · app/api/admin/remote-camera (staff: pair, commands, revoke) · /admin/remote-camera
 lib/compositor         FrameDefinition types, coverCrop, composeFrame
+lib/retouch            skin retouch: face finder (MediaPipe, lazy), face geometry + mask, each face's
+                       skin colour model, per-face plan, WebGL 1 and CPU engines, pipeline (budgets,
+                       failures), stats for the tests and the lab
+lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch → colour filter)
+config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag
+retouch-lab/           /retouch-lab page (own Vite bundle for Safari 15) · app/retouch-lab (route, gated)
+public/retouch         self-hosted face model + runtime (NOTICE.md), lab sample photos (sources, licences)
 lib/kiosk              pure state machine, help-mode reducer, session helpers, upload/consent client,
                        booth copy in Korean and English (copy.ts, D78),
                        session video recorder (injected MediaRecorder, D72)

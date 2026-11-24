@@ -9,5 +9,8 @@ docs/measurements/raw/
 .claude
 
 public/kiosk-legacy-assets/
+public/retouch-lab-assets/
+# MediaPipe's own loader, copied as published (tests/unit/retouch-assets.test.ts holds its hash).
+public/retouch/mediapipe/
 # Written by the Figma parity specs (PARITY_SAVE=1).
 docs/screenshots/figma-parity/*.json
