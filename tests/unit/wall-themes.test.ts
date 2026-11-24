@@ -70,7 +70,17 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     }
     const preview = await sharp(file(theme.preview)).metadata();
     expect([preview.width, preview.height]).toEqual([640, 180]);
-    if (theme.hang.kind === "clip") expect(existsSync(file(theme.hang.image))).toBe(true);
+    if (theme.hang.kind === "clip") {
+      for (const src of [theme.hang.image, ...(theme.hang.images ?? [])]) {
+        expect(existsSync(file(src)), src).toBe(true);
+        // Every picture of one clip has the clip's own shape, so a swap never moves a photo.
+        if (src.endsWith(".png")) {
+          const m = await sharp(file(src)).metadata();
+          expect(m.hasAlpha, src).toBe(true);
+          expect(m.width! / m.height!).toBeCloseTo(theme.hang.width / theme.hang.height, 2);
+        }
+      }
+    }
     expect(theme.fallbackColor).toMatch(/^#[0-9A-Fa-f]{6}$/);
     expect(theme.name.length).toBeGreaterThan(3);
   });

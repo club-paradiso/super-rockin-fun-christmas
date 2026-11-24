@@ -1833,3 +1833,18 @@ Five more lines differed from older Figma screens. The user chose Figma for all 
 "미디어월 게시 신청을 잠시 멈췄어요" on that screen only; the welcome line keeps the switch's name),
 the camera-error lead (3e), the video line on the shooting screen (3b), the send-failed lead (8e)
 and the English welcome sub-line (1c). English and Chinese follow the new Korean.
+
+## D114 · Media wall tape: the user's own paper tapes, a colour per slot (2026-11-24)
+
+The user generated six paper masking tapes (cream ×2, kraft ×2, pine green, berry red; transparent
+PNG) and asked for them in place of the drawn tape of D112, first in Figma, then in code.
+
+- **Figma.** SS 03E holds the six (`Wall/Tape · 마스킹테이프 6종`) and a preview of S01 with the
+  photo slots shown, the clothespin parts hidden and a tape on every photo
+  (`미리보기 · S01 · 집게 → 마스킹테이프`).
+- **Code.** Each tape is stood upright, trimmed and set in the clip's own 44 × 96 box
+  (`public/wall/tapes/*.png`, 132 × 288 so it stays sharp on the 2× scene), with the faint shadow
+  to +x +y (D101) and the fold over the line baked in, as the SVG had them. `WallClip.images` gives
+  the slots the colours in turn (`clipImage`); every picture keeps the same size and `lineY`, so
+  no photo moves and `planWallFit` is unchanged. `tape-washi.svg` is gone; the two themes with
+  pegs painted in the picture keep them.
