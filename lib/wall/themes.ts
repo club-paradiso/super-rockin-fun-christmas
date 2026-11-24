@@ -59,9 +59,11 @@ export interface WallTheme {
   /**
    * How a photo is held. `clip`: a clip picture is drawn at the hang point (the line is in the
    * background picture, or drawn by `rope`). `in-picture`: the picture already has pegs at the
-   * slot positions; nothing is drawn and the photo's top edge meets the peg.
+   * slot positions; nothing is drawn and the photo's top edge meets the peg. `reach`: how far
+   * the painted pegs rise above the hang point (measured in the picture), so nothing is planned
+   * over them (the logo, D112).
    */
-  hang: WallClip | { kind: "in-picture" };
+  hang: WallClip | { kind: "in-picture"; reach: number };
   /** A twine line drawn by the app along `scene.line`, for pictures that have no line. */
   rope: { x1: number; x2: number; color: string; width: number } | null;
   /**
@@ -207,7 +209,7 @@ export interface WallClip {
 
 /** How far a clip reaches above the line (scene px); 0 for a picture with its own pegs. */
 export function clipReach(hang: WallTheme["hang"]): number {
-  return hang.kind === "clip" ? hang.lineY : 0;
+  return hang.kind === "clip" ? hang.lineY : hang.reach;
 }
 
 /** Staff setting: which theme, and whether the wall changes background by itself. */

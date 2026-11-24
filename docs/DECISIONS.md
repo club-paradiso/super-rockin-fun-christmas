@@ -1790,12 +1790,23 @@ User request: the wall looked broken up (화질이 깨짐), the clothespins look
   clip and a smaller clothespin), turned a few degrees differently on each slot. The two themes
   with pegs painted in the picture (`star-of-peace`, `bethlehem`) keep them.
 - **The logo.** The text wordmark is replaced by the Figma logo (`public/frames/v2/logo-*.svg`,
-  STUDIO / SHALOM with the star in the O), painted in the theme's colour through a CSS mask. It
-  sits at the top centre of the screen: `planWallFit` returns `mark`, centred on the screen (kept
-  inside the picture next to a band). Because it moves with the screen, each theme keeps the whole
-  band of the logo free of photos and clips (tests/unit/wall-themes.test.ts). Height 104 scene px;
-  `ink` / `cream` on a calm sky or wall, a paper tag (`label`) under the coast themes' garland;
-  under the star on `star-of-peace`. Board cuts keep the logo's distance from the top.
+  STUDIO / SHALOM with the star in the O). It sits at the top centre of the screen: `planWallFit`
+  returns `mark`, centred on the screen (kept inside the picture next to a band). It moves with
+  the screen, so each theme keeps the logo clear of photos, clips and swing wherever it may be
+  centred (between the middle of the first two slots and of the last two;
+  tests/unit/wall-themes.test.ts). Board cuts keep the logo's distance from the top.
+- **The logo belongs to the picture** (user, same day: "로고랑 배경이랑 이질감 느끼게 배치하지 마").
+  On plaster or a pale sky the ink is multiplied into the picture, so the wall's grain and the
+  sunlight show through it like paint; on the night sky (Bethlehem) the cream is screened in. The
+  four coast themes have a garland across the top, so the logo is printed on a grained paper tag
+  hung from the garland on two strings, turned a little. On the star theme it sits right under
+  the star. The pegs painted in the star and Bethlehem pictures rise 130 / 108 px above the hang
+  point (measured): `hang.reach` now says so, and the plan keeps the logo above them.
+- **The booth's frames on the wall.** The wall recognises every booth frame (`getFrame` covers
+  the v2 frames) and hangs it at its own shape: strips in the strip box, the polaroid
+  (1200 × 1459) and the lace oval (1200 × 1500) wider. The wall E2E now hangs the booth's own
+  results (the Figma references the booth is measured against, `tests/fixtures/figma-parity`)
+  and checks, for each, that the picture is the booth's output and its box has exactly that shape.
 
 Not verified: a real 4K TV, the church board and the LED; how a low-power wall PC copes with a
 7680 × 2160 picture (low-spec mode never loads it).

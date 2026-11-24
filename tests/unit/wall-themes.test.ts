@@ -132,23 +132,43 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
       expect(theme.status).toBe("legacy"); // only the old picture carries its own wordmark
       return;
     }
-    // The wall centres the logo on the screen (planWallFit), so it may sit at any x: the whole
-    // band from its top to its bottom must be free of photos, clips and their swing.
+    // The wall centres the logo on the screen (planWallFit), over the photos it hangs (at least
+    // two neighbours, WALL_FIT.minSlots): so it may sit anywhere between the middle of the first
+    // two slots and the middle of the last two, and nothing may reach it there.
     const box = wordmarkBox(theme, layout.width / 2)!;
-    const band: Rect = { x: 0, y: box.y - 4, width: layout.width, height: box.height + 8 };
+    const xs = layout.slots.map((p) => p.x);
+    const first = (xs[0]! + xs[1]!) / 2;
+    const last = (xs.at(-2)! + xs.at(-1)!) / 2;
+    const centres = Array.from({ length: 41 }, (_, k) => first + ((last - first) * k) / 40);
+    const bands: Rect[] = centres.map((c) => {
+      const b = wordmarkBox(theme, c)!;
+      return { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 };
+    });
+    const band = bands[20]!;
     expect(box.x).toBeGreaterThan(0);
     expect(box.x + box.width).toBeLessThan(layout.width);
     expect(band.y).toBeGreaterThanOrEqual(0);
     // At the top: never further down than a fifth of the picture.
     expect(box.y).toBeLessThan(layout.height * 0.2);
-    expect(theme.wordmark.size).toBeGreaterThanOrEqual(96); // readable across a room on a 1080-line wall
+    // Readable across a room on a 1080-line wall (a tag's paper adds contrast, so it may be smaller).
+    expect(theme.wordmark.size).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 72 : 76);
+    // Pegs painted in the picture hang all along the line, not only at the slots.
+    if (theme.hang.kind === "in-picture") {
+      for (const b of bands)
+        for (let x = b.x; x <= b.x + b.width; x += 10)
+          expect(lineYAt(theme.scene.line, x) - clipReach(theme.hang)).toBeGreaterThan(
+            b.y + b.height,
+          );
+    }
     layout.slots.forEach((place, i) => {
-      expect(overlaps(band, slotEnvelope(place, theme))).toBe(false);
-      for (const b of boxesIn(i)) {
-        // The photo box plus what holds it (the clip reaches above the line, plus a margin).
-        const reach = clipReach(theme.hang) + 4;
-        const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
-        expect(overlaps(band, withClip)).toBe(false);
+      for (const band of bands) {
+        expect(overlaps(band, slotEnvelope(place, theme))).toBe(false);
+        for (const b of boxesIn(i)) {
+          // The photo box plus what holds it (the clip reaches above the line, plus a margin).
+          const reach = clipReach(theme.hang) + 4;
+          const withClip = { ...b, y: place.y - reach, height: b.height + (b.y - place.y) + reach };
+          expect(overlaps(band, withClip)).toBe(false);
+        }
       }
     });
   });

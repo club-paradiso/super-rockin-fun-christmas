@@ -631,6 +631,7 @@ export function WallApp({
                     data-testid="wall-photo"
                     data-photo-id={slot.photoId}
                     data-phase={slot.phase}
+                    data-frame-id={frame.id}
                     className="absolute"
                     style={{
                       left: box.x,

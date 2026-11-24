@@ -63,9 +63,13 @@ describe("planWallFit (D110)", () => {
           // Centred on the screen unless that would push it off the picture (next to a band).
           if (plan.bands.left + plan.bands.right < EPS)
             expect(mx + (s * mark.width) / 2).toBeCloseTo(width / 2, 3);
-          // Above every photo: nothing hangs in its band.
-          for (const p of plan.layout.slots)
-            expect(slotEnvelope(p, plan.theme).y).toBeGreaterThan(mark.y + mark.height);
+          // Clear of every photo, its clip and its swing.
+          for (const p of plan.layout.slots) {
+            const e = slotEnvelope(p, plan.theme);
+            const apart =
+              e.y >= mark.y + mark.height || e.x >= mark.x + mark.width || mark.x >= e.x + e.width;
+            expect(apart).toBe(true);
+          }
         }
 
         // The picture covers every edge it can: a band exists only on an axis where the drawn

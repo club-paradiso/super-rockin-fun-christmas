@@ -252,16 +252,92 @@ body {
   --wall-photo-shadow: rgba(43, 26, 16, 0.4);
 }
 /* The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-2b1a10.svg) at the top centre
-   of the wall, painted in the tone's colour through the logo as a mask: one file, any colour. */
+   of the wall, painted in the tone's colour through the logo as a mask: one file, any colour.
+   It belongs to the picture, not on top of it (D112): on a wall or a pale sky the ink is
+   multiplied into the picture, so the plaster's grain and the sunlight show through it like paint;
+   on a night sky the cream is screened in, like the picture's own starlight; under a garland it
+   is printed on a paper tag that hangs from the garland on two strings. */
 .wall-logo {
-  color: #2b1a10;
+  color: #3b2416;
+}
+.wall-logo[data-tone="ink"] .wall-logo-mark {
+  mix-blend-mode: multiply;
+  opacity: 0.9;
 }
 .wall-logo[data-tone="cream"] {
-  color: var(--wall-cream);
+  color: #f3e3c4;
+}
+.wall-logo[data-tone="cream"] .wall-logo-mark {
+  mix-blend-mode: screen;
+  opacity: 0.92;
 }
 .wall-logo[data-tone="label"] {
-  background: var(--wall-card);
-  box-shadow: 6px 9px 18px var(--wall-photo-shadow);
+  color: #2b1a10;
+  background:
+    url("/wall/paper-grain.svg") 0 0 / 240px 240px,
+    #ecdcbc;
+  border-radius: 4px;
+  transform: rotate(-1.4deg);
+  transform-origin: 50% -40px;
+  box-shadow:
+    inset 0 0 0 1px rgb(120 90 55 / 0.22),
+    5px 8px 14px var(--wall-photo-shadow);
+}
+/* The two twine strings the tag hangs from, up into the garland, each through a punched hole. */
+.wall-logo[data-tone="label"]::before,
+.wall-logo[data-tone="label"]::after {
+  content: "";
+  position: absolute;
+  bottom: calc(100% - 13px);
+  width: 9px;
+  height: 64px;
+  background:
+    radial-gradient(circle at 50% calc(100% - 4.5px), #5a4128 0 3.5px, transparent 4px),
+    linear-gradient(#7a5a38, #7a5a38) 50% 0 / 4px calc(100% - 4px) no-repeat;
+}
+.wall-logo[data-tone="label"]::before {
+  left: 12%;
+}
+.wall-logo[data-tone="label"]::after {
+  right: 12%;
+}
+.wall-logo-mark {
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}
+.wall-logo[data-tone="cream"] {
+  color: #f3e3c4;
+}
+.wall-logo[data-tone="cream"] .wall-logo-mark {
+  mix-blend-mode: screen;
+  opacity: 0.92;
+}
+.wall-logo[data-tone="label"] {
+  color: #2b1a10;
+  background: #efe2c8;
+  border-radius: 3px;
+  transform: rotate(-1.2deg);
+  transform-origin: 50% 0;
+  box-shadow:
+    inset 0 0 0 1px rgb(120 90 55 / 0.18),
+    6px 9px 18px var(--wall-photo-shadow);
+}
+/* The two strings the tag hangs from, up into the garland. */
+.wall-logo[data-tone="label"]::before,
+.wall-logo[data-tone="label"]::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  width: 3px;
+  height: 40px;
+  background: #8a6a44;
+  border-radius: 2px;
+}
+.wall-logo[data-tone="label"]::before {
+  left: 14%;
+}
+.wall-logo[data-tone="label"]::after {
+  right: 14%;
 }
 .wall-logo-mark {
   display: block;
