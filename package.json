@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:kiosk-legacy && npm run build:looks-sheet && next build",
+    "build": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -24,8 +24,9 @@
     "looks:preview": "node scripts/looks-preview.mjs",
     "looks:measure": "node scripts/looks-measure.mjs",
     "build:kiosk-legacy": "vite build --config legacy-kiosk/vite.config.mts",
+    "build:retouch-lab": "vite build --config retouch-lab/vite.config.mts",
     "build:looks-sheet": "vite build --config looks-sheet/vite.config.mts",
-    "predev": "npm run build:kiosk-legacy && npm run build:looks-sheet"
+    "predev": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-kr": "^5.3.1",
@@ -43,6 +44,7 @@
     "@fontsource/shadows-into-light": "^5.3.0",
     "@fontsource/square-peg": "^5.3.0",
     "@fontsource/vt323": "^5.3.0",
+    "@mediapipe/tasks-vision": "0.10.21",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "next": "^16.4.5",

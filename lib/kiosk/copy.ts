@@ -163,6 +163,13 @@ const ko = {
       walnut: "월넛",
     } as Record<string, string>,
   },
+  // 피부 보정 (skin retouch on): on the photo-selection screen. Written by Claude (2026-11-24),
+  // not yet the user's wording (D76). The level names are the user's (끄기 / 자연스럽게 / 뽀샤시).
+  retouch: {
+    label: "피부 보정",
+    note: "얼굴 모양은 그대로 두고 피부만 살짝 다듬어요.",
+    level: { off: "끄기", natural: "자연스럽게", glow: "뽀샤시" },
+  },
   consent: {
     title: "이 사진을 미디어월에\n띄워도 될까요?",
     lead: "미디어월에 다른 분들 사진과 함께 돌아가며 보여요.\n아니요를 눌러도 사진은 받을 수 있어요.",
@@ -176,6 +183,8 @@ const ko = {
     publicNote: "미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.",
     finished: "완성된 사진",
     making: "사진을 만들고 있어요",
+    // Shown in the print's place while the photos are retouched (the user's wording, 2026-11-24).
+    developing: "현상 중…",
   },
   delivery: {
     title: "휴대폰으로 사진을 받아 가세요",
@@ -395,6 +404,11 @@ const en: KioskCopy = {
       walnut: "Walnut",
     },
   },
+  retouch: {
+    label: "Skin retouch",
+    note: "Faces keep their shape. Only the skin is evened a little.",
+    level: { off: "Off", natural: "Natural", glow: "Glow" },
+  },
   consent: {
     title: "Can we show this photo\non the media wall?",
     lead: "It will take turns on the wall with other guests’ photos.\nYou still get your photo if you say no.",
@@ -404,6 +418,7 @@ const en: KioskCopy = {
     publicNote: "The media wall is shown on the screen here and at its web address.",
     finished: "Your finished photo",
     making: "Making your photo",
+    developing: "Developing…",
   },
   delivery: {
     title: "Get your photo on your phone",
@@ -615,6 +630,11 @@ const zh: KioskCopy = {
       walnut: "胡桃",
     },
   },
+  retouch: {
+    label: "皮肤修饰",
+    note: "不改变脸型，只让皮肤更均匀一点。",
+    level: { off: "关闭", natural: "自然", glow: "柔光" },
+  },
   consent: {
     title: "可以把这张照片\n放到媒体墙上吗？",
     lead: "照片会和其他人的照片一起轮流显示在媒体墙上。\n选“不用”也一样可以领取照片。",
@@ -624,6 +644,7 @@ const zh: KioskCopy = {
     publicNote: "媒体墙会同时显示在活动现场的屏幕和网络地址上。",
     finished: "完成的照片",
     making: "正在制作照片",
+    developing: "冲洗中……",
   },
   delivery: {
     title: "请用手机领取照片",

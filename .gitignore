@@ -42,6 +42,7 @@ supabase/.temp
 
 # Standalone kiosk assets (generated before dev and production builds)
 public/kiosk-legacy-assets/
+public/retouch-lab-assets/
 # Stand-alone look comparison sheet (generated the same way)
 public/looks-sheet-assets/
 

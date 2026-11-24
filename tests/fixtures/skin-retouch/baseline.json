@@ -1,0 +1,452 @@
+{
+  "dark-woman": {
+    "natural": {
+      "affected": 44287,
+      "affectedShare": 0.064,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.989,
+      "maxAbsDiff": 10,
+      "fineRetention": 0.992,
+      "midReduction": 0.073,
+      "lumaShift": -0.485,
+      "saturationRatio": 0.995,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 47337,
+      "affectedShare": 0.068,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.177,
+      "maxAbsDiff": 18,
+      "fineRetention": 0.949,
+      "midReduction": 0.05,
+      "lumaShift": 2.763,
+      "saturationRatio": 1.02,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "older-woman": {
+    "natural": {
+      "affected": 26931,
+      "affectedShare": 0.039,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.473,
+      "maxAbsDiff": 11,
+      "fineRetention": 0.991,
+      "midReduction": 0.044,
+      "lumaShift": -0.387,
+      "saturationRatio": 0.991,
+      "clippedBefore": 1944,
+      "clippedAfter": 1000,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 27628,
+      "affectedShare": 0.04,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.985,
+      "maxAbsDiff": 18,
+      "fineRetention": 0.945,
+      "midReduction": 0.029,
+      "lumaShift": 2.992,
+      "saturationRatio": 1.013,
+      "clippedBefore": 1930,
+      "clippedAfter": 2070,
+      "faces": 1
+    }
+  },
+  "group-7": {
+    "natural": {
+      "affected": 0,
+      "affectedShare": 0,
+      "changedOutside": 0,
+      "meanAbsDiff": 0,
+      "maxAbsDiff": 0,
+      "fineRetention": 1,
+      "midReduction": 0,
+      "lumaShift": 0,
+      "saturationRatio": 1,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 0
+    },
+    "glow": {
+      "affected": 0,
+      "affectedShare": 0,
+      "changedOutside": 0,
+      "meanAbsDiff": 0,
+      "maxAbsDiff": 0,
+      "fineRetention": 1,
+      "midReduction": 0,
+      "lumaShift": 0,
+      "saturationRatio": 1,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 0
+    }
+  },
+  "east-asian-fringe": {
+    "natural": {
+      "affected": 38633,
+      "affectedShare": 0.056,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.312,
+      "maxAbsDiff": 11,
+      "fineRetention": 0.996,
+      "midReduction": 0.043,
+      "lumaShift": -1.028,
+      "saturationRatio": 0.997,
+      "clippedBefore": 3226,
+      "clippedAfter": 1578,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 40337,
+      "affectedShare": 0.058,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.247,
+      "maxAbsDiff": 18,
+      "fineRetention": 0.952,
+      "midReduction": 0.027,
+      "lumaShift": 1.696,
+      "saturationRatio": 1.013,
+      "clippedBefore": 3227,
+      "clippedAfter": 1935,
+      "faces": 1
+    }
+  },
+  "dark-man": {
+    "natural": {
+      "affected": 32553,
+      "affectedShare": 0.047,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.453,
+      "maxAbsDiff": 7,
+      "fineRetention": 0.996,
+      "midReduction": 0.032,
+      "lumaShift": -0.248,
+      "saturationRatio": 0.987,
+      "clippedBefore": 94,
+      "clippedAfter": 81,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 34558,
+      "affectedShare": 0.05,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.723,
+      "maxAbsDiff": 17,
+      "fineRetention": 0.945,
+      "midReduction": 0.013,
+      "lumaShift": 2.462,
+      "saturationRatio": 1.013,
+      "clippedBefore": 96,
+      "clippedAfter": 125,
+      "faces": 1
+    }
+  },
+  "light-woman": {
+    "natural": {
+      "affected": 57050,
+      "affectedShare": 0.083,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.268,
+      "maxAbsDiff": 12,
+      "fineRetention": 0.991,
+      "midReduction": 0.04,
+      "lumaShift": -0.137,
+      "saturationRatio": 0.993,
+      "clippedBefore": 200,
+      "clippedAfter": 68,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 60024,
+      "affectedShare": 0.087,
+      "changedOutside": 0,
+      "meanAbsDiff": 4.115,
+      "maxAbsDiff": 20,
+      "fineRetention": 0.941,
+      "midReduction": 0.022,
+      "lumaShift": 3.467,
+      "saturationRatio": 1.016,
+      "clippedBefore": 200,
+      "clippedAfter": 184,
+      "faces": 1
+    }
+  },
+  "outdoor-man": {
+    "natural": {
+      "affected": 21729,
+      "affectedShare": 0.031,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.667,
+      "maxAbsDiff": 10,
+      "fineRetention": 0.945,
+      "midReduction": 0.057,
+      "lumaShift": -0.031,
+      "saturationRatio": 0.993,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 23632,
+      "affectedShare": 0.034,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.532,
+      "maxAbsDiff": 18,
+      "fineRetention": 0.93,
+      "midReduction": 0.033,
+      "lumaShift": 3.453,
+      "saturationRatio": 1.019,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "glasses-man": {
+    "natural": {
+      "affected": 96662,
+      "affectedShare": 0.14,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.399,
+      "maxAbsDiff": 14,
+      "fineRetention": 1,
+      "midReduction": 0.05,
+      "lumaShift": -0.645,
+      "saturationRatio": 0.989,
+      "clippedBefore": 6359,
+      "clippedAfter": 3274,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 101435,
+      "affectedShare": 0.147,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.554,
+      "maxAbsDiff": 24,
+      "fineRetention": 0.957,
+      "midReduction": 0.033,
+      "lumaShift": 2.498,
+      "saturationRatio": 1.009,
+      "clippedBefore": 6378,
+      "clippedAfter": 6712,
+      "faces": 1
+    }
+  },
+  "child-1942": {
+    "natural": {
+      "affected": 19761,
+      "affectedShare": 0.029,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.97,
+      "maxAbsDiff": 12,
+      "fineRetention": 0.97,
+      "midReduction": 0.05,
+      "lumaShift": -0.585,
+      "saturationRatio": 0.992,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 21493,
+      "affectedShare": 0.031,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.122,
+      "maxAbsDiff": 20,
+      "fineRetention": 0.937,
+      "midReduction": 0.015,
+      "lumaShift": 2.761,
+      "saturationRatio": 1.017,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "elderly-glasses": {
+    "natural": {
+      "affected": 19601,
+      "affectedShare": 0.028,
+      "changedOutside": 0,
+      "meanAbsDiff": 0.945,
+      "maxAbsDiff": 6,
+      "fineRetention": 0.978,
+      "midReduction": 0.012,
+      "lumaShift": -0.05,
+      "saturationRatio": 0.996,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 24679,
+      "affectedShare": 0.036,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.281,
+      "maxAbsDiff": 12,
+      "fineRetention": 0.984,
+      "midReduction": -0.006,
+      "lumaShift": 2.278,
+      "saturationRatio": 1.023,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "elderly-group": {
+    "natural": {
+      "affected": 0,
+      "affectedShare": 0,
+      "changedOutside": 0,
+      "meanAbsDiff": 0,
+      "maxAbsDiff": 0,
+      "fineRetention": 1,
+      "midReduction": 0,
+      "lumaShift": 0,
+      "saturationRatio": 1,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 0
+    },
+    "glow": {
+      "affected": 0,
+      "affectedShare": 0,
+      "changedOutside": 0,
+      "meanAbsDiff": 0,
+      "maxAbsDiff": 0,
+      "fineRetention": 1,
+      "midReduction": 0,
+      "lumaShift": 0,
+      "saturationRatio": 1,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 0
+    }
+  },
+  "indoor-glasses": {
+    "natural": {
+      "affected": 6736,
+      "affectedShare": 0.01,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.474,
+      "maxAbsDiff": 6,
+      "fineRetention": 0.967,
+      "midReduction": 0.032,
+      "lumaShift": -0.083,
+      "saturationRatio": 0.995,
+      "clippedBefore": 15,
+      "clippedAfter": 6,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 7230,
+      "affectedShare": 0.01,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.435,
+      "maxAbsDiff": 12,
+      "fineRetention": 0.967,
+      "midReduction": 0.022,
+      "lumaShift": 2.088,
+      "saturationRatio": 1.01,
+      "clippedBefore": 15,
+      "clippedAfter": 8,
+      "faces": 1
+    }
+  },
+  "east-asian-man": {
+    "natural": {
+      "affected": 15146,
+      "affectedShare": 0.022,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.111,
+      "maxAbsDiff": 11,
+      "fineRetention": 0.947,
+      "midReduction": 0.096,
+      "lumaShift": -0.649,
+      "saturationRatio": 0.993,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 16331,
+      "affectedShare": 0.024,
+      "changedOutside": 0,
+      "meanAbsDiff": 3.505,
+      "maxAbsDiff": 22,
+      "fineRetention": 0.908,
+      "midReduction": 0.066,
+      "lumaShift": 3.117,
+      "saturationRatio": 1.017,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "dim-indoor-sim": {
+    "natural": {
+      "affected": 53608,
+      "affectedShare": 0.078,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.33,
+      "maxAbsDiff": 6,
+      "fineRetention": 0.993,
+      "midReduction": 0.043,
+      "lumaShift": -0.105,
+      "saturationRatio": 0.995,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 58489,
+      "affectedShare": 0.085,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.505,
+      "maxAbsDiff": 11,
+      "fineRetention": 0.939,
+      "midReduction": 0.006,
+      "lumaShift": 2.368,
+      "saturationRatio": 1.024,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  },
+  "backlit-sim": {
+    "natural": {
+      "affected": 13530,
+      "affectedShare": 0.02,
+      "changedOutside": 0,
+      "meanAbsDiff": 1.33,
+      "maxAbsDiff": 7,
+      "fineRetention": 0.957,
+      "midReduction": 0.149,
+      "lumaShift": -0.547,
+      "saturationRatio": 0.989,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    },
+    "glow": {
+      "affected": 15807,
+      "affectedShare": 0.023,
+      "changedOutside": 0,
+      "meanAbsDiff": 2.562,
+      "maxAbsDiff": 11,
+      "fineRetention": 0.922,
+      "midReduction": 0.091,
+      "lumaShift": 2.505,
+      "saturationRatio": 1.017,
+      "clippedBefore": 0,
+      "clippedAfter": 0,
+      "faces": 1
+    }
+  }
+}

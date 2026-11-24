@@ -13,6 +13,7 @@ import {
 } from "@/config/frames/v2";
 import { getHandFont, pickHandFont } from "@/config/hand-fonts";
 import { LOOK_IDS } from "@/config/looks";
+import { parseRetouchLevel, type RetouchLevelId } from "@/config/retouch";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskLang } from "@/lib/kiosk/copy";
 
@@ -130,6 +131,14 @@ export interface KioskState<Shot> {
   mobile: MobileState;
   /** Language of this guest's screens (D78). Per guest: RESET returns to Korean. */
   lang: KioskLang;
+  /**
+   * Skin retouch (「피부 보정」). `retouchDefault` is the booth's setting ("off" = the feature is
+   * not on, and the guest is offered nothing); `retouch` is this guest's answer on the
+   * photo-selection screen, which starts at the default and is final once the photos are chosen.
+   * A view like the language: no shooting, selection, consent or upload rule changes with it.
+   */
+  retouchDefault: RetouchLevelId;
+  retouch: RetouchLevelId;
 }
 
 export type KioskAction<Shot> =
@@ -183,6 +192,8 @@ export type KioskAction<Shot> =
   | { type: "MOBILE_RETRY" }
   /** The guest chose the language of the booth screens (D78). Allowed at any time. */
   | { type: "SET_LANG"; lang: KioskLang }
+  /** 피부 보정: 끄기 / 자연스럽게 / 뽀샤시, while choosing the photos (feature on only). */
+  | { type: "SET_RETOUCH"; level: RetouchLevelId }
   /** "이전": one step back, only where canGoBack allows it (D78). */
   | { type: "BACK" }
   | { type: "RESET" };
@@ -192,6 +203,8 @@ export interface KioskInit {
   countdownSeconds: number;
   /** The font the previous session on this booth had (kept across a page reload). */
   lastHandFont?: string | null;
+  /** The booth's skin-retouch setting: "off" (default) offers the guest nothing. */
+  retouch?: RetouchLevelId;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
@@ -224,6 +237,8 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     consentAsked: null,
     mobile: { status: "idle" },
     lang: "ko",
+    retouchDefault: init.retouch ?? "off",
+    retouch: init.retouch ?? "off",
   };
 }
 
@@ -249,6 +264,8 @@ export function kioskReducer<Shot>(
         shotCount: state.shotCount,
         countdownSeconds: state.countdownSeconds,
         lastHandFont: state.handFont ?? state.lastHandFont,
+        // Every guest starts at the booth's setting, never at the previous guest's answer.
+        retouch: state.retouchDefault,
       });
 
     case "OPEN":
@@ -256,6 +273,16 @@ export function kioskReducer<Shot>(
 
     case "SET_LANG":
       return state.lang === action.lang ? state : { ...state, lang: action.lang };
+
+    case "SET_RETOUCH":
+      // Only where it is offered (the feature is on, the photos are being chosen), and only one
+      // of the three levels. Once the photos are chosen the print is being made: it is final.
+      return state.phase === "select" &&
+        state.retouchDefault !== "off" &&
+        parseRetouchLevel(action.level) !== undefined &&
+        state.retouch !== action.level
+        ? { ...state, retouch: action.level }
+        : state;
 
     case "BACK":
       if (!canGoBack(state)) return state;

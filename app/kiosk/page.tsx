@@ -67,6 +67,15 @@ export default async function KioskPage({
     );
   }
 
-  const { camera } = await searchParams;
-  return <KioskApp {...await kioskBootstrap(typeof camera === "string" ? camera : undefined)} />;
+  const { camera, retouch, retouchHud } = await searchParams;
+  const text = (value: string | string[] | undefined) =>
+    typeof value === "string" ? value : undefined;
+  return (
+    <KioskApp
+      {...await kioskBootstrap(text(camera), {
+        retouch: text(retouch),
+        retouchHud: text(retouchHud),
+      })}
+    />
+  );
 }

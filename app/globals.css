@@ -1445,6 +1445,89 @@ body {
   .select-actions > * {
     flex: 1 1 auto;
   }
+  /* 피부 보정 (skin retouch on): three answers with the photos, above the main button. Drawn like
+     the option answers of the frame screens (Figma 898:1955): a pill with a 2 px ink line, the
+     chosen one filled with ink and checked. The chosen answer is a state, not a second action. */
+  .select-retouch {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    min-width: 0;
+  }
+  .select-retouch-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--gap-s);
+    color: var(--color-ink);
+    font-size: var(--fs-caption);
+    line-height: 1.3;
+  }
+  .select-retouch-label {
+    font-weight: 700;
+  }
+  .select-retouch-choices {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--gap-s);
+  }
+  .select-retouch-choice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28em;
+    min-width: 0;
+    min-height: var(--ctl-h);
+    padding: 4px 10px;
+    border: 2px solid rgb(43 26 16 / 0.35);
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.7);
+    color: var(--color-ink);
+    font-size: var(--ctl-fs);
+    font-weight: 700;
+    line-height: 1.15;
+    word-break: keep-all;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Both rows on (colour looks and 피부 보정): no Figma screen has both. The three answers share
+     one line with their label and drop the note, and the prints may shrink further, so the main
+     button stays on screen at 768 × 1024 (without this it was 138 px below, measured). */
+  .select.has-looks.select-has-retouch .fit-stage {
+    --fit-min: clamp(140px, 15 * var(--bh), 300px);
+  }
+  .select.has-looks.select-has-retouch .select-retouch {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--gap-s);
+  }
+  .select.has-looks.select-has-retouch .select-retouch-note {
+    display: none;
+  }
+  .select.has-looks.select-has-retouch .select-retouch-choices {
+    flex: 1 1 auto;
+  }
+  .select-retouch-choice[aria-checked="true"] {
+    border-color: var(--color-ink);
+    background: var(--color-ink);
+    color: #ffffff;
+  }
+  .select-retouch-choice:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 2px;
+  }
+  .select-retouch-choice > svg {
+    flex: none;
+    width: 0.76em;
+    height: 0.86em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+  }
+
   /* The colour row of the choice screen (Figma 956:1589): a title with the page, "다음", and four
      looks on the guest's own first shot. The chosen one is filled, as on the options screen: a
      state, not a second action. Every size is a token; a chip is never under a touch target. */
@@ -1588,6 +1671,23 @@ body {
     aspect-ratio: 1 / 3;
     transform: translateX(-50%);
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  /* "현상 중…" while the photos are retouched (skin retouch on): one line on a paper tag across
+     the print's place, whatever the strip's width (Figma 「5 · 공개 동의 · 현상 중」). */
+  .frame-art-developing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0.4em 1em;
+    border: 2px solid rgb(43 26 16 / 0.35);
+    border-radius: 9999px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-size: var(--fs-caption);
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
   }
   .pick-preview-caption {
     display: flex;
@@ -1863,6 +1963,27 @@ body {
       grid-area: actions;
       align-self: start;
       min-width: 0;
+    }
+    /* With 피부 보정 the three answers sit under the photos (the wide column, where
+       "자연스럽게" has room) and the main button stays beside them. */
+    .select-has-retouch {
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "stage head" "retouch actions";
+    }
+    .select-retouch {
+      grid-area: retouch;
+      align-self: end;
+    }
+    .select-has-retouch .select-actions {
+      align-self: end;
+    }
+    /* Both rows on (colour looks and 피부 보정): the looks stay beside the prints, the three
+       retouch answers go under the prints, and the main button keeps the bottom of the side
+       column, level with them. The side column is already full with the looks: a fourth row
+       across both columns put the main button off a 1024 × 768 screen (measured). */
+    .select.has-looks.select-has-retouch {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-areas: "stage head" "stage looks" "stage actions" "retouch actions";
     }
     /* Beside the prints the colour row sits between the title and the button, two looks a row. */
     .select.has-looks {
