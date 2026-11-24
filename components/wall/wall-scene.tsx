@@ -3,11 +3,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
+import { WALL_FIT } from "@/lib/wall/fit";
+import type { Rect } from "@/lib/wall/layout";
 import { WALL_LIGHT, fitTheme, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
- * STUDIO SHALOM wordmark where no photo reaches, and the hung photos on top. Drawn in scene pixels
+ * STUDIO SHALOM logo at the top centre of the screen (`mark`, from the fit plan), and the hung
+ * photos on top. Drawn in scene pixels
  * (3840 × 1080, or the size of the theme's cut for this screen shape, D91); the parent scales it
  * to the screen. Nothing comes from the internet.
  *
@@ -22,8 +25,14 @@ export function WallScene({
   children,
   overlay,
   feather = null,
+  mark = null,
+  hiDpi = false,
 }: {
   theme: WallTheme;
+  /** The logo's box in scene px (`WallFitPlan.mark`); none without one. */
+  mark?: Rect | null;
+  /** Use the 2× picture: the screen shows the scene enlarged (and this is not low-spec mode). */
+  hiDpi?: boolean;
   /** The screen's shape: the picture fading out is cut for it too (D91). */
   aspect?: number | null;
   layout: SceneLayout;
@@ -49,6 +58,7 @@ export function WallScene({
     return () => clearTimeout(id);
   }, [under]);
   const underTheme = under ? fitTheme(getWallTheme(under), aspect) : null;
+  const picture = (t: WallTheme) => (hiDpi && t.background2x) || t.background;
   const edge = featherMask(feather);
 
   return (
@@ -70,7 +80,7 @@ export function WallScene({
       {underTheme && (
         // eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline
         <img
-          src={underTheme.background}
+          src={picture(underTheme)}
           alt=""
           aria-hidden
           // A picture of another shape (a 32:9 theme under a 2.4:1 one, D91) is cropped, never
@@ -82,7 +92,7 @@ export function WallScene({
       {/* eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline */}
       <img
         key={theme.id}
-        src={theme.background}
+        src={picture(theme)}
         alt=""
         aria-hidden
         className={`absolute inset-0 h-full w-full ${under ? "wall-background-in" : ""}`}
@@ -117,21 +127,26 @@ export function WallScene({
           />
         </svg>
       )}
-      {theme.wordmark && (
-        <p
-          className="wall-wordmark absolute"
+      {theme.wordmark && mark && (
+        <div
+          className="wall-logo absolute"
+          role="img"
+          aria-label="STUDIO SHALOM"
           data-testid="wall-wordmark"
           data-tone={theme.wordmark.tone}
           style={{
-            left: theme.wordmark.x,
-            top: theme.wordmark.y,
-            fontSize: theme.wordmark.size,
+            left: mark.x,
+            top: mark.y,
+            width: mark.width,
+            height: mark.height,
+            padding:
+              theme.wordmark.tone === "label"
+                ? `${(mark.height - theme.wordmark.size) / 2}px ${(mark.width - theme.wordmark.size * WALL_FIT.logo.aspect) / 2}px`
+                : 0,
           }}
         >
-          <span className="wall-wordmark-name">Studio Shalom</span>
-          <span className="wall-wordmark-rule" aria-hidden />
-          <span className="wall-wordmark-sub">평화의 벽</span>
-        </p>
+          <span className="wall-logo-mark" aria-hidden />
+        </div>
       )}
       {children}
       {overlay}
@@ -160,13 +175,16 @@ export function featherMask(feather: { x: boolean; y: boolean } | null | undefin
 }
 
 /**
- * What holds a photo: the theme's clip picture, drawn in the photo's box, whose top is the line at
- * the hang point. Placed by its own numbers (`WallClip`): the line crosses it `lineY` px below its
- * top. Nothing for a theme whose pegs are already in the picture.
+ * What holds a photo: the theme's clip picture (a strip of masking tape folded over the line),
+ * drawn in the photo's box, whose top is the line at the hang point. Placed by its own numbers
+ * (`WallClip`): the line crosses it `lineY` px below its top. A clip with `tilts` is turned a little
+ * differently on each slot, about where it crosses the line, so the tapes do not look stamped.
+ * Nothing for a theme whose pegs are already in the picture.
  */
-export function Clip({ theme }: { theme: WallTheme }) {
+export function Clip({ theme, slot = 0 }: { theme: WallTheme; slot?: number }) {
   const { hang } = theme;
   if (hang.kind !== "clip") return null;
+  const tilt = hang.tilts?.length ? hang.tilts[slot % hang.tilts.length]! : 0;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- static, same-origin, works offline
     <img
@@ -174,6 +192,7 @@ export function Clip({ theme }: { theme: WallTheme }) {
       alt=""
       aria-hidden
       draggable={false}
+      data-testid="wall-clip"
       className="pointer-events-none absolute left-1/2 max-w-none"
       style={{
         top: -hang.lineY,
@@ -181,6 +200,8 @@ export function Clip({ theme }: { theme: WallTheme }) {
         height: hang.height,
         marginLeft: -hang.centerX,
         zIndex: 2,
+        transform: tilt ? `rotate(${tilt}deg)` : undefined,
+        transformOrigin: `${hang.centerX}px ${hang.lineY}px`,
       }}
     />
   );

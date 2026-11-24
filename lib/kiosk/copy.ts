@@ -108,7 +108,7 @@ const ko = {
     errors: {
       denied: {
         title: "카메라 사용이 허용되지 않았어요",
-        // Figma KIOSK 3e (395:1351), chosen by the user on 2026-11-23 (D112).
+        // Figma KIOSK 3e (395:1351), chosen by the user on 2026-11-23 (D113).
         lead: "브라우저에서 카메라 사용을 허용한 후 다시 시도해 주세요.\n어렵다면 안내 도우미에게 알려 주세요.",
       },
       missing: {
@@ -130,7 +130,7 @@ const ko = {
     free: "자유 포즈로 찍기",
     guide: "포즈 추천받고 찍기",
     plan: (seconds: number, total: number) => `${seconds}초마다 한 컷씩, 모두 ${total}컷을 찍어요`,
-    // Figma KIOSK 3b (395:1204), chosen by the user on 2026-11-23 (D112).
+    // Figma KIOSK 3b (395:1204), chosen by the user on 2026-11-23 (D113).
     video: "촬영 과정은 소리 없이 짧은 영상으로도 저장돼요.",
     pose: "추천 포즈",
     progress: (done: number, total: number) => `${total}장 중 ${done}장 촬영`,
@@ -184,7 +184,7 @@ const ko = {
     retry: "다시 시도",
     failedTitle: "사진을 보내지 못했어요",
     temporaryQueue: "사진이 이 화면에만 임시로 보관돼요. 화면을 닫지 말고 도우미에게 알려 주세요.",
-    // Figma KIOSK 8e (396:1569), chosen by the user on 2026-11-23 (D112).
+    // Figma KIOSK 8e (396:1569), chosen by the user on 2026-11-23 (D113).
     failedLead: "화면을 안내 도우미에게 보여 주세요.\n전송 상태를 확인할 수 있도록 도와드릴게요.",
     home: "처음으로",
     sendingTitle: "사진을 보내고 있어요",
@@ -201,7 +201,7 @@ const ko = {
         title: "지금은 인터넷이 연결되지 않았어요",
         lead: "내 사진 보내기는 인터넷이 필요해요. 사진 찍기는 지금도 할 수 있어요.",
       },
-      // Figma KIOSK M4 (396:1705), chosen by the user on 2026-11-23 (D112).
+      // Figma KIOSK M4 (396:1705), chosen by the user on 2026-11-23 (D113).
       paused: {
         title: "지금은 사진 접수를 잠시 멈췄어요",
         lead: "잠시 뒤 다시 시도해 주세요. 사진 찍기는 지금도 할 수 있어요.",
@@ -253,7 +253,7 @@ const en: KioskCopy = {
     title: "Make a Christmas memory together",
     lead: "Take photos and get them on your phone, or send your own photo to hang on the big screen.",
     camera: "Take photos here",
-    // Figma KIOSK 1c (391:491), chosen by the user on 2026-11-23 (D112).
+    // Figma KIOSK 1c (391:491), chosen by the user on 2026-11-23 (D113).
     cameraLead: "Take photos, and get them on your phone",
     mobile: "Share a photo from your phone",
     mobileLead: "Send a photo from your phone to the media wall",

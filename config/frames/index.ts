@@ -21,7 +21,7 @@ import { V2_FRAMES } from "./v2";
 
 /**
  * The frames before 「틀 선택 v2」 (2026-11-22). The booth no longer offers them (it shows the seven
- * cards of ./v2.ts) and neither does the phone page (D112: it offers the same v2 cards), but they
+ * cards of ./v2.ts) and neither does the phone page (D113: it offers the same v2 cards), but they
  * stay: a photo stored with one of these ids must keep its slot data (wall, AI check).
  *
  * Picker order: the STUDIO SHALOM 2×2 first (D77), then the STUDIO SHALOM letter set by number of

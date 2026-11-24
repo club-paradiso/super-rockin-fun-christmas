@@ -55,7 +55,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아); the guest then shoots six, reviews, chooses the photos. There is no
   "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). Every option
   combination is its own frame id. The earlier 20 frames (`FRAMES`) stay only for photos already
-  stored; neither the booth nor the phone page offers them (D112).
+  stored; neither the booth nor the phone page offers them (D113).
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
@@ -130,6 +130,9 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   theme's own numbers. Every variant passes the same theme tests.
 - **The wall fits any screen by itself** (D110): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
   photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
+  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at the top centre of the screen
+  (`plan.mark`, D112), so every theme keeps its whole band free of photos and clips. A screen that
+  enlarges the scene gets the theme's `background2x`; low-spec mode never does.
   Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
   with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep
   `tests/unit/wall-fit.test.ts` green. The wall re-plans on resize/fullscreen without a reload.
@@ -144,7 +147,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   condition for getting the picture, and never send it without "yes".
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put photos in one of the booth's
-  v2 frames on the phone (D93, D112: the booth's eight cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
+  v2 frames on the phone (D93, D113: the booth's eight cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
   the wall like that frame), `phone-photo` for a plain photo from a page older than D93. Test a phone
   photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review

@@ -279,7 +279,7 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       const p = await shoot(true);
       await svc.moderate(p.id, "approve", staffId);
       const row = (await backend.photos.getById(p.id))!;
-      const wallPath = row.objectPath.replace(/\.[a-z]+$/, "") + ".wall.jpg";
+      const wallPath = row.objectPath.replace(/\.[a-z]+$/, "") + ".wall-hd.jpg";
       const first = await svc.wallImage(p.id);
       expect(first?.mime).toBe("image/jpeg");
       expect(Array.from(first!.data)).toEqual(Array.from(WALL_BYTES));
