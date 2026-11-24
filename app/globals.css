@@ -251,8 +251,8 @@ body {
 .wall-scene[data-tone="light"] {
   --wall-photo-shadow: rgba(43, 26, 16, 0.4);
 }
-/* The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-2b1a10.svg) at the top centre
-   of the wall, painted in the tone's colour through the logo as a mask: one file, any colour.
+/* The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-2b1a10.svg) at its own place in
+   each picture (D116), painted in the tone's colour through the logo as a mask: one file, any colour.
    It belongs to the picture, not on top of it (D112): on a wall or a pale sky the ink is
    multiplied into the picture, so the plaster's grain and the sunlight show through it like paint;
    on a night sky the cream is screened in, like the picture's own starlight; under a garland it

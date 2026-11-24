@@ -1,4 +1,3 @@
-import { WALL_CONFIG } from "./wall";
 import {
   HALF_LIFE_MINUTES,
   ROTATE_MINUTES,
@@ -55,18 +54,6 @@ const TAPE: WallClip = {
   lineY: 34,
   tilts: [-4, 3, -2, 5, -3],
 };
-/**
- * The old brass clip, where it has always been drawn: 37 × 70, a 22.4 × 56 clip at (7, 2.8) whose
- * top is 26 px above the line, so it reaches 10 px over the strip top.
- */
-const BRASS: WallClip = {
-  kind: "clip",
-  image: WALL_CONFIG.scene.clip,
-  width: 37,
-  height: 70,
-  centerX: 18.2,
-  lineY: 28.8,
-};
 const TWINE = "#B48F5E";
 const FIGMA = "Figma SS 03";
 
@@ -98,6 +85,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 440,
+    // The logo is painted on the plaster above the rope, in the sunlight through the leaves.
     wordmark: { x: 1920, y: 48, size: 104, tone: "ink" },
     emptyTextY: 620,
     motion: "none",
@@ -129,14 +117,15 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 380,
-    wordmark: { x: 1920, y: 40, size: 104, tone: "ink" },
+    // The logo is in the sky above the chapel, between the rope and the chapel's cross.
+    wordmark: { x: 3090, y: 248, size: 84, tone: "ink" },
     emptyTextY: 600,
     motion: "none",
   },
   {
     id: "star-of-peace",
     name: "성탄의 별 · 설경 · 기억의 빨랫줄",
-    note: "설산 위 성탄의 별. 그림 속 집게에 사진이 걸려요",
+    note: "설산 위 성탄의 별. 사진은 빨랫줄에 테이프로 붙어요",
     source: `${FIGMA} · S02 (354:24)`,
     status: "current",
     background: "/wall/themes/star-of-peace.jpg",
@@ -146,8 +135,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     tone: "light",
     scene: {
       ...CANVAS,
-      line: { midX: 1900, y0: 368, curve: 2.52e-5 },
-      strip: { width: 170, height: 510, drop: 0 },
+      line: { midX: 1864, y0: 330.3, curve: 3.5e-5 },
+      strip: { width: 170, height: 510, drop: 16 },
       slots: [
         { x: 706, tilt: -0.5 },
         { x: 1402, tilt: 0.4 },
@@ -156,10 +145,12 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    // The painted pegs: top at y 240, the hang point under them at about 370 (measured).
-    hang: { kind: "in-picture", reach: 130 },
+    // The picture's eight painted pegs were painted out (2026-11-24, D115); the line follows the
+    // rope itself (fitted to the rope's centre, 272 of 300 columns, s.d. 1.7 px).
+    hang: TAPE,
     rope: null,
     wideMax: 440,
+    // The logo is right under the star.
     wordmark: { x: 1920, y: 118, size: 76, tone: "ink" },
     emptyTextY: 700,
     motion: "none",
@@ -177,8 +168,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     tone: "dark",
     scene: {
       ...CANVAS,
-      line: { midX: 1900, y0: 328, curve: 2.38e-5 },
-      strip: { width: 150, height: 450, drop: 0 },
+      line: { midX: 1904, y0: 295.7, curve: 2.91e-5 },
+      strip: { width: 150, height: 450, drop: 16 },
       slots: [
         { x: 758, tilt: -0.5 },
         { x: 1418, tilt: 0.4 },
@@ -187,11 +178,13 @@ const BASE_THEMES: readonly WallTheme[] = [
       ],
     },
     liteSlots: [0, 1, 2, 3],
-    // The painted pegs: top at y 222, the hang point under them at about 330 (measured).
-    hang: { kind: "in-picture", reach: 108 },
+    // The picture's eight painted pegs were painted out (2026-11-24, D115); the line follows the
+    // rope itself (fitted to the rope's centre, 272 of 300 columns, s.d. 1.4 px).
+    hang: TAPE,
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1920, y: 48, size: 104, tone: "cream" },
+    // The logo is under the star of Bethlehem (measured at x 2575, y 50), like starlight.
+    wordmark: { x: 2575, y: 120, size: 92, tone: "cream" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -221,7 +214,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is burned into the front of the wooden window sill, under the photos.
+    wordmark: { x: 1920, y: 898, size: 76, tone: "ink" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -251,7 +245,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is painted on the plaster under the window.
+    wordmark: { x: 1920, y: 892, size: 80, tone: "ink" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -281,7 +276,8 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is a paper tag hung from the garland under its right-hand poinsettia.
+    wordmark: { x: 2940, y: 92, size: 76, tone: "label" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -311,27 +307,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: { x1: 528, x2: 3172, color: TWINE, width: 6 },
     wideMax: 400,
-    wordmark: { x: 1920, y: 92, size: 76, tone: "label" },
+    // The logo is a paper tag hung from the garland near the left end of the window.
+    wordmark: { x: 860, y: 92, size: 76, tone: "label" },
     emptyTextY: 600,
-    motion: "none",
-  },
-  {
-    id: "night-window",
-    name: "제주 밤 11시 창가 (이전 장면)",
-    note: "FOLLOW THE LIGHTS 때의 밤 장면. 기록용으로 남겨 뒀어요",
-    source: "Figma FTL · 미디어월 (Wall / Composite preview v3)",
-    status: "legacy",
-    background: WALL_CONFIG.scene.background,
-    preview: "/wall/themes/night-window.preview.jpg",
-    fallbackColor: "#0B0806",
-    tone: "dark",
-    scene: WALL_CONFIG.scene,
-    liteSlots: WALL_CONFIG.liteSlots,
-    hang: BRASS,
-    rope: null,
-    wideMax: 340,
-    wordmark: null,
-    emptyTextY: WALL_CONFIG.scene.line.y0 + 281,
     motion: "none",
   },
 ];
@@ -344,12 +322,11 @@ const BASE_THEMES: readonly WallTheme[] = [
  *
  * - `top`: rows of the scaled original above the theme's own picture (the script's `top`).
  * - `left`: board pixels cut from the left. 778 = the right edge of the original, which keeps
- *   the cross (and the chapel) whole. Star of peace cannot keep the cross with four pegs free of
- *   it, so its board leaves the cross out entirely (it ends 33 px before the crossbar) and
+ *   the cross (and the chapel) whole. Star of peace cannot keep the cross with four photos free
+ *   of it, so its board leaves the cross out entirely (it ends 33 px before the crossbar) and
  *   keeps the lantern.
- * - `slots`: Bethlehem's board hangs on the other four pegs (measured in the picture: brightness
- *   peaks of the pegs, corrected by the offset of the four known ones), because its first peg is
- *   cut off.
+ * - `slots`: Bethlehem's board uses its own four places along the rope (where the painted pegs
+ *   stood before D115, measured then), because the theme's first place is cut off.
  */
 const BOARD = { width: 3096, height: 1290 } as const;
 const ORIGINAL_3x1 = { width: 2048, height: 682 } as const;
@@ -365,8 +342,7 @@ const BOARD_CUTS: Record<
 > = {
   "peace-wall": { top: 150, left: 778 },
   "snowy-chapel": { top: 100, left: 778 },
-  // The logo stays under the star, which moves down with the picture.
-  "star-of-peace": { top: 60, left: 200, wordmarkY: 166 },
+  "star-of-peace": { top: 60, left: 200 },
   bethlehem: {
     top: 100,
     left: 778,

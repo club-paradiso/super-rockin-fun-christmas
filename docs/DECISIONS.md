@@ -1848,3 +1848,46 @@ PNG) and asked for them in place of the drawn tape of D112, first in Figma, then
   the slots the colours in turn (`clipImage`); every picture keeps the same size and `lineY`, so
   no photo moves and `planWallFit` is unchanged. `tape-washi.svg` is gone; the two themes with
   pegs painted in the picture keep them.
+
+## D115 · No clothespin anywhere: tape on every theme and on frame C (2026-11-24)
+
+The user asked for every clothespin to become tape ("빨래집게는 싹다 테이프로 교체").
+
+- **Wall pictures.** `star-of-peace` and `bethlehem` had eight wooden pegs painted on the rope. They
+  were painted out in all five pictures of each theme (1×, @2x, board 1× and 2×, preview): each peg's
+  box is filled with the real texture beside it (rope twist and sky grain, the rope moved column by
+  column onto the line between the box's edges), its low frequencies replaced by a blend of the
+  box's own edges, then feathered in. Both themes now hang with `TAPE` and their `line` follows the
+  rope (a quadratic fitted to the rope's centre, s.d. under 2 px); `strip.drop` is 16 like the other
+  taped themes. The `in-picture` hang stays in the type for a picture that brings its own clips.
+- **Old scene.** `night-window` hangs with `TAPE` too; the brass clip (`clip-brass.svg`, `BRASS`,
+  `WALL_CONFIG.scene.clip`) is gone.
+- **Frame C (빨랫줄).** The four wooden clothespins (`clothespin.svg`) are the wall's tapes
+  (`public/frames/tape-*.png`: cream, berry, kraft, pine), 30 px wide, crossing the line at their
+  centre, tilted −4°, 3°, −2°, 5°. Only photos already stored use this frame (D113).
+- **Figma.** `Template/C · Clothesline` (SS 02) has `Wall/Tape` layers (the pins are hidden and
+  renamed, not deleted), and the KIOSK thumbnails follow; SS 03 S02·S04 and SS 03E S02·S04 carry
+  `집게 지움 패치 8개` over their pictures; the hidden `05` parts in SS 03E S01–S04 hold tapes.
+
+## D116 · The wall logo has its own place in each picture; the old night scene is gone (2026-11-24)
+
+User: the old "Jeju at 11 p.m." scene has no roots in this event ("근본 없는"), so remove it; and
+the logo fixed at the top centre of the screen gets in the way of each picture's character.
+
+- **`night-window` removed.** The theme, its preview, `background-v3.jpg` and the scene's
+  `background` field are gone; `WALL_CONFIG.scene` stays as the numbers the layout tests use. A
+  stored setting that still names it falls back to the default theme (`getWallTheme`).
+- **The logo belongs to the picture.** `theme.wordmark` is now a place in the picture (centre `x`,
+  top `y`, `size`, tone), and `planWallFit` fits it like the photos instead of centring it on the
+  screen; a recut picture (D91) carries it to the same point. Places, chosen in each picture: the
+  plaster above the rope (peace wall), the sky above the chapel between the rope and its cross
+  (snowy chapel), right under the star (star of peace), under the star of Bethlehem in cream
+  (Bethlehem), burned into the wooden sill under the photos (sunset window), painted on the
+  plaster under the window (pastel coast), and a paper tag on the garland under the right-hand
+  poinsettia (festive lights) or near the window's left end (winter sea).
+- **Tests.** Each theme keeps its logo inside the picture and clear of every photo, clip and
+  swing (`tests/unit/wall-themes.test.ts`); on every screen the plan puts it exactly there and on
+  screen, above, below or beside the photos (`tests/unit/wall-fit.test.ts`); the wall E2E checks
+  the drawn logo against the plan.
+- **Trade-off.** A logo far from the photos (the chapel sky, Bethlehem's star) makes the fitted
+  area wider, so on a narrow screen the photos come out a little smaller than with a centred logo.

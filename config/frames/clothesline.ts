@@ -1,7 +1,16 @@
 import type { FrameDecoration, FrameDefinition, FrameSlot } from "@/lib/compositor/types";
 import { lockupBox, STRIP } from "./shared";
 
-// Template C · Clothesline — 크라프트 종이 + 폴라로이드 + 집게. 미디어월 빨랫줄과 같은 언어.
+// Template C · Clothesline — 크라프트 종이 + 폴라로이드 + 마스킹테이프. 미디어월 빨랫줄과 같은 언어.
+
+/**
+ * The media wall's paper tapes (D114, D115: they replaced the wooden clothespin), one colour per
+ * polaroid. Each picture is a 44 × 96 box with the line 34 px below its top; drawn 30 wide here,
+ * it crosses the 3 px line at its centre and reaches down over the polaroid's top edge.
+ */
+const TAPES = ["cream", "berry", "kraft", "pine"] as const;
+const TAPE = { width: 30, height: (30 * 96) / 44, lineY: (30 * 34) / 44 } as const;
+const TAPE_TILTS = [-4, 3, -2, 5] as const;
 
 /** Each polaroid's centre and tilt, from the Figma groups (bounding box centre, rotate). */
 const POLAROIDS = [
@@ -21,7 +30,7 @@ const slots: FrameSlot[] = POLAROIDS.map(({ cx, cy, deg }) => ({
   rotation: { deg, pivot: { x: cx, y: cy } },
 }));
 
-/** Line, card, photo, pin — and the next line crosses the bottom of the card above it. */
+/** Line, card, photo, tape — and the next line crosses the bottom of the card above it. */
 const rows: FrameDecoration[] = POLAROIDS.flatMap(({ cx, cy, deg }, i): FrameDecoration[] => [
   { type: "rect", x: 0, y: 42 + 370 * i, width: 600, height: 3, color: "#a9774a" },
   {
@@ -38,11 +47,12 @@ const rows: FrameDecoration[] = POLAROIDS.flatMap(({ cx, cy, deg }, i): FrameDec
   { type: "photo", slot: i },
   {
     type: "image",
-    src: "/frames/clothespin.svg",
-    x: 288,
-    y: 16 + 370 * i,
-    width: 24,
-    height: 74,
+    src: `/frames/tape-${TAPES[i]}.png`,
+    x: 300 - TAPE.width / 2,
+    y: 43.5 + 370 * i - TAPE.lineY,
+    width: TAPE.width,
+    height: TAPE.height,
+    rotation: { deg: TAPE_TILTS[i]!, pivot: { x: 300, y: 43.5 + 370 * i } },
   },
 ]);
 
