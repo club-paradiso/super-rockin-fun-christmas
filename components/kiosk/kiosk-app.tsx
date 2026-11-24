@@ -1482,7 +1482,11 @@ export function KioskApp({
           />
         )}
         {retouchHud && skinRetouch !== "off" && (
-          <RetouchHud metrics={retouch.metrics} level={state.retouch} />
+          <RetouchHud
+            metrics={retouch.metrics}
+            level={state.retouch}
+            offReason={retouch.offReason}
+          />
         )}
       </main>
     </KioskChromeContext.Provider>

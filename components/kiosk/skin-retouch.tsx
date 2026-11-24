@@ -28,6 +28,9 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
   // failures in a row: the booth then stops offering the choice and hands every photo straight
   // through (never another wait under "현상 중…" for something that will not work).
   const [usable, setUsable] = useState(true);
+  // Why it is off (for the measuring HUD): the last failure code the retoucher reported.
+  const [offReason, setOffReason] = useState<RetouchErrorCode | null>(null);
+  const lastErrorRef = useRef<RetouchErrorCode | null>(null);
   const [metrics, setMetrics] = useState<BatchMetrics | null>(null);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
     const load = (retoucherRef.current ??= import("@/lib/retouch/browser").then((m) =>
       m.createBrowserRetoucher({
         onError: (code) => {
+          lastErrorRef.current = code;
           failuresRef.current = { count: failuresRef.current.count + 1, last: code };
         },
       }),
@@ -44,7 +48,11 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
     void load
       .then((retoucher) => retoucher.warmUp())
       .catch(() => false)
-      .then((ok) => live && setUsable(ok));
+      .then((ok) => {
+        if (!live) return;
+        setUsable(ok);
+        if (!ok) setOffReason(lastErrorRef.current ?? "init-failed");
+      });
     return () => {
       live = false;
       retoucherRef.current = null;
@@ -66,7 +74,10 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
           setMetrics(batch);
           // Three photos in a row failed: the retoucher is off until the page reloads, so the
           // next guest is not offered it.
-          if (retoucher.isDisabled()) setUsable(false);
+          if (retoucher.isDisabled()) {
+            setUsable(false);
+            setOffReason("disabled-after-failures");
+          }
           return {
             images: results.map((r) => r.image as ComposeImage),
             release: () => {
@@ -96,6 +107,8 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
     /** The guest may be offered the choice: the feature is on and its model loaded. */
     offered: active && usable,
     metrics,
+    /** Why the booth stopped offering it (null while it is usable). For the measuring HUD. */
+    offReason: active && !usable ? offReason : null,
     /** For the heartbeat: failures since the last call, then counted from zero again. */
     takeFailures(): { retouchFailures: number; retouchError: RetouchErrorCode } | null {
       const { count, last } = failuresRef.current;
@@ -110,9 +123,12 @@ export function useSkinRetouch(enabled: boolean, level: RetouchLevelId) {
 export function RetouchHud({
   metrics,
   level,
+  offReason = null,
 }: {
   metrics: BatchMetrics | null;
   level: RetouchLevelId;
+  /** Set once the booth has stopped offering the retouch: shown first, with its code. */
+  offReason?: RetouchErrorCode | null;
 }) {
   const sum = (pick: (p: BatchMetrics["photos"][number]) => number) =>
     Math.round(metrics?.photos.reduce((total, p) => total + pick(p), 0) ?? 0);
@@ -134,16 +150,19 @@ export function RetouchHud({
         whiteSpace: "pre",
       }}
     >
-      {metrics
-        ? [
-            `피부 보정(${level}) ${metrics.photos.length}장 합계 ${Math.round(metrics.totalMs)} ms (목표 ${RETOUCH_CONFIG.budget.targetTotalMs})`,
-            `검출 ${sum((p) => p.detectMs)} ms · 보정 ${sum((p) => p.filterMs)} ms · 모델 올리기 ${Math.round(metrics.initMs)} ms`,
-            `장당 ${metrics.photos.map((p) => Math.round(p.totalMs)).join(" / ")} ms`,
-            `얼굴 ${metrics.photos.map((p) => `${p.facesRetouched}/${p.facesFound}`).join(" ")} · 엔진 ${metrics.photos.find((p) => p.engine)?.engine ?? "-"}`,
-            `메모리 추정 ${(metrics.peakBytes / 1048576).toFixed(1)} MB${metrics.jsHeapBytes === null ? "" : ` · JS 힙 ${(metrics.jsHeapBytes / 1048576).toFixed(0)} MB`}`,
-            ...metrics.photos.flatMap((p, i) => (p.error ? [`${i + 1}번 사진: ${p.error}`] : [])),
-          ].join("\n")
-        : `피부 보정(${level}): 아직 처리한 사진 없음`}
+      {[
+        ...(offReason ? [`피부 보정 꺼짐: ${offReason} (페이지를 다시 열 때까지)`] : []),
+        ...(metrics
+          ? [
+              `피부 보정(${level}) ${metrics.photos.length}장 합계 ${Math.round(metrics.totalMs)} ms (목표 ${RETOUCH_CONFIG.budget.targetTotalMs})`,
+              `검출 ${sum((p) => p.detectMs)} ms · 보정 ${sum((p) => p.filterMs)} ms · 모델 올리기 ${Math.round(metrics.initMs)} ms`,
+              `장당 ${metrics.photos.map((p) => Math.round(p.totalMs)).join(" / ")} ms`,
+              `얼굴 ${metrics.photos.map((p) => `${p.facesRetouched}/${p.facesFound}`).join(" ")} · 엔진 ${metrics.photos.find((p) => p.engine)?.engine ?? "-"}`,
+              `메모리 추정 ${(metrics.peakBytes / 1048576).toFixed(1)} MB${metrics.jsHeapBytes === null ? "" : ` · JS 힙 ${(metrics.jsHeapBytes / 1048576).toFixed(0)} MB`}`,
+              ...metrics.photos.flatMap((p, i) => (p.error ? [`${i + 1}번 사진: ${p.error}`] : [])),
+            ]
+          : [`피부 보정(${level}): 아직 처리한 사진 없음`]),
+      ].join("\n")}
     </aside>
   );
 }

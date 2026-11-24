@@ -55,6 +55,7 @@ describe("the booth stops offering skin retouch that cannot work (components/kio
     const { result } = await mountHook();
     await waitFor(() => expect(fake.current!.warmUp).toHaveBeenCalled());
     expect(result.current.offered).toBe(true);
+    expect(result.current.offReason).toBeNull();
     await act(() => result.current.stage!.run([photo]));
     expect(fake.current.retouchBatch).toHaveBeenCalledTimes(1);
   });
@@ -63,6 +64,8 @@ describe("the booth stops offering skin retouch that cannot work (components/kio
     fake.current = retoucher({ warm: false });
     const { result } = await mountHook();
     await waitFor(() => expect(result.current.offered).toBe(false));
+    // The measuring HUD says why (the fake reports no code of its own).
+    expect(result.current.offReason).toBe("init-failed");
     const out = await act(() => result.current.stage!.run([photo]));
     expect(fake.current.retouchBatch).not.toHaveBeenCalled();
     expect(out.images).toEqual([photo]);
@@ -76,6 +79,7 @@ describe("the booth stops offering skin retouch that cannot work (components/kio
     expect(result.current.offered).toBe(true);
     await act(() => result.current.stage!.run([photo]));
     expect(result.current.offered).toBe(false);
+    expect(result.current.offReason).toBe("disabled-after-failures");
     // The next print is handed straight through.
     const out = await act(() => result.current.stage!.run([photo]));
     expect(fake.current.retouchBatch).toHaveBeenCalledTimes(1);
