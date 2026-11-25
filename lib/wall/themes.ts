@@ -93,7 +93,9 @@ export interface WallTheme {
   hang: WallClip | { kind: "in-picture"; reach: number };
   /**
    * A rope the app lays along `scene.line` for pictures that have no line (D119): the rope
-   * photographs (`WALL_ROPE`) from the nail at `x1` to the nail at `x2`, `width` px thick.
+   * photographs (`WALL_ROPE`) from the nail at `x1` to the nail at `x2`, `width` px thick. Each
+   * nail is measured onto the window frame in the picture (its wooden post, or where the garland
+   * covers it), so the rope is tied to the window, not to the sky.
    */
   rope: { x1: number; x2: number; width: number } | null;
   /**

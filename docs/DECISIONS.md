@@ -1966,3 +1966,8 @@ brass nail) and asked for it in code.
   light (`WALL_LIGHT.rope`). On a dark-tone picture the rope is dimmed (`.wall-rope`), since the
   photographs were lit for daylight. `rope.width` is now the rope's body thickness, 11 px (the flat
   6 px twine and its colour are gone).
+- **Tied to the window.** The user asked for the knots to sit on the window frame. Each nail is
+  measured onto the frame at the rope's height in the picture (3× crops with scene-px ticks):
+  sunset window 722 / 3426 (the wooden posts beside the bows), pastel coast 582 (the light face of
+  the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
+  the garland) / 3190 (the right post's wooden face).
