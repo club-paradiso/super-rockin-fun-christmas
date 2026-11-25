@@ -172,6 +172,13 @@ looks:measure`). `/looks` is the comparison
   Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
   with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep
   `tests/unit/wall-fit.test.ts` green. The wall re-plans on resize/fullscreen without a reload.
+- **전체화면 on the wall: one way in, only Escape out** (a user decision, 2026-11-25,
+  `lib/wall/fullscreen.ts`, `components/wall/fullscreen-button.tsx`). A browser opened by hand gets
+  the 「전체화면」 button (bottom right, says "끌 때는 Esc"), only while the window does not cover the
+  screen and the pointer moved in the last few seconds; a double-click or F also go in. Nothing on
+  the wall ever leaves fullscreen (no toggle): Escape, the browser's own, is the only way out. While
+  the wall covers the screen (Fullscreen API, `--kiosk`, F11) nothing is drawn over it and the
+  cursor is hidden. Keep `e2e/wall.spec.ts` 「전체화면」 green.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
   audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
   `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo

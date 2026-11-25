@@ -246,6 +246,43 @@ body {
   background: var(--wall-floor);
   color: var(--wall-cream);
 }
+/* 전체화면 button: only while the wall does not cover the screen and the pointer moved lately
+   (components/wall/fullscreen-button.tsx). Never on a wall that already fills the screen. */
+.wall-fullscreen-btn {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  min-height: 52px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 22px;
+  border: 1px solid color-mix(in srgb, var(--wall-cream) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wall-night) 82%, transparent);
+  color: var(--wall-cream);
+  cursor: pointer;
+  box-shadow: 4px 6px 14px rgba(0, 0, 0, 0.45);
+}
+.wall-fullscreen-btn:hover,
+.wall-fullscreen-btn:focus-visible {
+  background: var(--wall-night);
+  border-color: var(--wall-cream);
+  outline: none;
+}
+.wall-fullscreen-label {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.wall-fullscreen-hint {
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--wall-mist);
+}
 /* Themes (D85). A light picture gets a softer, warm photo shadow; text laid on a picture uses
    the booth's ink or the wall's cream, whichever the theme says reads on that spot. */
 .wall-scene[data-tone="light"] {

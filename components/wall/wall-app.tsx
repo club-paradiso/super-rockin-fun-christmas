@@ -12,6 +12,8 @@ import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/sched
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
 import { Clip, WallScene } from "./wall-scene";
+import { WallFullscreenButton, useFullscreenButton } from "./fullscreen-button";
+import { enterWallFullscreen } from "@/lib/wall/fullscreen";
 
 const RELOAD_KEY = "ftl-wall-reloaded-at";
 
@@ -74,28 +76,6 @@ function useScreenSize(ref: React.RefObject<HTMLElement | null>): ScreenSize | n
 }
 
 /**
- * 전체보기: double-click the wall (or press F) to enter or leave fullscreen. The fit follows by
- * itself (useScreenSize hears `fullscreenchange`). Browsers allow this only from a user gesture;
- * a refusal changes nothing (kiosk launchers already open the wall fullscreen).
- */
-function toggleFullscreen() {
-  const doc = document as Document & { webkitFullscreenElement?: Element | null };
-  try {
-    if (document.fullscreenElement || doc.webkitFullscreenElement) {
-      void document.exitFullscreen?.().catch(() => undefined);
-    } else {
-      const root = document.documentElement as HTMLElement & {
-        webkitRequestFullscreen?: () => void;
-      };
-      if (root.requestFullscreen) void root.requestFullscreen().catch(() => undefined);
-      else root.webkitRequestFullscreen?.();
-    }
-  } catch {
-    // Not allowed here: nothing to do.
-  }
-}
-
-/**
  * The media wall. Polls /api/wall/feed, keeps eligible images in memory (object URLs) and lets
  * the pure scheduler decide what enters and leaves, in the hub's fair rotation order. Anything
  * the server stops listing disappears on the same render; after WALL_CONFIG.offlineGraceMs
@@ -121,10 +101,12 @@ export function WallApp({
 }) {
   const mainRef = useRef<HTMLElement>(null);
   const viewport = useScreenSize(mainRef);
+  // 전체화면: the button, a double-click or F go in; only Escape (the browser's own) comes out.
+  const showFullscreenButton = useFullscreenButton();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey)
-        toggleFullscreen();
+        enterWallFullscreen();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -512,8 +494,8 @@ export function WallApp({
       data-fit-scale={plan ? plan.scale.toFixed(4) : ""}
       data-fit-coverage={plan ? plan.coverage.toFixed(4) : ""}
       style={{ background: theme.fallbackColor }}
-      className="wall-stage relative h-dvh w-full cursor-none overflow-hidden"
-      onDoubleClick={toggleFullscreen}
+      className={`wall-stage relative h-dvh w-full overflow-hidden ${showFullscreenButton ? "cursor-default" : "cursor-none"}`}
+      onDoubleClick={() => enterWallFullscreen()}
     >
       {viewport && stage && plan && (
         <div
@@ -717,6 +699,7 @@ export function WallApp({
           STAFF · 연결 확인 중
         </p>
       )}
+      {showFullscreenButton && <WallFullscreenButton />}
     </main>
   );
 }
