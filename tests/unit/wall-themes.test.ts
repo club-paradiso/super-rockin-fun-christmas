@@ -15,6 +15,8 @@ import {
   lineYAt,
   phoneCardBox,
   ropePath,
+  ropePieces,
+  WALL_ROPE,
   wallLayout,
   type Rect,
 } from "@/lib/wall/layout";
@@ -22,6 +24,7 @@ import { readFileSync } from "node:fs";
 import { slotEnvelope, wordmarkBox } from "@/lib/wall/fit";
 import {
   ROTATE_MINUTES,
+  WALL_LOGO,
   activeThemeId,
   clipReach,
   fitTheme,
@@ -147,8 +150,10 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(band.x + band.width).toBeLessThanOrEqual(layout.width);
     expect(band.y).toBeGreaterThanOrEqual(0);
     expect(band.y + band.height).toBeLessThanOrEqual(layout.height);
-    // Readable across a room on a 1080-line wall (a tag's paper adds contrast, so it may be smaller).
-    expect(theme.wordmark.size).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 72 : 76);
+    // Readable across a room on a 1080-line wall: the main capitals (PEACEMAKERS, or the whole
+    // one-line form) at least 38 scene px tall (a tag's paper adds contrast, so it may be 36), D117.
+    const letters = theme.wordmark.size * WALL_LOGO[theme.wordmark.form].letters;
+    expect(letters).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 36 : 38);
     // Pegs painted in the picture hang all along the line, not only at the slots.
     if (theme.hang.kind === "in-picture") {
       for (const b of bands)
@@ -188,6 +193,68 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
       expect(hang.height - hang.lineY).toBeGreaterThan(theme.scene.strip.drop);
       for (const place of layout.slots) expect(place.y - hang.lineY).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the rope photographs (D119)", () => {
+  it("are on disk at the sizes the layout uses", async () => {
+    const { default: sharp } = await import("sharp");
+    for (const pic of [WALL_ROPE.tile, WALL_ROPE.left, WALL_ROPE.right]) {
+      const meta = await sharp(file(pic.src)).metadata();
+      expect([meta.width, meta.height, meta.hasAlpha], pic.src).toEqual([pic.w, pic.h, true]);
+    }
+  });
+
+  it.each(WALL_THEMES.filter((t) => t.rope).map((t) => [t.id, t] as const))(
+    "%s: knots on the line at both nails, tiles end to end between them",
+    (_id, theme) => {
+      const { x1, x2, width } = theme.rope!;
+      const line = theme.scene.line;
+      const { tiles, left, right } = ropePieces(line, x1, x2, width);
+      expect([left.x, left.y]).toEqual([x1, lineYAt(line, x1)]);
+      expect([right.x, right.y]).toEqual([x2, lineYAt(line, x2)]);
+      const k = width / WALL_ROPE.body;
+      expect(tiles.length).toBeGreaterThan(5);
+      // The first tile starts under the left knot's faded rope, the last ends under the right's.
+      expect(tiles[0]!.x).toBeLessThan(x1 + (WALL_ROPE.left.joinX - WALL_ROPE.left.anchorX) * k);
+      const last = tiles.at(-1)!;
+      const lastEnd = last.x + last.w * Math.cos((last.angle * Math.PI) / 180);
+      expect(lastEnd).toBeGreaterThan(x2 - (WALL_ROPE.right.anchorX - WALL_ROPE.right.joinX) * k);
+      expect(lastEnd).toBeLessThan(x2);
+      for (let i = 1; i < tiles.length; i++) {
+        const a = tiles[i - 1]!;
+        const b = tiles[i]!;
+        // Each tile is a whole twist run and starts where the one before it ends: no gap, no
+        // overlap, so the twist runs on unbroken; every tile's rope sits on the curve.
+        expect(a.w).toBeCloseTo(WALL_ROPE.tile.w * k, 6);
+        expect(b.x - a.x).toBeCloseTo(a.w * Math.cos((a.angle * Math.PI) / 180), 6);
+        expect(b.y).toBeCloseTo(lineYAt(line, b.x), 6);
+        expect(Math.abs(b.angle - a.angle)).toBeLessThan(0.5);
+      }
+    },
+  );
+});
+
+describe("the wall logo (D117)", () => {
+  it("is 평화의 벽 · THE WALL OF PEACEMAKERS in two forms, outlined, at the aspect the planner uses", () => {
+    for (const form of Object.keys(WALL_LOGO) as (keyof typeof WALL_LOGO)[]) {
+      const { src, aspect, letters } = WALL_LOGO[form];
+      const svg = readFileSync(file(src), "utf8");
+      const [, , w, h] = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/
+        .exec(svg)!
+        .slice(1)
+        .map(Number);
+      expect(w! / h!, form).toBeCloseTo(aspect, 2);
+      // Outlined paths only: the wall never depends on a web font for its logo.
+      expect(svg).not.toMatch(/<text/);
+      expect(letters).toBeGreaterThan(0);
+      expect(letters).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("changes with the background: some pictures use the basic form, others the one-line form", () => {
+    const forms = new Set(WALL_THEMES.map((t) => t.wordmark?.form));
+    expect(forms).toEqual(new Set(["stack", "line"]));
   });
 });
 

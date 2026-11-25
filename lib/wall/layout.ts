@@ -111,6 +111,90 @@ export function ropePath(line: WallSceneConfig["line"], x1: number, x2: number):
   return `M${n(x1)} ${n(y1)} Q${n(cx)} ${n(cy)} ${n(x2)} ${n(y2)}`;
 }
 
+/**
+ * The rope photographs (D119, GPT Image, `public/wall/rope/`): a straight jute rope cut to a
+ * seamless run of eight twists, and its two ends knotted round a brass nail. Sizes are the files'
+ * own px; the rope's body is `body` px thick in all three (`top` = where the body starts in the
+ * tile). `anchor` is the nail in an end (the line's end point sits under its knot, on the rope's
+ * centre); `join` is where that end's rope has faded out into the tiled rope.
+ */
+export const WALL_ROPE = {
+  tile: { src: "/wall/rope/rope-tile.png", w: 395, h: 54, top: 3.2 },
+  body: 48,
+  left: {
+    src: "/wall/rope/rope-end-left.png",
+    w: 176,
+    h: 240,
+    anchorX: 57.2,
+    anchorY: 91.1,
+    joinX: 118.1,
+  },
+  right: {
+    src: "/wall/rope/rope-end-right.png",
+    w: 188,
+    h: 259,
+    anchorX: 130,
+    anchorY: 100.1,
+    joinX: 57.8,
+  },
+} as const;
+
+/**
+ * One picture placed along the line: turned `angle` degrees about the point (`x`, `y`) on the
+ * line, and drawn `w × h` px with its top-left corner at (`dx`, `dy`) from that point.
+ */
+export interface RopePiece {
+  x: number;
+  y: number;
+  angle: number;
+  dx: number;
+  dy: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The rope of a theme whose picture has no line, laid along the curve the slots use from `x1` to
+ * `x2` and `width` px thick: a knotted end at each point (the nail's knot on the line) and,
+ * between them, one tile after another, each turned to the curve's slope where it starts (the sag
+ * is gentle, so the twist runs on unbroken). The last tile is cut short (`w` < the tile's width)
+ * a little past the right end's join, under that end's faded rope.
+ */
+export function ropePieces(
+  line: WallSceneConfig["line"],
+  x1: number,
+  x2: number,
+  width: number,
+): { tiles: RopePiece[]; left: RopePiece; right: RopePiece } {
+  const k = width / WALL_ROPE.body;
+  const slope = (x: number) => -2 * line.curve * (x - line.midX);
+  const deg = (a: number) => (a * 180) / Math.PI;
+  const { tile, left: L, right: R } = WALL_ROPE;
+  const end = (x: number, e: typeof L | typeof R): RopePiece => ({
+    x,
+    y: lineYAt(line, x),
+    angle: deg(Math.atan(slope(x))),
+    dx: -e.anchorX * k,
+    dy: -e.anchorY * k,
+    w: e.w * k,
+    h: e.h * k,
+  });
+  const overlap = width / 2;
+  const start = x1 + (L.joinX - L.anchorX) * k - overlap;
+  const stop = x2 - (R.anchorX - R.joinX) * k + overlap;
+  const tw = tile.w * k;
+  const th = tile.h * k;
+  const centre = (tile.top + WALL_ROPE.body / 2) * k;
+  const tiles: RopePiece[] = [];
+  for (let x = start; x < stop - 0.5;) {
+    const a = Math.atan(slope(x));
+    const w = Math.min(tw, (stop - x) / Math.cos(a));
+    tiles.push({ x, y: lineYAt(line, x), angle: deg(a), dx: 0, dy: -centre, w, h: th });
+    x += tw * Math.cos(a);
+  }
+  return { tiles, left: end(x1, L), right: end(x2, R) };
+}
+
 export function phoneCardBox(place: SlotPlace): Rect {
   const height = PHONE_CARD.margin + PHONE_CARD.photoHeight + PHONE_CARD.caption;
   return { x: place.x - PHONE_CARD.width / 2, y: place.box.y, width: PHONE_CARD.width, height };

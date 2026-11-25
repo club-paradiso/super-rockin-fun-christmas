@@ -1891,3 +1891,83 @@ the logo fixed at the top centre of the screen gets in the way of each picture's
   the drawn logo against the plan.
 - **Trade-off.** A logo far from the photos (the chapel sky, Bethlehem's star) makes the fitted
   area wider, so on a narrow screen the photos come out a little smaller than with a centred logo.
+
+## D117 · The wall shows its own name, 평화의 벽 · THE WALL OF PEACEMAKERS, in two forms (2026-11-25)
+
+User: the wall's English name will be "The Wall of Peacemakers", so the wall's logo changes with
+it; the sparkle goes on the line above 평화의 벽, not inside a letter; a one-line form is made too,
+the uniform one is chosen; and "the logo keeps changing too: the basic form and the uniform form".
+
+- **The logo is the wall's name, not the booth's.** The wall drew the STUDIO SHALOM lockup; it now
+  draws the wall logo made in Figma SS 00 (`THE WALL OF PEACEMAKERS · 평화의 벽 로고` section):
+  the basic form `Brand/Wall — THE WALL OF PEACEMAKERS · 영문형` (973:86: THE WALL OF / PEACEMAKERS /
+  — ✦ — / 평화의 벽, the sparkle the STUDIO SHALOM star) and the uniform one-line form
+  `Brand/Wall — 가로 한 줄 · 균일 (채택)` (978:154). Both are outlined SVGs cut tight to their ink
+  (`public/wall/logo-stack.svg`, `logo-line.svg`), drawn as a CSS mask in the theme's tone like the
+  old one, so the gold of the divider becomes the tone's colour. The phone card on the wall and the
+  holding screen keep the STUDIO SHALOM lockup: they speak for the booth.
+- **The form belongs to the picture, so the logo changes with the background.** `theme.wordmark`
+  gains `form` (`WALL_LOGO` in `lib/wall/themes.ts` holds each form's file, aspect and main-letter
+  height), and `wordmarkBox` uses that form's aspect. Basic form where the picture has a calm
+  block of sky or plaster: peace wall (above the rope), snowy chapel (under the rope, clear of
+  both crosses), star of peace (beside the star: under it there is no room above the photos on the
+  2.4:1 board cut). One-line form where the place is a long low band: Bethlehem (under the star,
+  cream), sunset window (the sill), pastel coast (the plaster under the window), and a long paper
+  tag on the garland (festive lights, winter sea). When staff rotate the backgrounds, the logo
+  alternates between the two forms with them.
+- **Legibility rule.** The old rule was a minimum `size`; it is now the height of the main
+  capitals (PEACEMAKERS, or the whole line): at least 38 scene px, 36 on a paper tag
+  (`tests/unit/wall-themes.test.ts`). The forms are a third to twice the old lockup's height, so
+  every place was re-measured against the pictures (composites of every picture and cut with the
+  logo and the photo boxes, PR description).
+- **Not done.** Time-based alternation inside one background (the logo swapping while the
+  picture stays) was not built: each place was chosen for one form, and the other form would not
+  fit most of them.
+
+## D118 · The one-line logo takes on the surface it is on (2026-11-25)
+
+User: make the one-line THE WALL OF PEACEMAKERS logo sit in its backgrounds as well as it can.
+
+- **Each surface gets its own treatment, not one ink.** `theme.wordmark.tone` gains `carved`, and
+  `theme.wordmark.color` lets a picture set the colour from the surface around the logo (sampled
+  from the picture, same hue, much darker or lighter):
+  - **Sunset window (wood sill): `carved`, #3a1e0e.** A dark groove multiplied into the grain,
+    with the same form 2 px lower screened in warm light, so the lower edge of every letter
+    catches the sun like a cut in wood.
+  - **Pastel coast (plaster): `ink`, #4b2f1b.** Paint in the plaster's own brown, multiplied, so
+    the grain and the light show through.
+  - **Bethlehem (night sky): `cream`, #f6dac1, the star's own colour,** with a soft halo: the
+    form blurred (`public/wall/logo-*-halo.png`, padded by `WALL_LOGO_HALO_PAD` of the height on
+    each side) screened in behind the letters, like the star's light.
+  - **Paper tags (festive lights, winter sea).** The tag CSS was defined twice and the older copy
+    won, so the paper grain and the twine through punched holes never showed; the stale copy is
+    gone. The tag is taller (`labelPad` 0.6 × 0.55 of the logo height) so the holes sit clear of
+    the letters, and the festive-lights tag hangs a little lower so the poinsettia above it shows.
+- Checked on every picture in Chromium with the real CSS (blend modes, masks), then by the wall
+  E2E. Not checked on the LED itself.
+
+## D119 · The drawn rope is a photographed rope, knotted round a nail at each end (2026-11-25)
+
+User: the line the app draws on pictures that have none should look real; they made the rope in
+GPT Image from our prompts (a straight jute rope, and its left and right ends knotted round a
+brass nail) and asked for it in code.
+
+- **Assets** (`public/wall/rope/`, cut from the three transparent PNGs): `rope-tile.png`, eight
+  twists of the straight rope (one twist measured at 123.6 px by autocorrelation) with its start
+  cross-faded into what follows its end, so tiles join without a seam; `rope-end-left.png` and
+  `rope-end-right.png`, the knots with a short run of straight rope that fades out. All three are
+  scaled so the rope's body is 48 px thick (`WALL_ROPE` in `lib/wall/layout.ts` holds sizes, the
+  nail anchors and the joins).
+- **Layout** (`ropePieces`): an end's knot sits on the line at `rope.x1` and `rope.x2`, the nail
+  just above it; between them tiles run end to end, each turned to the curve's slope where it
+  starts, and the last is cut short under the right end's faded rope. The sag is gentle (under
+  0.5° between neighbours), so the twist runs on unbroken.
+- **Drawing**: SVG images in the existing rope layer; one drop shadow down and right with the one
+  light (`WALL_LIGHT.rope`). On a dark-tone picture the rope is dimmed (`.wall-rope`), since the
+  photographs were lit for daylight. `rope.width` is now the rope's body thickness, 11 px (the flat
+  6 px twine and its colour are gone).
+- **Tied to the window.** The user asked for the knots to sit on the window frame. Each nail is
+  measured onto the frame at the rope's height in the picture (3× crops with scene-px ticks):
+  sunset window 722 / 3426 (the wooden posts beside the bows), pastel coast 582 (the light face of
+  the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
+  the garland) / 3190 (the right post's wooden face).
