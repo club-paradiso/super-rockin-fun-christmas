@@ -164,7 +164,9 @@ looks:measure`). `/looks` is the comparison
   theme's own numbers. Every variant passes the same theme tests.
 - **The wall fits any screen by itself** (D110): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
   photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
-  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at its own place in each picture
+  The wordmark is the wall's own logo (D117: 평화의 벽 · THE WALL OF PEACEMAKERS, Figma SS 00,
+  `public/wall/logo-stack.svg` basic form or `logo-line.svg` one-line form, `WALL_LOGO`; each
+  picture picks one in `theme.wordmark.form`, so the logo changes with the background) at its own place in each picture
   (`theme.wordmark`, `plan.mark`, D116: under a star, painted on plaster, burned into a sill, a tag
   on a garland), moving with the picture, never with the screen, and clear of every photo and clip
   on every screen. Nothing hangs a clip over the line elsewhere: every theme uses tape (D115). A screen that

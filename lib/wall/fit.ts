@@ -1,5 +1,5 @@
 import { PHONE_CARD, wallLayout, type Rect, type SceneLayout, type SlotPlace } from "./layout";
-import { WALL_LIGHT, clipReach, type WallTheme, type WallThemeLook } from "./themes";
+import { WALL_LIGHT, WALL_LOGO, clipReach, type WallTheme, type WallThemeLook } from "./themes";
 
 /**
  * Screen-adaptive fit for the media wall (D110). The scene is still never stretched (D65), but
@@ -26,10 +26,10 @@ export const WALL_FIT = {
    */
   stickiness: 1.08,
   /**
-   * The logo (public/frames/v2/logo-*.svg, 170 × 40): width per unit of height, and the paper
-   * tag's padding around it for a `label` theme, as a share of the logo's height.
+   * The paper tag's padding around the logo for a `label` theme, as a share of the logo's height
+   * (its width per unit of height is the form's, `WALL_LOGO`).
    */
-  logo: { aspect: 170 / 40, labelPad: { x: 0.5, y: 0.3 } },
+  logo: { labelPad: { x: 0.5, y: 0.3 } },
   /**
    * Bands cost: score × coverage^bandWeight (coverage = share of the screen the picture covers).
    */
@@ -123,7 +123,8 @@ export function slotEnvelope(place: SlotPlace, theme: WallTheme, lite = false): 
 export function wordmarkBox(theme: WallTheme, centerX?: number): Rect | null {
   const mark = theme.wordmark;
   if (!mark) return null;
-  const { aspect, labelPad } = WALL_FIT.logo;
+  const { labelPad } = WALL_FIT.logo;
+  const { aspect } = WALL_LOGO[mark.form];
   const pad = mark.tone === "label" ? labelPad : { x: 0, y: 0 };
   const width = mark.size * (aspect + 2 * pad.x);
   const height = mark.size * (1 + 2 * pad.y);

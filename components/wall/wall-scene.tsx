@@ -3,13 +3,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
-import { WALL_FIT } from "@/lib/wall/fit";
 import type { Rect } from "@/lib/wall/layout";
-import { WALL_LIGHT, clipImage, fitTheme, type WallTheme } from "@/lib/wall/themes";
+import { WALL_LIGHT, WALL_LOGO, clipImage, fitTheme, type WallTheme } from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
- * STUDIO SHALOM logo at its place in the picture (`mark`, from the fit plan, D116), and the hung
+ * wall logo (평화의 벽, in the form the picture uses, D117) at its place in the picture (`mark`,
+ * from the fit plan, D116), and the hung
  * photos on top. Drawn in scene pixels
  * (3840 × 1080, or the size of the theme's cut for this screen shape, D91); the parent scales it
  * to the screen. Nothing comes from the internet.
@@ -131,9 +131,10 @@ export function WallScene({
         <div
           className="wall-logo absolute"
           role="img"
-          aria-label="STUDIO SHALOM"
+          aria-label="평화의 벽 · The Wall of Peacemakers"
           data-testid="wall-wordmark"
           data-tone={theme.wordmark.tone}
+          data-form={theme.wordmark.form}
           style={{
             left: mark.x,
             top: mark.y,
@@ -141,7 +142,7 @@ export function WallScene({
             height: mark.height,
             padding:
               theme.wordmark.tone === "label"
-                ? `${(mark.height - theme.wordmark.size) / 2}px ${(mark.width - theme.wordmark.size * WALL_FIT.logo.aspect) / 2}px`
+                ? `${(mark.height - theme.wordmark.size) / 2}px ${(mark.width - theme.wordmark.size * WALL_LOGO[theme.wordmark.form].aspect) / 2}px`
                 : 0,
           }}
         >

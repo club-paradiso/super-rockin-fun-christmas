@@ -1891,3 +1891,35 @@ the logo fixed at the top centre of the screen gets in the way of each picture's
   the drawn logo against the plan.
 - **Trade-off.** A logo far from the photos (the chapel sky, Bethlehem's star) makes the fitted
   area wider, so on a narrow screen the photos come out a little smaller than with a centred logo.
+
+## D117 · The wall shows its own name, 평화의 벽 · THE WALL OF PEACEMAKERS, in two forms (2026-11-25)
+
+User: the wall's English name will be "The Wall of Peacemakers", so the wall's logo changes with
+it; the sparkle goes on the line above 평화의 벽, not inside a letter; a one-line form is made too,
+the uniform one is chosen; and "the logo keeps changing too: the basic form and the uniform form".
+
+- **The logo is the wall's name, not the booth's.** The wall drew the STUDIO SHALOM lockup; it now
+  draws the wall logo made in Figma SS 00 (`THE WALL OF PEACEMAKERS · 평화의 벽 로고` section):
+  the basic form `Brand/Wall — THE WALL OF PEACEMAKERS · 영문형` (973:86: THE WALL OF / PEACEMAKERS /
+  — ✦ — / 평화의 벽, the sparkle the STUDIO SHALOM star) and the uniform one-line form
+  `Brand/Wall — 가로 한 줄 · 균일 (채택)` (978:154). Both are outlined SVGs cut tight to their ink
+  (`public/wall/logo-stack.svg`, `logo-line.svg`), drawn as a CSS mask in the theme's tone like the
+  old one, so the gold of the divider becomes the tone's colour. The phone card on the wall and the
+  holding screen keep the STUDIO SHALOM lockup: they speak for the booth.
+- **The form belongs to the picture, so the logo changes with the background.** `theme.wordmark`
+  gains `form` (`WALL_LOGO` in `lib/wall/themes.ts` holds each form's file, aspect and main-letter
+  height), and `wordmarkBox` uses that form's aspect. Basic form where the picture has a calm
+  block of sky or plaster: peace wall (above the rope), snowy chapel (under the rope, clear of
+  both crosses), star of peace (beside the star: under it there is no room above the photos on the
+  2.4:1 board cut). One-line form where the place is a long low band: Bethlehem (under the star,
+  cream), sunset window (the sill), pastel coast (the plaster under the window), and a long paper
+  tag on the garland (festive lights, winter sea). When staff rotate the backgrounds, the logo
+  alternates between the two forms with them.
+- **Legibility rule.** The old rule was a minimum `size`; it is now the height of the main
+  capitals (PEACEMAKERS, or the whole line): at least 38 scene px, 36 on a paper tag
+  (`tests/unit/wall-themes.test.ts`). The forms are a third to twice the old lockup's height, so
+  every place was re-measured against the pictures (composites of every picture and cut with the
+  logo and the photo boxes, PR description).
+- **Not done.** Time-based alternation inside one background (the logo swapping while the
+  picture stays) was not built: each place was chosen for one form, and the other form would not
+  fit most of them.

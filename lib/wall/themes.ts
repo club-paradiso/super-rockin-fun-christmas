@@ -27,6 +27,18 @@ export const wallPhotoShadow = (kind: "filter" | "box") => {
   return kind === "filter" ? `drop-shadow(${offset})` : offset;
 };
 
+/**
+ * The wall logo's two forms (D117), outlined from Figma SS 00 (`Brand/Wall — THE WALL OF
+ * PEACEMAKERS · 영문형`, 973:86, and `Brand/Wall — 가로 한 줄 · 균일 (채택)`, 978:154) and cut tight
+ * to their ink. `aspect` is width / height of that box; `letters` is the height of the main
+ * capitals (PEACEMAKERS; the whole line) as a share of it, which is what decides legibility.
+ */
+export const WALL_LOGO = {
+  stack: { src: "/wall/logo-stack.svg", aspect: 953.18 / 292.46, letters: 85.7 / 292.46 },
+  line: { src: "/wall/logo-line.svg", aspect: 1168.82 / 42.62, letters: 1 },
+} as const;
+export type WallLogoForm = keyof typeof WALL_LOGO;
+
 export interface WallTheme {
   id: string;
   /** Staff-facing name (Korean), as labelled in Figma. */
@@ -72,14 +84,24 @@ export interface WallTheme {
    */
   wideMax: number;
   /**
-   * The STUDIO SHALOM logo (the Figma lockup, public/frames/v2/logo-*.svg), at its own place in
-   * this picture (D116: under a star, painted on plaster, burned into a sill, a tag on a garland):
-   * `x` is its centre, `y` its top, `size` its height (its width is `WALL_FIT.logo.aspect` × size).
+   * The wall's own logo, 평화의 벽 · THE WALL OF PEACEMAKERS (D117, Figma SS 00), at its own place
+   * in this picture (D116: under a star, painted on plaster, burned into a sill, a tag on a
+   * garland). `form` is which of its two Figma forms the picture shows (`WALL_LOGO`): `stack`, the
+   * basic form (THE WALL OF / PEACEMAKERS / — ✦ — / 평화의 벽), or `line`, the uniform one-line form
+   * (THE WALL OF PEACEMAKERS) for a long, low band. Each picture picks the one that fits its place,
+   * so the logo changes with the background (a user decision, 2026-11-25).
+   * `x` is its centre, `y` its top, `size` its height (its width is the form's aspect × size).
    * It moves with the picture, never with the screen, and must stay clear of every photo and clip.
    * `ink` / `cream` = the logo colour on a calm part of the picture; `label` = ink on a paper tag
    * hung from a garland. Null = no logo.
    */
-  wordmark: { x: number; y: number; size: number; tone: "ink" | "cream" | "label" } | null;
+  wordmark: {
+    x: number;
+    y: number;
+    size: number;
+    tone: "ink" | "cream" | "label";
+    form: WallLogoForm;
+  } | null;
   /** Baseline of the "empty wall" line of text. */
   emptyTextY: number;
   /** Ambient animation. None of the current themes animate: a still picture is the design. */

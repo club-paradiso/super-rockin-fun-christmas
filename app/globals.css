@@ -347,6 +347,16 @@ body {
   -webkit-mask: url("/frames/v2/logo-2b1a10.svg") center / contain no-repeat;
   mask: url("/frames/v2/logo-2b1a10.svg") center / contain no-repeat;
 }
+/* The wall's own logo (D117): the form each picture uses (WALL_LOGO). The phone card and the
+   holding screen keep the STUDIO SHALOM lockup above. */
+.wall-logo[data-form="stack"] .wall-logo-mark {
+  -webkit-mask-image: url("/wall/logo-stack.svg");
+  mask-image: url("/wall/logo-stack.svg");
+}
+.wall-logo[data-form="line"] .wall-logo-mark {
+  -webkit-mask-image: url("/wall/logo-line.svg");
+  mask-image: url("/wall/logo-line.svg");
+}
 /* The "empty wall" line: a paper note, readable on every theme. */
 .wall-note {
   left: 50%;

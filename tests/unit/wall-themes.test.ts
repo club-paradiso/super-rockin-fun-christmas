@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { slotEnvelope, wordmarkBox } from "@/lib/wall/fit";
 import {
   ROTATE_MINUTES,
+  WALL_LOGO,
   activeThemeId,
   clipReach,
   fitTheme,
@@ -147,8 +148,10 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
     expect(band.x + band.width).toBeLessThanOrEqual(layout.width);
     expect(band.y).toBeGreaterThanOrEqual(0);
     expect(band.y + band.height).toBeLessThanOrEqual(layout.height);
-    // Readable across a room on a 1080-line wall (a tag's paper adds contrast, so it may be smaller).
-    expect(theme.wordmark.size).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 72 : 76);
+    // Readable across a room on a 1080-line wall: the main capitals (PEACEMAKERS, or the whole
+    // one-line form) at least 38 scene px tall (a tag's paper adds contrast, so it may be 36), D117.
+    const letters = theme.wordmark.size * WALL_LOGO[theme.wordmark.form].letters;
+    expect(letters).toBeGreaterThanOrEqual(theme.wordmark.tone === "label" ? 36 : 38);
     // Pegs painted in the picture hang all along the line, not only at the slots.
     if (theme.hang.kind === "in-picture") {
       for (const b of bands)
@@ -188,6 +191,29 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
       expect(hang.height - hang.lineY).toBeGreaterThan(theme.scene.strip.drop);
       for (const place of layout.slots) expect(place.y - hang.lineY).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the wall logo (D117)", () => {
+  it("is 평화의 벽 · THE WALL OF PEACEMAKERS in two forms, outlined, at the aspect the planner uses", () => {
+    for (const form of Object.keys(WALL_LOGO) as (keyof typeof WALL_LOGO)[]) {
+      const { src, aspect, letters } = WALL_LOGO[form];
+      const svg = readFileSync(file(src), "utf8");
+      const [, , w, h] = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/
+        .exec(svg)!
+        .slice(1)
+        .map(Number);
+      expect(w! / h!, form).toBeCloseTo(aspect, 2);
+      // Outlined paths only: the wall never depends on a web font for its logo.
+      expect(svg).not.toMatch(/<text/);
+      expect(letters).toBeGreaterThan(0);
+      expect(letters).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("changes with the background: some pictures use the basic form, others the one-line form", () => {
+    const forms = new Set(WALL_THEMES.map((t) => t.wordmark?.form));
+    expect(forms).toEqual(new Set(["stack", "line"]));
   });
 });
 
