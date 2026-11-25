@@ -193,6 +193,9 @@ const ko = {
     // D95: what the booth says while the automatic check runs. The user's wording (mission brief).
     reviewChecking: "사진을 확인하고 있어요. 잠시만 기다려 주세요.",
     reviewDelayed: "사진 확인이 조금 지연되고 있어요. 안전하게 확인한 뒤 화면에 표시할게요.",
+    // Shown once the server says the photo is on the wall (AI review on by default, 2026-11-25,
+    // Figma 969:1690). Written by Claude, not yet the user's wording (D76).
+    reviewApproved: "미디어월에 올라갔어요! 큰 화면에서 찾아보세요.",
     done: "다 받았어요",
     resetSoon: "잠시 뒤 처음 화면으로 돌아가요",
     qrNote: "휴대폰으로 찍으면\n사진 파일을 받을 수 있어요",
@@ -427,6 +430,7 @@ const en: KioskCopy = {
     reviewChecking: "We are checking your photo. One moment, please.",
     reviewDelayed:
       "The check is taking a little longer. We will show your photo once it has been checked.",
+    reviewApproved: "Your photo is on the media wall! Look for it on the big screen.",
     done: "All done",
     resetSoon: "This screen will reset in a moment",
     qrNote: "Scan it with your phone\nto download the photo",
@@ -652,6 +656,7 @@ const zh: KioskCopy = {
     onWall: "稍后请在大屏幕上找找你的照片。",
     reviewChecking: "正在确认照片，请稍等。",
     reviewDelayed: "照片确认需要多一点时间。确认无误后会显示在屏幕上。",
+    reviewApproved: "照片已经上墙了！请在大屏幕上找找看。",
     done: "已经领取了",
     resetSoon: "稍后会回到开头画面",
     qrNote: "用手机扫描后\n就能下载照片文件",

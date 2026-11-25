@@ -13,7 +13,9 @@ import {
  * The automatic check (D95), end to end in a real browser: staff switch it on, a "yes" is checked
  * and approved without a person, the wall shows it, and staff can still take it down. The booth
  * does not announce the check (D96); it tells every guest that staff can hide a photo. The provider is the built-in mock (it calls nobody).
- * Named zz- so it runs last; it puts the event back in manual mode whatever happens.
+ * Named zz- so it runs last; it puts the event back in manual mode whatever happens. AI review
+ * (auto) is the default since 2026-11-25; e2e/global-setup.ts checks that, then sets manual for
+ * the other specs, which expect a person to approve.
  */
 test.describe.configure({ mode: "serial" });
 // A booth session takes about 25 s; these tests run one or two each, plus the wall.
@@ -42,7 +44,7 @@ test.afterAll(async ({ browser }) => {
   await page.close();
 });
 
-test("manual mode (the default): a yes waits for a person, and the booth says staff can hide photos", async ({
+test("manual mode: a yes waits for a person, and the booth says staff can hide photos", async ({
   browser,
 }) => {
   const staff = await browser.newPage();
@@ -111,7 +113,16 @@ test("auto mode: staff switch it on, a yes reaches the wall without a person, st
   // First the honest "checking" line, then "on the wall" only once the server says so.
   await expect(line).toHaveAttribute("data-review", /checking|approved/);
   await expect(line).toHaveAttribute("data-review", "approved", { timeout: 20_000 });
-  await expect(line).toHaveText("잠시 뒤 큰 화면에서 내 사진을 찾아보세요.");
+  await expect(line).toHaveText("미디어월에 올라갔어요! 큰 화면에서 찾아보세요.");
+  // The wall status (Figma 969:1690) is a polite live region, on screen, and adds no scrolling.
+  await expect(line).toHaveAttribute("role", "status");
+  const box = (await line.boundingBox())!;
+  const viewport = booth.viewportSize()!;
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(
+    await booth.locator(".kiosk-scroll").evaluate((el) => el.scrollHeight - el.clientHeight),
+  ).toBeLessThanOrEqual(1);
   console.log(`consent → booth shows "approved": ${Date.now() - answered} ms (mock provider)`);
   expect((await photoForToken(tokenFromUrl(url)))?.moderationStatus).toBe("APPROVED");
   // The guest's own link works as always.

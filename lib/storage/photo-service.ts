@@ -941,11 +941,11 @@ export class PhotoService {
   ): Promise<PurgeResult> {
     const nowIso = this.now().toISOString();
     const result: PurgeResult = { examined: rows.length, deleted: 0, failed: 0, deletedIds: [] };
-    for (const row of rows) {
-      const marked = await this.backend.photos
+    const tombstone = (photo: PhotoRow) =>
+      this.backend.photos
         .transition({
-          photoId: row.id,
-          from: row.moderationStatus,
+          photoId: photo.id,
+          from: photo.moderationStatus,
           to: "DELETED",
           deletedAt: nowIso,
           actor,
@@ -953,6 +953,21 @@ export class PhotoService {
           note,
         })
         .catch(() => null);
+    for (const row of rows) {
+      let marked = await tombstone(row);
+      // The row may have moved since it was listed (the AI review approved it, or staff acted:
+      // compare-and-set refuses the stale state). Read it once more and delete what it is now, so
+      // event close and retention never leave a photo, or its cloud link, behind for that.
+      if (!marked) {
+        const fresh = await this.backend.photos.getById(row.id).catch(() => null);
+        if (
+          fresh &&
+          !fresh.deletedAt &&
+          fresh.moderationStatus !== "DELETED" &&
+          fresh.moderationStatus !== row.moderationStatus
+        )
+          marked = await tombstone(fresh);
+      }
       if (!marked) {
         result.failed++;
         continue;

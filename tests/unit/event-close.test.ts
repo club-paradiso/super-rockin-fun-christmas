@@ -138,6 +138,39 @@ describe("event close", () => {
     expect((await again.json()).deleted).toBe(0);
   });
 
+  it("a photo approved between listing and deleting is still deleted (AI review on by default)", async () => {
+    const { getBackend, getPhotoService } = await import("@/lib/storage/server");
+    const backend = getBackend();
+    const svc = getPhotoService();
+    const put = await svc.put({
+      sessionId: uuid(),
+      kioskId: null,
+      frameId: "starlight-strip",
+      mime: "image/jpeg",
+      data: JPEG,
+    });
+    await svc.setWallConsent(put.token, true, null);
+    expect((await backend.photos.getById(put.photo.id))?.moderationStatus).toBe("PENDING");
+    // The race: the photo is listed as PENDING, then approved before its delete runs.
+    const list = backend.photos.list.bind(backend.photos);
+    const spy = vi.spyOn(backend.photos, "list").mockImplementationOnce(async (q) => {
+      const rows = await list(q);
+      await svc.moderate(put.photo.id, "approve", staffId);
+      return rows;
+    });
+    const result = await closeEvent({
+      service: svc,
+      backend,
+      sync: null,
+      staffUserId: staffId,
+      now: new Date(Date.now() + 1000),
+    });
+    spy.mockRestore();
+    expect(result).toMatchObject({ deleted: 1, failed: 0, incomplete: false });
+    const row = await backend.photos.getById(put.photo.id);
+    expect(row?.moderationStatus).toBe("DELETED");
+  });
+
   it("queues the cloud delete for photos that have a cloud copy", async () => {
     const { getBackend, getPhotoService } = await import("@/lib/storage/server");
     const backend = getBackend();

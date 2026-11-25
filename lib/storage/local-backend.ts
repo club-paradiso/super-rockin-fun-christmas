@@ -103,8 +103,8 @@ class FileDb {
         // Files written before D85/D86: the default background, and a wall that is not public.
         wallPublic: db.settings.wallPublic ?? false,
         wallLook: db.settings.wallLook ?? defaultWallLook(),
-        // Files written before D95: a person approves every photo.
-        moderationMode: db.settings.moderationMode ?? "manual",
+        // Files written before D95: the default since 2026-11-25 (auto). A stored answer stays.
+        moderationMode: db.settings.moderationMode ?? "auto",
         // Files written before looks: on, the default since 2026-11-25. A stored answer stays.
         photoLooks: db.settings.photoLooks ?? true,
       };
