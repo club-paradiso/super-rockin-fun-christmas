@@ -144,7 +144,11 @@ jobs:
   e2e-supabase:
     name: Playwright E2E (local Supabase)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # One unsharded run of the whole suite. With the colour looks on by default (2026-11-25) every
+    # booth session grades its shots, and the run reached 44 min on main (PR #85 merge) and was cut
+    # at 45 min on PR #88 with every test so far passing. This is the job's wall clock, not a test
+    # limit: per-test timeouts are unchanged.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
