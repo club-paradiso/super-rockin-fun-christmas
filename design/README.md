@@ -23,6 +23,11 @@ Figma와 다른 점: 미리보기 색은 Figma 이미지 조정으로 흉내 낸
 화면은 아래 "처음으로" 줄 때문에 사진 여섯 장이 Figma보다 작다. 가로 화면(색감 2 × 2)은 Figma에 없다.
 머리줄의 "4 / 7"은 공통 Header 컴포넌트 값이고 코드는 점 6개다.
 
+**미디어월 상태 줄 (2026-11-25):** AI 검수가 기본으로 켜지면서 QR 화면에 상태 줄을 더했다. Figma
+`ZbeBrS0o5012SNFrGZNyIU` 의 `8 · QR 받기` 구역에 컴포넌트 `Kiosk/Wall status`(969:1690, 확인 중·올라감·지연)와
+화면 `8a-1`~`8a-3`. 코드: `WallStatusIcon` + `.wall-status`(`components/kiosk/kiosk-app.tsx`, `app/globals.css`),
+문구는 `lib/kiosk/copy.ts` 의 `delivery.reviewChecking`·`reviewApproved`·`reviewDelayed`. AI라는 말은 쓰지 않는다(D96).
+
 편집 가능한 원본은 Figma 파일 하나다. 2026-11-11부터 브랜드는 **STUDIO SHALOM** 이다(D73).
 
 - 파일: https://www.figma.com/design/S5hz7sZaXXB2kNc9YrB3cB (file key `S5hz7sZaXXB2kNc9YrB3cB`)
