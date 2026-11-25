@@ -1496,6 +1496,12 @@ body {
   /* Both rows on (colour looks and 피부 보정): no Figma screen has both. The three answers share
      one line with their label and drop the note, and the prints may shrink further, so the main
      button stays on screen at 768 × 1024 (without this it was 138 px below, measured). */
+  /* With the colour row (on by default since 2026-11-25) the prints give it a little room, so
+     the main button stays on screen without scrolling: at 768 × 1024 the screen was 22 px too
+     tall, at 820 × 1060 39 px (measured). */
+  .select.has-looks .fit-stage {
+    --fit-min: clamp(160px, 23 * var(--bh), 320px);
+  }
   .select.has-looks.select-has-retouch .fit-stage {
     --fit-min: clamp(140px, 15 * var(--bh), 300px);
   }
@@ -1982,19 +1988,22 @@ body {
        column, level with them. The side column is already full with the looks: a fourth row
        across both columns put the main button off a 1024 × 768 screen (measured). */
     .select.has-looks.select-has-retouch {
-      grid-template-rows: auto auto minmax(0, 1fr) auto;
-      grid-template-areas: "stage head" "stage looks" "stage actions" "retouch actions";
+      grid-template-rows: minmax(0, 1fr) auto auto;
+      grid-template-areas: "stage head" "looks actions" "retouch actions";
     }
-    /* Beside the prints the colour row sits between the title and the button, two looks a row. */
+    /* The colour row goes under the prints, four looks across the wide column, and the side
+       column keeps the title and the main button. Beside the prints (two looks a row) the side
+       column was 197 px taller than a 1024 × 768 screen and 224 px at 1180 × 820 (measured
+       2026-11-25), once the looks became the default. */
     .select.has-looks {
-      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
-      grid-template-areas: "stage head" "stage looks" "stage actions";
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas: "stage head" "looks actions";
+    }
+    .select.has-looks .select-actions {
+      align-self: end;
     }
     .look-row {
       grid-area: looks;
-    }
-    .look-chips {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .review-actions > * {
       flex-basis: 100%;

@@ -332,7 +332,9 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
     }) => {
       await page.setViewportSize({ width, height });
       await enrollKiosk(page);
-      await page.goto("/kiosk?camera=mock&retouch=natural");
+      // This Figma screen has the retouch row alone. Colour looks are on by default since
+      // 2026-11-25; the two rows together are the test further down ("with the colour looks on").
+      await page.goto("/kiosk?camera=mock&looks=0&retouch=natural");
       await startSession(page);
       await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
