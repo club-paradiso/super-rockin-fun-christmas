@@ -1923,3 +1923,25 @@ the uniform one is chosen; and "the logo keeps changing too: the basic form and 
 - **Not done.** Time-based alternation inside one background (the logo swapping while the
   picture stays) was not built: each place was chosen for one form, and the other form would not
   fit most of them.
+
+## D118 · The one-line logo takes on the surface it is on (2026-11-25)
+
+User: make the one-line THE WALL OF PEACEMAKERS logo sit in its backgrounds as well as it can.
+
+- **Each surface gets its own treatment, not one ink.** `theme.wordmark.tone` gains `carved`, and
+  `theme.wordmark.color` lets a picture set the colour from the surface around the logo (sampled
+  from the picture, same hue, much darker or lighter):
+  - **Sunset window (wood sill): `carved`, #3a1e0e.** A dark groove multiplied into the grain,
+    with the same form 2 px lower screened in warm light, so the lower edge of every letter
+    catches the sun like a cut in wood.
+  - **Pastel coast (plaster): `ink`, #4b2f1b.** Paint in the plaster's own brown, multiplied, so
+    the grain and the light show through.
+  - **Bethlehem (night sky): `cream`, #f6dac1, the star's own colour,** with a soft halo: the
+    form blurred (`public/wall/logo-*-halo.png`, padded by `WALL_LOGO_HALO_PAD` of the height on
+    each side) screened in behind the letters, like the star's light.
+  - **Paper tags (festive lights, winter sea).** The tag CSS was defined twice and the older copy
+    won, so the paper grain and the twine through punched holes never showed; the stale copy is
+    gone. The tag is taller (`labelPad` 0.6 × 0.55 of the logo height) so the holes sit clear of
+    the letters, and the festive-lights tag hangs a little lower so the poinsettia above it shows.
+- Checked on every picture in Chromium with the real CSS (blend modes, masks), then by the wall
+  E2E. Not checked on the LED itself.

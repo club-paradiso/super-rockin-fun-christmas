@@ -302,44 +302,7 @@ body {
   right: 12%;
 }
 .wall-logo-mark {
-  mix-blend-mode: multiply;
-  opacity: 0.9;
-}
-.wall-logo[data-tone="cream"] {
-  color: #f3e3c4;
-}
-.wall-logo[data-tone="cream"] .wall-logo-mark {
-  mix-blend-mode: screen;
-  opacity: 0.92;
-}
-.wall-logo[data-tone="label"] {
-  color: #2b1a10;
-  background: #efe2c8;
-  border-radius: 3px;
-  transform: rotate(-1.2deg);
-  transform-origin: 50% 0;
-  box-shadow:
-    inset 0 0 0 1px rgb(120 90 55 / 0.18),
-    6px 9px 18px var(--wall-photo-shadow);
-}
-/* The two strings the tag hangs from, up into the garland. */
-.wall-logo[data-tone="label"]::before,
-.wall-logo[data-tone="label"]::after {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  width: 3px;
-  height: 40px;
-  background: #8a6a44;
-  border-radius: 2px;
-}
-.wall-logo[data-tone="label"]::before {
-  left: 14%;
-}
-.wall-logo[data-tone="label"]::after {
-  right: 14%;
-}
-.wall-logo-mark {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -356,6 +319,34 @@ body {
 .wall-logo[data-form="line"] .wall-logo-mark {
   -webkit-mask-image: url("/wall/logo-line.svg");
   mask-image: url("/wall/logo-line.svg");
+}
+/* Cut into wood (D118): a dark groove multiplied into the grain, its lower edge lit by the sun
+   (the same form a hair lower, screened in a warm light) so the letters sit in the wood. */
+.wall-logo[data-tone="carved"] {
+  color: #3a1a0a;
+}
+.wall-logo[data-tone="carved"] .wall-logo-mark {
+  mix-blend-mode: multiply;
+  opacity: 0.85;
+}
+.wall-logo[data-tone="carved"] .wall-logo-mark--lit {
+  position: absolute;
+  inset: 0;
+  color: #ffd9a6;
+  transform: translateY(2px);
+  mix-blend-mode: screen;
+  opacity: 0.4;
+}
+/* Starlight (D118): the cream letters with the form's blurred halo screened in behind them. */
+.wall-logo-halo {
+  position: absolute;
+  background-color: currentColor;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0.35;
 }
 /* The "empty wall" line: a paper note, readable on every theme. */
 .wall-note {

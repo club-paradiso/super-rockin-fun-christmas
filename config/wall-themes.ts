@@ -188,7 +188,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     wideMax: 400,
     // The logo (one-line form) is under the star of Bethlehem (measured at x 2575, y 50), like
     // starlight: the basic form is too tall for the sky between the star and the photos.
-    wordmark: { x: 2575, y: 160, size: 42, tone: "cream", form: "line" },
+    wordmark: { x: 2575, y: 160, size: 42, tone: "cream", form: "line", color: "#f6dac1" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -219,7 +219,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
     wideMax: 400,
     // The logo (one-line form) is burned into the front of the wooden window sill, under the photos.
-    wordmark: { x: 1920, y: 914, size: 44, tone: "ink", form: "line" },
+    wordmark: { x: 1920, y: 914, size: 44, tone: "carved", form: "line", color: "#3a1e0e" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -250,7 +250,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
     wideMax: 400,
     // The logo (one-line form) is painted on the plaster under the window.
-    wordmark: { x: 1920, y: 910, size: 44, tone: "ink", form: "line" },
+    wordmark: { x: 1920, y: 910, size: 44, tone: "ink", form: "line", color: "#4b2f1b" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -282,7 +282,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     wideMax: 400,
     // The logo (one-line form) is a long paper tag hung from the garland under its right-hand
     // poinsettia.
-    wordmark: { x: 2940, y: 92, size: 40, tone: "label", form: "line" },
+    wordmark: { x: 2940, y: 128, size: 40, tone: "label", form: "line" },
     emptyTextY: 640,
     motion: "none",
   },

@@ -4,7 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
 import { ropePath, type SceneLayout } from "@/lib/wall/layout";
 import type { Rect } from "@/lib/wall/layout";
-import { WALL_LIGHT, WALL_LOGO, clipImage, fitTheme, type WallTheme } from "@/lib/wall/themes";
+import {
+  WALL_LIGHT,
+  WALL_LOGO,
+  WALL_LOGO_HALO_PAD,
+  clipImage,
+  fitTheme,
+  type WallTheme,
+} from "@/lib/wall/themes";
 
 /**
  * One wall theme (D85): its bundled background picture, the twine if the picture has none, the
@@ -136,6 +143,7 @@ export function WallScene({
           data-tone={theme.wordmark.tone}
           data-form={theme.wordmark.form}
           style={{
+            color: theme.wordmark.color,
             left: mark.x,
             top: mark.y,
             width: mark.width,
@@ -146,6 +154,22 @@ export function WallScene({
                 : 0,
           }}
         >
+          {theme.wordmark.tone === "cream" && (
+            // Starlight: the form blurred, screened in behind the letters.
+            <span
+              className="wall-logo-halo"
+              aria-hidden
+              style={{
+                inset: -theme.wordmark.size * WALL_LOGO_HALO_PAD,
+                WebkitMaskImage: `url(${WALL_LOGO[theme.wordmark.form].halo})`,
+                maskImage: `url(${WALL_LOGO[theme.wordmark.form].halo})`,
+              }}
+            />
+          )}
+          {theme.wordmark.tone === "carved" && (
+            // Cut into wood: the groove's lower edge catches the light.
+            <span className="wall-logo-mark wall-logo-mark--lit" aria-hidden />
+          )}
           <span className="wall-logo-mark" aria-hidden />
         </div>
       )}

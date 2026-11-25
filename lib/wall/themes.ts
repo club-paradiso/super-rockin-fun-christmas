@@ -34,9 +34,24 @@ export const wallPhotoShadow = (kind: "filter" | "box") => {
  * capitals (PEACEMAKERS; the whole line) as a share of it, which is what decides legibility.
  */
 export const WALL_LOGO = {
-  stack: { src: "/wall/logo-stack.svg", aspect: 953.18 / 292.46, letters: 85.7 / 292.46 },
-  line: { src: "/wall/logo-line.svg", aspect: 1168.82 / 42.62, letters: 1 },
+  stack: {
+    src: "/wall/logo-stack.svg",
+    halo: "/wall/logo-stack-halo.png",
+    aspect: 953.18 / 292.46,
+    letters: 85.7 / 292.46,
+  },
+  line: {
+    src: "/wall/logo-line.svg",
+    halo: "/wall/logo-line-halo.png",
+    aspect: 1168.82 / 42.62,
+    letters: 1,
+  },
 } as const;
+/**
+ * The starlight halo behind a `cream` logo is the form blurred, with this share of the logo's
+ * height added on every side (scripts: the PNGs are made from the SVGs at that padding).
+ */
+export const WALL_LOGO_HALO_PAD = 0.6;
 export type WallLogoForm = keyof typeof WALL_LOGO;
 
 export interface WallTheme {
@@ -92,15 +107,19 @@ export interface WallTheme {
    * so the logo changes with the background (a user decision, 2026-11-25).
    * `x` is its centre, `y` its top, `size` its height (its width is the form's aspect × size).
    * It moves with the picture, never with the screen, and must stay clear of every photo and clip.
-   * `ink` / `cream` = the logo colour on a calm part of the picture; `label` = ink on a paper tag
-   * hung from a garland. Null = no logo.
+   * `ink` = paint on a calm wall or pale sky (multiplied into it); `cream` = starlight on a night
+   * sky (screened in, with a soft halo); `carved` = cut into wood (a dark groove with a lit lower
+   * edge); `label` = ink on a paper tag hung from a garland. `color` overrides the tone's colour
+   * with one taken from the picture around the logo, so it reads as part of that surface. Null =
+   * no logo.
    */
   wordmark: {
     x: number;
     y: number;
     size: number;
-    tone: "ink" | "cream" | "label";
+    tone: "ink" | "cream" | "carved" | "label";
     form: WallLogoForm;
+    color?: string;
   } | null;
   /** Baseline of the "empty wall" line of text. */
   emptyTextY: number;

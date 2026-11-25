@@ -27,9 +27,10 @@ export const WALL_FIT = {
   stickiness: 1.08,
   /**
    * The paper tag's padding around the logo for a `label` theme, as a share of the logo's height
-   * (its width per unit of height is the form's, `WALL_LOGO`).
+   * (its width per unit of height is the form's, `WALL_LOGO`). Tall enough that the two punched
+   * string holes at the top sit clear of the letters (D118).
    */
-  logo: { labelPad: { x: 0.5, y: 0.3 } },
+  logo: { labelPad: { x: 0.6, y: 0.55 } },
   /**
    * Bands cost: score × coverage^bandWeight (coverage = share of the screen the picture covers).
    */
