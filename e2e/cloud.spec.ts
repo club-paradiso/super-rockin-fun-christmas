@@ -310,6 +310,10 @@ test("staff delete on the hub kills the cloud link too", async () => {
 // Phase 5, RUNBOOK 8: the hub's EVENT_END_AT is an hour ago (e2e/env.ts), so staff may close the
 // event. Every photo on the hub goes, and every cloud link with it.
 test("행사 종료 처리: typed phrase + confirm deletes every photo and every cloud link", async () => {
+  // Two whole booth sessions (about 22 s each with the colour looks on by default), the close,
+  // then the cloud deletes, which the sync worker sends on its next 15 s round: more than the
+  // 60 s default. CI timed out here at 60 s with the deletes still on their way (PR #85).
+  test.setTimeout(120_000);
   const first = await kioskPhotoToQr(kiosk);
   const second = await kioskPhotoToQr(kiosk);
   for (const p of [first, second])
