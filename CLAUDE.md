@@ -49,17 +49,19 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
 - **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
   `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
   slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
-- **Looks are candidates behind a flag, off by default** (2026-11-23, `lib/looks`,
+- **Looks are on by default, behind a staff switch** (2026-11-23, `lib/looks`; on by default since
+  2026-11-25, a user decision: the guest must be able to choose a colour,
   `docs/research/`): eight looks, each the house stock (`HOUSE` in `config/looks/index.ts`) plus
   differences, baked to `public/looks/<id>.cube` by `npm run looks:build` (never hand-edit a
   `.cube`; `tests/unit/looks-cube.test.ts` fails while file and numbers disagree). One WebGL1 shader
   (`lib/looks/shader.ts`) applies halation (small lights only), the LUT, strength, grain and corner falloff; the frame previews
   and the final composite pass the same `grade` to `composeFrame`, so their colours cannot differ.
   Which frame gets which look is `config/looks/frame-looks.json`, never code. With looks off the booth fetches no LUT, creates no WebGL
-  context and composes as before; that is what the Figma parity tests measure, so do not turn them
-  on by default without new Figma examples. What turns them on (`looksActive`): the address
+  context and composes as before; that is what the Figma parity tests measure, so they load the
+  booth with `?looks=0` (Figma has no look). What turns them on (`looksActive`): the address
   (`?looks=1` / `?looks=0`, which wins), else the build (`NEXT_PUBLIC_LOOKS=1`) or the staff switch
-  「사진 색 보정」 (`settings.photoLooks`, audited through `ftl_settings_set_looks`, default off). The
+  「사진 색 보정」 (`settings.photoLooks`, audited through `ftl_settings_set_looks`, default **on**;
+  migration `20261125090000` turns an existing database on only if staff never set it). The
   switch reaches a booth with its heartbeat and is taken up only on "화면을 눌러 시작"
   (`sessionLooks`): never under a guest. **The guest may change the look on the photo choice screen, and nowhere
   else** (a user decision, 2026-11-24, Figma 956:1589 / 956:1715): a row of the eight looks, four at

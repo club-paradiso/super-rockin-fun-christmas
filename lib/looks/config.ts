@@ -68,7 +68,7 @@ export function looksOverride(search?: string): boolean | null {
 
 /**
  * Whether this booth applies looks: the address if it says, otherwise the build flag or the staff
- * switch (`settings.photoLooks`, 「사진 색 보정」 in /admin). The address wins over the switch so
+ * switch (`settings.photoLooks`, 「사진 색 보정」 in /admin, on by default since 2026-11-25). The address wins over the switch so
  * one tablet can be tried, or held back, without touching the others.
  */
 export function looksActive(search: string | undefined, staffSwitch: boolean): boolean {

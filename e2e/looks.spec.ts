@@ -370,7 +370,7 @@ test.describe("the booth with looks", () => {
     await expect(page.getByTestId("final-image")).toBeVisible();
   }
 
-  test("flag off (default): no LUT is fetched and no WebGL context is made", async ({ page }) => {
+  test("looks off (?looks=0): no LUT is fetched and no WebGL context is made", async ({ page }) => {
     await enrollKiosk(page);
     const cubes: string[] = [];
     page.on("request", (request) => {
@@ -385,7 +385,7 @@ test.describe("the booth with looks", () => {
         return original.apply(this, arguments as never);
       } as typeof original;
     });
-    await sessionToConsent(page, "/kiosk?camera=mock", "film4");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film4");
     expect(cubes).toEqual([]);
     expect(
       await page.evaluate(() => (window as unknown as { __webglAsked: number }).__webglAsked),
@@ -402,7 +402,7 @@ test.describe("the booth with looks", () => {
       if (message.type() === "error" && message.text().includes("[looks]"))
         errors.push(message.text());
     });
-    await sessionToConsent(page, "/kiosk?camera=mock", "film4");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film4");
     const plain = await firstPhotoColour(page);
 
     const cubes: string[] = [];
@@ -427,13 +427,14 @@ test.describe("the booth with looks", () => {
     expect(Buffer.from(await copy.body()).equals(Buffer.from(preview))).toBe(true);
   });
 
-  test("the staff switch arrives mid-session: this guest keeps what they started with, the next gets the look", async ({
+  test("the staff switch arrives mid-session: this guest keeps what they started with, the next goes without", async ({
     page,
   }) => {
     test.setTimeout(150_000);
     await enrollKiosk(page);
     // The switch as the booth hears it with its heartbeat, turned here without a staff page.
-    let heard = false;
+    // On is the default (2026-11-25); staff turn it off while a guest is shooting.
+    let heard = true;
     await page.route("**/api/kiosk/heartbeat", async (route) => {
       const response = await route.fetch();
       const body = (await response.json()) as Record<string, unknown>;
@@ -442,26 +443,30 @@ test.describe("the booth with looks", () => {
     await page.clock.install();
     await page.goto("/kiosk?camera=mock");
     await startSession(page, "film35", { color: "mono" });
-    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+    await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-look-view", "mono");
 
-    heard = true;
+    heard = false;
     const beat = page.waitForResponse("**/api/kiosk/heartbeat");
     await page.clock.fastForward(46_000);
     await beat;
     // Heard, and not applied: nothing changes under a guest.
     await page.waitForTimeout(500);
-    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
+    await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-look-view", "mono");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await expect(page.getByTestId("review-shot-0").locator("img")).toHaveAttribute("src", /^blob:/);
+    await expect(page.getByTestId("review-shot-0").locator("img")).toHaveAttribute(
+      "src",
+      /^data:image\/jpeg/,
+    );
     await toSelect(page);
+    await expect(page.getByTestId("look-row")).toBeVisible();
     await selectDefaultPhotos(page);
     await answerForQr(page, "no");
     await page.getByRole("button", { name: "다 받았어요" }).click();
     await expect(page.getByTestId("screen-attract")).toBeVisible();
 
     await startSession(page, "film35", { color: "mono" });
-    await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-look-view", "mono");
+    await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
   });
 
   test("looks on, a colour frame: the camera view is left alone and the shots are graded", async ({
@@ -583,7 +588,7 @@ test.describe("the booth with looks", () => {
   test("looks off: the choice screen has no colour row", async ({ page }) => {
     test.setTimeout(120_000);
     await enrollKiosk(page);
-    await page.goto("/kiosk?camera=mock");
+    await page.goto("/kiosk?camera=mock&looks=0");
     await startSession(page, "film4");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });

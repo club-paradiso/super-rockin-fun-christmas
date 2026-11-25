@@ -124,8 +124,8 @@ export function EmergencyPanel({
         <span className="min-w-0 flex-1">
           <span className="block text-base font-semibold">사진 색 보정</span>
           <span className="admin-help mt-0.5 block">
-            부스 사진에 틀마다 정해 둔 색감을 입혀요. 끄면 예전 그대로 나가요. 다음 손님부터
-            바뀌어요.
+            손님이 사진 고르는 화면에서 색감을 골라요(기본: 틀마다 정해 둔 색감). 끄면 색감 고르기가
+            사라지고 예전 그대로 나가요. 다음 손님부터 바뀌어요.
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-center gap-1">

@@ -76,15 +76,16 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", 
   await expect(page.getByTestId("review-shot-5").locator("img")).toBeVisible();
   // v2: six shots only, no extra.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
+  // Colour looks are on by default (2026-11-25): the review shows each 960 × 720 shot as a
+  // graded 480 × 360 copy in the frame's look (sepia → walnut), drawn on this WebKit's WebGL.
+  const reviewShot = page.getByTestId("review-shot-5").locator("img");
+  await expect(reviewShot).toHaveAttribute("src", /^data:image\/jpeg/);
   expect(
-    await page
-      .getByTestId("review-shot-5")
-      .locator("img")
-      .evaluate(async (img: HTMLImageElement) => {
-        await img.decode();
-        return [img.naturalWidth, img.naturalHeight];
-      }),
-  ).toEqual([960, 720]);
+    await reviewShot.evaluate(async (img: HTMLImageElement) => {
+      await img.decode();
+      return [img.naturalWidth, img.naturalHeight];
+    }),
+  ).toEqual([480, 360]);
 
   // Keep the strip private and queued while the network is unavailable. Once the route is
   // reachable, retry uses the same session ID and only the server response can create a QR.
