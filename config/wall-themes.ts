@@ -54,7 +54,6 @@ const TAPE: WallClip = {
   lineY: 34,
   tilts: [-4, 3, -2, 5, -3],
 };
-const TWINE = "#B48F5E";
 const FIGMA = "Figma SS 03";
 
 const BASE_THEMES: readonly WallTheme[] = [
@@ -216,7 +215,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
+    rope: { x1: 748, x2: 3392, width: 11 },
     wideMax: 400,
     // The logo (one-line form) is burned into the front of the wooden window sill, under the photos.
     wordmark: { x: 1920, y: 914, size: 44, tone: "carved", form: "line", color: "#3a1e0e" },
@@ -247,7 +246,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
+    rope: { x1: 606, x2: 3424, width: 11 },
     wideMax: 400,
     // The logo (one-line form) is painted on the plaster under the window.
     wordmark: { x: 1920, y: 910, size: 44, tone: "ink", form: "line", color: "#4b2f1b" },
@@ -310,7 +309,7 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 528, x2: 3172, color: TWINE, width: 6 },
+    rope: { x1: 528, x2: 3172, width: 11 },
     wideMax: 400,
     // The logo (one-line form) is a long paper tag hung from the garland near the left end of the
     // window.

@@ -348,6 +348,11 @@ body {
   mix-blend-mode: screen;
   opacity: 0.35;
 }
+/* The rope photographs were lit for daylight (D119); on a dusk or night picture they take less
+   of that light, so the rope sits in the scene instead of glowing on it. */
+.wall-scene[data-tone="dark"] .wall-rope {
+  filter: brightness(0.78) saturate(1.05);
+}
 /* The "empty wall" line: a paper note, readable on every theme. */
 .wall-note {
   left: 50%;

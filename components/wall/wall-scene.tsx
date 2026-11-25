@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getWallTheme } from "@/config/wall-themes";
-import { ropePath, type SceneLayout } from "@/lib/wall/layout";
+import { WALL_ROPE, ropePieces, type SceneLayout } from "@/lib/wall/layout";
 import type { Rect } from "@/lib/wall/layout";
 import {
   WALL_LIGHT,
@@ -67,6 +67,9 @@ export function WallScene({
   const underTheme = under ? fitTheme(getWallTheme(under), aspect) : null;
   const picture = (t: WallTheme) => (hiDpi && t.background2x) || t.background;
   const edge = featherMask(feather);
+  const rope = theme.rope
+    ? ropePieces(theme.scene.line, theme.rope.x1, theme.rope.x2, theme.rope.width)
+    : null;
 
   return (
     <div
@@ -107,31 +110,56 @@ export function WallScene({
         data-testid="wall-background"
         data-feather={feather ? `${feather.x ? "x" : ""}${feather.y ? "y" : ""}` : ""}
       />
-      {theme.rope && (
+      {rope && (
         <svg
-          className="absolute inset-0"
+          className="wall-rope absolute inset-0"
           width={layout.width}
           height={layout.height}
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           aria-hidden
           data-testid="wall-rope"
         >
-          <path
-            d={ropePath(theme.scene.line, theme.rope.x1, theme.rope.x2)}
-            fill="none"
-            stroke="rgba(43,26,16,0.28)"
-            strokeWidth={theme.rope.width}
-            strokeLinecap="round"
-            // The twine's shadow on the backdrop falls with the one light (top left).
-            transform={`translate(${WALL_LIGHT.rope.x} ${WALL_LIGHT.rope.y})`}
-          />
-          <path
-            d={ropePath(theme.scene.line, theme.rope.x1, theme.rope.x2)}
-            fill="none"
-            stroke={theme.rope.color}
-            strokeWidth={theme.rope.width}
-            strokeLinecap="round"
-          />
+          <defs>
+            {/* The rope's shadow on the backdrop falls with the one light (top left). */}
+            <filter id="wall-rope-shadow" x="-2%" y="-50%" width="104%" height="200%">
+              <feDropShadow
+                dx={WALL_LIGHT.rope.x}
+                dy={WALL_LIGHT.rope.y}
+                stdDeviation={2.5}
+                floodColor="rgb(43 26 16)"
+                floodOpacity={0.38}
+              />
+            </filter>
+          </defs>
+          <g filter="url(#wall-rope-shadow)">
+            {rope.tiles.map((t, i) => (
+              <g key={i} transform={`translate(${t.x} ${t.y}) rotate(${t.angle})`}>
+                <image
+                  href={WALL_ROPE.tile.src}
+                  x={t.dx}
+                  y={t.dy}
+                  width={t.w}
+                  height={t.h}
+                  preserveAspectRatio="xMinYMid slice"
+                />
+              </g>
+            ))}
+            {(["left", "right"] as const).map((side) => {
+              const e = rope[side];
+              return (
+                <g key={side} transform={`translate(${e.x} ${e.y}) rotate(${e.angle})`}>
+                  <image
+                    href={WALL_ROPE[side].src}
+                    x={e.dx}
+                    y={e.dy}
+                    width={e.w}
+                    height={e.h}
+                    data-testid={`wall-rope-${side}`}
+                  />
+                </g>
+              );
+            })}
+          </g>
         </svg>
       )}
       {theme.wordmark && mark && (

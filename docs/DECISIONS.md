@@ -1945,3 +1945,24 @@ User: make the one-line THE WALL OF PEACEMAKERS logo sit in its backgrounds as w
     the letters, and the festive-lights tag hangs a little lower so the poinsettia above it shows.
 - Checked on every picture in Chromium with the real CSS (blend modes, masks), then by the wall
   E2E. Not checked on the LED itself.
+
+## D119 · The drawn rope is a photographed rope, knotted round a nail at each end (2026-11-25)
+
+User: the line the app draws on pictures that have none should look real; they made the rope in
+GPT Image from our prompts (a straight jute rope, and its left and right ends knotted round a
+brass nail) and asked for it in code.
+
+- **Assets** (`public/wall/rope/`, cut from the three transparent PNGs): `rope-tile.png`, eight
+  twists of the straight rope (one twist measured at 123.6 px by autocorrelation) with its start
+  cross-faded into what follows its end, so tiles join without a seam; `rope-end-left.png` and
+  `rope-end-right.png`, the knots with a short run of straight rope that fades out. All three are
+  scaled so the rope's body is 48 px thick (`WALL_ROPE` in `lib/wall/layout.ts` holds sizes, the
+  nail anchors and the joins).
+- **Layout** (`ropePieces`): an end's knot sits on the line at `rope.x1` and `rope.x2`, the nail
+  just above it; between them tiles run end to end, each turned to the curve's slope where it
+  starts, and the last is cut short under the right end's faded rope. The sag is gentle (under
+  0.5° between neighbours), so the twist runs on unbroken.
+- **Drawing**: SVG images in the existing rope layer; one drop shadow down and right with the one
+  light (`WALL_LIGHT.rope`). On a dark-tone picture the rope is dimmed (`.wall-rope`), since the
+  photographs were lit for daylight. `rope.width` is now the rope's body thickness, 11 px (the flat
+  6 px twine and its colour are gone).

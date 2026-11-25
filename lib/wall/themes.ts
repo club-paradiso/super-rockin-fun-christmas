@@ -91,8 +91,11 @@ export interface WallTheme {
    * over them (the logo, D112).
    */
   hang: WallClip | { kind: "in-picture"; reach: number };
-  /** A twine line drawn by the app along `scene.line`, for pictures that have no line. */
-  rope: { x1: number; x2: number; color: string; width: number } | null;
+  /**
+   * A rope the app lays along `scene.line` for pictures that have no line (D119): the rope
+   * photographs (`WALL_ROPE`) from the nail at `x1` to the nail at `x2`, `width` px thick.
+   */
+  rope: { x1: number; x2: number; width: number } | null;
   /**
    * Widest box for a photo that is not a 1:3 strip (2×2, landscape frames). Never wider than the
    * slot spacing minus a gap, so neighbours cannot touch.

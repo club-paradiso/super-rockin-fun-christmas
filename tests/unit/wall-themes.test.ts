@@ -15,6 +15,8 @@ import {
   lineYAt,
   phoneCardBox,
   ropePath,
+  ropePieces,
+  WALL_ROPE,
   wallLayout,
   type Rect,
 } from "@/lib/wall/layout";
@@ -192,6 +194,45 @@ describe.each(LOOKS)("wall theme %s", (_id, theme, isCut) => {
       for (const place of layout.slots) expect(place.y - hang.lineY).toBeGreaterThan(0);
     }
   });
+});
+
+describe("the rope photographs (D119)", () => {
+  it("are on disk at the sizes the layout uses", async () => {
+    const { default: sharp } = await import("sharp");
+    for (const pic of [WALL_ROPE.tile, WALL_ROPE.left, WALL_ROPE.right]) {
+      const meta = await sharp(file(pic.src)).metadata();
+      expect([meta.width, meta.height, meta.hasAlpha], pic.src).toEqual([pic.w, pic.h, true]);
+    }
+  });
+
+  it.each(WALL_THEMES.filter((t) => t.rope).map((t) => [t.id, t] as const))(
+    "%s: knots on the line at both nails, tiles end to end between them",
+    (_id, theme) => {
+      const { x1, x2, width } = theme.rope!;
+      const line = theme.scene.line;
+      const { tiles, left, right } = ropePieces(line, x1, x2, width);
+      expect([left.x, left.y]).toEqual([x1, lineYAt(line, x1)]);
+      expect([right.x, right.y]).toEqual([x2, lineYAt(line, x2)]);
+      const k = width / WALL_ROPE.body;
+      expect(tiles.length).toBeGreaterThan(5);
+      // The first tile starts under the left knot's faded rope, the last ends under the right's.
+      expect(tiles[0]!.x).toBeLessThan(x1 + (WALL_ROPE.left.joinX - WALL_ROPE.left.anchorX) * k);
+      const last = tiles.at(-1)!;
+      const lastEnd = last.x + last.w * Math.cos((last.angle * Math.PI) / 180);
+      expect(lastEnd).toBeGreaterThan(x2 - (WALL_ROPE.right.anchorX - WALL_ROPE.right.joinX) * k);
+      expect(lastEnd).toBeLessThan(x2);
+      for (let i = 1; i < tiles.length; i++) {
+        const a = tiles[i - 1]!;
+        const b = tiles[i]!;
+        // Each tile is a whole twist run and starts where the one before it ends: no gap, no
+        // overlap, so the twist runs on unbroken; every tile's rope sits on the curve.
+        expect(a.w).toBeCloseTo(WALL_ROPE.tile.w * k, 6);
+        expect(b.x - a.x).toBeCloseTo(a.w * Math.cos((a.angle * Math.PI) / 180), 6);
+        expect(b.y).toBeCloseTo(lineYAt(line, b.x), 6);
+        expect(Math.abs(b.angle - a.angle)).toBeLessThan(0.5);
+      }
+    },
+  );
 });
 
 describe("the wall logo (D117)", () => {
