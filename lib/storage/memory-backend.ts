@@ -655,7 +655,9 @@ export class MemorySettingsRepository implements SettingsRepository {
     wallForce: "auto",
     wallPublic: false,
     wallLook: defaultWallLook(),
-    moderationMode: "manual",
+    // Auto (2026-11-25, a user decision): the AI approves what it finds clearly fine; everything
+    // else waits for a person. Without an AI provider configured nothing changes: all wait.
+    moderationMode: "auto",
     // On (2026-11-25, a user decision): the guest chooses a colour on the photo choice screen.
     photoLooks: true,
     updatedAt: now(),

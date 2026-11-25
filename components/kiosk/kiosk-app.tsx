@@ -2180,20 +2180,37 @@ function Screen(p: ScreenProps) {
                 <h1 className="booth-title">{t.delivery.title}</h1>
                 <p className="booth-lead">
                   {t.delivery.lead}
-                  {state.consent === "yes" && (
+                  {state.consent === "yes" && !p.reviewLine && (
                     <>
                       <br />
-                      {/* D95: "on the wall" only once the server says the photo is approved. */}
-                      <span data-testid="review-line" data-review={p.reviewLine ?? "usual"}>
-                        {p.reviewLine === "checking"
-                          ? t.delivery.reviewChecking
-                          : p.reviewLine === "delayed"
-                            ? t.delivery.reviewDelayed
-                            : t.delivery.onWall}
+                      {/* Without the automatic check: the user's line (D76), as before. */}
+                      <span data-testid="review-line" data-review="usual">
+                        {t.delivery.onWall}
                       </span>
                     </>
                   )}
                 </p>
+                {state.consent === "yes" && p.reviewLine && (
+                  // The wall status (AI review, on by default since 2026-11-25; Figma 969:1690):
+                  // "on the wall" only once the server says the photo is approved (D95). It never
+                  // names the AI (D96). Read out when it changes; it holds up nothing.
+                  <p
+                    className="wall-status"
+                    data-testid="review-line"
+                    data-review={p.reviewLine}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <WallStatusIcon line={p.reviewLine} />
+                    <span>
+                      {p.reviewLine === "approved"
+                        ? t.delivery.reviewApproved
+                        : p.reviewLine === "delayed"
+                          ? t.delivery.reviewDelayed
+                          : t.delivery.reviewChecking}
+                    </span>
+                  </p>
+                )}
               </div>
               {/* The QR is a still, scan-safe journal bookmark; only its surrounding ticket moves. */}
               <div className="qr-card journal-qr-card" data-testid="qr-envelope">
@@ -2597,6 +2614,45 @@ function LookRow({
         })}
       </div>
     </div>
+  );
+}
+
+/** The icon of the wall status line: three dots while checking, a tick once up, a clock if slow. */
+function WallStatusIcon({ line }: { line: ReviewLine }) {
+  return (
+    <svg className="wall-status-icon" viewBox="0 0 28 28" aria-hidden="true">
+      {line === "approved" ? (
+        <>
+          <circle cx="14" cy="14" r="12" fill="currentColor" />
+          <path
+            d="M8.5 14.5l3.8 3.8 7.2-8"
+            fill="none"
+            stroke="var(--color-paper)"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      ) : line === "delayed" ? (
+        <>
+          <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" strokeWidth="2.4" />
+          <path
+            d="M14 8v6.5l4 2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      ) : (
+        <g className="wall-status-dots" fill="currentColor">
+          <circle cx="6" cy="14" r="3" />
+          <circle cx="14" cy="14" r="3" />
+          <circle cx="22" cy="14" r="3" />
+        </g>
+      )}
+    </svg>
   );
 }
 

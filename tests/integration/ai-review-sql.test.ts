@@ -55,7 +55,13 @@ describe.skipIf(!DB_URL)("AI review SQL (integration)", () => {
     expect(await scalar("select current_user as u")).toEqual({ u: "service_role" });
   });
 
-  it("applying it turns nothing on: the mode defaults to manual, every photo to NONE", async () => {
+  it("the mode defaults to auto (2026-11-25), every photo to NONE; the default migration re-runs", async () => {
+    const file = path.resolve(
+      import.meta.dirname,
+      "../../supabase/migrations/20261125120000_moderation_auto_default.sql",
+    );
+    await owner.query(await readFile(file, "utf8"));
+    await owner.query(await readFile(file, "utf8"));
     const col = async (table: string, column: string) =>
       (
         await scalar<{ d: string }>(
@@ -64,7 +70,7 @@ describe.skipIf(!DB_URL)("AI review SQL (integration)", () => {
           [table, column],
         )
       ).d;
-    expect(await col("event_settings", "moderation_mode")).toContain("manual");
+    expect(await col("event_settings", "moderation_mode")).toContain("auto");
     expect(await col("photos", "ai_status")).toContain("NONE");
   });
 

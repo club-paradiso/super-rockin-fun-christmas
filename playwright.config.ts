@@ -17,6 +17,8 @@ const chromiumPath = process.env.E2E_CHROMIUM_PATH;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Checks that a fresh event starts in AI review, then sets manual for the specs (see the file).
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   retries: 0,
   // One server-side store shared by all specs; keep row-count assertions deterministic.
