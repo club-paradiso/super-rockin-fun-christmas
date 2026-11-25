@@ -96,7 +96,8 @@ const results: Record<string, unknown>[] = [];
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
-  await page.goto("/kiosk?camera=mock");
+  // Figma has no colour look: the frames are measured with looks off (the address wins).
+  await page.goto("/kiosk?camera=mock&looks=0");
   await page.addScriptTag({ content: bundle });
 });
 

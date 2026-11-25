@@ -142,7 +142,7 @@ lasts the normal link lifetime, but never past the photo's retention date.
 
 While any switch is on, a red banner appears on every admin page.
 
-Under the three switches is **사진 색 보정** (`settings.photoLooks`, off by default; not an emergency
+Under the three switches is **사진 색 보정** (`settings.photoLooks`, on by default since 2026-11-25; not an emergency
 switch, so no banner). On: every booth applies each frame's look (`config/looks/frame-looks.json`)
 to the photos it saves, lets the guest change it on the photo choice screen (eight looks, four at a
 time), shows the six shots in that look on the review and choice screens, and

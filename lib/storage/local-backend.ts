@@ -105,8 +105,8 @@ class FileDb {
         wallLook: db.settings.wallLook ?? defaultWallLook(),
         // Files written before D95: a person approves every photo.
         moderationMode: db.settings.moderationMode ?? "manual",
-        // Files written before looks: off.
-        photoLooks: db.settings.photoLooks ?? false,
+        // Files written before looks: on, the default since 2026-11-25. A stored answer stays.
+        photoLooks: db.settings.photoLooks ?? true,
       };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);

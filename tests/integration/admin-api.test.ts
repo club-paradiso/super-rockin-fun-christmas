@@ -358,7 +358,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallSubmissions: "open",
         wallPublic: false,
         aiReview: false,
-        photoLooks: false,
+        photoLooks: true,
         // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
         serverNow: expect.any(String),
       });
@@ -571,7 +571,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallSubmissions: "paused",
         wallPublic: false,
         aiReview: false,
-        photoLooks: false,
+        photoLooks: true,
         // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
         serverNow: expect.any(String),
       });

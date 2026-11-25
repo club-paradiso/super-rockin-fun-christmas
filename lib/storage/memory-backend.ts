@@ -656,7 +656,8 @@ export class MemorySettingsRepository implements SettingsRepository {
     wallPublic: false,
     wallLook: defaultWallLook(),
     moderationMode: "manual",
-    photoLooks: false,
+    // On (2026-11-25, a user decision): the guest chooses a colour on the photo choice screen.
+    photoLooks: true,
     updatedAt: now(),
     updatedBy: null,
   };

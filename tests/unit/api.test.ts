@@ -344,7 +344,7 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
       wallSubmissions: "open",
       wallPublic: false,
       aiReview: false,
-      photoLooks: false,
+      photoLooks: true,
       // The booth dates photos by the server's clock, never the tablet's (v2 date stamp).
       serverNow: expect.any(String),
     });

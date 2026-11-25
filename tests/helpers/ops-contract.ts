@@ -435,19 +435,19 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect(JSON.parse(last!.fromState!)).toMatchObject({ pause_submissions: true });
     });
 
-    it("colour looks: off by default, switched by staff, audited", async () => {
+    it("colour looks: on by default, switched by staff, audited", async () => {
       const { backend, staffId } = await setup();
-      expect((await backend.settings.get()).photoLooks).toBe(false);
-      const on = await backend.settings.update({ photoLooks: true }, staffId);
-      expect(on).toMatchObject({ photoLooks: true, updatedBy: staffId });
+      expect((await backend.settings.get()).photoLooks).toBe(true);
+      const off = await backend.settings.update({ photoLooks: false }, staffId);
+      expect(off).toMatchObject({ photoLooks: false, updatedBy: staffId });
       const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
       expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
-      expect(JSON.parse(last!.fromState!)).toMatchObject({ photo_looks: false });
-      expect(JSON.parse(last!.toState!)).toMatchObject({ photo_looks: true });
+      expect(JSON.parse(last!.fromState!)).toMatchObject({ photo_looks: true });
+      expect(JSON.parse(last!.toState!)).toMatchObject({ photo_looks: false });
       // Another setting changed later leaves it as it is; both together work too.
-      expect((await backend.settings.update({ pauseWall: true }, staffId)).photoLooks).toBe(true);
-      const both = await backend.settings.update({ photoLooks: false, pauseWall: false }, staffId);
-      expect(both).toMatchObject({ photoLooks: false, pauseWall: false });
+      expect((await backend.settings.update({ pauseWall: true }, staffId)).photoLooks).toBe(false);
+      const both = await backend.settings.update({ photoLooks: true, pauseWall: false }, staffId);
+      expect(both).toMatchObject({ photoLooks: true, pauseWall: false });
     });
 
     it("wall opening hours and the staff override: stored, audited, clearable", async () => {
