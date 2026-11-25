@@ -3,7 +3,14 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { MODERATION_CONFIG } from "@/config/moderation";
 import { FRAMES } from "@/config/frames";
-import { prepareModerationImage, prepareModerationShots } from "@/lib/moderation/image";
+import { ALL_FRAMES } from "@/config/frames";
+import { V2_FRAMES } from "@/config/frames/v2";
+import { MOBILE_FRAME_ID, mobileFrameId } from "@/config/mobile";
+import {
+  prepareModerationImage,
+  prepareModerationShots,
+  prepareStoredPhotoShots,
+} from "@/lib/moderation/image";
 import { JPEG } from "../helpers/images";
 
 /** A synthetic picture: flat colours only. No photograph of anyone is used in these tests. */
@@ -185,5 +192,55 @@ describe("the shots that may leave the server (D97)", () => {
       await prepareModerationShots(new Uint8Array([1, 2, 3, 4]), "image/jpeg", frame),
     ).toBeNull();
     expect(await prepareModerationShots(good, "image/jpeg", { ...frame, slots: [] })).toBeNull();
+  });
+});
+
+describe("phone photos are checked too (2026-11-25, a user decision)", () => {
+  const framed = async (frame: (typeof V2_FRAMES)[number]) =>
+    new Uint8Array(
+      await picture(Math.round(frame.outputWidth / 2), Math.round(frame.outputHeight / 2))
+        .jpeg()
+        .toBuffer(),
+    );
+
+  it("a phone photo in a booth frame is cut with that frame's slots, like the booth's own", async () => {
+    for (const frame of V2_FRAMES) {
+      const shots = await prepareStoredPhotoShots(
+        await framed(frame),
+        "image/jpeg",
+        mobileFrameId(frame.id),
+        ALL_FRAMES,
+      );
+      expect(shots, frame.id).toHaveLength(frame.slots.length);
+    }
+  });
+
+  it("a plain phone photo (no frame) is one shot: the whole picture, small and clean", async () => {
+    const photo = new Uint8Array(await picture(1600, 1200).jpeg().toBuffer());
+    const shots = (await prepareStoredPhotoShots(
+      photo,
+      "image/jpeg",
+      MOBILE_FRAME_ID,
+      ALL_FRAMES,
+    ))!;
+    expect(shots).toHaveLength(1);
+    expect(Math.max(shots[0]!.width, shots[0]!.height)).toBeLessThanOrEqual(
+      MODERATION_CONFIG.imageLongEdge,
+    );
+    expect((await sharp(shots[0]!.data).metadata()).exif).toBeUndefined();
+  });
+
+  it("an unknown frame, or a phone photo whose bytes are not a picture, waits for a person", async () => {
+    const photo = new Uint8Array(await picture(800, 600).jpeg().toBuffer());
+    expect(await prepareStoredPhotoShots(photo, "image/jpeg", "phone-nope", ALL_FRAMES)).toBeNull();
+    expect(await prepareStoredPhotoShots(photo, "image/jpeg", "nope", ALL_FRAMES)).toBeNull();
+    expect(
+      await prepareStoredPhotoShots(
+        new Uint8Array([1, 2, 3]),
+        "image/jpeg",
+        MOBILE_FRAME_ID,
+        ALL_FRAMES,
+      ),
+    ).toBeNull();
   });
 });

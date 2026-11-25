@@ -6,7 +6,7 @@ import { WALL_CONFIG } from "@/config/wall";
 import { getServerConfig, type AiProviderSettings } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { getBackend } from "@/lib/storage/server";
-import { prepareModerationShots } from "./image";
+import { prepareStoredPhotoShots } from "./image";
 import { createChatVisionProvider } from "./providers/chat-vision";
 import { createGeminiProvider } from "./providers/gemini";
 import { createMockProvider } from "./providers/mock";
@@ -56,10 +56,9 @@ export function getAiReview(): AiReviewService {
             sequential: fallback.sequential,
           }
         : null,
-    // Only a current frame has slot data to cut the shots out with. `getFrame` falls back to a
-    // default frame, which would cut the wrong places: look the id up exactly.
-    prepare: (data, mime, frameId) =>
-      prepareModerationShots(data, mime, ALL_FRAMES.find((f) => f.id === frameId) ?? null),
+    // The frame's own slots cut the shots (booth photos and phone photos in a booth frame); a
+    // plain phone photo is one shot. Exact ids only: an unknown frame waits for a person.
+    prepare: (data, mime, frameId) => prepareStoredPhotoShots(data, mime, frameId, ALL_FRAMES),
     dailyLimit: ai?.dailyLimit ?? 0,
     timeoutMs: ai?.timeoutMs ?? 8000,
     timeZone: WALL_CONFIG.timeZone,

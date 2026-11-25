@@ -33,6 +33,11 @@ export class HubInbox {
     private readonly backend: StorageBackend,
     private readonly client: CloudInboxClient,
     private readonly now: () => Date = () => new Date(),
+    /**
+     * A phone photo is now here and waiting for review: hand it to the AI review (D95, phone
+     * photos since 2026-11-25). Never awaited for anything but errors; never blocks the import.
+     */
+    private readonly onReviewable: (photoId: string) => Promise<unknown> = async () => undefined,
   ) {}
 
   status(): HubInboxStatus {
@@ -92,6 +97,8 @@ export class HubInbox {
         frameId: cloudFrameId && isMobileFrameId(cloudFrameId) ? cloudFrameId : MOBILE_FRAME_ID,
       });
       if (stored.ok && !stored.duplicate) this.state.imported++;
+      if (stored.ok && stored.moderationStatus === "PENDING")
+        await this.onReviewable(stored.photoId).catch(() => undefined);
     }
     // Stored here (or deleted here already): the cloud copy can go.
     const ack = await this.client.ack(sessionId);

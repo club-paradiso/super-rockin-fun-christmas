@@ -671,7 +671,7 @@ export function MobileUpload({
             </p>
             <h2 className="text-2xl font-bold text-ink">사진을 받았어요</h2>
             <p className="text-lg leading-relaxed text-ink/75">
-              운영팀이 확인하고 있어요. 확인이 끝나면 미디어월에 걸려요.
+              사진을 확인하고 있어요. 확인이 끝나면 미디어월에 걸려요.
               <br />
               <strong className="text-ink">아직 미디어월에 나온 것은 아니에요.</strong>
             </p>
@@ -951,7 +951,8 @@ function Notes() {
       <h3 className="text-lg font-bold text-ink">미디어월에 보내기 전에 읽어 주세요</h3>
       <ul className="mt-3 flex list-disc flex-col gap-2 pl-5 text-base leading-relaxed text-ink/75">
         <li>이 사진은 크리스마스 마을의 공개된 미디어월에 다른 분들 사진과 함께 보일 수 있어요.</li>
-        <li>운영팀이 직접 확인하고 승인한 사진만 걸려요. 승인되지 않을 수도 있어요.</li>
+        <li>확인을 거친 사진만 걸려요. 걸리지 않을 수도 있어요.</li>
+        <li>미디어월에 어울리지 않는 사진은 운영팀이 내릴 수 있어요.</li>
         <li>STUDIO SHALOM 미디어월에만 쓰고, 정해진 보관 기간이 지나면 지워져요.</li>
         <li>다른 사람이 함께 나온 사진은 그분께 먼저 허락을 받아 주세요.</li>
         <li>어린이가 나온 사진은 보호자가 함께 확인한 뒤 보내 주세요.</li>
