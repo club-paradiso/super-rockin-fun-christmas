@@ -54,7 +54,6 @@ const TAPE: WallClip = {
   lineY: 34,
   tilts: [-4, 3, -2, 5, -3],
 };
-const TWINE = "#B48F5E";
 const FIGMA = "Figma SS 03";
 
 const BASE_THEMES: readonly WallTheme[] = [
@@ -85,8 +84,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 440,
-    // The logo is painted on the plaster above the rope, in the sunlight through the leaves.
-    wordmark: { x: 1920, y: 48, size: 104, tone: "ink" },
+    // The logo (basic form, D117) is painted on the plaster above the rope, in the sunlight through
+    // the leaves.
+    wordmark: { x: 1920, y: 24, size: 166, tone: "ink", form: "stack" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -117,8 +117,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 380,
-    // The logo is in the sky above the chapel, between the rope and the chapel's cross.
-    wordmark: { x: 3090, y: 248, size: 84, tone: "ink" },
+    // The logo (basic form) is in the sky above the chapel, under the rope, clear of the chapel's
+    // cross and the wooden cross.
+    wordmark: { x: 3120, y: 240, size: 136, tone: "ink", form: "stack" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -150,8 +151,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 440,
-    // The logo is right under the star.
-    wordmark: { x: 1920, y: 118, size: 76, tone: "ink" },
+    // The logo (basic form) is in the clear sky just right of the star, left of the garland. Right
+    // under the star there is no room for it above the photos on the 2.4:1 board cut.
+    wordmark: { x: 2340, y: 80, size: 166, tone: "ink", form: "stack" },
     emptyTextY: 700,
     motion: "none",
   },
@@ -183,8 +185,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 400,
-    // The logo is under the star of Bethlehem (measured at x 2575, y 50), like starlight.
-    wordmark: { x: 2575, y: 120, size: 92, tone: "cream" },
+    // The logo (one-line form) is under the star of Bethlehem (measured at x 2575, y 50), like
+    // starlight: the basic form is too tall for the sky between the star and the photos.
+    wordmark: { x: 2575, y: 160, size: 42, tone: "cream", form: "line", color: "#f6dac1" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -212,10 +215,10 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 748, x2: 3392, color: TWINE, width: 6 },
+    rope: { x1: 722, x2: 3426, width: 11 },
     wideMax: 400,
-    // The logo is burned into the front of the wooden window sill, under the photos.
-    wordmark: { x: 1920, y: 898, size: 76, tone: "ink" },
+    // The logo (one-line form) is burned into the front of the wooden window sill, under the photos.
+    wordmark: { x: 1920, y: 914, size: 44, tone: "carved", form: "line", color: "#3a1e0e" },
     emptyTextY: 620,
     motion: "none",
   },
@@ -243,10 +246,10 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 606, x2: 3424, color: TWINE, width: 6 },
+    rope: { x1: 582, x2: 3430, width: 11 },
     wideMax: 400,
-    // The logo is painted on the plaster under the window.
-    wordmark: { x: 1920, y: 892, size: 80, tone: "ink" },
+    // The logo (one-line form) is painted on the plaster under the window.
+    wordmark: { x: 1920, y: 910, size: 44, tone: "ink", form: "line", color: "#4b2f1b" },
     emptyTextY: 600,
     motion: "none",
   },
@@ -276,8 +279,9 @@ const BASE_THEMES: readonly WallTheme[] = [
     hang: TAPE,
     rope: null,
     wideMax: 400,
-    // The logo is a paper tag hung from the garland under its right-hand poinsettia.
-    wordmark: { x: 2940, y: 92, size: 76, tone: "label" },
+    // The logo (one-line form) is a long paper tag hung from the garland under its right-hand
+    // poinsettia.
+    wordmark: { x: 2940, y: 128, size: 40, tone: "label", form: "line" },
     emptyTextY: 640,
     motion: "none",
   },
@@ -305,10 +309,11 @@ const BASE_THEMES: readonly WallTheme[] = [
     },
     liteSlots: [0, 1, 2, 3],
     hang: TAPE,
-    rope: { x1: 528, x2: 3172, color: TWINE, width: 6 },
+    rope: { x1: 518, x2: 3190, width: 11 },
     wideMax: 400,
-    // The logo is a paper tag hung from the garland near the left end of the window.
-    wordmark: { x: 860, y: 92, size: 76, tone: "label" },
+    // The logo (one-line form) is a long paper tag hung from the garland near the left end of the
+    // window.
+    wordmark: { x: 1000, y: 92, size: 40, tone: "label", form: "line" },
     emptyTextY: 600,
     motion: "none",
   },

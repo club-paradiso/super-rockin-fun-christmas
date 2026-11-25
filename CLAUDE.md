@@ -172,7 +172,9 @@ looks:measure`). `/looks` is the comparison
   theme's own numbers. Every variant passes the same theme tests.
 - **The wall fits any screen by itself** (D110): `planWallFit` (`lib/wall/fit.ts`, pure) fits the
   photos and the wordmark, not the whole picture, choosing the cut and the run of slots per screen.
-  The wordmark is the Figma logo (`public/frames/v2/logo-*.svg`) at its own place in each picture
+  The wordmark is the wall's own logo (D117: 평화의 벽 · THE WALL OF PEACEMAKERS, Figma SS 00,
+  `public/wall/logo-stack.svg` basic form or `logo-line.svg` one-line form, `WALL_LOGO`; each
+  picture picks one in `theme.wordmark.form`, so the logo changes with the background) at its own place in each picture
   (`theme.wordmark`, `plan.mark`, D116: under a star, painted on plaster, burned into a sill, a tag
   on a garland), moving with the picture, never with the screen, and clear of every photo and clip
   on every screen. Nothing hangs a clip over the line elsewhere: every theme uses tape (D115). A screen that
@@ -180,6 +182,13 @@ looks:measure`). `/looks` is the comparison
   Never stretch, never zoom past covering the screen, bands only where the photos need them (filled
   with the blurred picture, `.wall-ambient`). Any new wall look or slot change must keep
   `tests/unit/wall-fit.test.ts` green. The wall re-plans on resize/fullscreen without a reload.
+- **전체화면 on the wall: one way in, only Escape out** (a user decision, 2026-11-25,
+  `lib/wall/fullscreen.ts`, `components/wall/fullscreen-button.tsx`). A browser opened by hand gets
+  the 「전체화면」 button (bottom right, says "끌 때는 Esc"), only while the window does not cover the
+  screen and the pointer moved in the last few seconds; a double-click or F also go in. Nothing on
+  the wall ever leaves fullscreen (no toggle): Escape, the browser's own, is the only way out. While
+  the wall covers the screen (Fullscreen API, `--kiosk`, F11) nothing is drawn over it and the
+  cursor is hidden. Keep `e2e/wall.spec.ts` 「전체화면」 green.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
   audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
   `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo
