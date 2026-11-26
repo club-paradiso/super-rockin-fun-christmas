@@ -372,6 +372,9 @@ test.describe("the booth with looks", () => {
 
   test("looks off (?looks=0): no LUT is fetched and no WebGL context is made", async ({ page }) => {
     await enrollKiosk(page);
+    // Enrolling for the first time lands on /kiosk with looks on (the default): leave it before
+    // listening, or its late LUT downloads are counted against ?looks=0.
+    await page.goto("about:blank");
     const cubes: string[] = [];
     page.on("request", (request) => {
       if (request.url().endsWith(".cube")) cubes.push(request.url());
@@ -568,7 +571,7 @@ test.describe("the booth with looks", () => {
       await expect(page.getByTestId("look-page")).toHaveText("2 / 2");
       await expect(page.getByTestId("look-ink")).toBeVisible();
       await expect(page.getByTestId("look-linen")).toHaveCount(0);
-      await expect(page.getByTestId("look-turn")).toHaveText("‹ 이전");
+      await expect(page.getByTestId("look-turn")).toHaveText("‹ 앞장");
 
       // Black and white: the six shots turn grey at once, and so does the finished photo.
       const before = await page.getByTestId("select-shot-0").locator("img").getAttribute("src");

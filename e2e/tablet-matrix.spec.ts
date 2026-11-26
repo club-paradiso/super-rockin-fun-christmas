@@ -237,7 +237,7 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
   await page.getByTestId("start-camera").click();
   {
     await expect(page.getByTestId("screen-pick")).toBeVisible();
-    // "이전" sits in the top left corner, where staff hold for help: a tap there is still "이전".
+    // "이전" sits in the bottom bar beside "처음으로" (2026-11-25).
     await page.getByTestId("go-back").click();
     await expect(page.getByTestId("screen-welcome")).toBeVisible();
     await page.getByTestId("start-camera").click();
