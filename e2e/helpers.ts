@@ -39,7 +39,7 @@ export async function openWelcome(page: Page) {
 }
 
 /** A card's options on the v2 options screen, e.g. `{ color: "sepia", logo: "logoOff" }`. */
-export type CardOptions = Partial<Record<"color" | "logo", string>>;
+export type CardOptions = Partial<Record<"color" | "logo" | "theme", string>>;
 
 /**
  * 「틀 선택 v2」: on the picker choose a card (or keep 필름 3컷), press "다음" / "이 틀로 찍기",

@@ -5,14 +5,14 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("the seven v2 cards show one persistent selection, 필름 3컷 first", async ({ page }) => {
+test("the nine v2 cards show one persistent selection, 필름 3컷 first", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);
   await page.getByTestId("start-camera").click();
 
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(8);
+  await expect(cards).toHaveCount(9);
   await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
   await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("confirm-pick")).toHaveText("다음");
