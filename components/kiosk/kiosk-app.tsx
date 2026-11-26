@@ -36,6 +36,7 @@ import type { CanvasLike } from "@/lib/canvas";
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
 import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
+import type { FrameDefinition } from "@/lib/compositor/types";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
 import { LOOK_IDS } from "@/config/looks";
 import {
@@ -116,10 +117,13 @@ import {
   HAND_FONT_KEY,
   loadSamplePhotos,
   readStoredHandFont,
+  rememberingGrader,
   renderPreview,
   useHandFontCycle,
   useServerClock,
 } from "./frame-preview";
+import { prefetch, RenderCache, type PrefetchJob } from "@/lib/kiosk/render-cache";
+import { HAND_FONTS } from "@/config/hand-fonts";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import {
   BoothScreen,
@@ -182,6 +186,11 @@ export interface LookChip {
 }
 /** Longest edge of the picture on a look chip. */
 const LOOK_CHIP_EDGE = 280;
+/**
+ * Frame previews kept between guests: the eight picker cards plus the options screen's pictures
+ * (one per option and handwriting font). Small JPEG data URLs; the oldest go first.
+ */
+const PREVIEW_CACHE_LIMIT = 48;
 
 /** Longest edge of a graded shot on the review and choice screens: they are shown small. */
 const GRADED_SHOT_EDGE = 480;
@@ -220,8 +229,81 @@ function gradedShotUrl(
   }
 }
 
+/**
+ * The graded pictures of one shot, kept while the shot lives (a retake makes new shots, so their
+ * pictures go with the old ones). Keys: `shotKey` and `chipKey`. A failure is never kept.
+ */
+type ShotPictures = WeakMap<CapturedFrame, Map<string, string>>;
+
+/** A shot in a look on the review and choice screens. `look` is chosenLook's id, or "own". */
+function shotKey(frameId: string, look: string, seed: number, index: number): string {
+  return `shot|${frameId}|${look}|${seed}|${index}`;
+}
+
+function chipKey(frameId: string, lookId: string, seed: number): string {
+  return `chip|${frameId}|${lookId}|${seed}`;
+}
+
+/** `make()` once per shot and key; a null (could not be graded) is not kept. */
+function keptShotPicture(
+  store: ShotPictures,
+  shot: CapturedFrame,
+  key: string,
+  make: () => string | null,
+): string | null {
+  let pictures = store.get(shot);
+  if (!pictures) store.set(shot, (pictures = new Map()));
+  const kept = pictures.get(key);
+  if (kept) return kept;
+  const url = make();
+  if (url) pictures.set(key, url);
+  return url;
+}
+
+function hasShotPicture(store: ShotPictures, shot: CapturedFrame, key: string): boolean {
+  return store.get(shot)?.has(key) ?? false;
+}
+
+/** One shot graded for the review and choice screens (index = the shot's own grain seed). */
+function gradedShotFor(
+  store: ShotPictures,
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  lookId: string | null,
+  shot: CapturedFrame,
+  index: number,
+): string | null {
+  const override = chosenLook(frameId, lookId);
+  return keptShotPicture(
+    store,
+    shot,
+    shotKey(frameId, override?.lookId ?? "own", seed, index),
+    () => {
+      const grade = looks.graderFor(frameId, seed, override);
+      return grade ? gradedShotUrl(shot, grade, index) : null;
+    },
+  );
+}
+
+/** One chip of the colour row: the shot in one look. */
+function lookChipFor(
+  store: ShotPictures,
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  lookId: string,
+  shot: CapturedFrame,
+): string | null {
+  return keptShotPicture(store, shot, chipKey(frameId, lookId, seed), () => {
+    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
+    return grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+  });
+}
+
 /** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
 function lookChipsFor(
+  store: ShotPictures,
   looks: BoothLooks,
   frameId: string,
   seed: number,
@@ -229,8 +311,7 @@ function lookChipsFor(
 ): LookChip[] {
   const chips: LookChip[] = [];
   for (const lookId of LOOK_IDS) {
-    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
-    const url = grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+    const url = lookChipFor(store, looks, frameId, seed, lookId, shot);
     if (!url) return [];
     chips.push({ id: lookId, url });
   }
@@ -718,15 +799,28 @@ export function KioskApp({
   const choosing = state.phase === "review" || state.phase === "select";
   const lookFrameId = choosing ? state.frameId : null;
   const lookSeed = seedFromText(state.sessionId);
+  // Kept per shot (shotPictures), and drawn ahead in the background (below): a tap on another
+  // colour usually finds its six pictures ready.
+  const [shotPictures] = useState<ShotPictures>(() => new WeakMap());
   const gradedShots = useMemo(() => {
     const out: (string | null)[] = [];
     if (!looks || !lookFrameId) return out;
-    const grade = looks.graderFor(lookFrameId, lookSeed, chosenLook(lookFrameId, state.lookId));
-    if (!grade) return out;
     for (const [index, shot] of state.shots.entries())
-      out.push(shot ? gradedShotUrl(shot.frame, grade, index) : null);
+      out.push(
+        shot
+          ? gradedShotFor(
+              shotPictures,
+              looks,
+              lookFrameId,
+              lookSeed,
+              state.lookId,
+              shot.frame,
+              index,
+            )
+          : null,
+      );
     return out;
-  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId]);
+  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId, shotPictures]);
   // The colour row of the choice screen: the guest's first shot in each of the eight looks.
   // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
   const lookRowFrameId = state.phase === "select" ? state.frameId : null;
@@ -734,10 +828,35 @@ export function KioskApp({
   const lookChips = useMemo(
     () =>
       looks && lookRowFrameId && firstShot
-        ? lookChipsFor(looks, lookRowFrameId, lookSeed, firstShot.frame)
+        ? lookChipsFor(shotPictures, looks, lookRowFrameId, lookSeed, firstShot.frame)
         : [],
-    [looks, lookRowFrameId, lookSeed, firstShot],
+    [looks, lookRowFrameId, lookSeed, firstShot, shotPictures],
   );
+  // While the guest looks at the review screen, draw the colour row (needed next), then the six
+  // shots in every other look (needed on a tap), one picture per task.
+  const allShot = state.shots.every((s) => s !== null);
+  useEffect(() => {
+    if (!looks || !lookFrameId || !allShot) return;
+    const store = shotPictures;
+    const shots = state.shots.map((s) => s!.frame);
+    const jobs: PrefetchJob[] = [];
+    const first = shots[0]!;
+    for (const lookId of LOOK_IDS)
+      jobs.push({
+        done: () => hasShotPicture(store, first, chipKey(lookFrameId, lookId, lookSeed)),
+        run: () => lookChipFor(store, looks, lookFrameId, lookSeed, lookId, first),
+      });
+    for (const lookId of LOOK_IDS) {
+      const look = chosenLook(lookFrameId, lookId)?.lookId ?? "own";
+      for (const [index, shot] of shots.entries())
+        jobs.push({
+          done: () => hasShotPicture(store, shot, shotKey(lookFrameId, look, lookSeed, index)),
+          run: () => gradedShotFor(store, looks, lookFrameId, lookSeed, lookId, shot, index),
+        });
+    }
+    return prefetch(jobs);
+  }, [looks, lookFrameId, lookSeed, state.shots, allShot, shotPictures]);
+
   // The live camera picture of a black-and-white frame is black and white too.
   const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
 
@@ -754,37 +873,100 @@ export function KioskApp({
   }, []);
   const clock = useServerClock(serverNow);
   const previewing = state.phase === "pick" || state.phase === "options";
+  // The previews are the same for every guest (the sample photos, the day's date): drawn once
+  // and kept until the samples, the art or the looks change. Drawn ahead while nobody is at the
+  // picker, so "여기서 사진 찍기" does not wait for eight frames to be drawn.
+  const previews = useMemo(
+    () => ({
+      pictures: new RenderCache<string | null>(PREVIEW_CACHE_LIMIT),
+      graded: new RenderCache<CanvasImageSource>(PREVIEW_CACHE_LIMIT),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new set whenever these change
+    [samples, assets, looks, legacyIOS15, renderBudget.thumbScale],
+  );
+  const preview = useCallback(
+    (frame: FrameDefinition, scale: number, handFont?: string) => {
+      const now = clock.now();
+      // A look that failed (WebGL) is tried again for a later guest: its previews are not kept.
+      const lookState = looks ? (looks.problem() === null ? "graded" : "failed") : "none";
+      const key = [
+        frame.id,
+        scale,
+        handFont ?? "",
+        formatDateLabel(now),
+        formatStampLabel(now),
+        lookState,
+      ].join("|");
+      return {
+        key,
+        done: () => previews.pictures.has(key),
+        make: () => {
+          if (!samples || !assets) return null;
+          const url = renderPreview(frame, samples, assets, {
+            scale,
+            legacy: legacyIOS15,
+            handFont,
+            now,
+            grade: rememberingGrader(
+              looks?.graderFor(frame.id, 1),
+              previews.graded,
+              `${frame.id}|${scale}`,
+            ),
+          });
+          // A drawing that failed is tried again next time, as it always was.
+          if (url && lookState !== "failed") previews.pictures.set(key, url);
+          return url;
+        },
+      };
+    },
+    [clock, looks, previews, samples, assets, legacyIOS15],
+  );
+  const kept = (job: ReturnType<typeof preview>) =>
+    job.done() ? (previews.pictures.get(job.key) ?? null) : job.make();
+  const thumbScale = renderBudget.thumbScale;
   const pickThumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!samples || !assets || !previewing) return out;
     for (const card of FRAME_CARDS) {
-      const frame = card.frame(defaultOptions(card));
-      const url = renderPreview(frame, samples, assets, {
-        scale: renderBudget.thumbScale,
-        legacy: legacyIOS15,
-        now: clock.now(),
-        grade: looks?.graderFor(frame.id, 1),
-      });
+      const url = kept(preview(card.frame(defaultOptions(card)), thumbScale));
       if (url) out[card.id] = url;
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale, looks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
+  }, [samples, assets, previewing, thumbScale, preview, previews]);
+  // Between guests (the attract and welcome screens): the eight picker cards, ahead of time.
+  const betweenGuests = state.phase === "attract" || state.phase === "welcome";
+  useEffect(() => {
+    if (!betweenGuests || !samples || !assets) return;
+    // While the LUTs are loading the previews would be drawn twice: wait for them.
+    if (!looks && looksActive(window.location.search, looksNow)) return;
+    return prefetch(
+      FRAME_CARDS.map((card) => {
+        const job = preview(card.frame(defaultOptions(card)), thumbScale);
+        return { done: job.done, run: job.make };
+      }),
+    );
+  }, [betweenGuests, samples, assets, looks, looksNow, preview, thumbScale]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
+  // Each font's picture is kept, and the next font is drawn ahead in the 1.2 s before it shows.
   const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
   const previewFont = useHandFontCycle(!!optionsFrame && usesHandwriting(optionsFrame));
+  const optionScale = thumbScale * 1.4;
   const optionPreview = useMemo(() => {
     if (!optionsFrame || !samples || !assets) return null;
-    return renderPreview(optionsFrame, samples, assets, {
-      scale: renderBudget.thumbScale * 1.4,
-      legacy: legacyIOS15,
-      handFont: previewFont,
-      now: clock.now(),
-      grade: looks?.graderFor(optionsFrame.id, 1),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale, looks]);
+    return kept(preview(optionsFrame, optionScale, previewFont));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
+  }, [optionsFrame, samples, assets, previewFont, optionScale, preview]);
+  const optionsFrameId = optionsFrame?.id ?? null;
+  const cyclingFonts = !!optionsFrame && usesHandwriting(optionsFrame);
+  useEffect(() => {
+    if (!optionsFrameId || !cyclingFonts) return;
+    const at = HAND_FONTS.findIndex((f) => f.id === previewFont);
+    const nextFont = HAND_FONTS[(at + 1) % HAND_FONTS.length]!.id;
+    const job = preview(getFrame(optionsFrameId), optionScale, nextFont);
+    return prefetch([{ done: job.done, run: job.make }]);
+  }, [optionsFrameId, cyclingFonts, previewFont, optionScale, preview]);
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.

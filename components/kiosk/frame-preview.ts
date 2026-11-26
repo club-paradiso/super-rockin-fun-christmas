@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createDomCanvas } from "@/lib/canvas";
+import { createDomCanvas, type CanvasFactory } from "@/lib/canvas";
 import {
   composeFrame,
   formatDateLabel,
@@ -13,6 +13,7 @@ import { placeholderPhotos } from "@/lib/compositor/placeholders";
 import type { ComposeImage, FrameDefinition } from "@/lib/compositor/types";
 import { HAND_FONTS, HAND_PREVIEW_MS, getHandFont } from "@/config/hand-fonts";
 import { createServerClock, type ServerClock } from "@/lib/kiosk/clock";
+import type { RenderCache } from "@/lib/kiosk/render-cache";
 
 /**
  * The frame picker and the options screen show each frame with sample photos (the Figma file's
@@ -58,6 +59,36 @@ export function renderPreview(
   } finally {
     if (canvas && opts.legacy) canvas.width = canvas.height = 0;
   }
+}
+
+/**
+ * A grader for previews that remembers what it graded. A preview's photos are always the same
+ * samples, cropped the same way for one frame at one scale, and the grain seed is fixed, so the
+ * graded slot is the same picture every time: the options screen, which draws the frame again for
+ * each handwriting font, grades each slot once instead of once per font. `prefix` must name the
+ * frame, the look and the scale. The graded picture is copied out of the grader's shared canvas.
+ */
+export function rememberingGrader(
+  grade: PhotoGrader | undefined,
+  store: RenderCache<CanvasImageSource>,
+  prefix: string,
+  createCanvas: CanvasFactory = createDomCanvas,
+): PhotoGrader | undefined {
+  if (!grade) return undefined;
+  return (photo, width, height, slotIndex) => {
+    const key = `${prefix}|${width}x${height}|${slotIndex}`;
+    const kept = store.get(key);
+    if (kept) return kept;
+    // A failure is not remembered: the next drawing tries the look again.
+    const graded = grade(photo, width, height, slotIndex);
+    if (!graded) return null;
+    const copy = createCanvas(width, height);
+    const ctx = copy.getContext("2d");
+    if (!ctx) return graded;
+    ctx.drawImage(graded, 0, 0, width, height);
+    store.set(key, copy as unknown as CanvasImageSource);
+    return copy as unknown as CanvasImageSource;
+  };
 }
 
 /**
