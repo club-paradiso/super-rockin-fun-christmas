@@ -13,6 +13,12 @@ import { renderParams } from "./types";
  * When WebGL fails the photo is not lost and nobody waits: the grader returns null, the
  * compositor falls back to the frame's own tone (the booth as it was before looks), and the
  * failure is written to the console once, with its reason. Never silently.
+ *
+ * A failure is not forever. iPad Safari drops WebGL contexts under memory pressure, when the
+ * screen sleeps or the tab goes to the background; a booth runs all day. So a failed render is
+ * tried once more at once on a fresh renderer (a new canvas and context), and `newSession()`
+ * clears a failure for the next guest. Before this, one lost context hid the guest's colour row
+ * for every guest after it until someone reloaded the page.
  */
 export interface BoothLooks {
   /** Fetches and parses the LUTs of these frames. Resolves when all are in (or have failed). */
@@ -27,6 +33,11 @@ export interface BoothLooks {
   graderFor(frameId: string, seed: number, override?: LookOverride): PhotoGrader | undefined;
   /** Why looks are not being applied, if they are not. */
   problem(): string | null;
+  /**
+   * A new guest: a failure of an earlier session is forgotten and WebGL is tried again on a fresh
+   * renderer. The LUTs stay loaded.
+   */
+  newSession(): void;
   dispose(): void;
 }
 
@@ -68,6 +79,13 @@ export function createBoothLooks({
   const loading = new Map<string, Promise<void>>();
   let renderer: LookRenderer | null = null;
   let broken: string | null = null;
+  // Renderers made since the last new session: bounds the retries (each is a WebGL context).
+  let builds = 0;
+
+  const dropRenderer = () => {
+    renderer?.dispose();
+    renderer = null;
+  };
 
   const fail = (reason: string, detail?: unknown) => {
     if (!broken) log(`${reason}. Photos keep the frame's own tone.`, detail);
@@ -112,36 +130,80 @@ export function createBoothLooks({
       const lut = luts.get(entry.look.id);
       if (!lut) return undefined;
       const strength = override?.strength ?? entry.strength * entry.look.strength;
+      const params = renderParams(entry.look, 0, strength);
+      if (override?.grainAmount !== undefined) params.grainAmount = override.grainAmount;
+      if (override?.vignette !== undefined) params.vignette = override.vignette;
+      if (override?.halation !== undefined) params.halation = override.halation;
       return (photo: CanvasLike, width: number, height: number, slotIndex: number) => {
-        if (broken) return null;
-        try {
-          renderer ??= new LookRenderer(createGlCanvas());
-          const params = renderParams(entry.look, seed * 31 + slotIndex, strength);
-          if (override?.grainAmount !== undefined) params.grainAmount = override.grainAmount;
-          if (override?.vignette !== undefined) params.vignette = override.vignette;
-          if (override?.halation !== undefined) params.halation = override.halation;
-          return renderer.render(
-            photo as unknown as TexImageSource,
-            width,
-            height,
-            entry.look.id,
-            lut,
-            params,
-          ) as unknown as CanvasImageSource;
-        } catch (error) {
-          fail(error instanceof Error ? error.message : "WebGL failed", error);
-          return null;
+        let lastError: unknown = null;
+        // The renderer as it is, then (once) a fresh one: a lost context is usually back on a
+        // new canvas. Never more than MAX_RENDERERS_PER_SESSION contexts per guest.
+        for (let attempt = 0; attempt < 2 && !broken; attempt++) {
+          try {
+            if (!renderer) {
+              if (builds >= MAX_RENDERERS_PER_SESSION) break;
+              builds++;
+              renderer = new LookRenderer(createGlCanvas());
+            }
+            return renderer.render(
+              photo as unknown as TexImageSource,
+              width,
+              height,
+              entry.look.id,
+              lut,
+              { ...params, seed: seed * 31 + slotIndex },
+            ) as unknown as CanvasImageSource;
+          } catch (error) {
+            lastError = error;
+            dropRenderer();
+          }
         }
+        if (!broken)
+          fail(
+            lastError instanceof Error
+              ? lastError.message
+              : "WebGL failed again on a fresh renderer",
+            lastError ?? undefined,
+          );
+        return null;
       };
     },
 
     problem: () => broken,
 
+    newSession() {
+      builds = renderer ? 1 : 0;
+      if (!broken) return;
+      log(`Trying WebGL again for the next guest (it failed before: ${broken})`);
+      broken = null;
+      dropRenderer();
+      builds = 0;
+    },
+
     dispose() {
-      renderer?.dispose();
-      renderer = null;
+      dropRenderer();
     },
   };
+}
+
+/** WebGL contexts the looks may make for one guest (the first, and fresh ones after failures). */
+export const MAX_RENDERERS_PER_SESSION = 3;
+
+/**
+ * A failure as a short code, for the server log (the reason itself stays in the tablet console):
+ * which way WebGL failed on a booth, without sending anything else.
+ */
+export type LooksErrorCode =
+  "no_webgl" | "context_lost" | "shader" | "too_large" | "gl_error" | "other";
+
+export function looksErrorCode(problem: string | null): LooksErrorCode | null {
+  if (!problem) return null;
+  if (/not available|could not create/i.test(problem)) return "no_webgl";
+  if (/context was lost/i.test(problem)) return "context_lost";
+  if (/compile|link/i.test(problem)) return "shader";
+  if (/over this GPU/i.test(problem)) return "too_large";
+  if (/WebGL error/i.test(problem)) return "gl_error";
+  return "other";
 }
 
 /**

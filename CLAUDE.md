@@ -83,7 +83,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   black-and-white or sepia frame is shown that way with a CSS filter on the `<video>` only
   (`lookViewForFrame`); a colour look never changes the camera view. Staff read the state on the
   booth in the help menu (`lib/looks/status.ts`). When WebGL fails the photo keeps the frame's own
-  `photoTone` and the reason goes to the console (`[looks]`): never silently, never a blocked guest.
+  `photoTone` and the reason goes to the console (`[looks]`) and, as a code, to the server log
+  with the heartbeat (`kiosk_looks_failed`): never silently, never a blocked guest. A failure is
+  never permanent (2026-11-26): a failed render is tried once more on a fresh renderer (the old
+  context is released), and `newSession()` on "화면을 눌러 시작" tries WebGL again for the next
+  guest, so one lost context (iPad sleep, memory pressure) cannot hide the colour row all day.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
   greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
   from the others (`tests/unit/looks-distinct.test.ts`: every pair at least 4.5 ΔE00 apart on the samples; `npm run
