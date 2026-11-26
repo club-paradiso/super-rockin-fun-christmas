@@ -42,6 +42,7 @@ import {
   chosenLook,
   createBoothLooks,
   LOOKS_WAIT_MS,
+  looksErrorCode,
   seedFromText,
   settleWithin,
   type BoothLooks,
@@ -705,6 +706,12 @@ export function KioskApp({
     };
   }, [looksNow]);
 
+  // Every new guest starts with WebGL tried again: a context the tablet lost (sleep, memory,
+  // background) must not take the colour row away from everyone after it.
+  useEffect(() => {
+    if (state.phase === "attract") looksRef.current?.newSession();
+  }, [state.phase]);
+
   // The six shots on the review and choice screens, in the look of the frame they were taken
   // for: what the guest chooses from is what the print will show. Small copies, made once per
   // session; a shot that could not be graded keeps its own picture.
@@ -1313,7 +1320,12 @@ export function KioskApp({
           credentials: "same-origin",
           headers: { "content-type": "application/json" },
           // Retouch failures since the last beat (a code and a count), so they reach the log.
-          body: JSON.stringify({ ...heartbeatRef.current, ...retouchFailuresRef.current() }),
+          body: JSON.stringify({
+            ...heartbeatRef.current,
+            ...retouchFailuresRef.current(),
+            // Why colour looks are off on this tablet, as a code (never anything about a photo).
+            looksError: looksErrorCode(looksRef.current?.problem() ?? null) ?? undefined,
+          }),
         });
         if (!stopped && res.ok) {
           const data = (await res.json()) as {
