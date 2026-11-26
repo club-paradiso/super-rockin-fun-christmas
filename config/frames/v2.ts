@@ -2,7 +2,7 @@ import type { FrameDecoration, FrameDefinition, FrameSlot } from "@/lib/composit
 import { HAND_TEXT } from "@/config/hand-fonts";
 
 /**
- * 「틀 선택 v2」 (2026-11-22; 필름 35mm added 2026-11-24): eight cards on the booth's frame picker, some with options (colour,
+ * 「틀 선택 v2」 (2026-11-22; 필름 35mm added 2026-11-24, 밈 4컷 2026-11-26): nine cards on the booth's frame picker, some with options (colour,
  * logo). Each combination is its own FrameDefinition with its own id, so the server, the wall and
  * the AI check (which cut the photo up by slot) see an ordinary frame.
  *
@@ -395,6 +395,114 @@ const lace1: FrameDefinition = {
   ],
 };
 
+// ── 밈 4컷 (Figma SS 02 "01 · 최종 후보", 2026-11-26) ────────────────────────────────────────
+/**
+ * Five season frames built on memes, one card with the meme as its option. Each is two pieces of
+ * exported art: the background with the photo layers left as plain boxes (so their white
+ * outlines and drop shadows stay in the art), and a vector overlay of every layer Figma puts
+ * above the photos (captions, speech bubbles, cut numbers, stickers, the logo). 18 "분석 중? ·
+ * 네온 스캔 HUD" (1018:1823, black) is left out on purpose (a user decision, 2026-11-26).
+ *
+ * These frames carry the logo Figma draws for each of them, in the art, instead of the shared
+ * two-line lockup: the katakana STUDIO シャローム (야호), the contact name in the message header
+ * (문자), the "STUDIO SHALOM · 평화의 벽" line under the A2O parody wordmark (이모찌, 분석 중?) and
+ * the four-line lockup (L을 가져가). tests/unit/frames-v2.test.ts holds that exception.
+ */
+const MEME4 = {
+  yaho: {
+    figma: "997:1817",
+    bg: "#FF2A9D",
+    ys: [258, 604, 950, 1296],
+    x: 30,
+    w: 540,
+    h: 320,
+    radius: 26,
+    label: "크리스마스 야호",
+    en: "Christmas Yaho",
+    zh: "圣诞呀吼",
+  },
+  quit: {
+    figma: "1027:1866",
+    bg: "#000000",
+    ys: [338, 679, 1048, 1389],
+    x: 90,
+    w: 486,
+    h: 271,
+    radius: 22,
+    label: "촬영 포기하겠습니다",
+    en: "I give up the shoot",
+    zh: "我放弃拍摄",
+  },
+  emoji: {
+    figma: "998:1817",
+    bg: "#FCFDFF",
+    ys: [150, 492, 834, 1176],
+    x: 30,
+    w: 540,
+    h: 292,
+    radius: 0,
+    label: "이거 제 이모찌야",
+    en: "This is my emoji",
+    zh: "这是我的表情包",
+  },
+  takel: {
+    figma: "1000:1823",
+    bg: "#84C4FF",
+    ys: [184, 546, 908, 1270],
+    x: 30,
+    w: 540,
+    h: 318,
+    radius: 18,
+    label: "L을 가져가",
+    en: "Take the L",
+    zh: "拿走L",
+  },
+  analyzing: {
+    figma: "1021:1829",
+    bg: "#E7E0F7",
+    ys: [184, 546, 908, 1270],
+    x: 30,
+    w: 540,
+    h: 318,
+    radius: 0,
+    label: "분석 중?",
+    en: "Analyzing?",
+    zh: "分析中？",
+  },
+} as const;
+export type MemeTheme = keyof typeof MEME4;
+
+function meme4(theme: MemeTheme): FrameDefinition {
+  const c = MEME4[theme];
+  return {
+    id: `meme4-${theme}`,
+    name: `Meme 4 · ${theme}`,
+    label: `밈 4컷 · ${c.label}`,
+    labelEn: `Meme · 4 shots · ${c.en}`,
+    labelZh: `梗图 4格 · ${c.zh}`,
+    outputWidth: 600,
+    outputHeight: 1800,
+    background: { type: "solid", color: c.bg },
+    slots: c.ys.map((y) => ({
+      ...slot(c.x, y, c.w, c.h),
+      ...(c.radius ? { radius: c.radius } : {}),
+    })),
+    decorations: [
+      art(`meme4-${theme}-base.png`, 600, 1800),
+      ...photos(4),
+      art(`meme4-${theme}-overlay.svg`, 600, 1800),
+    ],
+  };
+}
+
+export const MEME4_THEMES = Object.keys(MEME4) as readonly MemeTheme[];
+export const MEME4_VARIANTS = Object.fromEntries(MEME4_THEMES.map((t) => [t, meme4(t)])) as Record<
+  MemeTheme,
+  FrameDefinition
+>;
+/** True for the five meme frames (their logo is in the art, see MEME4). */
+export const isMemeFrame = (frameId: string) => frameId.startsWith("meme4-");
+
 export const FILM3_VARIANTS = {
   "mono-logo": film3("mono", true),
   "mono-plain": film3("mono", false),
@@ -419,16 +527,25 @@ export const V2_FRAMES: readonly FrameDefinition[] = [
   checkBlue,
   lace1,
   ...Object.values(FILM35_VARIANTS),
+  ...Object.values(MEME4_VARIANTS),
 ];
 
-// ── The eight cards ─────────────────────────────────────────────────────────────────────────
+// ── The nine cards ──────────────────────────────────────────────────────────────────────────
 
 export type FrameCardId =
-  "film3" | "film4" | "polaroid1" | "polaroid3" | "verse4" | "check2" | "lace1" | "film35";
+  | "film3"
+  | "film4"
+  | "polaroid1"
+  | "polaroid3"
+  | "verse4"
+  | "check2"
+  | "lace1"
+  | "film35"
+  | "meme4";
 
-export type OptionKey = "color" | "logo";
+export type OptionKey = "color" | "logo" | "theme";
 export type OptionValue =
-  "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue" | "natural";
+  "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue" | "natural" | MemeTheme;
 export type FrameOptions = Partial<Record<OptionKey, OptionValue>>;
 
 export interface FrameCardOption {
@@ -479,6 +596,13 @@ export const FRAME_CARDS: readonly FrameCard[] = [
     id: "film35",
     options: [{ key: "color", values: ["natural", "mono", "sepia"] }],
     frame: (o) => FILM35_VARIANTS[o.color === "mono" || o.color === "sepia" ? o.color : "natural"],
+  },
+  {
+    // 밈 4컷 (2026-11-26): the meme is the option, 크리스마스 야호 (Figma "채택") first.
+    id: "meme4",
+    options: [{ key: "theme", values: ["yaho", "quit", "emoji", "takel", "analyzing"] }],
+    frame: (o) =>
+      MEME4_VARIANTS[MEME4_THEMES.includes(o.theme as MemeTheme) ? (o.theme as MemeTheme) : "yaho"],
   },
 ];
 

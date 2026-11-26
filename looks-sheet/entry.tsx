@@ -414,22 +414,30 @@ function FrameSection({
     (mapped && mapped.look.id === lookId ? mapped.strength : 1) * 100,
   );
   const strengthValue = strength?.key === strengthKey ? strength.value : defaultStrength;
-  const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
+  const [loadedArt, setAssets] = useState<{
+    frameId: string;
+    map: Map<string, ComposeImage>;
+  } | null>(null);
+  const assets = loadedArt?.frameId === frameId ? loadedArt.map : null;
   const beforeRef = useRef<HTMLCanvasElement>(null);
   const afterRef = useRef<HTMLCanvasElement>(null);
 
+  // Only the frame on screen: decoding every frame's art at once (the 밈 4컷 overlays are large
+  // vector files) would keep the page busy while the tiles above are being compared.
   useEffect(() => {
+    const frame = V2_FRAMES.find((f) => f.id === frameId);
+    if (!frame) return;
     let cancelled = false;
     void Promise.all([
-      loadFrameFonts(V2_FRAMES),
-      loadFrameAssets(V2_FRAMES, (src) => loadImageAsset(asset(src))),
+      loadFrameFonts([frame]),
+      loadFrameAssets([frame], (src) => loadImageAsset(asset(src))),
     ]).then(([, loaded]) => {
-      if (!cancelled) setAssets(loaded.assets);
+      if (!cancelled) setAssets({ frameId: frame.id, map: loaded.assets });
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [frameId]);
 
   // The chosen sample first, then the other photos, so a strip is not one face four times.
   const photos = useMemo(() => {
