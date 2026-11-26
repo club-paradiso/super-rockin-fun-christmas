@@ -3,7 +3,14 @@ import { V2_FRAMES } from "@/config/frames/v2";
 import { LOOKS } from "@/config/looks";
 import { composeFrame } from "@/lib/compositor/compose";
 import type { ComposeImage } from "@/lib/compositor/types";
-import { createBoothLooks, LOOKS_WAIT_MS, seedFromText, settleWithin } from "@/lib/looks/booth";
+import {
+  createBoothLooks,
+  looksErrorCode,
+  LOOKS_WAIT_MS,
+  MAX_RENDERERS_PER_SESSION,
+  seedFromText,
+  settleWithin,
+} from "@/lib/looks/booth";
 import { buildLut, serializeCube } from "@/lib/looks/cube";
 import { LookUnavailableError, type GlCanvas } from "@/lib/looks/renderer";
 import { FakeCanvas, fakeCanvasFactory } from "../helpers/fake-canvas";
@@ -105,6 +112,63 @@ describe("createBoothLooks", () => {
     expect(looks.problem()).toMatch(/WebGL/);
   });
 
+  it("a lost context is not forever: the same photo is drawn again on a fresh renderer", async () => {
+    const tablet = fakeGlTablet();
+    const log = vi.fn();
+    const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log });
+    await looks.preload(["film4-cream"]);
+    const grader = looks.graderFor("film4-cream", 3)!;
+    expect(grader(new FakeCanvas(10, 10), 10, 10, 0)).not.toBeNull();
+    // iPad Safari drops the context (sleep, memory pressure, background).
+    tablet.contexts[0]!.lost = true;
+    expect(grader(new FakeCanvas(10, 10), 10, 10, 1)).not.toBeNull();
+    expect(tablet.contexts).toHaveLength(2);
+    // The old context was handed back, not left to count against WebKit's few.
+    expect(tablet.contexts[0]!.released).toBe(true);
+    expect(looks.problem()).toBeNull();
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("failing on a fresh renderer too: off for this guest, logged once, tried again for the next", async () => {
+    const tablet = fakeGlTablet();
+    const log = vi.fn();
+    const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log });
+    await looks.preload(["film4-cream"]);
+    tablet.failNew = true;
+    const grader = looks.graderFor("film4-cream", 3)!;
+    expect(grader(new FakeCanvas(10, 10), 10, 10, 0)).toBeNull();
+    expect(grader(new FakeCanvas(10, 10), 10, 10, 1)).toBeNull();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(looks.problem()).toMatch(/context was lost/);
+    expect(looksErrorCode(looks.problem())).toBe("context_lost");
+    expect(tablet.contexts.length).toBeLessThanOrEqual(MAX_RENDERERS_PER_SESSION);
+    // The tablet recovers; the next guest gets the looks (and so the colour row) back.
+    tablet.failNew = false;
+    looks.newSession();
+    expect(looks.problem()).toBeNull();
+    expect(looks.graderFor("film4-cream", 4)!(new FakeCanvas(10, 10), 10, 10, 0)).not.toBeNull();
+  });
+
+  it("a new session with nothing wrong keeps the renderer it has", async () => {
+    const tablet = fakeGlTablet();
+    const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log: vi.fn() });
+    await looks.preload(["film4-cream"]);
+    looks.graderFor("film4-cream", 1)!(new FakeCanvas(10, 10), 10, 10, 0);
+    looks.newSession();
+    looks.graderFor("film4-cream", 2)!(new FakeCanvas(10, 10), 10, 10, 0);
+    expect(tablet.contexts).toHaveLength(1);
+  });
+
+  it("failure codes for the server log", () => {
+    expect(looksErrorCode(null)).toBeNull();
+    expect(looksErrorCode("WebGL is not available")).toBe("no_webgl");
+    expect(looksErrorCode("WebGL context was lost")).toBe("context_lost");
+    expect(looksErrorCode("Shader did not compile: x")).toBe("shader");
+    expect(looksErrorCode("Photo 9000×10 is over this GPU's 4096 px")).toBe("too_large");
+    expect(looksErrorCode("WebGL error 1285")).toBe("gl_error");
+    expect(looksErrorCode("something else")).toBe("other");
+  });
+
   it("a LUT that will not load is logged and that look is simply not applied", async () => {
     const log = vi.fn();
     const looks = createBoothLooks({
@@ -162,3 +226,40 @@ describe("createBoothLooks", () => {
     expect(a).toBeLessThan(30000);
   });
 });
+
+/**
+ * A tablet's WebGL, enough for LookRenderer: every call succeeds unless the context is lost.
+ * `failNew` makes every new context arrive already lost (a tablet that has not recovered yet).
+ */
+function fakeGlTablet() {
+  const contexts: { lost: boolean; released: boolean }[] = [];
+  const tablet = {
+    contexts,
+    failNew: false,
+    create: (): GlCanvas => {
+      const state = { lost: tablet.failNew, released: false };
+      contexts.push(state);
+      const gl = new Proxy(
+        {},
+        {
+          get(_target, prop) {
+            if (prop === "NO_ERROR") return 0;
+            if (prop === "MAX_TEXTURE_SIZE") return 3379;
+            if (typeof prop === "string" && /^[A-Z_0-9]+$/.test(prop)) return 1;
+            if (prop === "isContextLost") return () => state.lost;
+            if (prop === "getError") return () => 0;
+            if (prop === "getParameter") return () => 4096;
+            if (prop === "getExtension")
+              return (name: string) =>
+                name === "WEBGL_lose_context"
+                  ? { loseContext: () => void (state.released = true) }
+                  : null;
+            return () => ({});
+          },
+        },
+      );
+      return { width: 0, height: 0, getContext: () => gl as unknown as WebGLRenderingContext };
+    },
+  };
+  return tablet;
+}

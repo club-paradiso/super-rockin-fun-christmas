@@ -18,6 +18,15 @@ const limiter = new RateLimiter(12, 60_000);
 const CAMERA: CameraState[] = ["ok", "error", "unknown"];
 /** The codes of lib/retouch/types.ts `RetouchErrorCode`: short lower-case words, nothing else. */
 const RETOUCH_ERROR = /^[a-z]+(?:-[a-z]+){0,3}$/;
+/** lib/looks/booth.ts `LooksErrorCode`. */
+const LOOKS_ERROR = new Set([
+  "no_webgl",
+  "context_lost",
+  "shader",
+  "too_large",
+  "gl_error",
+  "other",
+]);
 
 /**
  * Enrolled kiosk → "I'm alive". Carries only operational state (queue depth, camera state,
@@ -41,6 +50,7 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     memoryMb?: unknown;
     retouchFailures?: unknown;
     retouchError?: unknown;
+    looksError?: unknown;
   };
   // Skin retouch failed on that booth since its last beat: a code and a count for the log, so a
   // booth that is quietly sending unretouched photos is seen (nothing about a face is sent).
@@ -61,6 +71,13 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       "warn",
     );
   }
+  // Colour looks failed on that booth (WebGL): its guests get no colour row until it recovers.
+  if (typeof body.looksError === "string" && LOOKS_ERROR.has(body.looksError))
+    logEvent(
+      "kiosk_looks_failed",
+      { kioskId: auth.kioskId ?? "dev", code: body.looksError },
+      "warn",
+    );
   // Wall displays only (docs/ARCHITECTURE.md 1.8). Anything odd is dropped, not stored.
   const frameRate =
     typeof body.frameRate === "number" && body.frameRate >= 0 && body.frameRate <= 240

@@ -193,12 +193,20 @@ export class LookRenderer {
     return this.canvas;
   }
 
-  /** Gives the GPU memory back (the booth calls it when a session ends). */
+  /**
+   * Gives the GPU memory back, and the context itself: older WebKit allows only a few WebGL
+   * contexts per page, so a renderer that is replaced after a failure must not keep its own.
+   */
   dispose(): void {
     const gl = this.gl;
-    for (const { texture } of this.lutTextures.values()) gl.deleteTexture(texture);
+    try {
+      for (const { texture } of this.lutTextures.values()) gl.deleteTexture(texture);
+      gl.deleteTexture(this.imageTexture);
+      gl.deleteProgram(this.program);
+      (gl.getExtension?.("WEBGL_lose_context") as WEBGL_lose_context | null)?.loseContext();
+    } catch {
+      // A lost context has nothing left to give back.
+    }
     this.lutTextures.clear();
-    gl.deleteTexture(this.imageTexture);
-    gl.deleteProgram(this.program);
   }
 }
