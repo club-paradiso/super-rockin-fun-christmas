@@ -24,12 +24,12 @@ test("the seven v2 cards show one persistent selection, 필름 3컷 first", asyn
   await expect(page.getByTestId("confirm-pick")).toHaveText("이 틀로 찍기");
 });
 
-test("the review has no retake at all: six photos and one way on", async ({ page }) => {
+test("the review: six photos, no seventh, one 다시 찍기 for all six", async ({ page }) => {
   await shootSixWithMock(page);
   const review = page.getByTestId("screen-review");
   await expect(review.locator(".review-photo")).toHaveCount(6);
   await expect(review.getByTestId("take-extra-shot")).toHaveCount(0);
-  await expect(review.getByText("다시 찍기", { exact: true })).toHaveCount(0);
+  await expect(review.getByText("다시 찍기", { exact: true })).toHaveCount(1);
   await expect(review.locator(".journal-tab")).toHaveText("03");
 });
 

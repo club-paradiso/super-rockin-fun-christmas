@@ -167,8 +167,10 @@
   width: 100%;
   height: 100%;
 }
+/* "처음으로" and "이전" side by side at the left (2026-11-25), the fullscreen switch at the right
+   (its own margin-left: auto). */
 .kiosk-root .booth-footer {
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 .kiosk-root .kiosk-fullscreen-corner {
   position: absolute;
@@ -313,6 +315,9 @@
 }
 .kiosk-root .booth-screen.booth-screen-v2 .booth-header {
   margin-bottom: calc(5 * var(--fx));
+  /* As tall as when "이전" sat in it (75), so nothing under it moved when "이전" went down to
+     the bar (2026-11-25). */
+  min-height: max(52px, calc(75 * var(--fx)));
 }
 .kiosk-root .booth-screen-v2 .letter-sheet.pick-v2,
 .kiosk-root .booth-screen-v2 .letter-sheet.options {
@@ -479,8 +484,9 @@
   outline-offset: 2px;
 }
 
-/* The bottom bar: "처음으로" at the left, the main button to the right edge of the content
-   (Figma: 30 → 204 and 224 → 732, 76 tall, 24 above the bottom), 32 below the content. It stays
+/* The bottom bar: "처음으로" at the left, then "이전" where there is a way back, the main button
+   to the right edge of the content (Figma: 30 → 204, 224 → 333, 353 → 732; without "이전" the
+   main button starts at 224; 76 tall, 24 above the bottom), 32 below the content. It stays
    at the bottom of the booth's one scroll area if a screen ever runs long. */
 .kiosk-root .booth-screen-v2 .booth-footer.booth-footer-bar {
   position: sticky;
@@ -496,6 +502,10 @@
   flex: none;
   width: calc(174 * var(--fx));
   min-width: max-content;
+}
+/* "이전" in the bar: 224 → 333, the width it had in the header (Figma 898:1677, 2026-11-25). */
+.kiosk-root .booth-screen-v2 .booth-footer-bar .booth-back-btn {
+  width: calc(109 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
   flex: 1 1 auto;

@@ -2,8 +2,8 @@
   "screen": "pick",
   "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.459,
-  "meanDeltaE": 0.269,
+  "overPct": 1.345,
+  "meanDeltaE": 0.239,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",

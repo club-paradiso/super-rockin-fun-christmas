@@ -1388,7 +1388,7 @@ body {
     height: 100%;
     object-fit: cover;
   }
-  /* Review prints are no longer per-photo retake buttons. All six are preserved. */
+  /* No per-photo retake: 「다시 찍기」 (a secondary button) replaces all six, after asking. */
   .review-actions {
     display: flex;
     flex-wrap: wrap;
@@ -2101,8 +2101,13 @@ body {
     .look-row {
       grid-area: looks;
     }
+    /* Stacked beside the prints: the main button on top, 「다시 찍기」 under it. */
+    .review-actions {
+      flex-direction: column-reverse;
+      flex-wrap: nowrap;
+    }
     .review-actions > * {
-      flex-basis: 100%;
+      flex-basis: auto;
     }
     .select-grid {
       --cols: 3;

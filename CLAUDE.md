@@ -94,7 +94,10 @@ looks:measure`). `/looks` is the comparison
   offers the eight cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
   4컷, Figma 924:2026, added 2026-11-24); a card with options (colour, logo) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아); the guest then shoots six, reviews, chooses the photos. There is no
-  "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). Every option
+  "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). The one way
+  past the shots is 「다시 찍기」 on the review screen (a user decision, 2026-11-25): it asks first,
+  throws all six away (and the session video) and shoots six again in the same frame,
+  `KIOSK_CONFIG.retakesPerSession` times (1); never once the photos are chosen. Every option
   combination is its own frame id. The earlier 20 frames (`FRAMES`) stay only for photos already
   stored; neither the booth nor the phone page offers them (D113).
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
@@ -234,7 +237,11 @@ looks:measure`). `/looks` is the comparison
   `lib/kiosk/copy.ts` in all three languages; never hard-code booth copy in a component. A frame
   or pose carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
   `:lang(zh-Hans)` (own font, no `word-break: keep-all`): keep `<html lang>` on `HTML_LANG`. Korean copy is the user's wording (D76). "이전" exists only
-  where `canGoBack` allows it: never once a shot exists or the frame is final.
+  where `canGoBack` allows it, a step that loses nothing: frame pick → welcome, options → pick,
+  camera before the first shot → options, photo choice → review (the choice kept), phone QR →
+  welcome; never during shooting, on the review, or once the photos are chosen. It sits in the
+  footer beside "처음으로" (a user decision, 2026-11-25; Figma `Kiosk/Footer` Type=HomeBack),
+  never in the header.
 - **The booth is a ring-bound memory journal** (D104): the `LetterSheet` export and
   `data-testid="letter-sheet"` remain for compatibility, but the kiosk UI shows a leather-look
   journal cover, binder rings, numbered chapter tabs and a QR bookmark. See the
