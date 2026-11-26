@@ -511,6 +511,17 @@
   line-height: 1.2;
   word-spacing: calc(var(--space-fix, 0) * 1em);
 }
+/* Figma's ✓ is a glyph of the 18 px label here, not of the 22 px one: the drawn mark scales with
+   it (16.6 × 18.9 at 22 px, × 18/22). The gap was measured on 1055:3631 instead of scaled: with
+   2.9 the mark and the text start on Figma's pixels (2.4 and 3.45 both put them a pixel off). */
+.kiosk-root .booth-screen-v2 .options-grid .v2-mark-check {
+  width: calc(13.58 * var(--fx));
+  height: calc(15.46 * var(--fx));
+  top: calc(1.06 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-grid .options-choice {
+  gap: calc(2.9 * var(--fx));
+}
 /* The grid has no 2 px inset as the two-answer row (64 tall, 60 tall answers) has, so nothing
    makes up for it: the preview ends 12 above the first answer and the grid 4 above the bar. */
 .kiosk-root .booth-screen-v2 .options-preview.options-preview-grid {
