@@ -64,13 +64,17 @@ export interface PrefetchTimers {
 export const PREFETCH_GAP_MS = 40;
 
 /**
- * Runs the jobs one at a time, each in its own task, skipping any already done. Returns a function that stops the rest. A job that throws is skipped: background work
+ * Runs the jobs one at a time, each in its own task, skipping any already done, and waiting while
+ * `busy()` says the guest has just touched the screen or a screen has just appeared. Returns a function that stops the rest. A job that throws is skipped: background work
  * must never break the booth (the screen then draws that picture itself, as it always did).
  */
 export function prefetch(
   jobs: readonly PrefetchJob[],
   timers: PrefetchTimers = globalThis,
   gapMs = PREFETCH_GAP_MS,
+  startAfterMs = gapMs,
+  /** True while the guest is in the middle of something: the next drawing waits a gap. */
+  busy: () => boolean = () => false,
 ): () => void {
   let index = 0;
   let stopped = false;
@@ -78,6 +82,10 @@ export function prefetch(
   const next = () => {
     timer = null;
     if (stopped) return;
+    if (busy()) {
+      timer = timers.setTimeout(next, gapMs);
+      return;
+    }
     while (index < jobs.length && jobs[index]!.done()) index++;
     const job = jobs[index++];
     if (!job) return;
@@ -88,7 +96,7 @@ export function prefetch(
     }
     timer = timers.setTimeout(next, gapMs);
   };
-  timer = timers.setTimeout(next, gapMs);
+  timer = timers.setTimeout(next, startAfterMs);
   return () => {
     stopped = true;
     if (timer !== null) timers.clearTimeout(timer);

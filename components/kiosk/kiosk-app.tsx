@@ -122,7 +122,7 @@ import {
   useHandFontCycle,
   useServerClock,
 } from "./frame-preview";
-import { prefetch, RenderCache, type PrefetchJob } from "@/lib/kiosk/render-cache";
+import { prefetch, PREFETCH_GAP_MS, RenderCache, type PrefetchJob } from "@/lib/kiosk/render-cache";
 import { HAND_FONTS } from "@/config/hand-fonts";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import {
@@ -191,6 +191,13 @@ const LOOK_CHIP_EDGE = 280;
  * (one per option and handwriting font). Small JPEG data URLs; the oldest go first.
  */
 const PREVIEW_CACHE_LIMIT = 48;
+/** How long "화면을 눌러 시작" stays untouched before the picker cards are drawn ahead. */
+const PREVIEW_PREFETCH_QUIET_MS = 1500;
+/**
+ * No background drawing this long after a screen appears or a finger touches: longer than the
+ * double-tap guard's window (TAP_GUARD_MS, 350), so a drawing never delays a tap it must judge.
+ */
+const PREFETCH_QUIET_AFTER_TAP_MS = 600;
 
 /** Longest edge of a graded shot on the review and choice screens: they are shown small. */
 const GRADED_SHOT_EDGE = 480;
@@ -414,7 +421,23 @@ export function KioskApp({
   const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}:${privateDelivery}`;
   // When the screen on show appeared, and what made the last press: finger taps in the first
   // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
-  const tapRef = useRef({ screenShownAt: 0, pointerType: "", previousTouchAt: -Infinity });
+  const tapRef = useRef({
+    screenShownAt: 0,
+    pointerType: "",
+    previousTouchAt: -Infinity,
+    // Any press, accepted or not: background drawing (lib/kiosk/render-cache.ts) waits after it.
+    pointerDownAt: -Infinity,
+  });
+  // A screen that has just appeared or a finger that has just touched: no background drawing
+  // now, so the next tap is handled at once and the double-tap guard sees its true time.
+  const guestBusy = useCallback(() => {
+    const now = performance.now();
+    const { screenShownAt, pointerDownAt } = tapRef.current;
+    return (
+      now - screenShownAt < PREFETCH_QUIET_AFTER_TAP_MS ||
+      now - pointerDownAt < PREFETCH_QUIET_AFTER_TAP_MS
+    );
+  }, []);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     tapRef.current.screenShownAt = performance.now();
@@ -854,8 +877,8 @@ export function KioskApp({
           run: () => gradedShotFor(store, looks, lookFrameId, lookSeed, lookId, shot, index),
         });
     }
-    return prefetch(jobs);
-  }, [looks, lookFrameId, lookSeed, state.shots, allShot, shotPictures]);
+    return prefetch(jobs, globalThis, PREFETCH_GAP_MS, PREFETCH_GAP_MS, guestBusy);
+  }, [looks, lookFrameId, lookSeed, state.shots, allShot, shotPictures, guestBusy]);
 
   // The live camera picture of a black-and-white frame is black and white too.
   const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
@@ -934,8 +957,10 @@ export function KioskApp({
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
   }, [samples, assets, previewing, thumbScale, preview, previews]);
-  // Between guests (the attract and welcome screens): the eight picker cards, ahead of time.
-  const betweenGuests = state.phase === "attract" || state.phase === "welcome";
+  // Between guests: the picker cards, ahead of time, only on "화면을 눌러 시작" and only once it has
+  // been quiet for a moment. Never on the welcome screen: a drawing there holds up the guest's
+  // first deliberate tap, and a late tap slips past the double-tap guard (lib/kiosk/tap-guard.ts).
+  const betweenGuests = state.phase === "attract";
   useEffect(() => {
     if (!betweenGuests || !samples || !assets) return;
     // While the LUTs are loading the previews would be drawn twice: wait for them.
@@ -945,8 +970,12 @@ export function KioskApp({
         const job = preview(card.frame(defaultOptions(card)), thumbScale);
         return { done: job.done, run: job.make };
       }),
+      globalThis,
+      PREFETCH_GAP_MS,
+      PREVIEW_PREFETCH_QUIET_MS,
+      guestBusy,
     );
-  }, [betweenGuests, samples, assets, looks, looksNow, preview, thumbScale]);
+  }, [betweenGuests, samples, assets, looks, looksNow, preview, thumbScale, guestBusy]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
   // Each font's picture is kept, and the next font is drawn ahead in the 1.2 s before it shows.
@@ -965,8 +994,14 @@ export function KioskApp({
     const at = HAND_FONTS.findIndex((f) => f.id === previewFont);
     const nextFont = HAND_FONTS[(at + 1) % HAND_FONTS.length]!.id;
     const job = preview(getFrame(optionsFrameId), optionScale, nextFont);
-    return prefetch([{ done: job.done, run: job.make }]);
-  }, [optionsFrameId, cyclingFonts, previewFont, optionScale, preview]);
+    return prefetch(
+      [{ done: job.done, run: job.make }],
+      globalThis,
+      PREFETCH_GAP_MS,
+      PREFETCH_GAP_MS,
+      guestBusy,
+    );
+  }, [optionsFrameId, cyclingFonts, previewFont, optionScale, preview, guestBusy]);
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
@@ -1556,6 +1591,7 @@ export function KioskApp({
           ref={scrollRef}
           onPointerDownCapture={(e) => {
             tapRef.current.pointerType = e.pointerType;
+            tapRef.current.pointerDownAt = performance.now();
           }}
           onClickCapture={(e) => {
             const now = performance.now();

@@ -71,4 +71,23 @@ describe("prefetch", () => {
     tick();
     expect(ran).toEqual(["b"]);
   });
+
+  it("waits while the guest is busy, and starts only after its quiet time", () => {
+    const delays: number[] = [];
+    const queue: (() => void)[] = [];
+    const timers: PrefetchTimers = {
+      setTimeout: (fn, ms) => (delays.push(ms), queue.push(fn)),
+      clearTimeout: () => queue.splice(0),
+    };
+    let busy = true;
+    const ran: string[] = [];
+    prefetch([{ done: () => false, run: () => ran.push("a") }], timers, 40, 1500, () => busy);
+    expect(delays).toEqual([1500]);
+    queue.shift()!();
+    expect(ran).toEqual([]); // a finger just touched: wait another gap
+    expect(delays).toEqual([1500, 40]);
+    busy = false;
+    queue.shift()!();
+    expect(ran).toEqual(["a"]);
+  });
 });
