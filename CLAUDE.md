@@ -230,7 +230,7 @@ looks:measure`). `/looks` is the comparison
   selection, consent or upload rules.
 - **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
   decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, text only; no
-  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (10 s).
+  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26).
   `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
 - **The booth language is a view too** (D78, D89): `lang` in `lib/kiosk/machine.ts` (Korean,
   English or Simplified Chinese; every guest starts in Korean). Every guest string lives in

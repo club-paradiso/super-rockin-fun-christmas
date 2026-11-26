@@ -15,9 +15,9 @@ export const KIOSK_CONFIG = {
   /**
    * Seconds counted before every shot (D71). The single kiosk flow has no easy-mode override (D89).
    * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
-   * the E2E run does not wait 6 × 10 s per session. Do not set it on a real booth.
+   * the E2E run does not wait 6 × 5 s per session. Do not set it on a real booth.
    */
-  countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 10),
+  countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 5),
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview
    * box uses the same ratio with object-fit: cover, so what the guest sees is what is saved.
