@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import sharp from "sharp";
 import {
   SHOOT_TIMEOUT,
   answerForQr,
@@ -93,6 +94,16 @@ test("happy path: frame → options → 6 shots → select → consent YES → u
   const fileDownload = phone.waitForEvent("download");
   await phone.getByTestId("file-download").click();
   expect((await fileDownload).suggestedFilename()).toMatch(/\.jpg$/);
+  // The Instagram story copy: 1080 × 1920, drawn on the phone (no share sheet here: a download).
+  const story = phone.getByTestId("save-story");
+  await expect(story).toHaveAttribute("data-ready", "true");
+  await expect(phone.locator(".btn-primary")).toHaveCount(1);
+  const storyDownload = phone.waitForEvent("download");
+  await story.click();
+  const storyFile = await storyDownload;
+  expect(storyFile.suggestedFilename()).toMatch(/^studio-shalom-story-\d{4}-\d{2}-\d{2}\.jpg$/);
+  const storyMeta = await sharp(await storyFile.path()).metadata();
+  expect([storyMeta.format, storyMeta.width, storyMeta.height]).toEqual(["jpeg", 1080, 1920]);
   await phoneContext.close();
 
   await expect
