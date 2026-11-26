@@ -1807,7 +1807,12 @@ function Screen(p: ScreenProps) {
     case "options": {
       // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷).
       const card = getCard(state.cardId);
-      const title = card.options.length > 1 ? t.option.titleColorLogo : t.option.titleColor;
+      const title =
+        card.options.length > 1
+          ? t.option.titleColorLogo
+          : card.options[0]?.key === "theme"
+            ? t.option.titleTheme
+            : t.option.titleColor;
       return (
         <BoothScreen
           testId="screen-options"
@@ -1851,6 +1856,7 @@ function Screen(p: ScreenProps) {
               <div
                 key={option.key}
                 className="options-row"
+                data-many={option.values.length > 3 ? "" : undefined}
                 role="radiogroup"
                 aria-label={t.label[option.key]}
               >
