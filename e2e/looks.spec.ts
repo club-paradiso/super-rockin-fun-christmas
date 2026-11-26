@@ -588,6 +588,72 @@ test.describe("the booth with looks", () => {
       await context.close();
     });
 
+  test("a tablet that loses WebGL keeps the colour row: a fresh context for this guest, a new try for the next", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await enrollKiosk(page);
+    // Every WebGL context the booth makes, and a switch that makes new ones fail (a tablet that
+    // has not recovered yet). iPad Safari drops contexts on sleep, memory pressure, background.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __gl: WebGLRenderingContext[]; __glDead: boolean };
+      w.__gl = [];
+      w.__glDead = false;
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string) {
+        if ((type === "webgl" || type === "experimental-webgl") && w.__glDead) return null;
+        // eslint-disable-next-line prefer-rest-params
+        const made = original.apply(this, arguments as never);
+        if (type === "webgl" && made) w.__gl.push(made as unknown as WebGLRenderingContext);
+        return made;
+      } as typeof original;
+    });
+    const loseAll = () =>
+      page.evaluate(() => {
+        for (const gl of (window as unknown as { __gl: WebGLRenderingContext[] }).__gl)
+          gl.getExtension("WEBGL_lose_context")?.loseContext();
+      });
+    const setDead = (dead: boolean) =>
+      page.evaluate((d) => {
+        (window as unknown as { __glDead: boolean }).__glDead = d;
+      }, dead);
+    const goHome = async () => {
+      await page.getByTestId("go-home").click();
+      await page.getByRole("button", { name: "처음으로 갈게요" }).click();
+      await expect(page.getByTestId("screen-attract")).toBeVisible();
+    };
+    const shootToSelect = async () => {
+      await startSession(page, "film4");
+      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+      await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    };
+
+    // No ?looks: the staff switch (on by default) decides, as on the event's tablets.
+    await page.goto("/kiosk?camera=mock");
+    await shootToSelect();
+    // The context is lost before the choice screen draws the row: drawn again on a fresh one.
+    await loseAll();
+    await toSelect(page);
+    await expect(page.getByTestId("look-row")).toBeVisible();
+    await expect(page.getByTestId("look-row").getByRole("radio")).toHaveCount(4);
+
+    // Next guest: WebGL is gone for a while. This guest has no row (all or nothing)...
+    await goHome();
+    await setDead(true);
+    await loseAll();
+    await shootToSelect();
+    await toSelect(page);
+    await expect(page.getByTestId("select-shot-0")).toBeVisible();
+    await expect(page.getByTestId("look-row")).toHaveCount(0);
+
+    // ...and once the tablet has it again, the guest after gets the row back without a reload.
+    await goHome();
+    await setDead(false);
+    await shootToSelect();
+    await toSelect(page);
+    await expect(page.getByTestId("look-row")).toBeVisible();
+  });
+
   test("looks off: the choice screen has no colour row", async ({ page }) => {
     test.setTimeout(120_000);
     await enrollKiosk(page);
