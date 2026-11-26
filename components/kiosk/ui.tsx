@@ -125,7 +125,7 @@ export function Stepper({ step, total }: { step: number; total: number }) {
 }
 
 /**
- * One booth screen: header (way back, wordmark, progress), the letter sheet, footer. The sheet
+ * One booth screen: header (wordmark, progress), the letter sheet, footer (way home, way back). The sheet
  * takes the height that is left; `className` lays out what is on it (see "Screens" in
  * app/globals.css). The screen fills the booth and grows only when its content cannot fit, in
  * which case the booth's scroll area scrolls.
@@ -156,8 +156,7 @@ export function BoothScreen({
   onClick?: () => void;
 }) {
   const chrome = useKioskChrome();
-  const back = chrome?.goBack ?? null;
-  const showHeader = header && (progress || back);
+  const showHeader = header && progress;
   return (
     <section
       data-testid={testId}
@@ -165,19 +164,9 @@ export function BoothScreen({
       onClick={onClick}
     >
       {showHeader && (
-        <header className={`booth-header ${back ? "booth-header-back" : ""}`}>
+        <header className="booth-header">
+          {/* "이전" is in the footer, beside "처음으로" (2026-11-25). */}
           <div className="booth-header-left">
-            {/* One step back, where nothing the guest made is lost (D78). */}
-            {back && (
-              <button
-                type="button"
-                className="booth-chrome-btn"
-                onClick={back}
-                data-testid="go-back"
-              >
-                <span aria-hidden>‹</span> {chrome!.t.chrome.back}
-              </button>
-            )}
             <BrandWordmark className="booth-wordmark" />
           </div>
           {progress && <Stepper step={progress.step} total={progress.total} />}

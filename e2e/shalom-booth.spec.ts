@@ -61,6 +61,72 @@ test("이전: frame pick → welcome, camera → frame pick, never during or aft
   await expect(page.getByTestId("go-back")).toHaveCount(0);
 });
 
+test("이전 sits in the bottom bar beside 처음으로, never in the header", async ({ page }) => {
+  await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
+  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  const pick = page.getByTestId("screen-pick");
+  await expect(pick.locator(".booth-header [data-testid='go-back']")).toHaveCount(0);
+  const bar = pick.getByTestId("booth-footer");
+  // 처음으로 → 이전 → the main button, left to right, on one line.
+  const [home, back, next] = await Promise.all([
+    bar.getByTestId("go-home").boundingBox(),
+    bar.getByTestId("go-back").boundingBox(),
+    bar.getByTestId("confirm-pick").boundingBox(),
+  ]);
+  expect(home!.x + home!.width).toBeLessThan(back!.x);
+  expect(back!.x + back!.width).toBeLessThan(next!.x);
+  expect(Math.abs(home!.y - back!.y)).toBeLessThanOrEqual(1);
+  expect(back!.height).toBeGreaterThanOrEqual(52);
+});
+
+test("이전: photo choice → review keeps the choice; the phone QR → welcome", async ({ page }) => {
+  await shootSixWithMock(page);
+  await toSelect(page);
+  await page.getByTestId("select-shot-4").click();
+  await page.getByTestId("select-shot-1").click();
+  await page.getByTestId("go-back").click();
+  await expect(page.getByTestId("screen-review")).toBeVisible();
+  await expect(page.getByTestId("go-back")).toHaveCount(0);
+  await toSelect(page);
+  await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("select-shot-1")).toHaveAttribute("aria-pressed", "true");
+
+  await page.goto("/kiosk?camera=mock");
+  await openWelcome(page);
+  await page.getByRole("button", { name: /내 사진으로 참여하기/ }).click();
+  await expect(page.getByTestId("screen-mobile")).toBeVisible();
+  await page.getByTestId("go-back").click();
+  await expect(page.getByTestId("screen-welcome")).toBeVisible();
+});
+
+test("다시 찍기: asks first, shoots all six again in the same frame, once, and the QR works", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await shootSixWithMock(page);
+  const review = page.getByTestId("screen-review");
+  // Changing one's mind keeps the six.
+  await review.getByTestId("retake").click();
+  const dialog = page.getByTestId("confirm-retake");
+  await expect(dialog).toContainText("사진 6장은 지워지고");
+  await dialog.getByRole("button", { name: "이대로 둘게요" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(review.locator(".review-photo img")).toHaveCount(6);
+
+  await review.getByTestId("retake").click();
+  await page.getByTestId("confirm-retake-yes").click();
+  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("retake")).toHaveCount(0);
+  await toSelect(page);
+  await selectDefaultPhotos(page);
+  await expect(page.getByTestId("screen-consent")).toBeVisible();
+  const url = await answerForQr(page, "no");
+  expect((await page.request.get(`${url}/image`)).status()).toBe(200);
+});
+
 test("English: the whole booth in English, the next guest back in Korean", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
   await openWelcome(page);

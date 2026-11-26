@@ -6,6 +6,7 @@ import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
   canGoBack,
+  canRetake,
   capturedCount,
   createInitialState as attractState,
   currentPose,
@@ -144,8 +145,134 @@ describe("no extra photo, no second frame choice (v2)", () => {
       { type: "SET_OPTION", key: "color", value: "sepia" },
       { type: "BACK" },
     );
-    expect([s.phase, s.frameId]).toEqual(["select", frameId]);
-    expect(canGoBack(select)).toBe(false);
+    // "이전" from the photo choice is the review, never a frame choice.
+    expect([s.phase, s.frameId]).toEqual(["review", frameId]);
+    expect(canGoBack(s)).toBe(false);
+    expect(run(s, { type: "BACK" })).toBe(s);
+  });
+});
+
+describe("이전 where nothing is lost (2026-11-25)", () => {
+  it("photo choice → review keeps the shots, the choice, the look and the retouch answer", () => {
+    const select = run(
+      toReview(),
+      { type: "CONFIRM_SHOTS" },
+      { type: "TOGGLE_SHOT_SELECTION", index: 4 },
+      { type: "TOGGLE_SHOT_SELECTION", index: 1 },
+      { type: "SET_LOOK", lookId: "ink" },
+    );
+    expect(canGoBack(select)).toBe(true);
+    const back = run(select, { type: "BACK" });
+    expect(back.phase).toBe("review");
+    expect(back.shots).toEqual(select.shots);
+    const again = run(back, { type: "CONFIRM_SHOTS" });
+    expect(again.phase).toBe("select");
+    expect(again.selectedShotIndices).toEqual([4, 1]);
+    expect(again.lookId).toBe("ink");
+  });
+
+  it("never once the photos are chosen: the picture is being made and uploaded", () => {
+    const consent = selectAll(toReview(), true);
+    expect(consent.phase).toBe("consent");
+    expect(canGoBack(consent)).toBe(false);
+    expect(run(consent, { type: "BACK" })).toBe(consent);
+    const delivery = run(consent, { type: "SET_CONSENT", consent: "no" });
+    expect(canGoBack(delivery)).toBe(false);
+  });
+
+  it("the phone QR → welcome, until the phone's photo is in", () => {
+    const waiting = run(init(), { type: "START_MOBILE" });
+    expect(canGoBack(waiting)).toBe(true);
+    expect(run(waiting, { type: "BACK" })).toMatchObject({
+      phase: "welcome",
+      mobile: { status: "idle" },
+    });
+    const ready = run(waiting, {
+      type: "MOBILE_READY",
+      sessionId: "m",
+      url: "u",
+      expiresAt: "e",
+      via: "lan",
+    });
+    expect(run(ready, { type: "BACK" }).phase).toBe("welcome");
+    // A late answer about the QR that was left changes nothing.
+    const left = run(ready, { type: "BACK" });
+    expect(run(left, { type: "MOBILE_RECEIVED", sessionId: "m" })).toBe(left);
+    const received = run(ready, { type: "MOBILE_RECEIVED", sessionId: "m" });
+    expect(canGoBack(received)).toBe(false);
+    expect(run(received, { type: "BACK" })).toBe(received);
+  });
+
+  it("never during shooting, the review or the camera error", () => {
+    const counting = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    expect(canGoBack(counting)).toBe(false);
+    expect(canGoBack(toReview())).toBe(false);
+    const error = run(toReady(), { type: "CAMERA_FAILED", kind: "failed" });
+    expect(canGoBack(error)).toBe(false);
+  });
+});
+
+describe("다시 찍기 (2026-11-25)", () => {
+  const withRetakes = (n: number) =>
+    createInitialState<string>({ shotCount: 6, countdownSeconds: 3, retakesPerSession: n });
+  const review = (n = 1) => shootSix(toReady(withRetakes(n)));
+
+  it("is off unless the booth allows it", () => {
+    const s = toReview();
+    expect(s.retakesLeft).toBe(0);
+    expect(canRetake(s)).toBe(false);
+    expect(run(s, { type: "RETAKE" })).toBe(s);
+  });
+
+  it("throws the six shots away and opens the camera again, same frame and font", () => {
+    const s = review();
+    expect(canRetake(s)).toBe(true);
+    const r = run(s, { type: "RETAKE" });
+    expect(r.phase).toBe("camera");
+    expect(r.shots).toEqual([null, null, null, null, null, null]);
+    expect([r.frameId, r.handFont, r.sessionId]).toEqual([s.frameId, s.handFont, s.sessionId]);
+    expect([r.selectedShotIndices, r.lookId, r.poseGuide]).toEqual([[], null, false]);
+    expect(r.retakesLeft).toBe(0);
+    // Shoot again: six new shots, and no second retake.
+    const again = shootSix(run(r, { type: "CAMERA_READY" }));
+    expect(again.phase).toBe("review");
+    expect(capturedCount(again)).toBe(6);
+    expect(canRetake(again)).toBe(false);
+  });
+
+  it("only on the review screen: not from the photo choice, not once the photos are chosen", () => {
+    const select = run(review(), { type: "CONFIRM_SHOTS" });
+    expect(canRetake(select)).toBe(false);
+    expect(run(select, { type: "RETAKE" })).toBe(select);
+    // From the photo choice the way is "이전" first.
+    expect(run(select, { type: "BACK" }, { type: "RETAKE" }).phase).toBe("camera");
+    const consent = selectAll(review(), true);
+    expect(run(consent, { type: "RETAKE" })).toBe(consent);
+    const shooting = run(toReady(withRetakes(1)), { type: "BEGIN_SHOOTING", guide: false });
+    expect(run(shooting, { type: "RETAKE" })).toBe(shooting);
+  });
+
+  it("the retouch answer and look go back to the booth's defaults", () => {
+    const s = createInitialState<string>({
+      shotCount: 6,
+      countdownSeconds: 3,
+      retakesPerSession: 2,
+      retouch: "natural",
+    });
+    const select = run(
+      shootSix(toReady(s)),
+      { type: "CONFIRM_SHOTS" },
+      { type: "SET_RETOUCH", level: "off" },
+      { type: "SET_LOOK", lookId: "ink" },
+    );
+    const r = run(select, { type: "BACK" }, { type: "RETAKE" });
+    expect([r.retouch, r.lookId, r.retakesLeft]).toEqual(["natural", null, 1]);
+  });
+
+  it("the next guest gets the booth's allowance again", () => {
+    const used = run(review(), { type: "RETAKE" });
+    expect(used.retakesLeft).toBe(0);
+    expect(run(used, { type: "RESET" }).retakesLeft).toBe(1);
   });
 });
 
@@ -504,14 +631,14 @@ describe("ordered selection", () => {
     expect(three.selectedShotIndices).toEqual([5, 4, 3]);
     expect(run(three, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
-  it("deselects; there is no way back to a frame choice", () => {
+  it("deselects; 이전 is the review, never a frame choice", () => {
     const s = run(
       prepare(),
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
       { type: "BACK" },
     );
-    expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["select", [], "idle"]);
+    expect([s.phase, s.selectedShotIndices, s.delivery.status]).toEqual(["review", [], "idle"]);
   });
 });
 
@@ -702,22 +829,26 @@ describe("back (D78): one step, never losing what the guest made", () => {
     expect([reconnected.phase, canGoBack(reconnected)]).toEqual(["ready", false]);
     const review = toReview();
     expect(canGoBack(review)).toBe(false);
-    const select = run(review, { type: "CONFIRM_SHOTS" });
-    expect(canGoBack(select)).toBe(false);
     const consent = selectAll(review, true);
     expect(consent.phase).toBe("consent");
     expect(canGoBack(consent)).toBe(false);
     expect(run(consent, { type: "BACK" })).toBe(consent);
   });
 
-  it("photo selection has no way back (v2: the frame is fixed once shooting starts)", () => {
+  it("photo selection goes back to the review only (v2: the frame is fixed once shooting starts)", () => {
     const select = run(
       toReview(),
       { type: "CONFIRM_SHOTS" },
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
     );
-    expect(canGoBack(select)).toBe(false);
-    expect(run(select, { type: "BACK" })).toBe(select);
+    expect(canGoBack(select)).toBe(true);
+    const back = run(select, { type: "BACK" });
+    expect([back.phase, back.frameId, back.selectedShotIndices]).toEqual([
+      "review",
+      select.frameId,
+      [2],
+    ]);
+    expect(run(back, { type: "BACK" })).toBe(back);
   });
 });
 

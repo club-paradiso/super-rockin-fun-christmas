@@ -138,6 +138,16 @@ const ko = {
   review: {
     title: "잘 나왔나요?",
     confirm: "이대로 좋아요",
+    // 「다시 찍기」 (2026-11-25): Claude's wording, not yet the user's (D76).
+    retake: "다시 찍기",
+    retakeTitle: "다시 찍을까요?",
+    retakeLead: (shots: number, left: number) =>
+      `지금 찍은 사진 ${shots}장은 지워지고, 같은 틀로 처음부터 다시 찍어요.` +
+      (left === 1
+        ? "\n다시 찍기는 한 번만 할 수 있어요."
+        : `\n다시 찍기는 ${left}번 할 수 있어요.`),
+    retakeYes: "다시 찍을게요",
+    retakeNo: "이대로 둘게요",
   },
   select: {
     title: (required: number, total: number) => `${total}장 중 ${required}장을 골라주세요`,
@@ -150,7 +160,8 @@ const ko = {
     // user's instruction to build it first: the user's own wording replaces these (D76).
     lookTitle: "색감",
     lookNext: "다음",
-    lookPrev: "이전",
+    // Not "이전": that is the step back in the bottom bar of the same screen (2026-11-25).
+    lookPrev: "앞장",
     lookChoose: (name: string) => `${name} 색감으로 바꾸기`,
     looks: {
       paper: "페이퍼",
@@ -384,6 +395,13 @@ const en: KioskCopy = {
   review: {
     title: "How did they turn out?",
     confirm: "Looks good",
+    retake: "Retake",
+    retakeTitle: "Retake your photos?",
+    retakeLead: (shots, left) =>
+      `These ${shots} photos will be deleted and you’ll start again with the same frame.` +
+      (left === 1 ? "\nYou can only do this once." : `\nYou can do this ${left} times.`),
+    retakeYes: "Retake",
+    retakeNo: "Keep these",
   },
   select: {
     title: (required, total) => `Pick ${required} of your ${total} photos`,
@@ -394,7 +412,7 @@ const en: KioskCopy = {
     confirm: "Finish with these",
     lookTitle: "Colour",
     lookNext: "Next",
-    lookPrev: "Back",
+    lookPrev: "Previous",
     lookChoose: (name) => `Change the colour to ${name}`,
     looks: {
       paper: "Paper",
@@ -612,6 +630,13 @@ const zh: KioskCopy = {
   review: {
     title: "拍得好看吗？",
     confirm: "就这样吧",
+    retake: "重拍",
+    retakeTitle: "要重拍吗？",
+    retakeLead: (shots, left) =>
+      `已拍的 ${shots} 张照片会被删除，用同一个相框从头重拍。` +
+      (left === 1 ? "\n只能重拍一次。" : `\n还可以重拍 ${left} 次。`),
+    retakeYes: "重拍",
+    retakeNo: "保留这些",
   },
   select: {
     title: (required, total) => `请从 ${total} 张中选 ${required} 张`,

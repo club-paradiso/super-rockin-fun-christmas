@@ -129,12 +129,13 @@ test("decline path: consent NO leaves the download working and nothing queued fo
 test("v2: no extra photo, no second frame choice, the steps are dots only", async ({ page }) => {
   await shootFourWithMock(page);
   const review = page.getByTestId("screen-review");
-  // 이대로 좋아요 and 처음으로 (plus the fullscreen switch in the footer): no retake of any kind.
+  // 이대로 좋아요, 다시 찍기 (all six, 2026-11-25) and 처음으로 (plus the fullscreen switch in the
+  // footer): never a seventh photo or a single-photo retake.
   const labels = await review
     .locator("button:not([data-testid='fullscreen-toggle'])")
     .allInnerTexts();
   expect(labels.map((l) => l.replace(/\s+/g, " ").trim()).sort()).toEqual(
-    ["← 처음으로", "이대로 좋아요"].sort(),
+    ["← 처음으로", "다시 찍기", "이대로 좋아요"].sort(),
   );
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
@@ -145,7 +146,8 @@ test("v2: no extra photo, no second frame choice, the steps are dots only", asyn
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
   await expect(page.getByText("6장 중 3장을 골라주세요")).toBeVisible();
-  await expect(page.getByTestId("go-back")).toHaveCount(0);
+  // "이전" from the photo choice is the review (the shots), never a frame choice.
+  await expect(page.getByTestId("go-back")).toHaveCount(1);
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
 });
 

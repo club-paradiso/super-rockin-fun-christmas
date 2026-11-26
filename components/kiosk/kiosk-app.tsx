@@ -57,6 +57,7 @@ import {
 } from "@/lib/looks/config";
 import {
   canGoBack,
+  canRetake,
   capturedCount,
   createInitialState,
   currentPose,
@@ -280,6 +281,7 @@ export function KioskApp({
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       lastHandFont: readStoredHandFont(),
       retouch: skinRetouch,
+      retakesPerSession: KIOSK_CONFIG.retakesPerSession,
     }),
   );
   // The previous session's handwriting font survives a reload, so the next one still differs.
@@ -292,6 +294,8 @@ export function KioskApp({
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
+  /** 「다시 찍기」 asks first: the six shots are thrown away. */
+  const [confirmRetake, setConfirmRetake] = useState(false);
   const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
@@ -472,11 +476,28 @@ export function KioskApp({
     setTicket(null);
     setMobileQr(null);
     setConfirmHome(false);
+    setConfirmRetake(false);
     setPrivateDelivery(false);
     setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
   }, []);
+
+  /**
+   * 「다시 찍기」: the guest threw the six shots away. Nothing of them is kept: their pictures, and
+   * the session video (closed when the photos were first chosen, or still open), so the video
+   * that follows the photo is of the round that made it. Nothing was uploaded yet.
+   */
+  const retake = useCallback(() => {
+    setConfirmRetake(false);
+    recorderRef.current?.discard();
+    videosRef.current.delete(state.sessionId);
+    dispatch({ type: "RETAKE" });
+    releaseUrls(urlsRef.current);
+    urlsRef.current.clear();
+    releaseCanvases(shotCanvasesRef.current);
+    setFinalImage(null);
+  }, [state.sessionId]);
 
   // ── Camera lifecycle ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1383,6 +1404,7 @@ export function KioskApp({
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
+            onRetake={canRetake(state) ? () => setConfirmRetake(true) : null}
             durableQueue={queueStatus.durable}
             privateDelivery={privateDelivery}
             onConsent={chooseConsent}
@@ -1450,6 +1472,36 @@ export function KioskApp({
             }
           >
             <p className="booth-lead">{t.home.lead}</p>
+          </KioskDialog>
+        )}
+        {confirmRetake && canRetake(state) && (
+          <KioskDialog
+            title={t.review.retakeTitle}
+            onClose={() => setConfirmRetake(false)}
+            testId="confirm-retake"
+            actions={
+              <>
+                <button
+                  type="button"
+                  className="booth-btn-secondary"
+                  onClick={() => setConfirmRetake(false)}
+                >
+                  {t.review.retakeNo}
+                </button>
+                <button
+                  type="button"
+                  className="booth-btn-primary"
+                  data-testid="confirm-retake-yes"
+                  onClick={retake}
+                >
+                  {t.review.retakeYes}
+                </button>
+              </>
+            }
+          >
+            <p className="booth-lead">
+              <Lines text={t.review.retakeLead(state.shotCount, state.retakesLeft)} />
+            </p>
           </KioskDialog>
         )}
         {shutterBlink > 0 && (
@@ -1524,6 +1576,8 @@ interface ScreenProps {
   qrSvg: string | null;
   onRetryDelivery: () => void;
   onDiscard: () => void;
+  /** 「다시 찍기」 on the review screen (asks first); null where it is not offered. */
+  onRetake: (() => void) | null;
   durableQueue: boolean;
   privateDelivery: boolean;
   onConsent: (c: "yes" | "no") => void;
@@ -1967,7 +2021,7 @@ function Screen(p: ScreenProps) {
     }
 
     case "review":
-      // The six originals are immutable. A guest may append one seventh shot, once.
+      // The six originals are immutable; 「다시 찍기」 replaces all six, after asking.
       return (
         <BoothScreen testId="screen-review" progress={progress} className="review">
           <div className="review-head">
@@ -1993,6 +2047,16 @@ function Screen(p: ScreenProps) {
             </div>
           </div>
           <div className="review-actions">
+            {p.onRetake && (
+              <button
+                type="button"
+                className="booth-btn-secondary"
+                data-testid="retake"
+                onClick={p.onRetake}
+              >
+                {t.review.retake}
+              </button>
+            )}
             <button
               type="button"
               className="booth-btn-primary"

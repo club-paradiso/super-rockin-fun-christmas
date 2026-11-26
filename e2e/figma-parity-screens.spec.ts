@@ -10,7 +10,8 @@ import { enrollKiosk, openWelcome } from "./helpers";
  *  - every element where Figma puts it, within ±2 px, and the same type sizes;
  *  - the screenshot against the Figma export: share of pixels with ΔE00 > 5 at most 2 %, with the
  *    frame previews masked (example photos, cycling handwriting).
- * The numbers below were read from the Figma nodes on 2026-11-23. PARITY_SAVE=1 writes the
+ * The numbers below were read from the Figma nodes on 2026-11-23; the header and the bottom bar
+ * again on 2026-11-25, when "이전" moved down beside "처음으로". PARITY_SAVE=1 writes the
  * comparison pictures and numbers to docs/screenshots/figma-parity/.
  */
 const FIX = "tests/fixtures/figma-parity";
@@ -30,9 +31,11 @@ interface Want {
 }
 
 const HEADER: Want[] = [
-  { sel: '[data-testid="go-back"]', box: [30, 29.5, 109, 75] },
-  // The wordmark starts 20 after "이전"; its box ends in letter spacing, so the left edge is compared.
-  { sel: ".booth-wordmark", text: { cx: 315.5, cy: 67, size: 30, left: 159 } },
+  // "이전" sits in the bottom bar, beside "처음으로" (2026-11-25): Kiosk/Footer Type=HomeBack.
+  { sel: '[data-testid="go-back"]', box: [224, 924, 109, 75] },
+  // The wordmark starts at the left margin; its box ends in letter spacing, so the left edge is
+  // compared.
+  { sel: ".booth-wordmark", text: { cx: 186.5, cy: 67, size: 30, left: 30 } },
   ...[0, 1, 2, 3, 4, 5].map((i) => ({
     sel: `.booth-steps-dot:nth-of-type(${i + 2})`,
     box: [572 + 30 * i, 59, 16, 16] as Box,
@@ -56,7 +59,7 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
     wants: [
       ...HEADER,
       title,
-      { sel: '[data-testid="confirm-pick"]', box: [224, 924, 508, 76] },
+      { sel: '[data-testid="confirm-pick"]', box: [353, 924, 379, 76] },
       ...Object.entries(CARD_X).map(([id, x]) => ({
         sel: `[data-testid="frame-option-${id}"]`,
         box: [x, 166, 149, 357] as Box,
@@ -104,7 +107,7 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       { sel: '[data-testid="option-color-sepia"]', box: [458, 754, 274, 60] },
       { sel: '[data-testid="option-logo-logoOn"]', box: [172, 830, 274, 60] },
       { sel: '[data-testid="option-logo-logoOff"]', box: [458, 830, 274, 60] },
-      { sel: '[data-testid="confirm-options"]', box: [224, 924, 508, 76] },
+      { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 540 }],
   },
@@ -116,7 +119,7 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       { sel: ".options-preview", box: [100, 200, 632, 616] },
       { sel: '[data-testid="option-color-cream"]', box: [172, 830, 274, 60] },
       { sel: '[data-testid="option-color-red"]', box: [458, 830, 274, 60] },
-      { sel: '[data-testid="confirm-options"]', box: [224, 924, 508, 76] },
+      { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 616 }],
   },
@@ -128,7 +131,7 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       { sel: ".options-preview", box: [100, 200, 632, 616] },
       { sel: '[data-testid="option-color-red"]', box: [172, 830, 274, 60] },
       { sel: '[data-testid="option-color-blue"]', box: [458, 830, 274, 60] },
-      { sel: '[data-testid="confirm-options"]', box: [224, 924, 508, 76] },
+      { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 616 }],
   },
