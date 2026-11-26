@@ -41,7 +41,7 @@ import {
  * as it holds in the order they go in, then answer the media-wall question with two equal answers.
  * Either way the guest can save the finished picture; only a "yes" sends it anywhere.
  *
- * The frames are the booth's own: the eight cards of 「틀 선택 v2」 and their options (colour,
+ * The frames are the booth's own: the nine cards of 「틀 선택 v2」 and their options (colour,
  * logo, tone), each combination its own frame id, exactly as on the booth. The frames the booth
  * dropped on 2026-11-22 are never offered here.
  */
@@ -795,7 +795,11 @@ function CardOptions({
         >
           <span className="text-center text-base font-semibold text-ink">{BOOTH.label[o.key]}</span>
           <div
-            className={o.values.length > 3 ? "grid grid-cols-2 gap-2" : "flex justify-center gap-2"}
+            className={
+              o.values.length >= 6
+                ? "grid grid-cols-2 gap-2"
+                : "flex flex-wrap justify-center gap-2"
+            }
           >
             {o.values.map((v) => (
               <button
@@ -821,7 +825,7 @@ function CardOptions({
   );
 }
 
-/** The booth's eight cards, each with sample photos (or the guest's own) in it, in picker order. */
+/** The booth's nine cards, each with sample photos (or the guest's own) in it, in picker order. */
 function FramePicker({
   frames,
   selected,

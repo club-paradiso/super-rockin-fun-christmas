@@ -11,6 +11,7 @@ import {
   defaultOptions,
   getCard,
   POLAROID1_VARIANTS,
+  isMemeFrame,
   usesHandwriting,
 } from "@/config/frames/v2";
 import { lowResSource } from "@/lib/compositor/assets";
@@ -54,8 +55,8 @@ const bounds = (s: (typeof V2_FRAMES)[number]["slots"][number]) => {
   };
 };
 
-describe("틀 선택 v2: the eight cards", () => {
-  it("are the seven of Figma 898:1677 in its order, then 필름 35mm (924:2026); 필름 3컷 preselected", () => {
+describe("틀 선택 v2: the nine cards", () => {
+  it("are the seven of Figma 898:1677 in its order, then 필름 35mm (924:2026) and 밈 4컷; 필름 3컷 preselected", () => {
     expect(FRAME_CARDS.map((c) => c.id)).toEqual([
       "film3",
       "film4",
@@ -65,6 +66,7 @@ describe("틀 선택 v2: the eight cards", () => {
       "check2",
       "lace1",
       "film35",
+      "meme4",
     ]);
     expect(DEFAULT_CARD_ID).toBe("film3");
     expect(getCard("nope").id).toBe("film3");
@@ -91,7 +93,7 @@ describe("틀 선택 v2: the eight cards", () => {
             "merry",
             "us",
             "merryKo",
-            "yaho",
+            "hooray",
             "checklist",
             "peace",
             "circle",
@@ -104,10 +106,12 @@ describe("틀 선택 v2: the eight cards", () => {
       lace1: [],
       // Three tones: an option may have more than two answers.
       film35: [["color", ["natural", "mono", "sepia"]]],
+      // The five memes of Figma SS 02 "01 · 최종 후보" (18 네온 스캔 HUD left out), 야호 first.
+      meme4: [["theme", ["yaho", "quit", "emoji", "takel", "analyzing"]]],
     });
   });
 
-  it("map every option combination to its own frame (polaroid1 10, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
+  it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
@@ -141,6 +145,11 @@ describe("틀 선택 v2: the eight cards", () => {
       "film35-natural",
       "film35-mono",
       "film35-sepia",
+      "meme4-yaho",
+      "meme4-quit",
+      "meme4-emoji",
+      "meme4-takel",
+      "meme4-analyzing",
     ]);
     expect(V2_FRAMES.map((f) => f.id)).toEqual(ids);
     for (const id of ids) expect(cardOfFrame(id)?.id).toBe(id.split("-")[0]);
@@ -149,7 +158,7 @@ describe("틀 선택 v2: the eight cards", () => {
 
   it("keep every earlier frame for the phone page and for stored photos", () => {
     expect(FRAMES).toHaveLength(20);
-    expect(ALL_FRAMES).toHaveLength(44);
+    expect(ALL_FRAMES).toHaveLength(49);
     expect(new Set(ALL_FRAMES.map((f) => f.id)).size).toBe(ALL_FRAMES.length);
     for (const f of [...FRAMES, ...V2_FRAMES]) {
       expect(isKnownFrameId(f.id)).toBe(true);
@@ -225,8 +234,10 @@ describe.each(V2_FRAMES.map((f) => [f.id, f] as const))("v2 frame %s", (_, frame
 
   it("has the STUDIO SHALOM logo below every photo, unstretched, with the star in its O", () => {
     const logos = frame.decorations.filter((d) => d.type === "image" && d.brand);
-    // 필름 3컷 "로고 빼기" is the guest's choice (spec 3): no logo at all.
-    if (frame.id.endsWith("-plain")) {
+    // 필름 3컷 "로고 빼기" is the guest's choice (spec 3): no logo at all. The meme frames carry
+    // the logo Figma draws for each in their art (katakana シャローム, the message header, the
+    // "STUDIO SHALOM · 평화의 벽" line, the four-line lockup): see MEME4 in config/frames/v2.ts.
+    if (frame.id.endsWith("-plain") || isMemeFrame(frame.id)) {
       expect(logos).toHaveLength(0);
       return;
     }
@@ -254,6 +265,35 @@ describe.each(V2_FRAMES.map((f) => [f.id, f] as const))("v2 frame %s", (_, frame
 });
 
 describe("v2 frame details (Figma measurements)", () => {
+  it("밈 4컷: four photos where Figma's 📷 layers are, art under and over them, the logo in the art", () => {
+    const want: Record<string, { x: number; ys: number[]; w: number; h: number; r?: number }> = {
+      yaho: { x: 30, ys: [258, 604, 950, 1296], w: 540, h: 320, r: 26 },
+      quit: { x: 90, ys: [338, 679, 1048, 1389], w: 486, h: 271, r: 22 },
+      emoji: { x: 30, ys: [150, 492, 834, 1176], w: 540, h: 292 },
+      takel: { x: 30, ys: [184, 546, 908, 1270], w: 540, h: 318, r: 18 },
+      analyzing: { x: 30, ys: [184, 546, 908, 1270], w: 540, h: 318 },
+    };
+    for (const [theme, w] of Object.entries(want)) {
+      const frame = getCard("meme4").frame({ theme: theme as never });
+      expect(frame.id).toBe(`meme4-${theme}`);
+      expect(frame.slots).toEqual(
+        w.ys.map((y) => ({ x: w.x, y, width: w.w, height: w.h, ...(w.r ? { radius: w.r } : {}) })),
+      );
+      expect(frame.decorations.map((d) => (d.type === "image" ? d.src : d.type))).toEqual([
+        `/frames/v2/meme4-${theme}-base.png`,
+        "photo",
+        "photo",
+        "photo",
+        "photo",
+        `/frames/v2/meme4-${theme}-overlay.svg`,
+      ]);
+      expect(frame.photoTone).toBeUndefined();
+    }
+    // 18 "분석 중? · 네온 스캔 HUD" (black) is not one of them; anything unknown is 야호.
+    expect(getCard("meme4").frame({ theme: "hud" as never }).id).toBe("meme4-yaho");
+    expect(defaultOptions(getCard("meme4"))).toEqual({ theme: "yaho" });
+  });
+
   it("필름 35mm 4컷: four 468 × 318 photos between the sprocket holes, one tone per answer", () => {
     for (const [answer, tone, bg] of [
       ["natural", "film", "#17130F"],

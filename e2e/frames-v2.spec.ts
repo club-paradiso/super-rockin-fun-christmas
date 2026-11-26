@@ -16,7 +16,7 @@ import {
 } from "./helpers";
 
 /**
- * 「틀 선택 v2」 (2026-11-22) end to end: each of the eight cards and every option combination,
+ * 「틀 선택 v2」 (2026-11-22) end to end: each of the nine cards and every option combination,
  * from the picker to a real QR, with the mock camera. Also: the handwriting font over 20
  * sessions, the date stamp against a wrong tablet clock, and the Figma screens at three tablet
  * sizes with nothing placed on the binder rings.
@@ -40,7 +40,7 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   ["polaroid1", {}, "polaroid1", [1200, 1459]],
   // 문구 (2026-11-26): the date in Figma's Caveat, and a caption drawn as Figma's art.
   ["polaroid1", { caption: "date" }, "polaroid1-date", [1200, 1459]],
-  ["polaroid1", { caption: "yaho" }, "polaroid1-yaho", [1200, 1459]],
+  ["polaroid1", { caption: "hooray" }, "polaroid1-yaho", [1200, 1459]],
   ["polaroid3", {}, "polaroid3", [600, 1800]],
   ["verse4", {}, "verse4", [600, 1800]],
   ["check2", {}, "check2-red", [600, 1800]],
@@ -49,6 +49,11 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   ["film35", {}, "film35-natural", [600, 1800]],
   ["film35", { color: "mono" }, "film35-mono", [600, 1800]],
   ["film35", { color: "sepia" }, "film35-sepia", [600, 1800]],
+  ["meme4", {}, "meme4-yaho", [600, 1800]],
+  ["meme4", { theme: "quit" }, "meme4-quit", [600, 1800]],
+  ["meme4", { theme: "emoji" }, "meme4-emoji", [600, 1800]],
+  ["meme4", { theme: "takel" }, "meme4-takel", [600, 1800]],
+  ["meme4", { theme: "analyzing" }, "meme4-analyzing", [600, 1800]],
 ];
 
 /** Nothing of "한 컷 더" or "프레임 바꾸기" on screen, in any language. */
@@ -223,7 +228,7 @@ for (const [width, height] of [
   [820, 1180],
   [1024, 1366],
 ] as const) {
-  test(`${width}×${height}: the picker and the four option screens, nothing on the rings`, async ({
+  test(`${width}×${height}: the picker and the five option screens, nothing on the rings`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
@@ -246,6 +251,7 @@ for (const [width, height] of [
       ["check2", "2E-check2-options"],
       ["film35", "2F-film35-options"],
       ["polaroid1", "2D-polaroid1-captions"],
+      ["meme4", "2G-meme4-options"],
     ] as const) {
       await page.getByTestId(`frame-option-${card}`).click();
       await page.getByTestId("confirm-pick").click();

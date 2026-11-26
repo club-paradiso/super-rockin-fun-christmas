@@ -1820,13 +1820,18 @@ function Screen(p: ScreenProps) {
       // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷), 1055:3631 (폴라로이드
       // 1컷 문구: ten answers in two columns, no row label).
       const card = getCard(state.cardId);
-      // Many answers (the captions) sit in a grid, which spaces the screen a little differently.
-      const grid = card.options.some((o) => o.values.length > 3);
-      const title = card.options.some((o) => o.key === "caption")
-        ? t.option.titleCaption
-        : card.options.length > 1
-          ? t.option.titleColorLogo
-          : t.option.titleColor;
+      // Many answers (the ten captions) sit in a two-column grid with no row label, which spaces
+      // the screen a little differently; four or five (밈 4컷) keep the row with its label.
+      const grid = card.options.some((o) => o.values.length >= OPTIONS_GRID_MIN);
+      const key = card.options.length === 1 ? card.options[0]!.key : null;
+      const title =
+        key === "caption"
+          ? t.option.titleCaption
+          : key === "theme"
+            ? t.option.titleTheme
+            : card.options.length > 1
+              ? t.option.titleColorLogo
+              : t.option.titleColor;
       return (
         <BoothScreen
           testId="screen-options"
@@ -1869,11 +1874,20 @@ function Screen(p: ScreenProps) {
             {card.options.map((option) => (
               <div
                 key={option.key}
-                className={option.values.length > 3 ? "options-row options-grid" : "options-row"}
+                className={
+                  option.values.length >= OPTIONS_GRID_MIN
+                    ? "options-row options-grid"
+                    : "options-row"
+                }
+                data-many={
+                  option.values.length > 3 && option.values.length < OPTIONS_GRID_MIN
+                    ? ""
+                    : undefined
+                }
                 role="radiogroup"
                 aria-label={t.label[option.key]}
               >
-                {option.values.length <= 3 && (
+                {option.values.length < OPTIONS_GRID_MIN && (
                   <span className="options-row-label" aria-hidden>
                     {t.label[option.key]}
                   </span>
@@ -2519,6 +2533,9 @@ function MobileScreen({
     </BoothScreen>
   );
 }
+
+/** From this many answers an option is a two-column grid without its row label (Figma 1055:3631). */
+const OPTIONS_GRID_MIN = 6;
 
 /** One card of the v2 picker: the frame with sample photos, its name, and its options hint. */
 function FrameCardButton({

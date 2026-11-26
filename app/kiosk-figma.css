@@ -344,22 +344,23 @@
   text-align: center;
 }
 
-/* The cards, four to a row (Figma: 149 × 357, 12 apart, rows 16 apart). Eight half-card tracks:
-   a card takes two, and a last row that is one card short starts half a card in, so it sits
-   centred under the gaps as in Figma's seven-card picker (898:1677). With eight cards (필름 35mm,
-   2026-11-24) both rows are full; a ninth card would need a third row and a new Figma screen. */
+/* The cards, five to a row since 밈 4컷 made nine (2026-11-26). Figma's picker (898:1677) has
+   seven, four to a row at 149 × 357, 12 apart, rows 16 apart; the nine keep its height, gaps and
+   outer edges, so a card is (632 − 4 × 12) / 5 = 116.8 wide. Ten half-card tracks: a card takes
+   two, and a last row that is short starts half a card in per missing card, so it stays centred
+   (nine: five, then four starting half a card in). Figma has no nine-card picker yet. */
 .kiosk-root .booth-screen-v2 .pick-cards {
   flex: 1 1 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(7, calc(80.5 * var(--fx))) calc(68.5 * var(--fx));
+  grid-template-columns: repeat(9, calc(64.4 * var(--fx))) calc(52.4 * var(--fx));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   row-gap: calc(16 * var(--fx));
   justify-content: center;
 }
 .kiosk-root .booth-screen-v2 .pick-card {
   grid-column: span 2;
-  width: calc(149 * var(--fx));
+  width: calc(116.8 * var(--fx));
   min-width: 48px;
   min-height: 0;
   display: flex;
@@ -378,18 +379,20 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-/* A last row that is short starts further in, so it stays centred: by half a card when one is
-   missing (seven cards, as in Figma), a whole card for two, a card and a half for three. Counted
-   from the cards themselves, so adding or removing one in config/frames/v2.ts needs no change
-   here. */
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(3) {
+/* A last row that is short starts further in, so it stays centred: half a card per missing
+   card. Counted from the cards themselves, so adding or removing one in config/frames/v2.ts
+   needs no change here (up to ten cards). */
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(4) {
   grid-column: 2 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(2) {
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(3) {
   grid-column: 3 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(4n + 1):nth-last-child(1) {
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(2) {
   grid-column: 4 / span 2;
+}
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(1) {
+  grid-column: 5 / span 2;
 }
 .kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
   border-width: calc(3 * var(--fx));
@@ -451,6 +454,15 @@
   grid-auto-columns: minmax(0, 1fr);
   column-gap: calc(12 * var(--fx));
   align-items: center;
+}
+/* 밈 4컷: five answers, three to a line, the label beside both lines (no Figma screen for it). */
+.kiosk-root .booth-screen-v2 .options-row[data-many] {
+  grid-template-columns: calc(60 * var(--fx)) repeat(3, minmax(0, 1fr));
+  grid-auto-flow: row;
+  row-gap: calc(12 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-row[data-many] .options-row-label {
+  grid-row: span 2;
 }
 .kiosk-root .booth-screen-v2 .options-row-label {
   font-size: max(15px, calc(20 * var(--fx)));

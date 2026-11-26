@@ -97,11 +97,11 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const guest = await phone(browser);
   await guest.goto(url);
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
-  // D103: the booth's order. First the frame: exactly the booth's eight cards (틀 선택 v2), the
+  // D103: the booth's order. First the frame: exactly the booth's nine cards (틀 선택 v2), the
   // booth's default chosen. None of the frames the booth dropped on 2026-11-22.
   await expect(guest.getByTestId("mobile-step-frame")).toBeVisible();
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
-  await expect(frames).toHaveCount(8);
+  await expect(frames).toHaveCount(9);
   for (const old of ["navy-strip", "shalom-grid", "shalom-single", "shalom-letter"])
     await expect(guest.locator(`[data-frame-id="${old}"]`)).toHaveCount(0);
   // Every frame name whole on a phone, as on the booth (no "35mm 필름 …").
