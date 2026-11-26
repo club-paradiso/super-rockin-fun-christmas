@@ -95,9 +95,12 @@ looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
   or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
-  offers the eight cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
-  4컷, Figma 924:2026, added 2026-11-24); a card with options (colour, logo) has an options screen,
-  and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아); the guest then shoots six, reviews, chooses the photos. There is no
+  offers the nine cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
+  4컷, Figma 924:2026, added 2026-11-24, then 밈 4컷, added 2026-11-26: the five meme frames of
+  Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD", the black one, is
+  left out by a user decision); a card with options (colour, logo, meme) has an options screen,
+  and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
+  to a line); the picker shows the nine five to a row; the guest then shoots six, reviews, chooses the photos. There is no
   "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). The one way
   past the shots is 「다시 찍기」 on the review screen (a user decision, 2026-11-25): it asks first,
   throws all six away (and the session video) and shoots six again in the same frame,
@@ -107,7 +110,10 @@ looks:measure`). `/looks` is the comparison
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
-  빼기" has none, the guest's choice) in `tests/unit/frames-v2.test.ts`; mirror frame changes in
+  빼기" has none, the guest's choice; the 밈 4컷 frames carry the logo their Figma frame draws,
+  inside their art, `isMemeFrame`) in `tests/unit/frames-v2.test.ts`; art over the photos is a
+  vector overlay exported from Figma (`*-overlay.svg`): Figma's export writes a shadow "spread"
+  (`feMorphology`) that Figma itself does not draw on text, so take it out of text layers' filters; mirror frame changes in
   Figma (`design/README.md`). Photo tones (흑백/세피아, 폴라로이드 3컷's
   "플래시 느낌", 필름 35mm's "컬러") are pixel arithmetic in `lib/compositor/tone.ts`, never `ctx.filter` (Safari 15 has
   none); their curves were measured from Figma exports, so change one only with a new measurement. The handwriting font is drawn
@@ -207,7 +213,7 @@ looks:measure`). `/looks` is the comparison
   condition for getting the picture, and never send it without "yes".
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put photos in one of the booth's
-  v2 frames on the phone (D93, D113: the booth's eight cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
+  v2 frames on the phone (D93, D113: the booth's nine cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
   the wall like that frame), `phone-photo` for a plain photo from a page older than D93. Test a phone
   photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
@@ -288,14 +294,15 @@ looks:measure`). `/looks` is the comparison
   upload answers carry it as `dayOrdinal`; anywhere it is missing the ticket says "오늘의 기록".
   The PNG ticket is drawn on the guest's phone (`lib/studio/ticket.ts`) and sent nowhere.
 - **Figma is the answer for the v2 frames and their four screens, and the match is measured**
-  (「Figma 일치」, 2026-11-23, `docs/FIGMA_PARITY.md`): `e2e/figma-parity.spec.ts` (15 outputs: share of
+  (「Figma 일치」, 2026-11-23, `docs/FIGMA_PARITY.md`): `e2e/figma-parity.spec.ts` (20 outputs: share of
   pixels with ΔE00 > 5 at most 1 %, photos within 1 px) and `e2e/figma-parity-screens.spec.ts`
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. One exception is written down: Figma's picker still has seven cards, so its second row
-  is left out of the pixel comparison until the Figma screen has the eighth (`ROW2` in the screens
-  spec). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
+  to pass. One exception is written down: Figma's picker still has seven cards, four to a row,
+  and the booth has nine, five to a row in the same box (2026-11-26), so the cards area is left
+  out of the pixel comparison until the Figma screen has them (`CARDS` in the screens spec; the
+  card boxes are still checked against the grid they follow from). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.

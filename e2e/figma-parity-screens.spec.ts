@@ -43,16 +43,19 @@ const HEADER: Want[] = [
   { sel: '[data-testid="go-home"]', box: [30, 924, 174, 75] },
 ];
 const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 32 } };
-const CARD_X = { film3: 100, film4: 261, polaroid1: 422, polaroid3: 583 };
 /**
- * The second row. Figma's picker (898:1677) has seven cards, three centred in this row at
- * x 180.5 / 341.5 / 502.5. The booth has an eighth since 2026-11-24 (필름 35mm, Figma 924:2026),
- * so the row is full, on the first row's columns. Figma has no picker with eight cards yet: these
- * positions follow from its grid, they are not read from a Figma frame, and the row is left out of
- * the pixel comparison (ROW2). Put it back when the Figma screen is updated.
+ * The cards. Figma's picker (898:1677) has seven, four to a row at 149 × 357. The booth has nine
+ * since 2026-11-26 (필름 35mm, then 밈 4컷), five to a row in the same box (x 100 → 732, rows at
+ * y 166 and 539, 357 tall, 12 apart): 116.8 wide, the second row of four centred. Figma has no
+ * picker with nine cards: these positions follow from its grid, they are not read from a Figma
+ * frame, and the cards area is left out of the pixel comparison (CARDS) until the Figma screen
+ * has them. The header, the title and the bottom bar are still compared with Figma.
  */
-const CARD_X2 = { verse4: 100, check2: 261, lace1: 422, film35: 583 };
-const ROW2: Rect = { x: 100, y: 539, w: 632, h: 357 };
+const CARD_W = 116.8;
+const col = (i: number) => 100 + i * (CARD_W + 12);
+const ROW1 = ["film3", "film4", "polaroid1", "polaroid3", "verse4"];
+const ROW2 = ["check2", "lace1", "film35", "meme4"];
+const CARDS: Rect = { x: 100, y: 166, w: 632, h: 730 };
 
 const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
   pick: {
@@ -60,38 +63,16 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       ...HEADER,
       title,
       { sel: '[data-testid="confirm-pick"]', box: [353, 924, 379, 76] },
-      ...Object.entries(CARD_X).map(([id, x]) => ({
+      ...ROW1.map((id, i) => ({
         sel: `[data-testid="frame-option-${id}"]`,
-        box: [x, 166, 149, 357] as Box,
+        box: [col(i), 166, CARD_W, 357] as Box,
       })),
-      ...Object.entries(CARD_X2).map(([id, x]) => ({
+      ...ROW2.map((id, i) => ({
         sel: `[data-testid="frame-option-${id}"]`,
-        box: [x, 539, 149, 357] as Box,
+        box: [col(i + 0.5), 539, CARD_W, 357] as Box,
       })),
-      {
-        sel: '[data-testid="frame-option-film3"] .pick-card-name',
-        text: { cx: 174.5, cy: 481, size: 18 },
-      },
-      {
-        sel: '[data-testid="frame-option-film3"] .pick-card-hint',
-        text: { cx: 174.5, cy: 506.5, size: 14 },
-      },
-      {
-        sel: '[data-testid="frame-option-polaroid1"] .pick-card-name',
-        text: { cx: 496.5, cy: 498, size: 18 },
-      },
-      {
-        sel: '[data-testid="frame-option-check2"] .pick-card-name',
-        text: { cx: 335.5, cy: 851, size: 18 },
-      },
-      {
-        sel: '[data-testid="frame-option-lace1"] .pick-card-name',
-        text: { cx: 496.5, cy: 871, size: 18 },
-      },
     ],
-    // The first row's previews (example photos; the frame art itself is compared in
-    // figma-parity.spec), and the whole second row (see ROW2).
-    masks: [...Object.values(CARD_X).map((x) => ({ x: x + 6, y: 178, w: 137, h: 303 })), ROW2],
+    masks: [CARDS],
   },
   film3: {
     wants: [
