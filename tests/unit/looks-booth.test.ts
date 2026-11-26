@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { V2_FRAMES } from "@/config/frames/v2";
-import { LOOKS } from "@/config/looks";
+import { LOOKS, NO_LOOK } from "@/config/looks";
 import { composeFrame } from "@/lib/compositor/compose";
 import type { ComposeImage } from "@/lib/compositor/types";
 import {
@@ -31,6 +31,8 @@ const photo = (): ComposeImage => ({
   height: 1200,
 });
 const context = { dateLabel: "2026.12.24" };
+/** A look the guest picked on the photo choice screen (no frame comes with one). */
+const LINEN = { lookId: "linen" };
 
 describe("composeFrame with a grader", () => {
   const frame = V2_FRAMES.find((f) => f.id === "film4-cream")!;
@@ -88,22 +90,26 @@ describe("composeFrame with a grader", () => {
 });
 
 describe("createBoothLooks", () => {
-  it("has no grader until the frame's LUT is loaded, then one per frame", async () => {
+  it("no frame comes with a look: the guest's choice gets a grader once its LUT is loaded", async () => {
     const looks = createBoothLooks({ fetchText, createGlCanvas: noGl, log: () => undefined });
-    expect(looks.graderFor("film4-cream", 1)).toBeUndefined();
-    await looks.preload(["film4-cream"]);
-    expect(looks.graderFor("film4-cream", 1)).toBeTypeOf("function");
-    // Another frame's look was not asked for.
+    // 원본 (2026-11-26): every frame starts with no look, so nothing to load and nothing to grade.
+    await looks.preload(V2_FRAMES.map((f) => f.id));
+    expect(looks.graderFor("film4-cream", 1, LINEN)).toBeUndefined();
     expect(looks.graderFor("film3-mono-logo", 1)).toBeUndefined();
-    await looks.preloadLooks(["ink"]);
-    expect(looks.graderFor("film3-mono-logo", 1)).toBeTypeOf("function");
+    // A look the guest picks, once its LUT is in.
+    expect(looks.graderFor("film4-cream", 1, LINEN)).toBeUndefined();
+    await looks.preloadLooks(["linen"]);
+    expect(looks.graderFor("film4-cream", 1, LINEN)).toBeTypeOf("function");
+    // Another look was not asked for; "원본" grades nothing.
+    expect(looks.graderFor("film3-mono-logo", 1, { lookId: "ink" })).toBeUndefined();
+    expect(looks.graderFor("film4-cream", 1, { lookId: NO_LOOK })).toBeUndefined();
   });
 
   it("no WebGL: the photo is left to the frame, and the reason is logged once, loudly", async () => {
     const log = vi.fn();
     const looks = createBoothLooks({ fetchText, createGlCanvas: noGl, log });
-    await looks.preload(["film4-cream"]);
-    const grader = looks.graderFor("film4-cream", 3)!;
+    await looks.preloadLooks(["linen"]);
+    const grader = looks.graderFor("film4-cream", 3, LINEN)!;
     expect(grader(new FakeCanvas(10, 10), 10, 10, 0)).toBeNull();
     expect(grader(new FakeCanvas(10, 10), 10, 10, 1)).toBeNull();
     expect(log).toHaveBeenCalledTimes(1);
@@ -116,8 +122,8 @@ describe("createBoothLooks", () => {
     const tablet = fakeGlTablet();
     const log = vi.fn();
     const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log });
-    await looks.preload(["film4-cream"]);
-    const grader = looks.graderFor("film4-cream", 3)!;
+    await looks.preloadLooks(["linen"]);
+    const grader = looks.graderFor("film4-cream", 3, LINEN)!;
     expect(grader(new FakeCanvas(10, 10), 10, 10, 0)).not.toBeNull();
     // iPad Safari drops the context (sleep, memory pressure, background).
     tablet.contexts[0]!.lost = true;
@@ -133,9 +139,9 @@ describe("createBoothLooks", () => {
     const tablet = fakeGlTablet();
     const log = vi.fn();
     const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log });
-    await looks.preload(["film4-cream"]);
+    await looks.preloadLooks(["linen"]);
     tablet.failNew = true;
-    const grader = looks.graderFor("film4-cream", 3)!;
+    const grader = looks.graderFor("film4-cream", 3, LINEN)!;
     expect(grader(new FakeCanvas(10, 10), 10, 10, 0)).toBeNull();
     expect(grader(new FakeCanvas(10, 10), 10, 10, 1)).toBeNull();
     expect(log).toHaveBeenCalledTimes(1);
@@ -146,16 +152,18 @@ describe("createBoothLooks", () => {
     tablet.failNew = false;
     looks.newSession();
     expect(looks.problem()).toBeNull();
-    expect(looks.graderFor("film4-cream", 4)!(new FakeCanvas(10, 10), 10, 10, 0)).not.toBeNull();
+    expect(
+      looks.graderFor("film4-cream", 4, LINEN)!(new FakeCanvas(10, 10), 10, 10, 0),
+    ).not.toBeNull();
   });
 
   it("a new session with nothing wrong keeps the renderer it has", async () => {
     const tablet = fakeGlTablet();
     const looks = createBoothLooks({ fetchText, createGlCanvas: tablet.create, log: vi.fn() });
-    await looks.preload(["film4-cream"]);
-    looks.graderFor("film4-cream", 1)!(new FakeCanvas(10, 10), 10, 10, 0);
+    await looks.preloadLooks(["linen"]);
+    looks.graderFor("film4-cream", 1, LINEN)!(new FakeCanvas(10, 10), 10, 10, 0);
     looks.newSession();
-    looks.graderFor("film4-cream", 2)!(new FakeCanvas(10, 10), 10, 10, 0);
+    looks.graderFor("film4-cream", 2, LINEN)!(new FakeCanvas(10, 10), 10, 10, 0);
     expect(tablet.contexts).toHaveLength(1);
   });
 
@@ -178,8 +186,8 @@ describe("createBoothLooks", () => {
       createGlCanvas: noGl,
       log,
     });
-    await looks.preload(["film4-cream"]);
-    expect(looks.graderFor("film4-cream", 1)).toBeUndefined();
+    await looks.preloadLooks(["linen"]);
+    expect(looks.graderFor("film4-cream", 1, LINEN)).toBeUndefined();
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls[0]![0]).toMatch(/Could not load the "linen" LUT/);
   });
@@ -191,8 +199,8 @@ describe("createBoothLooks", () => {
       createGlCanvas: noGl,
       log,
     });
-    await looks.preload(["verse4"]);
-    expect(looks.graderFor("verse4", 1)).toBeUndefined();
+    await looks.preloadLooks(["paper"]);
+    expect(looks.graderFor("verse4", 1, { lookId: "paper" })).toBeUndefined();
     expect(String(log.mock.calls[0]![1])).toMatch(/Expected 27 rows/);
   });
 

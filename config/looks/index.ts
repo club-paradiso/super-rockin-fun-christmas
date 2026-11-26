@@ -326,6 +326,14 @@ export const LOOKS: readonly LookDefinition[] = [
 
 export const LOOK_IDS = LOOKS.map((look) => look.id);
 
+/**
+ * "원본": no look at all. Every frame starts with it (a user decision, 2026-11-26: "색감은 모든
+ * 템플릿에서 아무것도 없는 걸 원칙으로 하고 유저가 직접 고를 수 있게"); the guest may pick one of
+ * the looks on the photo choice screen. A photo with no look keeps its frame's own `photoTone`
+ * (흑백, 세피아, ...), exactly as with looks off.
+ */
+export const NO_LOOK = "none";
+
 export function getLook(id: string | null | undefined): LookDefinition | undefined {
   return LOOKS.find((look) => look.id === id);
 }

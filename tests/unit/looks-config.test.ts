@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { V2_FRAMES } from "@/config/frames/v2";
-import { LOOKS, LOOK_IDS, getLook, lookCubeUrl } from "@/config/looks";
+import { LOOKS, LOOK_IDS, NO_LOOK, getLook, lookCubeUrl } from "@/config/looks";
 import {
   FRAME_LOOKS,
   frameLookProblems,
@@ -17,15 +17,27 @@ describe("config/looks/frame-looks.json", () => {
     expect(frameLookProblems(FRAME_LOOKS, frameIds)).toEqual([]);
   });
 
-  it("a black and white frame gets a black and white look, a colour frame a colour look", () => {
+  it("every frame starts with no look (원본): the guest chooses one (a user decision, 2026-11-26)", () => {
+    expect(FRAME_LOOKS.default.look).toBe(NO_LOOK);
     for (const frame of V2_FRAMES) {
-      const mono = !!lookForFrame(frame.id)!.look.grade.mono;
-      expect(mono, frame.id).toBe(frame.photoTone === "mono" || frame.photoTone === "sepia");
+      expect(FRAME_LOOKS.frames[frame.id]!.look, frame.id).toBe(NO_LOOK);
+      expect(lookForFrame(frame.id), frame.id).toBeNull();
     }
+    // An unlisted frame gets the default: no look either.
+    expect(lookForFrame("some-future-frame")).toBeNull();
   });
 
-  it("an unlisted frame gets the default look", () => {
-    expect(lookForFrame("some-future-frame")?.look.id).toBe(FRAME_LOOKS.default.look);
+  it("a frame may still name a look; an unlisted one gets the default", () => {
+    const map: FrameLookMap = {
+      default: { look: "paper", strength: 1 },
+      frames: { "film4-cream": { look: "linen", strength: 0.8 } },
+    };
+    expect(lookForFrame("film4-cream", map)).toMatchObject({
+      look: { id: "linen" },
+      strength: 0.8,
+    });
+    expect(lookForFrame("some-future-frame", map)?.look.id).toBe("paper");
+    expect(frameLookProblems(map, ["film4-cream"])).toEqual([]);
   });
 
   it("says what is wrong with a bad file", () => {

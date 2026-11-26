@@ -64,7 +64,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `.cube`; `tests/unit/looks-cube.test.ts` fails while file and numbers disagree). One WebGL1 shader
   (`lib/looks/shader.ts`) applies halation (small lights only), the LUT, strength, grain and corner falloff; the frame previews
   and the final composite pass the same `grade` to `composeFrame`, so their colours cannot differ.
-  Which frame gets which look is `config/looks/frame-looks.json`, never code. With looks off the booth fetches no LUT, creates no WebGL
+  Which frame gets which look is `config/looks/frame-looks.json`, never code; since 2026-11-26
+  (a user decision: "색감은 모든 템플릿에서 아무것도 없는 걸 원칙으로 하고 유저가 직접 고를 수
+  있게") every frame is `"none"` (`NO_LOOK`, 「원본」): no look unless the guest picks one, and a
+  photo with no look keeps its frame's own `photoTone` (흑백 stays 흑백). The booth still loads
+  every LUT, because the guest chooses from all of them. With looks off the booth fetches no LUT, creates no WebGL
   context and composes as before; that is what the Figma parity tests measure, so they load the
   booth with `?looks=0` (Figma has no look). What turns them on (`looksActive`): the address
   (`?looks=1` / `?looks=0`, which wins), else the build (`NEXT_PUBLIC_LOOKS=1`) or the staff switch
@@ -72,16 +76,19 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   migration `20261125090000` turns an existing database on only if staff never set it). The
   switch reaches a booth with its heartbeat and is taken up only on "화면을 눌러 시작"
   (`sessionLooks`): never under a guest. **The guest may change the look on the photo choice screen, and nowhere
-  else** (a user decision, 2026-11-24, Figma 956:1589 / 956:1715): a row of the eight looks, four at
-  a time with "다음" (`LOOKS_PER_PAGE`, `LookRow`), each on the guest's own first shot, opening on
-  the frame's own look, which stays the answer if the guest touches nothing. No extra screen and no
+  else** (a user decision, 2026-11-24, Figma 956:1589 / 956:1715): a row of 「원본」 and the eight
+  looks (`LOOK_CHOICES`), four at a time with "다음" (`LOOKS_PER_PAGE`, `LookRow`; three pages),
+  each on the guest's own first shot, opening on 「원본」, which stays the answer if the guest
+  touches nothing. No extra screen and no
   extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
   for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
   is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
   gives wording). With looks on, the six shots on the review and choice screens are shown in the
-  session's look (`gradedShots`, the same grader as the print; `chosenLook`), and the live camera picture of a
-  black-and-white or sepia frame is shown that way with a CSS filter on the `<video>` only
-  (`lookViewForFrame`); a colour look never changes the camera view. Staff read the state on the
+  session's look (`gradedShots`, the same grader as the print; `chosenLook`), or with no look in
+  the frame's own tone (`frameToneGrader`, the same `applyTone` as the print), and the live camera
+  picture of a black-and-white or sepia frame is shown that way with a CSS filter on the `<video>`
+  only (`lookViewForFrame`, from the frame's `photoTone` when it has no look); a colour look never
+  changes the camera view. Staff read the state on the
   booth in the help menu (`lib/looks/status.ts`). When WebGL fails the photo keeps the frame's own
   `photoTone` and the reason goes to the console (`[looks]`) and, as a code, to the server log
   with the heartbeat (`kiosk_looks_failed`): never silently, never a blocked guest. A failure is

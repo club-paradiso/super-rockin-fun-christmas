@@ -12,7 +12,7 @@ import {
   type OptionValue,
 } from "@/config/frames/v2";
 import { getHandFont, pickHandFont } from "@/config/hand-fonts";
-import { LOOK_IDS } from "@/config/looks";
+import { LOOK_IDS, NO_LOOK } from "@/config/looks";
 import { parseRetouchLevel, type RetouchLevelId } from "@/config/retouch";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskLang } from "@/lib/kiosk/copy";
@@ -495,7 +495,8 @@ export function kioskReducer<Shot>(
 
     case "SET_LOOK":
       // Fixed with the photos: once they are confirmed the picture is being made and uploaded.
-      return state.phase === "select" && LOOK_IDS.includes(action.lookId)
+      return state.phase === "select" &&
+        (action.lookId === NO_LOOK || LOOK_IDS.includes(action.lookId))
         ? { ...state, lookId: action.lookId }
         : state;
 
