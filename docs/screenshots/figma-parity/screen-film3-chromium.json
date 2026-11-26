@@ -2,8 +2,8 @@
   "screen": "film3",
   "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.571,
-  "meanDeltaE": 0.316,
+  "overPct": 1.474,
+  "meanDeltaE": 0.29,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
