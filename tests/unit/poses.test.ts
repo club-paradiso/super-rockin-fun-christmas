@@ -26,7 +26,7 @@ describe("pose guide data (D71)", () => {
     }
   });
 
-  it("the standard countdown is 10 s unless the test-only override is set", () => {
-    expect(KIOSK_CONFIG.countdownSeconds).toBe(10);
+  it("the standard countdown is 5 s unless the test-only override is set", () => {
+    expect(KIOSK_CONFIG.countdownSeconds).toBe(5);
   });
 });
