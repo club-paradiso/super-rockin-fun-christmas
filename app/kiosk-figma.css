@@ -613,6 +613,8 @@
 .kiosk-root .booth-screen-v2 .pick-card-hint {
   display: block;
   text-align: center;
+  /* A hint may carry its own line break (lib/kiosk/copy.ts). */
+  white-space: pre-line;
 }
 .kiosk-root .booth-screen-v2 .pick-card-hint .v2-mark-pencil {
   display: inline-block;

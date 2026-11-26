@@ -74,8 +74,10 @@ const ko = {
   },
   hint: {
     film3: "색·로고 선택",
-    film4: "크림·빨강 선택",
-    check2: "빨강·파랑 선택",
+    // The line break is the card's: five to a row these sit at the edge of one line, and a font
+    // a hair narrower would keep them on one (Figma 1069:2245 breaks them here).
+    film4: "크림·빨강\n선택",
+    check2: "빨강·파랑\n선택",
     film35: "컬러·흑백·세피아",
     meme4: "밈 5종 고르기",
   },
