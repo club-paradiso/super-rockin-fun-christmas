@@ -77,7 +77,7 @@ const ko = {
     film4: "크림·빨강 선택",
     check2: "빨강·파랑 선택",
     film35: "컬러·흑백·세피아",
-    polaroid1: "문구 고르기",
+    polaroid1: "문구 선택",
     meme4: "밈 5가지 중 선택",
   },
   option: {
@@ -104,7 +104,8 @@ const ko = {
     blue: "파랑",
     natural: "컬러",
     // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
-    // the photo; 「오늘 날짜」 and 「'26 동그라미」 describe it instead: 임시 문구 (D76).
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
     village: "Christmas Village '26",
     date: "오늘 날짜",
     verse: "blessed are the peacemakers",
@@ -114,7 +115,7 @@ const ko = {
     hooray: "크리스마스 야호-",
     checklist: "with my people",
     peace: "peace!",
-    circle: "'26 동그라미",
+    circle: "'26에 동그라미",
     yaho: "크리스마스 야호",
     quit: "촬영 포기하겠습니다",
     emoji: "이거 제 이모찌야",
@@ -387,7 +388,8 @@ const en: KioskCopy = {
     blue: "Blue",
     natural: "Color",
     // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
-    // the photo; 「오늘 날짜」 and 「'26 동그라미」 describe it instead: 임시 문구 (D76).
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
     village: "Christmas Village '26",
     date: "Today's date",
     verse: "blessed are the peacemakers",
@@ -646,7 +648,8 @@ const zh: KioskCopy = {
     blue: "蓝色",
     natural: "彩色",
     // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
-    // the photo; 「오늘 날짜」 and 「'26 동그라미」 describe it instead: 임시 문구 (D76).
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
     village: "Christmas Village '26",
     date: "今天日期",
     verse: "blessed are the peacemakers",

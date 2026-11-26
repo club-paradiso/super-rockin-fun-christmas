@@ -230,7 +230,7 @@ const POLAROID1_NAMES: Record<Polaroid1Caption, { ko: string; en: string; zh: st
   hooray: { ko: "크리스마스 야호", en: "크리스마스 야호", zh: "크리스마스 야호" },
   checklist: { ko: "체크리스트", en: "Checklist", zh: "清单" },
   peace: { ko: "peace!", en: "peace!", zh: "peace!" },
-  circle: { ko: "'26 동그라미", en: "Circled '26", zh: "圈出 '26" },
+  circle: { ko: "'26에 동그라미", en: "Circled '26", zh: "圈出 '26" },
 };
 
 /** Figma 877:1664: the handwriting group of the caption the booth always had. */
