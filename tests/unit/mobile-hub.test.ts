@@ -199,6 +199,22 @@ describe("hub side: HubInbox", () => {
     expect(inbox.status()).toMatchObject({ imported: 2, lastError: null });
   });
 
+  it("hands each photo it takes in to the review (AI first when it is on), even if that fails", async () => {
+    const reviewed: string[] = [];
+    const withReview = new HubInbox(svc, backend, cloud, undefined, async (photoId) => {
+      reviewed.push(photoId);
+      throw new Error("the review is down");
+    });
+    const a = uuid();
+    cloud.items.set(a, JPEG);
+    await withReview.pull();
+    const row = (await backend.photos.findBySessionId(a))!;
+    expect(reviewed).toEqual([row.id]);
+    // A failing review never stops the import: the photo is here, PENDING, and acknowledged.
+    expect(row.moderationStatus).toBe("PENDING");
+    expect(cloud.acks).toEqual([a]);
+  });
+
   it("offline: nothing happens, nothing is lost, the photos come down once it is back", async () => {
     const a = uuid();
     cloud.items.set(a, JPEG);

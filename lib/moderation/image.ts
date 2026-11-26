@@ -1,5 +1,6 @@
 import "server-only";
 import sharp, { type Sharp } from "sharp";
+import { MOBILE_FRAME_ID, MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
 import { MODERATION_CONFIG } from "@/config/moderation";
 import type { FrameDefinition, FrameSlot } from "@/lib/compositor/types";
 import { hasImageSignature } from "@/lib/server/request";
@@ -128,4 +129,29 @@ export async function prepareModerationShots(
   } catch {
     return null;
   }
+}
+
+/**
+ * The shots of a stored photo, by its frame id (D95, D97; phone photos since 2026-11-25, a user
+ * decision). A booth photo and a phone photo composed in a booth frame (`phone-<frame id>`, D93)
+ * are cut up with that frame's slots, exactly as the booth composed them. A plain phone photo
+ * (`phone-photo`, a page from before D93) is one picture of one moment: it is its own single shot.
+ * Anything else (an unknown or retired frame id) is null and waits for a person.
+ */
+export async function prepareStoredPhotoShots(
+  data: Uint8Array,
+  mime: PhotoMime,
+  frameId: string,
+  frames: readonly Pick<FrameDefinition, "id" | "outputWidth" | "outputHeight" | "slots">[],
+): Promise<ModerationImage[] | null> {
+  if (frameId === MOBILE_FRAME_ID) {
+    const one = await prepareModerationImage(data, mime);
+    return one ? [one] : null;
+  }
+  const boothId = frameId.startsWith(MOBILE_UPLOAD_CONFIG.frameIdPrefix)
+    ? frameId.slice(MOBILE_UPLOAD_CONFIG.frameIdPrefix.length)
+    : frameId;
+  // Exact ids only: a fallback frame would cut the wrong places.
+  const frame = frames.find((f) => f.id === boothId) ?? null;
+  return prepareModerationShots(data, mime, frame);
 }

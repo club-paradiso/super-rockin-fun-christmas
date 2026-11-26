@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requestAiReview } from "@/lib/moderation/server";
 import { MOBILE_UPLOAD_CONFIG, mobileFrameId, mobileOfferedFrame } from "@/config/mobile";
 import { matchesFrameShape, normalizeMobilePhoto, UnreadableImageError } from "@/lib/mobile/image";
 import { readUploadToken } from "@/lib/mobile/server";
@@ -106,6 +107,17 @@ export const POST = route("mobile_upload", async (request: Request) => {
     return jsonError(502, "storage unavailable");
   }
   if (!result.ok) return jsonError(409, result.reason);
+  // AI review for phone photos too (2026-11-25, a user decision): the same queue, the same single
+  // approval path; anything else waits for a person. Not on a cloud holding a hub's inbox photo
+  // (QR issued by a hub, kioskId null): that photo is reviewed on the hub once it is taken in.
+  if (result.moderationStatus === "PENDING" && !(config.role === "cloud" && kioskId === null))
+    await requestAiReview(result.photoId).catch((err: Error) =>
+      logEvent(
+        "ai_review_request_failed",
+        { photoId: result.photoId, message: err.message },
+        "warn",
+      ),
+    );
   logEvent("mobile_upload_ok", {
     sessionId,
     kioskId,

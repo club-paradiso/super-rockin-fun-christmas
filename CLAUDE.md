@@ -30,8 +30,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `AiReviewRepository.complete` with SAFE (`ftl_ai_complete`): one atomic, audited call. Unsafe,
   unsure, error, timeout, rate limit, no budget, no configuration → the photo stays PENDING for a
   person. Never add a path where "could not check" becomes approved, never let the AI reject,
-  hide, delete or restore, and never add a route that accepts a verdict. Phone uploads are always
-  reviewed by a person. The policy is `lib/moderation/policy.ts` + `prompt.ts`, never the
+  hide, delete or restore, and never add a route that accepts a verdict. Phone uploads (D66) go
+  through the same review since 2026-11-25 (a user decision): queued after the upload, or on the
+  hub when it takes one in from the cloud inbox (never on the cloud for a hub's inbox photo); a
+  phone photo in a booth frame is cut with that frame's slots, a plain one is one shot
+  (`prepareStoredPhotoShots`). The policy is `lib/moderation/policy.ts` + `prompt.ts`, never the
   provider's own.
 - **Only prepared copies leave the server, one per shot** (D95, D97): `prepareModerationShots` cuts
   a composed photo into its shots with the frame's slot data (small JPEGs, no metadata), and each

@@ -1,4 +1,5 @@
 import "server-only";
+import { requestAiReview } from "@/lib/moderation/server";
 import { getServerConfig } from "@/lib/server/env";
 import { logEvent } from "@/lib/server/log";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
@@ -35,7 +36,14 @@ export function getHubInbox(): HubInbox | null {
   const client = cloudClient();
   if (!client) return null;
   const g = globalThis as { __ftlHubInbox?: HubInbox };
-  g.__ftlHubInbox ??= new HubInbox(getPhotoService(), getBackend(), client);
+  g.__ftlHubInbox ??= new HubInbox(
+    getPhotoService(),
+    getBackend(),
+    client,
+    undefined,
+    // The hub reviews phone photos like booth photos (AI first when it is on, D95).
+    requestAiReview,
+  );
   return g.__ftlHubInbox;
 }
 
