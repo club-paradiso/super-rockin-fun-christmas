@@ -2,8 +2,8 @@
   "screen": "polaroid1",
   "browser": "kiosk-landscape",
   "worstOffsetPx": 1,
-  "overPct": 1.95,
-  "meanDeltaE": 0.58,
+  "overPct": 1.694,
+  "meanDeltaE": 0.395,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -174,7 +174,7 @@
       ]
     },
     {
-      "sel": "[data-testid=\"option-caption-yaho\"]",
+      "sel": "[data-testid=\"option-caption-hooray\"]",
       "delta": [
         0.02,
         0,
