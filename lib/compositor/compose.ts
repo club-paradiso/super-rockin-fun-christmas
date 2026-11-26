@@ -399,25 +399,31 @@ function drawHand(
   deco: Extract<FrameDecoration, { type: "hand" }>,
   context: ComposeContext,
 ) {
-  const font = getHandFont(context.handFont) ?? HAND_FONTS[0]!;
+  // A caption with its own font (Figma's) never takes the session's random one.
+  const session = getHandFont(context.handFont) ?? HAND_FONTS[0]!;
+  const font = deco.font
+    ? { ...deco.font, stroke: 0 }
+    : { ...session, size: session.size * deco.scale, stroke: session.stroke * deco.scale };
+  const text = deco.text.replaceAll("{handDate}", formatHandDate(context.dateLabel));
   const rad = (deco.deg * Math.PI) / 180;
   ctx.translate(deco.x, deco.y);
   ctx.rotate(rad);
-  ctx.font = `${font.weight} ${font.size * deco.scale}px "${font.family}", cursive`;
+  ctx.font = `${font.weight} ${font.size}px "${font.family}", cursive`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillStyle = deco.color;
-  const measured = ctx.measureText(deco.text)?.width;
+  const measured = ctx.measureText(text)?.width;
   // About 360 px in every font at the table's sizes (a recording canvas measures nothing).
-  const width = typeof measured === "number" && measured > 0 ? measured : 360 * deco.scale;
+  const width =
+    typeof measured === "number" && measured > 0 ? measured : (deco.width ?? 360 * deco.scale);
   const cy = deco.boxHeight / 2;
   if (font.stroke > 0) {
     ctx.strokeStyle = deco.color;
-    ctx.lineWidth = font.stroke * deco.scale;
+    ctx.lineWidth = font.stroke;
     ctx.lineJoin = "round";
-    ctx.strokeText(deco.text, 0, cy);
+    ctx.strokeText(text, 0, cy);
   }
-  ctx.fillText(deco.text, 0, cy);
+  ctx.fillText(text, 0, cy);
 
   const heart = deco.heart && context.assets?.get(deco.heart.src);
   if (deco.heart && heart) {
@@ -460,6 +466,17 @@ export function formatStampLabel(date: Date): string {
   }).formatToParts(date);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `'${get("year")} ${get("month")} ${get("day")}`;
+}
+
+/**
+ * The handwritten date of 폴라로이드 1컷 「오늘 날짜」 (Figma 877:1685 "12. 24. 2026"): month, day,
+ * year, from the frame's `dateLabel` ("2026.12.24"), so it is the same server day. No leading
+ * zeros, as a pen writes it ("12. 1. 2026"). Anything else is drawn as it came.
+ */
+export function formatHandDate(dateLabel: string): string {
+  const m = /^(\d{4})\.(\d{1,2})\.(\d{1,2})$/.exec(dateLabel.trim());
+  if (!m) return dateLabel;
+  return `${Number(m[2])}. ${Number(m[3])}. ${m[1]}`;
 }
 
 /** "2026.12.24" in Asia/Seoul, independent of the kiosk's OS timezone. */

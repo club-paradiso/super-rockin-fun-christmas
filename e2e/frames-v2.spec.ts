@@ -38,6 +38,9 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   ["film4", {}, "film4-cream", [600, 1800]],
   ["film4", { color: "red" }, "film4-red", [600, 1800]],
   ["polaroid1", {}, "polaroid1", [1200, 1459]],
+  // 문구 (2026-11-26): the date in Figma's Caveat, and a caption drawn as Figma's art.
+  ["polaroid1", { caption: "date" }, "polaroid1-date", [1200, 1459]],
+  ["polaroid1", { caption: "yaho" }, "polaroid1-yaho", [1200, 1459]],
   ["polaroid3", {}, "polaroid3", [600, 1800]],
   ["verse4", {}, "verse4", [600, 1800]],
   ["check2", {}, "check2-red", [600, 1800]],
@@ -116,7 +119,8 @@ for (const [card, options, frameId, [w, h]] of VARIANTS) {
     await expect(final).toHaveAttribute("data-width", String(w * 2));
     await expect(final).toHaveAttribute("data-height", String(h * 2));
     const hand = await final.getAttribute("data-hand-font");
-    if (card === "film4" || card === "polaroid1") expect(hand).toBeTruthy();
+    // Only the random handwriting is a session font; a chosen caption has Figma's own.
+    if (card === "film4" || frameId === "polaroid1") expect(hand).toBeTruthy();
     else expect(hand).toBeNull();
     // The stamp is the server's day (the tablet's clock is not used).
     await expect(final).toHaveAttribute("data-stamp", await serverStamp(page));
@@ -151,7 +155,7 @@ test("handwriting: 20 sessions in a row never repeat the previous font (a reload
     await page.getByTestId("start-camera").click();
     await page.getByTestId(i % 2 ? "frame-option-polaroid1" : "frame-option-film4").click();
     await page.getByTestId("confirm-pick").click();
-    if (i % 2 === 0) await page.getByTestId("confirm-options").click();
+    await page.getByTestId("confirm-options").click();
     await expect(page.getByTestId("screen-ready")).toBeVisible();
     const font = await page.locator(".kiosk-root").getAttribute("data-hand-font");
     expect(font).toBeTruthy();
@@ -241,6 +245,7 @@ for (const [width, height] of [
       ["film4", "2C-film4-options"],
       ["check2", "2E-check2-options"],
       ["film35", "2F-film35-options"],
+      ["polaroid1", "2D-polaroid1-captions"],
     ] as const) {
       await page.getByTestId(`frame-option-${card}`).click();
       await page.getByTestId("confirm-pick").click();

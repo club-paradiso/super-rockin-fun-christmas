@@ -98,7 +98,11 @@ looks:measure`). `/looks` is the comparison
   past the shots is 「다시 찍기」 on the review screen (a user decision, 2026-11-25): it asks first,
   throws all six away (and the session video) and shoots six again in the same frame,
   `KIOSK_CONFIG.retakesPerSession` times (1); never once the photos are chosen. Every option
-  combination is its own frame id. The earlier 20 frames (`FRAMES`) stay only for photos already
+  combination is its own frame id. 폴라로이드 1컷 has a 문구 option (2026-11-26, a user decision,
+  Figma 877:1665 / options screen 1055:3631): ten captions; only the first (`polaroid1`, the id photos
+  were stored under) draws the per-session random handwriting. Every other caption is Figma's own,
+  never a random font: outlined caption SVGs, and 「오늘 날짜」 in a fixed Caveat (`hand.font`,
+  `{handDate}`, the server's day). The earlier 20 frames (`FRAMES`) stay only for photos already
   stored; neither the booth nor the phone page offers them (D113).
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the

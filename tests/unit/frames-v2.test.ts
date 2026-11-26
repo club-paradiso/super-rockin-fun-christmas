@@ -10,6 +10,7 @@ import {
   cleanOptions,
   defaultOptions,
   getCard,
+  POLAROID1_VARIANTS,
   usesHandwriting,
 } from "@/config/frames/v2";
 import { lowResSource } from "@/lib/compositor/assets";
@@ -79,7 +80,24 @@ describe("틀 선택 v2: the eight cards", () => {
         ["logo", ["logoOn", "logoOff"]],
       ],
       film4: [["color", ["cream", "red"]]],
-      polaroid1: [],
+      // 문구 (2026-11-26): ten captions, the one the booth always had first.
+      polaroid1: [
+        [
+          "caption",
+          [
+            "village",
+            "date",
+            "verse",
+            "merry",
+            "us",
+            "merryKo",
+            "yaho",
+            "checklist",
+            "peace",
+            "circle",
+          ],
+        ],
+      ],
       polaroid3: [],
       verse4: [],
       check2: [["color", ["red", "blue"]]],
@@ -89,7 +107,7 @@ describe("틀 선택 v2: the eight cards", () => {
     });
   });
 
-  it("map every option combination to its own frame (film3 4, film35 3, film4 2, check2 2, others 1)", () => {
+  it("map every option combination to its own frame (polaroid1 10, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
@@ -106,6 +124,15 @@ describe("틀 선택 v2: the eight cards", () => {
       "film4-cream",
       "film4-red",
       "polaroid1",
+      "polaroid1-date",
+      "polaroid1-verse",
+      "polaroid1-merry",
+      "polaroid1-us",
+      "polaroid1-merry-ko",
+      "polaroid1-yaho",
+      "polaroid1-checklist",
+      "polaroid1-peace",
+      "polaroid1-circle",
       "polaroid3",
       "verse4",
       "check2-red",
@@ -122,7 +149,7 @@ describe("틀 선택 v2: the eight cards", () => {
 
   it("keep every earlier frame for the phone page and for stored photos", () => {
     expect(FRAMES).toHaveLength(20);
-    expect(ALL_FRAMES).toHaveLength(35);
+    expect(ALL_FRAMES).toHaveLength(44);
     expect(new Set(ALL_FRAMES.map((f) => f.id)).size).toBe(ALL_FRAMES.length);
     for (const f of [...FRAMES, ...V2_FRAMES]) {
       expect(isKnownFrameId(f.id)).toBe(true);
@@ -139,7 +166,8 @@ describe.each(V2_FRAMES.map((f) => [f.id, f] as const))("v2 frame %s", (_, frame
       polaroid1: [1200, 1459],
       lace1: [1200, 1500],
     };
-    expect([frame.outputWidth, frame.outputHeight]).toEqual(sizes[frame.id] ?? [600, 1800]);
+    const size = frame.id.startsWith("polaroid1") ? sizes.polaroid1 : sizes[frame.id];
+    expect([frame.outputWidth, frame.outputHeight]).toEqual(size ?? [600, 1800]);
   });
 
   it("holds one to six photos, every one placed exactly once, inside the frame, apart", () => {
@@ -325,6 +353,20 @@ describe("v2 frame details (Figma measurements)", () => {
       expect(d.underline!.dx).toBeGreaterThan(0);
       expect(d.underline!.dx).toBeLessThan(15 * d.scale);
     }
+  });
+
+  it("폴라로이드 1컷: only the first caption takes the random font; every caption's art is there", () => {
+    const random = Object.entries(POLAROID1_VARIANTS)
+      .filter(([, f]) => usesHandwriting(f))
+      .map(([c]) => c);
+    expect(random).toEqual(["village"]);
+    const date = POLAROID1_VARIANTS.date.decorations.find((d) => d.type === "hand")!;
+    expect(date.type === "hand" && date.font).toEqual({ family: "Caveat", weight: 700, size: 80 });
+    for (const f of Object.values(POLAROID1_VARIANTS))
+      for (const d of f.decorations) {
+        const src = d.type === "image" ? d.src : d.type === "hand" ? d.heart?.src : undefined;
+        if (src) expect(existsSync(join("public", src)), src).toBe(true);
+      }
   });
 
   it("defaults of each card are its first values", () => {

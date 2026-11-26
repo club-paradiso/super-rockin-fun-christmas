@@ -1805,9 +1805,16 @@ function Screen(p: ScreenProps) {
     }
 
     case "options": {
-      // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷).
+      // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷), 1055:3631 (폴라로이드
+      // 1컷 문구: ten answers in two columns, no row label).
       const card = getCard(state.cardId);
-      const title = card.options.length > 1 ? t.option.titleColorLogo : t.option.titleColor;
+      // Many answers (the captions) sit in a grid, which spaces the screen a little differently.
+      const grid = card.options.some((o) => o.values.length > 3);
+      const title = card.options.some((o) => o.key === "caption")
+        ? t.option.titleCaption
+        : card.options.length > 1
+          ? t.option.titleColorLogo
+          : t.option.titleColor;
       return (
         <BoothScreen
           testId="screen-options"
@@ -1832,7 +1839,7 @@ function Screen(p: ScreenProps) {
             </p>
           </div>
           <div
-            className="options-preview"
+            className={grid ? "options-preview options-preview-grid" : "options-preview"}
             data-testid="frame-preview"
             data-frame={state.frameId}
             data-hand={usesHandwriting(getFrame(state.frameId)) ? "cycling" : undefined}
@@ -1846,17 +1853,19 @@ function Screen(p: ScreenProps) {
               )}
             </div>
           </div>
-          <div className="options-rows">
+          <div className={grid ? "options-rows options-rows-grid" : "options-rows"}>
             {card.options.map((option) => (
               <div
                 key={option.key}
-                className="options-row"
+                className={option.values.length > 3 ? "options-row options-grid" : "options-row"}
                 role="radiogroup"
                 aria-label={t.label[option.key]}
               >
-                <span className="options-row-label" aria-hidden>
-                  {t.label[option.key]}
-                </span>
+                {option.values.length <= 3 && (
+                  <span className="options-row-label" aria-hidden>
+                    {t.label[option.key]}
+                  </span>
+                )}
                 {option.values.map((value) => {
                   const on = state.frameOptions[option.key] === value;
                   return (

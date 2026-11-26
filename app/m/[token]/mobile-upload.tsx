@@ -794,7 +794,9 @@ function CardOptions({
           className="flex flex-col gap-1.5"
         >
           <span className="text-center text-base font-semibold text-ink">{BOOTH.label[o.key]}</span>
-          <div className="flex justify-center gap-2">
+          <div
+            className={o.values.length > 3 ? "grid grid-cols-2 gap-2" : "flex justify-center gap-2"}
+          >
             {o.values.map((v) => (
               <button
                 key={v}

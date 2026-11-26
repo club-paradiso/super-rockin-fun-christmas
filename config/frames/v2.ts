@@ -185,52 +185,147 @@ function film4(color: keyof typeof FILM4): FrameDefinition {
 }
 
 // ── 폴라로이드 1컷 (Figma 873:1663, 1200 × 1459, photo square) ───────────────────────────────
-const polaroid1: FrameDefinition = {
-  id: "polaroid1",
-  name: "Polaroid 1",
-  label: "폴라로이드 1컷",
-  labelEn: "Polaroid · 1 shot",
-  labelZh: "拍立得 1格",
-  outputWidth: 1200,
-  outputHeight: 1459,
-  background: { type: "solid", color: "#F4F1EA" },
-  // The 4:3 photo is cropped to the square from its centre (coverCrop).
-  // Figma 873:1664: INNER_SHADOW radius 3, y 1, black 28 %.
-  slots: [
-    {
-      ...slot(61, 95, 1077, 1077),
-      innerShadow: { color: "rgba(0, 0, 0, 0.28)", blur: 3, offsetY: 1 },
-    },
-  ],
-  decorations: [
-    ...photos(1),
-    hand({
-      text: { x: 75, y: 1214, deg: 3, width: 538, height: 93 },
-      // Figma sets the polaroid's Caveat at 74 where the 600 px table has 49.
-      scale: 74 / 49,
-      color: "#1A1717",
-      heart: {
-        src: "hand-heart-polaroid1.svg",
-        x: 631.447,
-        y: 1240.744,
-        w: 43.848,
-        h: 42.256,
-        deg: -6,
-        svg: 49,
-      },
-      underline: {
-        src: "hand-underline-polaroid1.svg",
-        x: 83,
-        y: 1317.029,
-        w: 512.13,
-        h: 20,
-        svgW: 517,
-        svgH: 24,
-      },
-    }),
-    logo(942, 1356.56, 196, "#7A7066", "#F4F1EA"),
-  ],
+/**
+ * The ten captions the guest chooses from on the options screen (Figma 877:1665 「11 폴라로이드 ·
+ * 네임펜 데코 후보」; the options screen is 1055:3631). The first is the one the booth always had:
+ * "Christmas Village '26" in the session's random handwriting. Every other caption is drawn exactly
+ * as Figma has it, in Figma's own font, never the random one: the static ones are the Figma
+ * caption layer exported with its text outlined (public/frames/v2/polaroid1-caption-*.svg), and
+ * 「오늘 날짜」 writes the shooting day in Caveat with the star after it. F (장소 + 날짜) was
+ * dropped in Figma and is not here. The photo, the paper and the logo are the same in all ten.
+ */
+export const POLAROID1_CAPTIONS = [
+  "village",
+  "date",
+  "verse",
+  "merry",
+  "us",
+  "merryKo",
+  "yaho",
+  "checklist",
+  "peace",
+  "circle",
+] as const;
+export type Polaroid1Caption = (typeof POLAROID1_CAPTIONS)[number];
+
+/** Figma node and file name of each outlined caption (the frame-sized SVG, 1200 × 1459). */
+const POLAROID1_ART: Record<Exclude<Polaroid1Caption, "village" | "date">, [string, string]> = {
+  verse: ["877:1689", "verse"],
+  merry: ["877:1704", "merry"],
+  us: ["877:1719", "us"],
+  merryKo: ["878:1697", "merry-ko"],
+  yaho: ["987:3573", "yaho"],
+  checklist: ["878:1712", "checklist"],
+  peace: ["878:1731", "peace"],
+  circle: ["878:1748", "circle"],
 };
+
+const POLAROID1_NAMES: Record<Polaroid1Caption, { ko: string; en: string; zh: string }> = {
+  village: { ko: "", en: "", zh: "" },
+  date: { ko: "오늘 날짜", en: "Today's date", zh: "今天日期" },
+  verse: { ko: "성경 구절", en: "Bible verse", zh: "经文" },
+  merry: { ko: "merry christmas!", en: "merry christmas!", zh: "merry christmas!" },
+  us: { ko: "us", en: "us", zh: "us" },
+  merryKo: { ko: "메리 크리스마스", en: "메리 크리스마스", zh: "메리 크리스마스" },
+  yaho: { ko: "크리스마스 야호", en: "크리스마스 야호", zh: "크리스마스 야호" },
+  checklist: { ko: "체크리스트", en: "Checklist", zh: "清单" },
+  peace: { ko: "peace!", en: "peace!", zh: "peace!" },
+  circle: { ko: "'26 동그라미", en: "Circled '26", zh: "圈出 '26" },
+};
+
+/** Figma 877:1664: the handwriting group of the caption the booth always had. */
+const VILLAGE_HAND = hand({
+  text: { x: 75, y: 1214, deg: 3, width: 538, height: 93 },
+  // Figma sets the polaroid's Caveat at 74 where the 600 px table has 49.
+  scale: 74 / 49,
+  color: "#1A1717",
+  heart: {
+    src: "hand-heart-polaroid1.svg",
+    x: 631.447,
+    y: 1240.744,
+    w: 43.848,
+    h: 42.256,
+    deg: -6,
+    svg: 49,
+  },
+  underline: {
+    src: "hand-underline-polaroid1.svg",
+    x: 83,
+    y: 1317.029,
+    w: 512.13,
+    h: 20,
+    svgW: 517,
+    svgH: 24,
+  },
+});
+
+/**
+ * Figma 877:1687 「오늘 날짜」: "12. 24. 2026" (877:1685, Caveat Bold 80, turned −2°) is the
+ * shooting day, so it is drawn, not exported; the star (877:1686, 38.4 × 41.6, turned −8°) keeps
+ * its gap after the end of the date, whatever its width.
+ */
+const DATE_HAND: FrameDecoration = (() => {
+  const text = { x: 77, y: 1242, deg: 2, width: 361, height: 101 };
+  const star = { x: 451.8, y: 1250.4, w: 38.4, h: 41.6, deg: -8, svg: 50 };
+  const at = local({ x: text.x, y: text.y }, text.deg, star);
+  return {
+    type: "hand",
+    text: "{handDate}",
+    font: { family: "Caveat", weight: 700, size: 80 },
+    width: text.width,
+    x: text.x,
+    y: text.y,
+    deg: text.deg,
+    boxHeight: text.height,
+    scale: 1,
+    color: "#1A1717",
+    heart: {
+      src: `${V2}/polaroid1-star-1a1717.svg`,
+      dx: at.x - text.width,
+      dy: at.y,
+      padX: (star.svg - star.w) / 2,
+      padY: (star.svg - star.h) / 2,
+      width: star.svg,
+      height: star.svg,
+      deg: star.deg,
+    },
+  };
+})();
+
+function polaroid1(caption: Polaroid1Caption): FrameDefinition {
+  const name = POLAROID1_NAMES[caption];
+  const base = caption === "village";
+  const decoration: FrameDecoration =
+    caption === "village"
+      ? VILLAGE_HAND
+      : caption === "date"
+        ? DATE_HAND
+        : art(`polaroid1-caption-${POLAROID1_ART[caption][1]}.svg`, 1200, 1459);
+  return {
+    // The first caption keeps the id photos were stored under before there was a choice.
+    id: base ? "polaroid1" : `polaroid1-${caption === "date" ? "date" : POLAROID1_ART[caption][1]}`,
+    name: base ? "Polaroid 1" : `Polaroid 1 · ${caption}`,
+    label: base ? "폴라로이드 1컷" : `폴라로이드 1컷 · ${name.ko}`,
+    labelEn: base ? "Polaroid · 1 shot" : `Polaroid · 1 shot · ${name.en}`,
+    labelZh: base ? "拍立得 1格" : `拍立得 1格 · ${name.zh}`,
+    outputWidth: 1200,
+    outputHeight: 1459,
+    background: { type: "solid", color: "#F4F1EA" },
+    // The 4:3 photo is cropped to the square from its centre (coverCrop).
+    // Figma 873:1664: INNER_SHADOW radius 3, y 1, black 28 %.
+    slots: [
+      {
+        ...slot(61, 95, 1077, 1077),
+        innerShadow: { color: "rgba(0, 0, 0, 0.28)", blur: 3, offsetY: 1 },
+      },
+    ],
+    decorations: [...photos(1), decoration, logo(942, 1356.56, 196, "#7A7066", "#F4F1EA")],
+  };
+}
+
+export const POLAROID1_VARIANTS = Object.fromEntries(
+  POLAROID1_CAPTIONS.map((c) => [c, polaroid1(c)]),
+) as Record<Polaroid1Caption, FrameDefinition>;
 
 // ── 폴라로이드 3컷 · 스크랩 (Figma 836:1616) ─────────────────────────────────────────────────
 /** The orange VT323 date stamp on each polaroid (Figma 836:1681, 1686, 1691): 34 px, 34 tall. */
@@ -412,7 +507,7 @@ export const FILM35_VARIANTS = {
 export const V2_FRAMES: readonly FrameDefinition[] = [
   ...Object.values(FILM3_VARIANTS),
   ...Object.values(FILM4_VARIANTS),
-  polaroid1,
+  ...Object.values(POLAROID1_VARIANTS),
   polaroid3,
   verse4,
   checkRed,
@@ -426,9 +521,9 @@ export const V2_FRAMES: readonly FrameDefinition[] = [
 export type FrameCardId =
   "film3" | "film4" | "polaroid1" | "polaroid3" | "verse4" | "check2" | "lace1" | "film35";
 
-export type OptionKey = "color" | "logo";
+export type OptionKey = "color" | "logo" | "caption";
 export type OptionValue =
-  "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue" | "natural";
+  "mono" | "sepia" | "logoOn" | "logoOff" | "cream" | "red" | "blue" | "natural" | Polaroid1Caption;
 export type FrameOptions = Partial<Record<OptionKey, OptionValue>>;
 
 export interface FrameCardOption {
@@ -466,7 +561,17 @@ export const FRAME_CARDS: readonly FrameCard[] = [
     options: [{ key: "color", values: ["cream", "red"] }],
     frame: (o) => FILM4_VARIANTS[o.color === "red" ? "red" : "cream"],
   },
-  { id: "polaroid1", options: [], frame: only(polaroid1) },
+  {
+    id: "polaroid1",
+    // 문구 (2026-11-26): ten captions, the one the booth always had first.
+    options: [{ key: "caption", values: POLAROID1_CAPTIONS }],
+    frame: (o) =>
+      POLAROID1_VARIANTS[
+        POLAROID1_CAPTIONS.includes(o.caption as Polaroid1Caption)
+          ? (o.caption as Polaroid1Caption)
+          : "village"
+      ],
+  },
   { id: "polaroid3", options: [], frame: only(polaroid3) },
   { id: "verse4", options: [], frame: only(verse4) },
   {
@@ -516,7 +621,10 @@ export function cardOfFrame(frameId: string): FrameCard | null {
   return null;
 }
 
-/** True when the frame carries the handwriting (its font is chosen per session). */
+/**
+ * True when the frame carries the handwriting whose font is chosen per session. A caption with
+ * Figma's own font (폴라로이드 1컷 「오늘 날짜」) does not count: it never takes a random font.
+ */
 export function usesHandwriting(frame: FrameDefinition): boolean {
-  return frame.decorations.some((d) => d.type === "hand");
+  return frame.decorations.some((d) => d.type === "hand" && !d.font);
 }
