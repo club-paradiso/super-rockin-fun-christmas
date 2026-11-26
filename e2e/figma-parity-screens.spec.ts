@@ -6,7 +6,7 @@ import { diff, toRaw, triptych, type Rect } from "../tests/parity/compare";
 import { enrollKiosk, openWelcome } from "./helpers";
 
 /**
- * 「Figma 일치」, the four v2 screens at 768 × 1024 (Figma 898:1677, 898:1938, 898:2006, 898:2083):
+ * 「Figma 일치」, the four v2 screens at 768 × 1024 (Figma 1069:2245, 898:1938, 898:2006, 898:2083):
  *  - every element where Figma puts it, within ±2 px, and the same type sizes;
  *  - the screenshot against the Figma export: share of pixels with ΔE00 > 5 at most 2 %, with the
  *    frame previews masked (example photos, cycling handwriting).
@@ -44,18 +44,38 @@ const HEADER: Want[] = [
 ];
 const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 32 } };
 /**
- * The cards. Figma's picker (898:1677) has seven, four to a row at 149 × 357. The booth has nine
- * since 2026-11-26 (필름 35mm, then 밈 4컷), five to a row in the same box (x 100 → 732, rows at
- * y 166 and 539, 357 tall, 12 apart): 116.8 wide, the second row of four centred. Figma has no
- * picker with nine cards: these positions follow from its grid, they are not read from a Figma
- * frame, and the cards area is left out of the pixel comparison (CARDS) until the Figma screen
- * has them. The header, the title and the bottom bar are still compared with Figma.
+ * The cards: nine, five to a row (Figma 1069:2245, "2-A 틀 고르기 · 9개", made 2026-11-26 when
+ * 밈 4컷 joined; 898:1677 is the earlier seven-card screen). 116.8 × 357, 12 apart, rows at y 166
+ * and 539, the second row of four centred. Names and hints break between words, as the booth's
+ * `keep-all` does, and the pencil sits in the hint's first line.
  */
 const CARD_W = 116.8;
 const col = (i: number) => 100 + i * (CARD_W + 12);
 const ROW1 = ["film3", "film4", "polaroid1", "polaroid3", "verse4"];
 const ROW2 = ["check2", "lace1", "film35", "meme4"];
-const CARDS: Rect = { x: 100, y: 166, w: 632, h: 730 };
+/** Figma's text boxes, [x, y, w, h], read from 1069:2245. */
+const NAMES: Record<string, Box> = {
+  film3: [109, 470, 98.8, 22],
+  film4: [234.8, 450, 104.8, 22],
+  polaroid1: [363.6, 465, 104.8, 44],
+  polaroid3: [492.4, 465, 104.8, 44],
+  verse4: [621.2, 487, 104.8, 22],
+  check2: [170.4, 823, 104.8, 22],
+  lace1: [299.2, 860, 104.8, 22],
+  film35: [428, 801, 104.8, 44],
+  meme4: [556.8, 840, 104.8, 22],
+};
+const HINTS: Record<string, Box> = {
+  film3: [109, 498, 98.8, 17],
+  film4: [234.8, 478, 104.8, 34],
+  check2: [170.4, 851, 104.8, 34],
+  film35: [428, 851, 104.8, 34],
+  meme4: [556.8, 868, 104.8, 17],
+};
+const centre = ([x, y, w, h]: Box, size: number) => ({ cx: x + w / 2, cy: y + h / 2, size });
+const cardX = (id: string) =>
+  ROW1.includes(id) ? col(ROW1.indexOf(id)) : col(ROW2.indexOf(id) + 0.5);
+const cardY = (id: string) => (ROW1.includes(id) ? 166 : 539);
 
 const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
   pick: {
@@ -63,16 +83,27 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       ...HEADER,
       title,
       { sel: '[data-testid="confirm-pick"]', box: [353, 924, 379, 76] },
-      ...ROW1.map((id, i) => ({
+      ...[...ROW1, ...ROW2].map((id) => ({
         sel: `[data-testid="frame-option-${id}"]`,
-        box: [col(i), 166, CARD_W, 357] as Box,
+        box: [cardX(id), cardY(id), CARD_W, 357] as Box,
       })),
-      ...ROW2.map((id, i) => ({
-        sel: `[data-testid="frame-option-${id}"]`,
-        box: [col(i + 0.5), 539, CARD_W, 357] as Box,
+      ...Object.entries(NAMES).map(([id, box]) => ({
+        sel: `[data-testid="frame-option-${id}"] .pick-card-name`,
+        text: centre(box, 18),
+      })),
+      ...Object.entries(HINTS).map(([id, box]) => ({
+        sel: `[data-testid="frame-option-${id}"] .pick-card-hint`,
+        text: centre(box, 14),
       })),
     ],
-    masks: [CARDS],
+    // The previews only (example photos; the frame art itself is compared in
+    // figma-parity.spec): inside each card, from its top padding to just above its name.
+    masks: Object.entries(NAMES).map(([id, [, nameY]]) => ({
+      x: cardX(id) + 3,
+      y: cardY(id) + 3,
+      w: CARD_W - 6,
+      h: nameY - 4 - (cardY(id) + 3),
+    })),
   },
   film3: {
     wants: [

@@ -608,11 +608,16 @@
   justify-content: center;
   gap: calc(5.2 * var(--fx));
 }
+/* The pencil sits in the hint's first line, as in Figma: a hint that wraps (five cards to a row)
+   goes on under the text, not under the pencil. */
 .kiosk-root .booth-screen-v2 .pick-card-hint {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(4.5 * var(--fx));
+  display: block;
+  text-align: center;
+}
+.kiosk-root .booth-screen-v2 .pick-card-hint .v2-mark-pencil {
+  display: inline-block;
+  vertical-align: baseline;
+  margin-right: calc(4.5 * var(--fx));
 }
 /* The bar's two buttons start on the same line (924); the main button is flat in Figma
    (898:1677: a plain #412D1B pill, no bevel, no cast shadow). */

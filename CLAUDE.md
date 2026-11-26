@@ -286,7 +286,7 @@ looks:measure`). `/looks` is the comparison
   `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
   once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
   missing file must never break a layout or a touch target. The shutter stays the screen's one
-  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 898:1677), not
+  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 1069:2245; 898:1677 before 밈 4컷), not
   postcards on the desk; nothing on the picker or the options screen sits on the binder rings
   (`--ring-safe` in `app/kiosk-figma.css`).
 - **One light, top left (135°)** (D101): every cast shadow falls to +x +y: the `--shadow-*`,
@@ -306,10 +306,9 @@ looks:measure`). `/looks` is the comparison
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. One exception is written down: Figma's picker still has seven cards, four to a row,
-  and the booth has nine, five to a row in the same box (2026-11-26), so the cards area is left
-  out of the pixel comparison until the Figma screen has them (`CARDS` in the screens spec; the
-  card boxes are still checked against the grid they follow from). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
+  to pass. The picker's reference is Figma 1069:2245 (「2-A 틀 고르기 · 9개」, 2026-11-26): nine
+  cards five to a row, names and hints broken between words as the booth's `keep-all` breaks them,
+  the pencil in the hint's first line; only the card previews are masked. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.
