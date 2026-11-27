@@ -1255,6 +1255,28 @@ body {
     min-width: 0;
     text-align: center;
   }
+  /* Tall screen (a user request, 2026-11-27: the camera before shooting was too small): the
+     shot's name beside the strip, and the flash switch beside its two notes, each one line, so
+     the preview above takes the height they gave up. They wrap back to stacked lines when a
+     language's words do not fit. On a wide screen both wrappers are display: contents. */
+  .shoot-head,
+  .shoot-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: var(--gap-m);
+    row-gap: var(--gap-xs);
+    max-width: 100%;
+    min-width: 0;
+  }
+  .shoot-notes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    min-width: 0;
+    text-align: center;
+  }
   .shoot-actions {
     display: flex;
     flex-wrap: wrap;
@@ -2041,6 +2063,11 @@ body {
       row-gap: var(--gap-xs);
       text-align: left;
     }
+    .shoot-head,
+    .shoot-foot,
+    .shoot-notes {
+      display: contents;
+    }
     .shoot-panel {
       flex: 1 1 0;
       align-items: flex-start;
@@ -2417,6 +2444,14 @@ main input:focus-visible,
     .kiosk-root .shoot-live .camera-preview {
       width: min(100%, calc(68 * var(--bh) * var(--aspect, 1.3333)));
       max-width: none;
+    }
+  }
+  /* Before shooting on a tall screen the panel under the preview takes about 60 % of the
+     booth's height; 37 % is what is left for the preview, checked from 960 to 1366 px tall
+     against the container version. */
+  @media not all and (min-aspect-ratio: 5/4) {
+    .kiosk-root .shoot:not(.shoot-live) .camera-preview {
+      max-width: min(100%, calc(37 * var(--bh) * var(--aspect, 1.3333)));
     }
   }
   .kiosk-root .fit-grid {
