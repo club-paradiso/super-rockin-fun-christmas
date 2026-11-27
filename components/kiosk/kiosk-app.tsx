@@ -77,6 +77,13 @@ import { kioskRenderBudget, legacyIOS15InBrowser } from "@/lib/kiosk/legacy-ios"
 import { runPhotoStages, type PhotoStages } from "@/lib/kiosk/photo-stages";
 import { RETOUCH_LEVEL_IDS, type RetouchLevelId } from "@/config/retouch";
 import { RetouchHud, useSkinRetouch } from "./skin-retouch";
+import { useCameraEngine } from "./camera-engine";
+import type { CameraEngine } from "@/lib/camera-engine/engine";
+import {
+  defaultCameraEngine,
+  normalizeCameraEngine,
+  type CameraEngineSettings,
+} from "@/lib/camera-engine/settings";
 import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
 import {
@@ -387,6 +394,7 @@ export function KioskApp({
   serverNow,
   skinRetouch = "off",
   retouchHud = false,
+  initialCameraEngine,
 }: {
   cameraMode: CameraMode;
   frontend?: "modern" | "legacy";
@@ -406,6 +414,8 @@ export function KioskApp({
   skinRetouch?: RetouchLevelId;
   /** Show the retouch timings on screen (measuring a device; never for guests). */
   retouchHud?: boolean;
+  /** Staff's 「카메라 자동 보정」 (lib/camera-engine). Absent or "off": the booth as it always was. */
+  initialCameraEngine?: CameraEngineSettings;
 }) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
@@ -431,6 +441,13 @@ export function KioskApp({
   const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
+  // 「카메라 자동 보정」: null while staff have it off, and then nothing below does anything.
+  const [engineDefault] = useState(defaultCameraEngine);
+  const cameraEngine = useCameraEngine(
+    initialCameraEngine ?? engineDefault,
+    state.phase,
+    cameraMode,
+  );
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [deviceId, setDeviceId] = useState<string | undefined>(readStoredDevice);
@@ -648,6 +665,7 @@ export function KioskApp({
   }, [state.sessionId]);
 
   // ── Camera lifecycle ─────────────────────────────────────────────────────────────────────
+  const { cameraStarted, engine: engineNow } = cameraEngine;
   useEffect(() => {
     if (state.phase !== "camera" || !cameraRef.current) return;
     let cancelled = false;
@@ -656,6 +674,7 @@ export function KioskApp({
       .start(deviceId)
       .then(async () => {
         if (cancelled) return;
+        cameraStarted(camera, deviceId);
         setStream(camera.getStream());
         setDevices(await camera.listDevices());
         dispatch({ type: "CAMERA_READY" });
@@ -676,7 +695,7 @@ export function KioskApp({
     return () => {
       cancelled = true;
     };
-  }, [state.phase, deviceId]);
+  }, [state.phase, deviceId, cameraStarted]);
 
   // Camera off whenever it is not needed for shooting (v2: no retake after the review).
   useEffect(() => {
@@ -743,6 +762,7 @@ export function KioskApp({
         // Gone, or muted by the browser (a black frame): take the camera again before the shot.
         if (!camera.isActive() || camera.isStalled()) {
           await camera.start(deviceId);
+          cameraStarted(camera, deviceId);
           setStream(camera.getStream());
         }
         if (cancelled) return;
@@ -760,6 +780,8 @@ export function KioskApp({
           aspect: KIOSK_CONFIG.captureAspect,
           mirror: KIOSK_CONFIG.mirror,
           maxWidth: renderBudget.captureMaxWidth,
+          // The tablet's tilt, turned back in the photo (staff setting; null = as always).
+          correct: engineNow?.correct,
         });
         // The blink comes after the grab, so it can never light (or spoil) the photo itself.
         if (!cancelled) setShutterBlink((n) => n + 1);
@@ -796,6 +818,8 @@ export function KioskApp({
     legacyIOS15,
     renderBudget.captureMaxWidth,
     sound,
+    cameraStarted,
+    engineNow,
   ]);
 
   const images = useMemo(
@@ -1570,6 +1594,12 @@ export function KioskApp({
   useEffect(() => {
     retouchFailuresRef.current = retouch.takeFailures;
   });
+  const engineHeartbeatRef = useRef(cameraEngine.heartbeatStatus);
+  const engineHeardRef = useRef(cameraEngine.heard);
+  useEffect(() => {
+    engineHeartbeatRef.current = cameraEngine.heartbeatStatus;
+    engineHeardRef.current = cameraEngine.heard;
+  });
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
   useEffect(() => {
     heartbeatRef.current = {
@@ -1593,6 +1623,8 @@ export function KioskApp({
             ...retouchFailuresRef.current(),
             // Why colour looks are off on this tablet, as a code (never anything about a photo).
             looksError: looksErrorCode(looksRef.current?.problem() ?? null) ?? undefined,
+            // 「카메라 자동 보정」 as this tablet runs it: codes and rounded angles, no readings.
+            cameraEngine: engineHeartbeatRef.current(),
           }),
         });
         if (!stopped && res.ok) {
@@ -1601,6 +1633,7 @@ export function KioskApp({
             wallPublic?: boolean;
             aiReview?: boolean;
             photoLooks?: boolean;
+            cameraEngine?: unknown;
             serverNow?: string;
           };
           if (typeof data.serverNow === "string") clock.update(data.serverNow, sentAt, Date.now());
@@ -1608,6 +1641,8 @@ export function KioskApp({
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
           if (typeof data.aiReview === "boolean") setAiReview(data.aiReview);
           if (typeof data.photoLooks === "boolean") setPhotoLooks(data.photoLooks);
+          // Taken up at the next "화면을 눌러 시작", never under a guest.
+          if (data.cameraEngine) engineHeardRef.current(normalizeCameraEngine(data.cameraEngine));
         }
       } catch {
         // Offline: the queue badge already tells staff; the next beat will retry.
@@ -1635,6 +1670,7 @@ export function KioskApp({
         data-lang={state.lang}
         data-legacy-ios15={legacyIOS15 ? "true" : undefined}
         data-wall-submissions={wallSubmissions}
+        data-camera-engine={engineNow ? "on" : undefined}
       >
         <div
           className="kiosk-scroll"
@@ -1690,7 +1726,13 @@ export function KioskApp({
             privateDelivery={privateDelivery}
             onConsent={chooseConsent}
             onReset={reset}
-            onOpen={() => dispatch({ type: "OPEN" })}
+            onOpen={() => {
+              // iOS answers the motion sensor question only from inside a touch, and this is
+              // the booth's first one. Asked once per page load, and only with the engine on.
+              cameraEngine.requestPermission();
+              dispatch({ type: "OPEN" });
+            }}
+            engine={engineNow}
             onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
             onStartMobile={() => dispatch({ type: "START_MOBILE" })}
             mobileQrSvg={
@@ -1812,6 +1854,7 @@ export function KioskApp({
             soundMuted={muted}
             onToggleSound={sound ? () => sound.setMuted(!muted) : null}
             looks={{ staffSwitch: photoLooks, session: looksNow, booth: looks }}
+            cameraEngine={cameraEngine}
           />
         )}
         {retouchHud && skinRetouch !== "off" && (
@@ -1845,6 +1888,8 @@ interface ScreenProps {
   gradedShots: readonly (string | null)[];
   /** How the live camera picture is shown (a black-and-white frame: black and white). */
   lookView: LookView;
+  /** 「카메라 자동 보정」: the preview gets the photo's correction. Null: off. */
+  engine: CameraEngine | null;
   /** The colour row of the choice screen: every look on the first shot. Empty: no row. */
   lookChips: readonly LookChip[];
   /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
@@ -2238,6 +2283,7 @@ function Screen(p: ScreenProps) {
               aspect={aspect}
               mirror={KIOSK_CONFIG.mirror}
               lookView={p.lookView}
+              engine={p.engine}
             >
               <div className="absolute inset-0 flex items-center justify-center">
                 {state.phase === "countdown" ? (

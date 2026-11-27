@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet && next build",
+    "build": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet && npm run build:camera-lab && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -26,7 +26,8 @@
     "build:kiosk-legacy": "vite build --config legacy-kiosk/vite.config.mts",
     "build:retouch-lab": "vite build --config retouch-lab/vite.config.mts",
     "build:looks-sheet": "vite build --config looks-sheet/vite.config.mts",
-    "predev": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet"
+    "build:camera-lab": "vite build --config camera-lab/vite.config.mts",
+    "predev": "npm run build:kiosk-legacy && npm run build:retouch-lab && npm run build:looks-sheet && npm run build:camera-lab"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-kr": "^5.3.1",

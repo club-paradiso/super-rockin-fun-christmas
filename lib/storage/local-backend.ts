@@ -1,6 +1,8 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { defaultWallLook } from "@/config/wall-themes";
+import { normalizeCameraEngine } from "@/lib/camera-engine/settings";
+import { parseCameraEngineStatus } from "@/lib/camera-engine/status";
 import { createMemoryBackend, type MemoryBackend } from "./memory-backend";
 import type {
   AiUsage,
@@ -91,6 +93,8 @@ class FileDb {
         enrolledVia: k.enrolledVia ?? "secret",
         frameRate: k.frameRate ?? null,
         memoryMb: k.memoryMb ?? null,
+        // Files written before the camera engine, or a status this build cannot read: none.
+        cameraEngine: parseCameraEngineStatus(k.cameraEngine),
       });
     }
     for (const c of db.enrollmentCodes ?? []) this.mem.enrollmentCodes.rows.set(c.id, c);
@@ -107,6 +111,8 @@ class FileDb {
         moderationMode: db.settings.moderationMode ?? "auto",
         // Files written before looks: on, the default since 2026-11-25. A stored answer stays.
         photoLooks: db.settings.photoLooks ?? true,
+        // Files written before the camera engine: off. A damaged field reads as its default.
+        cameraEngine: normalizeCameraEngine(db.settings.cameraEngine),
       };
     for (const m of db.staff ?? []) this.mem.staff.rows.set(m.userId, m);
     for (const [id, pin] of Object.entries(db.staffPins ?? {})) this.mem.staff.pins.set(id, pin);

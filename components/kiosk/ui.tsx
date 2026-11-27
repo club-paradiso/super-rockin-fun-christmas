@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { BrandLockup, BrandWordmark } from "@/components/brand";
 import { useAssetReady } from "@/components/studio/stamp-ticket";
 import { STUDIO_ASSETS } from "@/config/studio";
+import type { CameraEngine } from "@/lib/camera-engine/engine";
 import { boothSound } from "@/lib/kiosk/sound";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 import { KioskFullscreenControl } from "./fullscreen";
@@ -249,12 +250,18 @@ export function JournalBookmark() {
  * so the guest sees exactly the crop that will be saved. The box takes its size from the stage
  * it sits in (.shoot-stage): as wide and as tall as the stage allows, always `aspect`. Turning
  * the tablet changes the stage, never the ratio.
+ *
+ * With 「카메라 자동 보정」 on (`engine`) the <video> is given the photo's own correction as a
+ * CSS matrix (lib/camera-engine/preview.ts): the browser's compositor applies it, nothing is
+ * drawn by script while the camera runs. Without an engine, or when it has nothing to correct,
+ * the element is exactly as above.
  */
 export function CameraPreview({
   stream,
   aspect,
   mirror,
   lookView = null,
+  engine = null,
   children,
 }: {
   stream: MediaStream | null;
@@ -262,9 +269,12 @@ export function CameraPreview({
   mirror: boolean;
   /** A black-and-white frame with looks on shows the live picture that way (lib/looks/config.ts). */
   lookView?: "mono" | "sepia" | null;
+  /** The camera engine while staff have it on. */
+  engine?: CameraEngine | null;
   children?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const t = useKioskCopy();
 
   useEffect(() => {
@@ -277,8 +287,72 @@ export function CameraPreview({
     };
   }, [stream]);
 
+  // The correction is written straight onto the element: it changes when the booth is moved,
+  // not with React's renders, and a still booth writes it once.
+  useEffect(() => {
+    const video = videoRef.current;
+    const box = boxRef.current;
+    if (!video || !box) return;
+    const plain = () => {
+      const s = video.style;
+      s.position = s.left = s.top = s.width = s.height = "";
+      s.maxWidth = s.objectFit = s.transformOrigin = "";
+      s.transform = mirror ? "scaleX(-1)" : "";
+      delete video.dataset.engine;
+    };
+    if (!engine) {
+      plain();
+      return;
+    }
+    const place = () => {
+      const layout = engine.preview(
+        video.videoWidth,
+        video.videoHeight,
+        box.clientWidth,
+        box.clientHeight,
+        aspect,
+        mirror,
+      );
+      if (!layout) {
+        plain();
+        return;
+      }
+      // The whole frame at the size "cover" would give it, so what the correction turns into
+      // view from outside the crop is there to be seen; the box clips it.
+      const s = video.style;
+      s.position = "absolute";
+      s.left = `${layout.left}px`;
+      s.top = `${layout.top}px`;
+      s.width = `${layout.width}px`;
+      s.height = `${layout.height}px`;
+      s.maxWidth = "none";
+      s.objectFit = "fill";
+      s.transformOrigin = "0 0";
+      s.transform = layout.transform;
+      video.dataset.engine = "on";
+    };
+    place();
+    // The engine says when its correction may have changed (the booth was moved, a session
+    // began or ended): only this element is touched, React renders nothing.
+    const unsubscribe = engine.subscribe(place);
+    video.addEventListener("loadedmetadata", place);
+    video.addEventListener("resize", place);
+    window.addEventListener("resize", place);
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
+    observer?.observe(box);
+    return () => {
+      unsubscribe();
+      video.removeEventListener("loadedmetadata", place);
+      video.removeEventListener("resize", place);
+      window.removeEventListener("resize", place);
+      observer?.disconnect();
+      plain();
+    };
+  }, [engine, stream, aspect, mirror]);
+
   return (
     <div
+      ref={boxRef}
       className="camera-preview"
       data-testid="camera-preview-box"
       style={{ aspectRatio: String(aspect), "--aspect": String(aspect) } as React.CSSProperties}
