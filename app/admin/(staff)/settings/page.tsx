@@ -1,3 +1,4 @@
+import { CameraEngineForm } from "@/components/admin/camera-engine-form";
 import { EmergencyPanel } from "@/components/admin/emergency-panel";
 import { EventClose } from "@/components/admin/event-close";
 import { PublicWallForm } from "@/components/admin/public-wall-form";
@@ -46,6 +47,7 @@ export default async function SettingsPage() {
         settings={settings}
         wallStatus={wallOpen(settings, new Date(), WALL_CONFIG.timeZone)}
       />
+      <CameraEngineForm settings={settings.cameraEngine} />
       <WallHoursForm hours={settings.wallHours} timeZone={WALL_CONFIG.timeZone} />
       <WallLookForm
         look={look}

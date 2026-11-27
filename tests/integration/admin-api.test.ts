@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { defaultCameraEngine } from "@/lib/camera-engine/settings";
 import { JPEG, uuid } from "../helpers/images";
 
 /**
@@ -359,6 +360,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallPublic: false,
         aiReview: false,
         photoLooks: true,
+        cameraEngine: defaultCameraEngine(),
         // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
         serverNow: expect.any(String),
       });
@@ -572,6 +574,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallPublic: false,
         aiReview: false,
         photoLooks: true,
+        cameraEngine: defaultCameraEngine(),
         // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
         serverNow: expect.any(String),
       });

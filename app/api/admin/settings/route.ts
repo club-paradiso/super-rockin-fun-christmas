@@ -7,6 +7,7 @@ import { getServerConfig } from "@/lib/server/env";
 import { MODERATION_MODES, type ModerationMode } from "@/lib/storage/types";
 import type { SettingsPatch, WallForce } from "@/lib/storage/types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
+import { cameraEngineProblem, normalizeCameraEngine } from "@/lib/camera-engine/settings";
 import { isValidHours } from "@/lib/wall/hours";
 import {
   HALF_LIFE_MINUTES,
@@ -32,7 +33,9 @@ export const GET = staffRoute("admin_settings", async () =>
  * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85),
  * "wallPace": {"showSeconds","halfLifeMinutes"} (D92; stored inside the look),
  * "moderationMode": "manual" | "auto" (D95; "auto" is refused with 409 while no AI provider is
- * configured on this server, so the switch can never promise a check that is not there). Audited.
+ * configured on this server, so the switch can never promise a check that is not there),
+ * "cameraEngine": the whole camera-engine setting (lib/camera-engine/settings.ts: every field,
+ * nothing else; a booth takes it up at its next guest). Audited.
  * pauseSubmissions stops NEW media-wall submissions only; photography and QR delivery continue.
  */
 export const POST = staffRoute("admin_settings_update", async (request, { staff }) => {
@@ -73,6 +76,11 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
             end: (body.wallHours as { end: string }).end,
           };
   }
+  if (body && "cameraEngine" in body) {
+    const problem = cameraEngineProblem(body.cameraEngine);
+    if (problem) return jsonError(400, problem);
+    patch.cameraEngine = normalizeCameraEngine(body.cameraEngine);
+  }
   if (body && "wallLook" in body) {
     const problem = wallLookProblem(body.wallLook);
     if (problem) return jsonError(400, problem);
@@ -92,10 +100,12 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
   }
   if (!Object.keys(patch).length) return jsonError(400, "nothing to change");
   const settings = await getBackend().settings.update(patch, staff.userId);
-  const { wallHours, wallLook, ...flags } = patch;
+  const { wallHours, wallLook, cameraEngine, ...flags } = patch;
   logEvent("settings_updated", {
     staffId: staff.userId,
     ...flags,
+    // The mode only: the offsets are in the audit row.
+    ...(cameraEngine && { cameraEngine: cameraEngine.mode }),
     ...(wallLook && {
       wallTheme: wallLook.theme,
       wallRotate: wallLook.rotate

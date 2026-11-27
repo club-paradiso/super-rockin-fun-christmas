@@ -5,6 +5,8 @@ import {
   generateEnrollmentCode,
 } from "@/lib/ops/enrollment-code";
 import { defaultWallLook } from "@/config/wall-themes";
+import { defaultCameraEngine, type CameraEngineSettings } from "@/lib/camera-engine/settings";
+import type { CameraEngineStatus } from "@/lib/camera-engine/status";
 import { PhotoService } from "@/lib/storage/photo-service";
 import { newKioskRow } from "@/lib/storage/rows";
 import type { StorageBackend } from "@/lib/storage/types";
@@ -349,6 +351,7 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
         appBuild: "test",
         frameRate: null,
         memoryMb: null,
+        cameraEngine: null,
       });
       // A wall display also reports how smoothly it draws (docs/ARCHITECTURE.md 1.8).
       await backend.kiosks.heartbeat(kioskId, {
@@ -448,6 +451,87 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect((await backend.settings.update({ pauseWall: true }, staffId)).photoLooks).toBe(false);
       const both = await backend.settings.update({ photoLooks: true, pauseWall: false }, staffId);
       expect(both).toMatchObject({ photoLooks: true, pauseWall: false });
+    });
+
+    it("camera engine: off by default, stored whole, audited, kept by other changes", async () => {
+      const { backend, staffId } = await setup();
+      expect((await backend.settings.get()).cameraEngine).toEqual(defaultCameraEngine());
+      expect((await backend.settings.get()).cameraEngine.mode).toBe("off");
+      const auto: CameraEngineSettings = { ...defaultCameraEngine(), mode: "auto" };
+      const on = await backend.settings.update({ cameraEngine: auto }, staffId);
+      expect(on).toMatchObject({ cameraEngine: auto, updatedBy: staffId });
+      const manual: CameraEngineSettings = {
+        mode: "manual",
+        level: true,
+        perspective: false,
+        portraitGuard: true,
+        rollOffset: -2.5,
+        pitchOffset: 8,
+        profile: auto.profile,
+        fov: 62.5,
+        calibration: 3,
+      };
+      expect(
+        (await backend.settings.update({ cameraEngine: manual }, staffId)).cameraEngine,
+      ).toEqual(manual);
+      expect((await backend.settings.get()).cameraEngine).toEqual(manual);
+      const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
+      expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
+      expect(JSON.parse(last!.fromState!)).toMatchObject({ camera_engine: auto });
+      expect(JSON.parse(last!.toState!)).toMatchObject({ camera_engine: manual });
+      // Another setting changed later leaves it as it is; both together work too.
+      expect((await backend.settings.update({ pauseWall: true }, staffId)).cameraEngine).toEqual(
+        manual,
+      );
+      const both = await backend.settings.update(
+        { cameraEngine: defaultCameraEngine(), pauseWall: false, photoLooks: true },
+        staffId,
+      );
+      expect(both).toMatchObject({
+        cameraEngine: defaultCameraEngine(),
+        pauseWall: false,
+        photoLooks: true,
+      });
+    });
+
+    it("camera engine status: stored with the heartbeat, kept when absent, cleared by null", async () => {
+      const { backend, kioskId } = await setup();
+      const beat = { atIso: new Date().toISOString(), queueDepth: 0, appBuild: "test" };
+      const status: CameraEngineStatus = {
+        state: "reduced",
+        reason: "guard",
+        permission: "granted",
+        sensor: "ok",
+        backend: "webgl",
+        roll: 2.4,
+        pitch: 11.5,
+        appliedRoll: 2.4,
+        appliedPitch: 6.1,
+        strength: 0.53,
+        zoom: 1.08,
+        loss: 0.12,
+        confidence: 0.97,
+        profile: "generic-front",
+        profileSource: "assumed",
+        locked: false,
+        previewMatches: true,
+        pitchWarning: false,
+        error: null,
+      };
+      expect((await backend.kiosks.get(kioskId))!.cameraEngine).toBeNull();
+      await backend.kiosks.heartbeat(kioskId, { ...beat, cameraState: "ok", cameraEngine: status });
+      expect((await backend.kiosks.get(kioskId))!.cameraEngine).toEqual(status);
+      expect((await backend.kiosks.list()).find((k) => k.id === kioskId)!.cameraEngine).toEqual(
+        status,
+      );
+      // A beat that says nothing about the engine leaves the last status where it is.
+      await backend.kiosks.heartbeat(kioskId, { ...beat, cameraState: "error" });
+      expect(await backend.kiosks.get(kioskId)).toMatchObject({
+        cameraState: "error",
+        cameraEngine: status,
+      });
+      await backend.kiosks.heartbeat(kioskId, { ...beat, cameraState: "ok", cameraEngine: null });
+      expect((await backend.kiosks.get(kioskId))!.cameraEngine).toBeNull();
     });
 
     it("wall opening hours and the staff override: stored, audited, clearable", async () => {

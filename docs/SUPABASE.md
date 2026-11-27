@@ -118,3 +118,16 @@ FTL_TEST_PG_URL=postgres://<owner>@localhost/ftl npx vitest run tests/integratio
 The URL is the database owner's (the test re-applies the migration); everything the application
 would do runs as `service_role`. The two stub schemas stand in for Supabase's own `auth` and
 `storage`; they exist only so the earlier migrations apply.
+
+## Camera engine migration (「카메라 자동 보정」)
+
+`20261127090000_camera_engine.sql` adds `event_settings.camera_engine` (the staff setting as one
+object; null = the defaults, mode off), `kiosks.camera_engine` (what each booth last said about
+its engine, from the heartbeat) and `ftl_settings_set_camera_engine(p_value jsonb, p_actor_id uuid)`,
+which stores the setting and writes its audit row in one transaction. `ftl_settings_update` is
+unchanged, so code and migration can go out in either order: without the migration the setting
+reads as off and the heartbeat goes without the status; saving the setting in /admin needs it.
+
+`tests/integration/camera-engine-sql.test.ts` checks the function, the audit row, the grants and
+the two columns on a real Postgres, the same way as the AI review test above
+(`FTL_TEST_PG_URL=… npx vitest run tests/integration/camera-engine-sql.test.ts`).
