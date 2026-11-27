@@ -469,7 +469,8 @@ test.describe("the booth with looks", () => {
       "src",
       /^data:image\/jpeg/,
     );
-    await expect(page.getByTestId("look-row")).toBeVisible();
+    // A black-and-white frame offers no colour choice (2026-11-27, a user decision).
+    await expect(page.getByTestId("look-row")).toHaveCount(0);
     await selectDefaultPhotos(page);
     await answerForQr(page, "no");
     await page.getByRole("button", { name: "다음 분 차례예요" }).click();

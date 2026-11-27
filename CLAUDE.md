@@ -82,7 +82,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   touches nothing. No extra screen and no
   extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
   for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
-  is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
+  is not shown. A frame whose photos are black and white or sepia (`photoTone` mono / sepia: 필름
+  3컷, 35mm 필름's 흑백 and 세피아) offers no look at all (2026-11-27, a user decision: "애초부터
+  흑백 컨셉 이런 템플릿은 필터 고르지 못하게"): `frameToneIsFixed` in `lib/looks/config.ts` hides
+  the row, `SET_LOOK` refuses and `chosenLook` gives no look to the print. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
   gives wording). With looks on, the shots on the choice screen are shown in the
   session's look (`gradedShots`, the same grader as the print; `chosenLook`), or with no look in
   the frame's own tone (`frameToneGrader`, the same `applyTone` as the print), and the live camera
@@ -292,7 +295,10 @@ looks:measure`). `/looks` is the comparison
   `app/globals.css` (`--bw`/`--bh`, `--gap-*`, `--fs-*`, `--btn-*`, `--ctl-*`). Never size a booth
   element from raw `vh`/`vw` or a fixed pixel height, never add a device-name or user-agent
   branch, never a second scroll area inside a screen. Compositions switch by shape (wide / tall /
-  short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
+  short). Where container queries are missing (Safari 15, the iPad mini 4) the two stages
+  (`.shoot-stage`, `.fit-stage`) are measured by `Stage` (`components/kiosk/stage-size.tsx`) and
+  the fallback CSS sizes from `--stage-w` / `--stage-h`, never from a viewport guess alone. Any
+  booth change must keep `e2e/tablet-matrix.spec.ts` green.
 - **The progress dots count the steps this session really has** (a user decision, 2026-11-24):
   five with the wall question, four when it is skipped (PAUSE SUBMISSIONS): 틀 → 촬영 → 사진
   고르기 → 동의 → QR (six and five until 2026-11-27, when the review screen went; Figma's

@@ -54,6 +54,7 @@ import {
   looksActive,
   lookPageOf,
   lookPages,
+  frameToneIsFixed,
   lookViewForFrame,
   sessionLookId,
   sessionLooks,
@@ -136,6 +137,7 @@ import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { boothPerf, isPerfCode } from "@/lib/kiosk/perf";
 import { PerfCorner } from "./perf-table";
 import { BoothScreen, BrandLockup, CameraPreview, LineIcon, ShutterButton, Tape } from "./ui";
+import { Stage } from "./stage-size";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -1049,7 +1051,9 @@ export function KioskApp({
   // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
   // Only the page on show is drawn with the screen (four chips, not nine); the other pages are
   // drawn in the background below, or at once when the guest turns to one (`showLookPage`).
-  const lookRowFrameId = state.phase === "select" ? state.frameId : null;
+  // No row for a black-and-white or sepia frame: its tone is the concept (frameToneIsFixed).
+  const lookRowFrameId =
+    state.phase === "select" && !frameToneIsFixed(state.frameId) ? state.frameId : null;
   const firstShot = state.shots[0] ?? null;
   const firstFrame = firstShot?.frame ?? null;
   // Chips drawn since (a background chip, a turned page): the row is read again.
@@ -1114,7 +1118,8 @@ export function KioskApp({
   const allShot = state.shots.every((s) => s !== null);
   const prefetchLookShots = renderBudget.prefetchLookShots;
   useEffect(() => {
-    if (!looks || !lookFrameId || !allShot) return;
+    // A black-and-white or sepia frame has no colour row and no other look to draw ahead.
+    if (!looks || !lookFrameId || !allShot || frameToneIsFixed(lookFrameId)) return;
     const store = shotPictures;
     const shots = state.shots.map((s) => s!.frame);
     const jobs: PrefetchJob[] = [];
@@ -2196,7 +2201,14 @@ function Lines({ text }: { text: string }) {
     <>
       {lines(text).map((line, i) => (
         <Fragment key={i}>
-          {i > 0 && <br />}
+          {/* The space keeps the words apart where a screen lets the lines run on (the shooting
+              screen on a tall booth); before a <br> it shows nothing. */}
+          {i > 0 && (
+            <>
+              {" "}
+              <br />
+            </>
+          )}
           {line}
         </Fragment>
       ))}
@@ -2527,7 +2539,7 @@ function Screen(p: ScreenProps) {
           progress={progress}
           className={shooting ? "shoot shoot-live" : "shoot"}
         >
-          <div className="shoot-stage">
+          <Stage className="shoot-stage">
             <CameraPreview
               stream={p.stream}
               aspect={aspect}
@@ -2553,7 +2565,7 @@ function Screen(p: ScreenProps) {
                 </div>
               )}
             </CameraPreview>
-          </div>
+          </Stage>
           <div className="shoot-panel">
             {/* On a tall screen the shot's name and the strip share one line, so the preview
                 above gets the height (on a wide one the wrapper is display: contents). */}
@@ -2655,7 +2667,7 @@ function Screen(p: ScreenProps) {
               {t.select.change(required)}
             </p>
           </div>
-          <div className="fit-stage">
+          <Stage className="fit-stage">
             <div
               className="fit-grid select-grid"
               data-testid="select-grid"
@@ -2686,7 +2698,7 @@ function Screen(p: ScreenProps) {
                 );
               })}
             </div>
-          </div>
+          </Stage>
           {p.lookChips.length > 0 && (
             <LookRow
               key={state.sessionId}

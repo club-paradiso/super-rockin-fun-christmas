@@ -655,6 +655,20 @@ describe("the colour look a guest chooses with the photos", () => {
     expect(run(s, { type: "SET_LOOK", lookId: "sparkle" })).toBe(s);
   });
 
+  it("offers no look in a black-and-white or sepia frame: its tone is the concept", () => {
+    const mono = toShotWith("film3");
+    expect(mono.frameId).toBe("film3-mono-logo");
+    expect(run(mono, { type: "SET_LOOK", lookId: "ink" })).toBe(mono);
+    expect(run(mono, { type: "SET_LOOK", lookId: "none" })).toBe(mono);
+    const sepia = toShotWith("film35", [{ type: "SET_OPTION", key: "color", value: "sepia" }]);
+    expect(sepia.frameId).toBe("film35-sepia");
+    expect(run(sepia, { type: "SET_LOOK", lookId: "lamp" })).toBe(sepia);
+    // 35mm 필름's 컬러 is a colour frame: the guest chooses as everywhere else.
+    const colour = toShotWith("film35");
+    expect(colour.frameId).toBe("film35-natural");
+    expect(run(colour, { type: "SET_LOOK", lookId: "lamp" }).lookId).toBe("lamp");
+  });
+
   it("changes nothing else: the chosen photos stay chosen", () => {
     const s = run(choosing(), { type: "TOGGLE_SHOT_SELECTION", index: 2 });
     expect(s.selectedShotIndices).toEqual([0, 1, 3]);
