@@ -31,6 +31,12 @@ const input = (over: Partial<PlanInput> = {}): PlanInput => ({
   ...over,
 });
 
+/**
+ * The sweeps below make a plan for every tilt of the matrix on every stream and picture shape
+ * (over a thousand plans, each a search): seconds on a laptop, more on a shared CI runner.
+ */
+const MATRIX_TIMEOUT = 60_000;
+
 const MATRIX: [number, number][] = [
   ...ROLLS.map((r) => [r, 0] as [number, number]),
   ...PITCHES.map((p) => [0, p] as [number, number]),
@@ -238,19 +244,23 @@ describe("Smart Perspective", () => {
 describe("Portrait Guard", () => {
   const wide = { fovLongDeg: 95, fovAssumed: false };
 
-  it("keeps every plan of the matrix inside its limits, on every stream", () => {
-    const { guard } = CAMERA_ENGINE;
-    for (const [srcWidth, srcHeight] of STREAMS)
-      for (const fov of [45, 55, 70, 95])
-        for (const [roll, pitch] of MATRIX) {
-          const plan = planCorrection(
-            input({ srcWidth, srcHeight, fovLongDeg: fov, tilt: { roll, pitch } }),
-          );
-          expect(plan.portraitAnisotropy).toBeLessThanOrEqual(guard.portraitAnisotropy + 1e-6);
-          expect(plan.frameAnisotropy).toBeLessThanOrEqual(guard.frameAnisotropy + 1e-6);
-          expect(plan.maxScale).toBeLessThanOrEqual(guard.maxLocalScale + 1e-6);
-        }
-  });
+  it(
+    "keeps every plan of the matrix inside its limits, on every stream",
+    () => {
+      const { guard } = CAMERA_ENGINE;
+      for (const [srcWidth, srcHeight] of STREAMS)
+        for (const fov of [45, 55, 70, 95])
+          for (const [roll, pitch] of MATRIX) {
+            const plan = planCorrection(
+              input({ srcWidth, srcHeight, fovLongDeg: fov, tilt: { roll, pitch } }),
+            );
+            expect(plan.portraitAnisotropy).toBeLessThanOrEqual(guard.portraitAnisotropy + 1e-6);
+            expect(plan.frameAnisotropy).toBeLessThanOrEqual(guard.frameAnisotropy + 1e-6);
+            expect(plan.maxScale).toBeLessThanOrEqual(guard.maxLocalScale + 1e-6);
+          }
+    },
+    MATRIX_TIMEOUT,
+  );
 
   it("holds the perspective back on a wide camera, and names itself as the reason", () => {
     const tilt = { roll: 0, pitch: 12 };
@@ -287,39 +297,43 @@ describe("Portrait Guard", () => {
 });
 
 describe("Smart Crop", () => {
-  it("leaves no empty corner anywhere in the matrix, at any stream or picture shape", () => {
-    for (const [srcWidth, srcHeight] of STREAMS)
-      for (const aspect of ASPECTS)
-        for (const guard of [true, false])
-          for (const [roll, pitch] of MATRIX) {
-            const plan = planCorrection(
-              input({ srcWidth, srcHeight, aspect, portraitGuard: guard, tilt: { roll, pitch } }),
-            );
-            expect(plan.zoom).toBeGreaterThanOrEqual(1);
-            expect(plan.zoom).toBeLessThanOrEqual(CAMERA_ENGINE.crop.hardZoom + 1e-6);
-            if (plan.identity) continue;
-            const crop = coverCrop(srcWidth, srcHeight, aspect);
-            const [ow, oh] = [240, Math.round(240 / aspect)];
-            for (const mirror of [true, false]) {
-              const m = outputToSource(plan.inverse, crop, ow, oh, mirror);
-              // Every pixel on the picture's border (its inside follows: the map is convex).
-              for (let i = 0; i <= 24; i++)
-                for (const [x, y] of [
-                  [(i / 24) * ow, 0],
-                  [(i / 24) * ow, oh],
-                  [0, (i / 24) * oh],
-                  [ow, (i / 24) * oh],
-                ] as const) {
-                  const s = project(m, x, y);
-                  expect(s.w).toBeGreaterThan(0);
-                  expect(s.x).toBeGreaterThanOrEqual(-0.01);
-                  expect(s.x).toBeLessThanOrEqual(srcWidth + 0.01);
-                  expect(s.y).toBeGreaterThanOrEqual(-0.01);
-                  expect(s.y).toBeLessThanOrEqual(srcHeight + 0.01);
-                }
+  it(
+    "leaves no empty corner anywhere in the matrix, at any stream or picture shape",
+    () => {
+      for (const [srcWidth, srcHeight] of STREAMS)
+        for (const aspect of ASPECTS)
+          for (const guard of [true, false])
+            for (const [roll, pitch] of MATRIX) {
+              const plan = planCorrection(
+                input({ srcWidth, srcHeight, aspect, portraitGuard: guard, tilt: { roll, pitch } }),
+              );
+              expect(plan.zoom).toBeGreaterThanOrEqual(1);
+              expect(plan.zoom).toBeLessThanOrEqual(CAMERA_ENGINE.crop.hardZoom + 1e-6);
+              if (plan.identity) continue;
+              const crop = coverCrop(srcWidth, srcHeight, aspect);
+              const [ow, oh] = [240, Math.round(240 / aspect)];
+              for (const mirror of [true, false]) {
+                const m = outputToSource(plan.inverse, crop, ow, oh, mirror);
+                // Every pixel on the picture's border (its inside follows: the map is convex).
+                for (let i = 0; i <= 24; i++)
+                  for (const [x, y] of [
+                    [(i / 24) * ow, 0],
+                    [(i / 24) * ow, oh],
+                    [0, (i / 24) * oh],
+                    [ow, (i / 24) * oh],
+                  ] as const) {
+                    const s = project(m, x, y);
+                    expect(s.w).toBeGreaterThan(0);
+                    expect(s.x).toBeGreaterThanOrEqual(-0.01);
+                    expect(s.x).toBeLessThanOrEqual(srcWidth + 0.01);
+                    expect(s.y).toBeGreaterThanOrEqual(-0.01);
+                    expect(s.y).toBeLessThanOrEqual(srcHeight + 0.01);
+                  }
+              }
             }
-          }
-  });
+    },
+    MATRIX_TIMEOUT,
+  );
 
   it("enlarges no more than it must: one corner of the picture sits on the stream's edge", () => {
     for (const [roll, pitch] of [

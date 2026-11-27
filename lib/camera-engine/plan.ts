@@ -163,6 +163,8 @@ function evaluate(
   dPitchDeg: number,
   conformal: boolean,
   cfg: EngineConfig,
+  /** False while only the enlargement is asked for: the two grids below are then skipped. */
+  measure = true,
 ): Candidate | null {
   const k = intrinsicsFor(geo.srcWidth, geo.srcHeight, geo.fovLongDeg);
   const rectified = rectification(k, correctionRays(rollDeg, dRollDeg, dPitchDeg, conformal));
@@ -214,6 +216,16 @@ function evaluate(
   const correction = framed(rectified, geo.anchor, zoom);
   const inverse = correction && invert(correction);
   if (!correction || !inverse || !isFiniteMat(correction)) return null;
+  if (!measure)
+    return {
+      correction,
+      inverse,
+      zoom,
+      loss: 0,
+      portraitAnisotropy: 1,
+      frameAnisotropy: 1,
+      maxScale: zoom,
+    };
 
   // Portrait Guard's measurements: the local stretch over a grid on the output.
   const n = cfg.guard.gridSize;
@@ -340,7 +352,8 @@ export function planCorrection(input: PlanInput, cfg: EngineConfig = CAMERA_ENGI
   const tol = 1e-9;
 
   // 1. Roll, as much of the ask as the hard zoom limit allows.
-  const rollAt = (t: number) => evaluate(geo, tilt.roll, rollAsk * t, 0, guard, cfg);
+  // A turn stretches nothing, so only the enlargement is looked at here.
+  const rollAt = (t: number) => evaluate(geo, tilt.roll, rollAsk * t, 0, guard, cfg, false);
   const rollShare = largestPassing(
     (t) => {
       const c = rollAt(t);
