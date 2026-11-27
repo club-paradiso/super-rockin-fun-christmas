@@ -1,10 +1,10 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { ENROLL_SECRET } from "./env";
+import { ENROLL_SECRET, PORT } from "./env";
 import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
-  openWelcome,
+  openPicker,
   startSession,
   storedPhotos,
   toConsent,
@@ -29,9 +29,11 @@ test.use({
 });
 
 const KIOSK_LABEL = "E2E kiosk";
+/** The E2E server itself (E2E_PORT), never a fixed port: another run may own 3100. */
+const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 async function adminPage(browser: Browser): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext({ baseURL: "http://127.0.0.1:3100" });
+  const ctx = await browser.newContext({ baseURL: ORIGIN });
   const page = await ctx.newPage();
   await page.goto("/admin/login");
   await page.getByLabel("비밀번호", { exact: true }).fill(ENROLL_SECRET);
@@ -71,8 +73,7 @@ async function pairPhone(phone: Page, code: string) {
 
 async function liveBooth(page: Page) {
   await page.goto("/kiosk?camera=remote");
-  await openWelcome(page);
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(page);
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   await confirmFrame(page);
   // The remote camera is ready only once the WebRTC link is up: the booth's own budget is a 10 s
@@ -95,11 +96,11 @@ async function liveBooth(page: Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ browser, page }) => {
+test("pair from /admin, preview, shoot five, choose, consent, QR", async ({ browser, page }) => {
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: ORIGIN,
     permissions: ["camera"],
   });
   const phone = await phoneCtx.newPage();
@@ -110,7 +111,7 @@ test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ brows
   const pairMs = Date.now() - pairStart;
 
   // A used code is dead: a second phone cannot reuse it.
-  const second = await browser.newContext({ baseURL: "http://127.0.0.1:3100" });
+  const second = await browser.newContext({ baseURL: ORIGIN });
   const p2 = await second.newPage();
   await p2.goto("/camera/remote");
   await p2.getByTestId("pair-code").fill(code);
@@ -125,15 +126,15 @@ test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ brows
   await expect(phone.getByTestId("status-panel")).toHaveAttribute("data-state", "live");
 
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   const sizes: Array<[number, number]> = [];
-  for (let i = 0; i < 6; i++) {
-    const img = page.getByTestId(`review-shot-${i}`).locator("img");
+  for (let i = 0; i < 5; i++) {
+    const img = page.getByTestId(`select-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     sizes.push(await img.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight]));
   }
   for (const [w, h] of sizes) expect(w / h).toBeCloseTo(4 / 3, 2);
-  await expect(phone.getByTestId("shots")).toHaveText("촬영 6장");
+  await expect(phone.getByTestId("shots")).toHaveText("촬영 5장");
 
   // v2: no extra photo; straight on to the photo choice, consent, a real QR.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
@@ -168,7 +169,7 @@ test("staff test capture shows a thumbnail; mode switch and revoke work", async 
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: ORIGIN,
     permissions: ["camera"],
   });
   const phone = await phoneCtx.newPage();
@@ -207,7 +208,7 @@ test("the phone page reloads mid-session: the booth shows the camera error, then
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: ORIGIN,
     permissions: ["camera"],
   });
   const phone = await phoneCtx.newPage();
@@ -228,7 +229,7 @@ test("the phone page reloads mid-session: the booth shows the camera error, then
   await page.getByRole("button", { name: "다시 시도" }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible({ timeout: 25_000 });
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
   // Leave nothing paired behind for the next spec.
   await admin.goto("/admin/remote-camera");

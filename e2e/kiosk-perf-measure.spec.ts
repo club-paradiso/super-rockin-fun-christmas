@@ -25,10 +25,10 @@ test.use(legacy ? { userAgent: LEGACY_UA, hasTouch: true } : {});
 async function session(page: Page, card?: string) {
   await startSession(page, card);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT * 4 });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT * 4 });
   await toConsent(page);
   await answerForQr(page, "no");
-  await page.getByRole("button", { name: "다 받았어요" }).click();
+  await page.getByRole("button", { name: "다음 분 차례예요" }).click();
   await expect(page.getByTestId("screen-attract")).toBeVisible();
 }
 

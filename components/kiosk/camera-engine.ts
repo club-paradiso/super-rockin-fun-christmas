@@ -77,8 +77,8 @@ export function useCameraEngine(
     setEngine(current.active() ? current : null);
   }, [sessionSettings, cameraMode]);
 
-  // The correction is fixed from a guest's first countdown until they are gone (a retake
-  // included); between guests the booth watches the sensors again.
+  // The correction is fixed from a guest's first countdown until they are gone (a camera that
+  // drops out and comes back included); between guests the booth watches the sensors again.
   useEffect(() => {
     const current = engineRef.current;
     if (!current) return;

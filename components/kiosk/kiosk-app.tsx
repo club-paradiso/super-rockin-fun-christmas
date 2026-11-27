@@ -61,7 +61,6 @@ import {
 } from "@/lib/looks/config";
 import {
   canGoBack,
-  canRetake,
   capturedCount,
   createInitialState,
   currentPose,
@@ -136,15 +135,7 @@ import { HAND_FONTS } from "@/config/hand-fonts";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import { boothPerf, isPerfCode } from "@/lib/kiosk/perf";
 import { PerfCorner } from "./perf-table";
-import {
-  BoothScreen,
-  BrandLockup,
-  CameraPreview,
-  LineIcon,
-  PhotoCorners,
-  ShutterButton,
-  Tape,
-} from "./ui";
+import { BoothScreen, BrandLockup, CameraPreview, LineIcon, ShutterButton, Tape } from "./ui";
 
 export interface Shot {
   frame: CapturedFrame;
@@ -211,9 +202,10 @@ const PREVIEW_CACHE_LIMIT = 48;
 const PREVIEW_PREFETCH_QUIET_MS = 1500;
 /**
  * No background drawing this long after a screen appears or a finger touches: longer than the
- * double-tap guard's window (TAP_GUARD_MS, 350), so a drawing never delays a tap it must judge.
+ * double-tap guard's longest window (PICK_TAP_GUARD_MS, 800), so a drawing never delays a tap it
+ * must judge.
  */
-const PREFETCH_QUIET_AFTER_TAP_MS = 600;
+const PREFETCH_QUIET_AFTER_TAP_MS = 900;
 
 /** 속도 기록: a screen that appears this soon after a tap is that tap's screen. */
 const SCREEN_TAP_WINDOW_MS = 1500;
@@ -259,7 +251,7 @@ function gradedShotUrl(
 }
 
 /**
- * The graded pictures of one shot, kept while the shot lives (a retake makes new shots, so their
+ * The graded pictures of one shot, kept while the shot lives (the next guest's shots are new, so their
  * pictures go with the old ones). Keys: `shotKey` and `chipKey`. A failure is never kept.
  */
 type ShotPictures = WeakMap<CapturedFrame, Map<string, string>>;
@@ -462,7 +454,6 @@ export function KioskApp({
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       lastHandFont: readStoredHandFont(),
       retouch: skinRetouch,
-      retakesPerSession: KIOSK_CONFIG.retakesPerSession,
     }),
   );
   // 속도 기록 (lib/kiosk/perf.ts): when the render that brought a new screen began. Taken here,
@@ -485,8 +476,6 @@ export function KioskApp({
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
-  /** 「다시 찍기」 asks first: the six shots are thrown away. */
-  const [confirmRetake, setConfirmRetake] = useState(false);
   const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
@@ -718,28 +707,11 @@ export function KioskApp({
     setTicket(null);
     setMobileQr(null);
     setConfirmHome(false);
-    setConfirmRetake(false);
     setPrivateDelivery(false);
     setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
   }, []);
-
-  /**
-   * 「다시 찍기」: the guest threw the six shots away. Nothing of them is kept: their pictures, and
-   * the session video (closed when the photos were first chosen, or still open), so the video
-   * that follows the photo is of the round that made it. Nothing was uploaded yet.
-   */
-  const retake = useCallback(() => {
-    setConfirmRetake(false);
-    recorderRef.current?.discard();
-    videosRef.current.delete(state.sessionId);
-    dispatch({ type: "RETAKE" });
-    releaseUrls(urlsRef.current);
-    urlsRef.current.clear();
-    releaseCanvases(shotCanvasesRef.current);
-    setFinalImage(null);
-  }, [state.sessionId]);
 
   // ── Camera lifecycle ─────────────────────────────────────────────────────────────────────
   const { cameraStarted, engine: engineNow } = cameraEngine;
@@ -958,9 +930,7 @@ export function KioskApp({
   // The chosen frame's kit, as soon as there is a chosen frame: the options screen draws with
   // it, and the final picture waits for it (again, below, in case this try lost its network).
   const kitFrameId =
-    lazyKit && !["attract", "welcome", "pick", "mobile"].includes(state.phase)
-      ? state.frameId
-      : null;
+    lazyKit && !["attract", "pick", "mobile"].includes(state.phase) ? state.frameId : null;
   useEffect(() => {
     if (!kitFrameId) return;
     let live = true;
@@ -1040,14 +1010,13 @@ export function KioskApp({
     if (state.phase === "attract") looksRef.current?.newSession();
   }, [state.phase]);
 
-  // The six shots on the review and choice screens, in the look of the frame they were taken
+  // The shots on the review and choice screens, in the look of the frame they were taken
   // for: what the guest chooses from is what the print will show. Small copies, made once per
   // session; a shot that could not be graded keeps its own picture.
-  const choosing = state.phase === "review" || state.phase === "select";
-  const lookFrameId = choosing ? state.frameId : null;
+  const lookFrameId = state.phase === "select" ? state.frameId : null;
   const lookSeed = seedFromText(state.sessionId);
   // Kept per shot (shotPictures), and drawn ahead in the background (below): a tap on another
-  // colour usually finds its six pictures ready.
+  // colour usually finds its pictures ready.
   const [shotPictures] = useState<ShotPictures>(() => new WeakMap());
   const { gradedShotEdge, lookChipEdge } = renderBudget;
   const gradedShots = useMemo(() => {
@@ -1282,7 +1251,7 @@ export function KioskApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
   }, [samples, assets, kitAll, staticThumbs, previewing, thumbScale, preview, previews]);
   // Between guests: the picker cards, ahead of time, only on "화면을 눌러 시작" and only once it has
-  // been quiet for a moment. Never on the welcome screen: a drawing there holds up the guest's
+  // been quiet for a moment. Never once a guest has touched the cover: a drawing then holds up the guest's
   // first deliberate tap, and a late tap slips past the double-tap guard (lib/kiosk/tap-guard.ts).
   const betweenGuests = state.phase === "attract";
   useEffect(() => {
@@ -1749,9 +1718,11 @@ export function KioskApp({
   // ── Resets ───────────────────────────────────────────────────────────────────────────────
   // Also the "잠시 뒤 처음 화면으로 돌아가요" of the QR screen.
   const idle = useIdleReset(
-    // The welcome choices go back to the attract screen too, so a half-chosen language never
-    // waits for the next guest (D80).
-    state.phase !== "attract" && !isShooting(state.phase) && !privateDelivery,
+    // The cover too, while a language other than Korean is chosen on it: a half-chosen
+    // language never waits for the next guest (D80). It resets without a countdown on screen.
+    (state.phase !== "attract" || state.lang !== "ko") &&
+      !isShooting(state.phase) &&
+      !privateDelivery,
     KIOSK_CONFIG.idleResetSeconds,
     onIdle,
   );
@@ -1866,8 +1837,7 @@ export function KioskApp({
     state.phase === "delivery" ||
     (state.phase === "mobile" &&
       (state.mobile.status === "received" || state.mobile.status === "failed"));
-  const midSession =
-    !privateDelivery && state.phase !== "attract" && state.phase !== "welcome" && !ownHomeButton;
+  const midSession = !privateDelivery && state.phase !== "attract" && !ownHomeButton;
   const requestHome = useCallback(() => {
     // Nothing to lose on these screens: go straight home. Elsewhere, ask first.
     if (state.phase === "mobile") reset();
@@ -2034,7 +2004,6 @@ export function KioskApp({
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
-            onRetake={canRetake(state) ? () => setConfirmRetake(true) : null}
             durableQueue={queueStatus.durable}
             privateDelivery={privateDelivery}
             onConsent={chooseConsent}
@@ -2043,10 +2012,9 @@ export function KioskApp({
               // iOS answers the motion sensor question only from inside a touch, and this is
               // the booth's first one. Asked once per page load, and only with the engine on.
               cameraEngine.requestPermission();
-              dispatch({ type: "OPEN" });
+              dispatch({ type: "OPEN", sessionId: newSessionId() });
             }}
             engine={engineNow}
-            onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
             onStartMobile={() => dispatch({ type: "START_MOBILE" })}
             mobileQrSvg={
               mobileQr &&
@@ -2069,12 +2037,12 @@ export function KioskApp({
             }
           />
         </div>
-        {moreBelow && !idle.warning && (
+        {moreBelow && !(idle.warning && state.phase !== "attract") && (
           <div className="booth-scroll-hint" aria-hidden data-testid="scroll-hint">
             <LineIcon name="down" />
           </div>
         )}
-        {idle.warning && (
+        {idle.warning && state.phase !== "attract" && (
           <div className="idle-warning" role="status" aria-live="polite" data-testid="idle-warning">
             <p className="booth-lead">{t.idle.warning(idle.secondsLeft)}</p>
             <button type="button" className="booth-btn-secondary" onClick={idle.bump}>
@@ -2108,36 +2076,6 @@ export function KioskApp({
             }
           >
             <p className="booth-lead">{t.home.lead}</p>
-          </KioskDialog>
-        )}
-        {confirmRetake && canRetake(state) && (
-          <KioskDialog
-            title={t.review.retakeTitle}
-            onClose={() => setConfirmRetake(false)}
-            testId="confirm-retake"
-            actions={
-              <>
-                <button
-                  type="button"
-                  className="booth-btn-secondary"
-                  onClick={() => setConfirmRetake(false)}
-                >
-                  {t.review.retakeNo}
-                </button>
-                <button
-                  type="button"
-                  className="booth-btn-primary"
-                  data-testid="confirm-retake-yes"
-                  onClick={retake}
-                >
-                  {t.review.retakeYes}
-                </button>
-              </>
-            }
-          >
-            <p className="booth-lead">
-              <Lines text={t.review.retakeLead(state.shotCount, state.retakesLeft)} />
-            </p>
           </KioskDialog>
         )}
         {shutterBlink > 0 && (
@@ -2220,17 +2158,14 @@ interface ScreenProps {
   qrSvg: string | null;
   onRetryDelivery: () => void;
   onDiscard: () => void;
-  /** 「다시 찍기」 on the review screen (asks first); null where it is not offered. */
-  onRetake: (() => void) | null;
   durableQueue: boolean;
   privateDelivery: boolean;
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onOpen: () => void;
-  onStart: () => void;
   onStartMobile: () => void;
   mobileQrSvg: string | null;
-  /** The guest's language choice on the welcome screen (D78). */
+  /** The guest's language choice on the cover (D78). */
   onSetLang: (lang: KioskState<Shot>["lang"]) => void;
   /** PAUSE SUBMISSIONS hides the wall-consent step; photos and QR are unaffected. */
   wallSubmissionsOpen: boolean;
@@ -2303,6 +2238,10 @@ function Screen(p: ScreenProps) {
           className="sheet-center attract"
           onClick={p.onOpen}
         >
+          {/* The free paper above and below the column (see .attract-space): equal shares, the
+              lower one never less than the edition line at the foot needs. Part of the paper:
+              a touch on it starts, like anywhere else on the cover. */}
+          <span className="attract-space" aria-hidden="true" />
           <BrandLockup className="attract-lockup" />
           <p className="booth-lead">{KIOSK_COPY.ko.attract.event}</p>
           <div className="attract-start">
@@ -2320,56 +2259,14 @@ function Screen(p: ScreenProps) {
               </p>
             ))}
           </div>
-          <p className="journal-cover-edition" aria-hidden="true">
-            CHRISTMAS MEMORIES · 2026
-          </p>
-        </BoothScreen>
-      );
-
-    case "welcome": {
-      // Two clear choices (2.0): take photos here, or send a photo from your own phone. The
-      // language is chosen here too.
-      return (
-        <BoothScreen testId="screen-welcome" header={false} className="welcome">
-          <div className="welcome-head">
-            <BrandLockup className="welcome-lockup" />
-            <h1 className="booth-title">{t.welcome.title}</h1>
-            <p className="booth-lead">{t.welcome.lead}</p>
-          </div>
-          <div className="welcome-choices">
-            <button
-              type="button"
-              className="welcome-choice welcome-choice-primary"
-              data-testid="start-camera"
-              onClick={p.onStart}
-            >
-              <span className="welcome-choice-icon">
-                <LineIcon name="camera" />
-              </span>
-              <span className="welcome-choice-text">
-                <span className="welcome-choice-title">{t.welcome.camera}</span>
-                <span className="welcome-choice-lead">{t.welcome.cameraLead}</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="welcome-choice"
-              data-testid="start-mobile"
-              disabled={!p.wallSubmissionsOpen}
-              onClick={p.onStartMobile}
-            >
-              <span className="welcome-choice-icon">
-                <LineIcon name="phone" />
-              </span>
-              <span className="welcome-choice-text">
-                <span className="welcome-choice-title">{t.welcome.mobile}</span>
-                <span className="welcome-choice-lead">
-                  {p.wallSubmissionsOpen ? t.welcome.mobileLead : t.welcome.paused}
-                </span>
-              </span>
-            </button>
-          </div>
-          <div className="welcome-options">
+          {/* What the welcome screen held (2026-11-27: one touch starts): the language, the
+              sound switch and the other way in. Small, below the start; a touch on one of them
+              is that control's own and does not start a session. */}
+          <div
+            className="attract-options"
+            data-testid="attract-options"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* 한국어 · English · 中文 (D78, D89): each name in its own language, the same in all. */}
             <div role="radiogroup" aria-label={t.langGroup} className="booth-seg">
               {KIOSK_LANGS.map((lang) => (
@@ -2387,6 +2284,18 @@ function Screen(p: ScreenProps) {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className="booth-btn-m attract-mobile"
+              data-testid="start-mobile"
+              disabled={!p.wallSubmissionsOpen}
+              // Paused: the reason is said where the button is, not only by greying it.
+              aria-describedby={p.wallSubmissionsOpen ? undefined : "attract-mobile-paused"}
+              onClick={p.onStartMobile}
+            >
+              <LineIcon name="phone" />
+              {t.attract.mobile}
+            </button>
             {p.onToggleSound && (
               <button
                 type="button"
@@ -2399,10 +2308,18 @@ function Screen(p: ScreenProps) {
                 {t.sound}
               </button>
             )}
+            {!p.wallSubmissionsOpen && (
+              <p className="booth-caption attract-mobile-paused" id="attract-mobile-paused">
+                {t.attract.mobilePaused}
+              </p>
+            )}
           </div>
+          <span className="attract-space attract-space-foot" aria-hidden="true" />
+          <p className="journal-cover-edition" aria-hidden="true">
+            CHRISTMAS MEMORIES · 2026
+          </p>
         </BoothScreen>
       );
-    }
 
     case "mobile":
       return (
@@ -2410,7 +2327,8 @@ function Screen(p: ScreenProps) {
       );
 
     case "pick": {
-      // 「틀 선택 v2」 (Figma 898:1677): seven cards, four and three, the second row centred.
+      // 「틀 선택 v2」 (Figma 1069:2245): nine cards, five to a row. A tap on a card goes on with
+      // it; the bottom bar's button, as Figma draws it, goes on with the card that is marked.
       const card = getCard(state.cardId);
       return (
         <BoothScreen
@@ -2441,7 +2359,10 @@ function Screen(p: ScreenProps) {
                 thumb={p.thumbs[c.id]}
                 onThumbError={p.onThumbError}
                 t={t}
-                onSelect={() => dispatch({ type: "SELECT_CARD", cardId: c.id })}
+                // A tap chooses the card and goes on (2026-11-27): no second press to confirm.
+                onSelect={() =>
+                  dispatch({ type: "PICK_CARD", cardId: c.id, random: Math.random() })
+                }
               />
             ))}
           </div>
@@ -2698,54 +2619,6 @@ function Screen(p: ScreenProps) {
       );
     }
 
-    case "review":
-      // The six originals are immutable; 「다시 찍기」 replaces all six, after asking.
-      return (
-        <BoothScreen testId="screen-review" progress={progress} className="review">
-          <div className="review-head">
-            <h1 className="booth-title">{t.review.title}</h1>
-          </div>
-          <div className="fit-stage">
-            <div className="fit-grid review-grid" data-testid="review-grid">
-              {state.shots.map((shot, i) => (
-                <div key={i} className="review-cell">
-                  <div
-                    className="review-photo"
-                    style={{ aspectRatio: String(aspect) }}
-                    data-testid={`review-shot-${i}`}
-                  >
-                    <PhotoCorners />
-                    {shot && (
-                      // eslint-disable-next-line @next/next/no-img-element -- local object URL
-                      <img src={p.gradedShots[i] ?? shot.url} alt={t.shoot.shot(i + 1)} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="review-actions">
-            {p.onRetake && (
-              <button
-                type="button"
-                className="booth-btn-secondary"
-                data-testid="retake"
-                onClick={p.onRetake}
-              >
-                {t.review.retake}
-              </button>
-            )}
-            <button
-              type="button"
-              className="booth-btn-primary"
-              onClick={() => dispatch({ type: "CONFIRM_SHOTS" })}
-            >
-              {t.review.confirm}
-            </button>
-          </div>
-        </BoothScreen>
-      );
-
     case "select": {
       const required = getFrame(state.frameId).slots.length;
       const selected = state.selectedShotIndices;
@@ -2767,9 +2640,17 @@ function Screen(p: ScreenProps) {
               {/* "2 / 4장" stays on one line (no-break spaces): the count is one thing to read. */}
               {t.select.lead(selected.length, required).replace(" / ", "\u00a0/\u00a0")}
             </p>
+            {/* The first photos are chosen already: how to change them, said once, small. */}
+            <p className="booth-caption" data-testid="select-change-hint">
+              {t.select.change(required)}
+            </p>
           </div>
           <div className="fit-stage">
-            <div className="fit-grid select-grid" data-testid="select-grid">
+            <div
+              className="fit-grid select-grid"
+              data-testid="select-grid"
+              data-count={state.shots.length}
+            >
               {state.shots.map((shot, index) => {
                 const order = selected.indexOf(index);
                 return (
@@ -3297,11 +3178,10 @@ function FinalPreview({
   );
 }
 
-/** The six shots of a session (v2: no extra one). */
 /**
  * The colour row of the photo choice screen (Figma 956:1589): eight looks, four at a time, each on
  * the guest's own first shot. It opens on the page of the look the frame comes with; "다음" shows
- * the rest. Choosing one redraws the six shots above in it; the print gets the same.
+ * the rest. Choosing one redraws the shots above in it; the print gets the same.
  */
 function LookRow({
   chips,

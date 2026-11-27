@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome } from "./helpers";
+import { selectDefaultPhotos, openPicker } from "./helpers";
 import { mkdir } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
@@ -33,11 +33,9 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
   await expect(page.getByTestId("screen-attract")).toBeVisible();
+  // The cover holds the language, the phone button and the sound switch (no welcome screen).
   await shot(page, "booth-1280x800-00-attract");
-  await openWelcome(page);
-  await shot(page, "booth-1280x800-01-welcome");
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await openPicker(page);
   await page.waitForTimeout(800); // frame thumbnails
   await shot(page, "booth-1280x800-02-pick");
   await page.getByTestId("confirm-pick").click();
@@ -51,10 +49,8 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
   await shot(page, "booth-1280x800-04-countdown");
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await shot(page, "booth-1280x800-05-review");
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible();
+  // The photo choice, the first photos already chosen (no review screen before it).
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await shot(page, "booth-1280x800-06-select");
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("final-image")).toBeVisible();
@@ -74,17 +70,14 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await phone.context().close();
 });
 
-test("booth 1920×1080 (a bigger monitor): welcome and frame choice", async ({ page }) => {
+test("booth 1920×1080 (a bigger monitor): the cover and the frame choice", async ({ page }) => {
   await enrollKiosk(page);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/kiosk?camera=mock");
   await hideMockBadge(page);
   await expect(page.getByTestId("screen-attract")).toBeVisible();
   await shot(page, "booth-1920x1080-00-attract");
-  await openWelcome(page);
-  await shot(page, "booth-1920x1080-01-welcome");
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await openPicker(page);
   await page.waitForTimeout(800);
   await shot(page, "booth-1920x1080-02-pick");
 });

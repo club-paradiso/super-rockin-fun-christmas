@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, openWelcome } from "./helpers";
+import { enrollKiosk, openPicker } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -45,16 +45,16 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   await expect(cover.getByTestId("fullscreen-toggle")).toBeVisible();
   await cover.getByTestId("fullscreen-toggle").click();
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-fullscreen-requested", "yes");
+  // The switch is its own control on the cover: pressing it opened no session.
   await expect(cover).toBeVisible();
-  await openWelcome(page);
-  await expect(page.getByTestId("screen-welcome").getByTestId("fullscreen-toggle")).toBeVisible();
-  await page.getByTestId("start-camera").click();
+  await expect(page.getByTestId("screen-pick")).toHaveCount(0);
+  await openPicker(page);
   // The v2 picker's bottom bar is Figma's: "처음으로" and the main button only.
   const picker = page.getByTestId("screen-pick");
   await expect(picker.getByTestId("go-home")).toBeVisible();
   await expect(picker.getByTestId("fullscreen-toggle")).toHaveCount(0);
+  // A tap on a card without options is the camera (no second press).
   await picker.getByTestId("frame-option-lace1").click();
-  await picker.getByTestId("confirm-pick").click();
   const ready = page.getByTestId("screen-ready");
   await expect(ready.getByTestId("fullscreen-toggle")).toBeVisible();
   await expect(ready.getByTestId("go-home")).toBeVisible();
@@ -93,13 +93,10 @@ test("once fullscreen is on, no guest screen shows a fullscreen control", async 
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-navigation-ui", "hide");
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
   await expect(cover).toBeVisible();
-  await openWelcome(page);
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
-  await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
-  await page.getByTestId("start-camera").click();
+  await openPicker(page);
   const picker = page.getByTestId("screen-pick");
+  await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
   await picker.getByTestId("frame-option-lace1").click();
-  await picker.getByTestId("confirm-pick").click();
   const ready = page.getByTestId("screen-ready");
   await expect(ready.getByTestId("go-home")).toBeVisible();
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
@@ -120,7 +117,7 @@ test("unsupported fullscreen offers real iPad home-screen instructions", async (
   await expect(cover.getByTestId("fullscreen-help")).toHaveCount(0);
 });
 
-test("welcome and picker align their content to the real screen center", async ({ page }) => {
+test("the cover and the picker align their content to the real screen center", async ({ page }) => {
   for (const [width, height] of [
     [820, 1180],
     [768, 1024],
@@ -128,13 +125,18 @@ test("welcome and picker align their content to the real screen center", async (
   ] as const) {
     await page.setViewportSize({ width, height });
     await page.goto("/kiosk?camera=mock");
-    await openWelcome(page);
-    const screen = page.getByTestId("screen-welcome");
+    // The cover holds the start and, under it, what the welcome screen held.
+    const screen = page.getByTestId("screen-attract");
+    await expect(screen).toBeVisible();
+    // The cover comes in with a short entrance (a scale): measure where it comes to rest.
+    await screen.evaluate((el) =>
+      Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
     const boxes = await Promise.all([
       screen.boundingBox(),
-      screen.locator(".welcome-head").boundingBox(),
-      screen.locator(".welcome-choices").boundingBox(),
-      screen.locator(".welcome-options").boundingBox(),
+      screen.locator(".attract-lockup").boundingBox(),
+      screen.getByTestId("attract-start").boundingBox(),
+      screen.getByTestId("attract-options").boundingBox(),
     ]);
     const [root, ...content] = boxes;
     expect(root).not.toBeNull();
@@ -143,7 +145,7 @@ test("welcome and picker align their content to the real screen center", async (
       expect(box).not.toBeNull();
       expect(Math.abs(box!.x + box!.width / 2 - axis)).toBeLessThan(3);
     }
-    await page.getByTestId("start-camera").click();
+    await openPicker(page);
     await expect(screen).toHaveCount(0);
     await expect(page.getByTestId("screen-pick").locator(".pick-head")).toHaveCSS(
       "text-align",

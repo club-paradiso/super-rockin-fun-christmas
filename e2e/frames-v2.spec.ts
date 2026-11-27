@@ -8,10 +8,9 @@ import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
-  openWelcome,
+  openPicker,
   selectDefaultPhotos,
   startSession,
-  toSelect,
   type CardOptions,
 } from "./helpers";
 
@@ -105,16 +104,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const [card, options, frameId, [w, h]] of VARIANTS) {
-  test(`${frameId}: card → options → six shots → review → choose → consent → QR`, async ({
-    page,
-  }) => {
+  test(`${frameId}: card → options → five shots → choose → consent → QR`, async ({ page }) => {
     await page.goto("/kiosk?camera=mock");
     await startSession(page, card, options);
     await expectNoRemovedControls(page);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await expectNoRemovedControls(page);
-    await toSelect(page);
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expectNoRemovedControls(page);
     await selectDefaultPhotos(page);
     await expect(page.getByTestId("screen-consent")).toBeVisible();
@@ -156,10 +151,9 @@ test("handwriting: 20 sessions in a row never repeat the previous font (a reload
   const fonts: string[] = [];
   for (let i = 0; i < 20; i++) {
     if (i === 10) await page.reload();
-    await openWelcome(page);
-    await page.getByTestId("start-camera").click();
+    await openPicker(page);
+    // A tap on the card is its options screen.
     await page.getByTestId(i % 2 ? "frame-option-polaroid1" : "frame-option-film4").click();
-    await page.getByTestId("confirm-pick").click();
     await page.getByTestId("confirm-options").click();
     await expect(page.getByTestId("screen-ready")).toBeVisible();
     const font = await page.locator(".kiosk-root").getAttribute("data-hand-font");
@@ -176,10 +170,8 @@ test("handwriting: 20 sessions in a row never repeat the previous font (a reload
 
 test("the options preview cycles the ten handwriting fonts every 1.2 s", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
-  await page.getByTestId("start-camera").click();
+  await openPicker(page);
   await page.getByTestId("frame-option-film4").click();
-  await page.getByTestId("confirm-pick").click();
   const img = page.getByTestId("frame-preview-image");
   await expect(img).toBeVisible();
   const first = await img.getAttribute("src");
@@ -197,8 +189,7 @@ test("date stamp: a tablet clock years off still stamps the server's day", async
   expect(await page.evaluate(() => new Date().getUTCFullYear())).toBe(2020);
   await startSession(page, "polaroid3");
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await toSelect(page);
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(page);
   const stamp = await page.getByTestId("final-image").getAttribute("data-stamp");
   expect(stamp).toBe(await serverStamp(page));
@@ -234,8 +225,7 @@ for (const [width, height] of [
     await page.setViewportSize({ width, height });
     await page.goto("/kiosk?camera=mock");
     await page.addStyleTag({ content: '[data-testid="mock-badge"]{display:none!important}' });
-    await openWelcome(page);
-    await page.getByTestId("start-camera").click();
+    await openPicker(page);
     for (const c of FRAME_CARDS.map((card) => card.id))
       await expect(page.getByTestId(`frame-option-${c}`).locator("img")).toBeVisible();
     expect(await page.evaluate(onTheRings)).toEqual([]);
@@ -254,7 +244,6 @@ for (const [width, height] of [
       ["meme4", "2G-meme4-options"],
     ] as const) {
       await page.getByTestId(`frame-option-${card}`).click();
-      await page.getByTestId("confirm-pick").click();
       await expect(page.getByTestId("frame-preview-image")).toBeVisible();
       expect(await page.evaluate(onTheRings)).toEqual([]);
       // Everything fits: the booth does not scroll.

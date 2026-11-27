@@ -154,9 +154,12 @@ describe("frame definitions", () => {
   });
 
   describe.each(FRAMES.map((f) => [f.id, f] as const))("%s", (_, frame) => {
-    it("uses one to six shots without exceeding captured photos", () => {
+    it("holds one to six photos", () => {
+      // These earlier frames stay only for photos already stored (D113): the booth offers the
+      // v2 frames, which never take more than a session shoots (tests/unit/frames-v2.test.ts).
+      // Six was a session when they were made; it is five since 2026-11-27.
       expect(frame.slots.length).toBeGreaterThanOrEqual(1);
-      expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
+      expect(frame.slots.length).toBeLessThanOrEqual(6);
     });
 
     it("uses the capture aspect ratio for every slot (preview = result)", () => {

@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
-import { openWelcome } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
@@ -69,22 +68,42 @@ test("setup: staff session and an enrolled booth", async ({ browser }) => {
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 });
 
-test("welcome: two clear choices and a language switch", async () => {
+test("the cover: one big start, and under it the phone button, the language and the sound switch", async () => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  for (const id of ["start-camera", "start-mobile"]) {
-    const box = (await kiosk.getByTestId(id).boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(150);
+  // No welcome screen (2026-11-27): the two ways in are both on the cover. Taking photos is the
+  // big one (the whole cover, and its button); the phone is a smaller control under it.
+  const cover = kiosk.getByTestId("screen-attract");
+  await expect(cover).toBeVisible();
+  await expect(kiosk.getByTestId("start-camera")).toHaveCount(0);
+  const start = (await kiosk.getByTestId("attract-start").boundingBox())!;
+  expect(start.height).toBeGreaterThanOrEqual(80);
+  const options = cover.getByTestId("attract-options");
+  const mobile = options.getByTestId("start-mobile");
+  await expect(mobile).toBeEnabled();
+  await expect(mobile).toHaveText("내 사진으로 참여하기");
+  const mobileBox = (await mobile.boundingBox())!;
+  expect(mobileBox.height).toBeGreaterThanOrEqual(52);
+  expect(mobileBox.y).toBeGreaterThanOrEqual(start.y + start.height);
+  for (const lang of ["ko", "en", "zh"]) {
+    const radio = options.getByTestId(`lang-${lang}`);
+    await expect(radio).toBeVisible();
+    expect((await radio.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   }
-  for (const lang of ["ko", "en", "zh"])
-    await expect(kiosk.getByTestId(`lang-${lang}`)).toBeVisible();
+  await expect(options.getByTestId("sound-toggle")).toBeVisible();
   await expect(kiosk.getByTestId("lang-ko")).toHaveAttribute("aria-checked", "true");
+  // The language switch is its own control: it changes the language and starts nothing.
+  await kiosk.getByTestId("lang-en").click();
+  await expect(kiosk.getByTestId("lang-en")).toHaveAttribute("aria-checked", "true");
+  await expect(mobile).toHaveText("Share a photo from your phone");
+  await kiosk.getByTestId("lang-ko").click();
+  await expect(cover).toBeVisible();
+  await expect(kiosk.locator("main")).toHaveAttribute("data-phase", "attract");
 });
 
 test("내 사진으로 참여하기: QR → phone → booth sees it → staff approve → wall hangs its frame", async ({
   browser,
 }) => {
-  await openWelcome(kiosk);
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await kiosk.getByTestId("start-mobile").click();
   const qr = kiosk.getByTestId("mobile-qr");
   await expect(qr.locator("svg")).toBeVisible();
@@ -200,7 +219,7 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
   browser,
 }) => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await kiosk.getByTestId("start-mobile").click();
   const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
   const sessionId = sessionOf(url);
@@ -266,7 +285,7 @@ test("the guest drags a phone photo in its slot and the picture is cut there", a
   browser,
 }) => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await kiosk.getByTestId("start-mobile").click();
   const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
 
@@ -335,7 +354,7 @@ test("saying no on the phone: the guest saves the framed picture, nothing is sen
   browser,
 }) => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await kiosk.getByTestId("start-mobile").click();
   const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
   const sessionId = sessionOf(url);

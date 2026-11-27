@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { answerForQr, enrollKiosk, SHOOT_TIMEOUT, startSession, toSelect } from "./helpers";
+import { answerForQr, enrollKiosk, SHOOT_TIMEOUT, startSession } from "./helpers";
 
 /**
  * A long event day on a 2 GB tablet: nothing a finished session made may stay behind. One guest
@@ -81,18 +81,15 @@ test(`${GUESTS} guests in a row leave nothing behind (iPadOS 15 profile)`, async
   for (let guest = 0; guest < GUESTS; guest++) {
     await startSession(page, CARDS[guest % CARDS.length]);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await toSelect(page);
-    const required = Number(
-      await page.getByTestId("select-required").getAttribute("data-required"),
-    );
-    for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    // The first photos are already chosen: nothing to tap but the colour and the finish.
+    await expect(page.getByTestId("confirm-selection")).toBeEnabled();
     // Every other guest picks a colour: the graded copies are part of what must go.
     if (guest % 2 === 1) await page.getByTestId("look-paper").click();
     await page.getByTestId("confirm-selection").click();
     await expect(page.getByTestId("final-image")).toBeVisible({ timeout: 30_000 });
     await answerForQr(page, guest % 3 === 0 ? "yes" : "no");
-    await page.getByRole("button", { name: /다 받았어요|다음 분 차례예요/ }).click();
+    await page.getByRole("button", { name: "다음 분 차례예요" }).click();
     await expect(page.getByTestId("screen-attract")).toBeVisible();
     after.push(await held(page));
   }

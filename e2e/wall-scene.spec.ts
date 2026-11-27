@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome, confirmFrame } from "./helpers";
+import { selectDefaultPhotos, openPicker, confirmFrame } from "./helpers";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -120,17 +120,15 @@ async function approve(request: APIRequestContext, sessionId: string) {
 
 async function boothPhoto(frame: "film4" | "polaroid3" | "check2" | "lace1") {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk, frame);
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
+  await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId("consent-yes").click();
   await expect(kiosk.getByTestId("qr-code").locator("svg")).toBeVisible();
   const short = (await kiosk.getByTestId("session-code").textContent())!.replace("세션", "").trim();
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
+  await kiosk.getByRole("button", { name: "다음 분 차례예요" }).click();
   const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
     photos: { sessionId: string }[];
   };

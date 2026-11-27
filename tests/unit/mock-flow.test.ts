@@ -17,7 +17,7 @@ import { fakeCanvasFactory } from "../helpers/fake-canvas";
  * camera/compositor code the kiosk uses, driven the way KioskApp's effects drive them.
  */
 describe("mock camera flow", () => {
-  it("completes welcome → 6 captures → composite → reset", async () => {
+  it("completes cover → 5 captures → composite → reset", async () => {
     const { factory } = fakeCanvasFactory();
     const camera = new MockCamera({ createCanvas: factory });
     let state: KioskState<CapturedFrame> = createInitialState({
@@ -26,11 +26,9 @@ describe("mock camera flow", () => {
     });
     const dispatch = (a: KioskAction<CapturedFrame>) => (state = kioskReducer(state, a));
 
-    dispatch({ type: "OPEN" });
-    dispatch({ type: "START", sessionId: crypto.randomUUID() });
-    // 필름 4컷 · 빨강: a card with an option and the handwriting.
-    dispatch({ type: "SELECT_CARD", cardId: "film4" });
-    dispatch({ type: "CONFIRM_PICK", random: 0.5 });
+    dispatch({ type: "OPEN", sessionId: crypto.randomUUID() });
+    // 필름 4컷 · 빨강: a card with an option and the handwriting. One tap chooses it and goes on.
+    dispatch({ type: "PICK_CARD", cardId: "film4", random: 0.5 });
     dispatch({ type: "SET_OPTION", key: "color", value: "red" });
     dispatch({ type: "CONFIRM_OPTIONS", random: 0.5 });
     expect(state.frameId).toBe("film4-red");
@@ -55,12 +53,14 @@ describe("mock camera flow", () => {
       }
     }
 
-    expect(state.phase).toBe("review");
-    expect(camera.captureCount).toBe(6);
-
-    dispatch({ type: "CONFIRM_SHOTS" });
+    // The last shot opens the photo choice with the first four chosen.
     expect(state.phase).toBe("select");
-    for (const index of [5, 1, 2, 0]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
+    expect(camera.captureCount).toBe(KIOSK_CONFIG.shotsPerSession);
+    expect(camera.captureCount).toBe(5);
+    expect(state.selectedShotIndices).toEqual([0, 1, 2, 3]);
+    // The guest wants another order: everything out, then 4, 1, 2, 0.
+    for (const index of [0, 1, 2, 3]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
+    for (const index of [4, 1, 2, 0]) dispatch({ type: "TOGGLE_SHOT_SELECTION", index });
     dispatch({ type: "CONFIRM_SELECTION", askConsent: true });
     expect(state.phase).toBe("consent");
 

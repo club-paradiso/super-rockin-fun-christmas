@@ -42,7 +42,7 @@ describe("the booth's engine hook", () => {
     // A guest is at the camera: nothing changes for them.
     expect(result.current.engine).toBeNull();
     rerender({ phase: "countdown" });
-    rerender({ phase: "review" });
+    rerender({ phase: "select" });
     expect(result.current.engine).toBeNull();
     // Back on "화면을 눌러 시작": the next guest gets it.
     rerender({ phase: "attract" });
@@ -58,10 +58,10 @@ describe("the booth's engine hook", () => {
     expect(result.current.heartbeatStatus()).toBeUndefined();
   });
 
-  it("fixes the correction from the first countdown until the guest is gone, a retake included", () => {
+  it("fixes the correction from the first countdown until the guest is gone, a camera reconnect included", () => {
     const { result, rerender } = mount(MANUAL);
     const engine = result.current.engine!;
-    for (const phase of ["welcome", "pick", "camera", "ready"] as KioskPhase[]) {
+    for (const phase of ["pick", "options", "camera", "ready"] as KioskPhase[]) {
       rerender({ phase });
       expect(engine.isLocked()).toBe(false);
     }
@@ -69,12 +69,11 @@ describe("the booth's engine hook", () => {
       "countdown",
       "capturing",
       "countdown",
-      "review",
-      // 「다시 찍기」
+      // The camera dropped out mid-session and came back (there is no 「다시 찍기」, 2026-11-27).
+      "camera-error",
       "camera",
       "ready",
       "countdown",
-      "review",
       "select",
       "consent",
       "delivery",

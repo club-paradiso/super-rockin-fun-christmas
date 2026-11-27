@@ -1041,6 +1041,33 @@ body {
   /* 0 · "화면을 눌러 시작" */
   .attract {
     gap: var(--gap-l);
+    /* The edition line at the foot of the cover (.journal-cover-edition): one line of this
+       size, 7 % up a sheet that fills the booth (the booth less its padding). A length, not a
+       percentage, so the line keeps its place when a short screen makes the sheet grow. */
+    --attract-edition-fs: clamp(20px, 3 * var(--bw), 30px);
+    --attract-edition-bottom: calc(0.07 * (100 * var(--bh) - 2 * var(--booth-pad)));
+    /* What that line needs under the last control: its place, its height (line-height 1.5) and
+       a little air, less the sheet's own padding and the gap that are already there. */
+    --attract-foot: max(
+      0px,
+      calc(
+        var(--attract-edition-bottom) + 1.5 * var(--attract-edition-fs) + var(--gap-s) / 2 -
+          var(--sheet-pad-y) - var(--gap-l)
+      )
+    );
+  }
+  /* The column stands in the middle of the cover: the free paper above and below it is shared
+     equally (as `justify-content: center` did), but the lower share is never less than the
+     edition line needs. A cover with more on it than usual (a second row of controls in another
+     language, the paused line, a short screen) moves up first and, when that is not enough,
+     scrolls in .kiosk-scroll: nothing is ever drawn over the edition line. */
+  .attract-space {
+    flex: 1 1 0;
+    min-height: 0;
+    align-self: stretch;
+  }
+  .attract-space-foot {
+    min-height: var(--attract-foot);
   }
   .attract-lockup {
     font-size: clamp(56px, min(13 * var(--bh), 13.5 * var(--bw)), 150px);
@@ -1050,6 +1077,39 @@ body {
     flex-direction: column;
     align-items: center;
     gap: var(--gap-s);
+  }
+  /* The language, "내 사진으로 참여하기" and the sound switch, on the cover since the welcome
+     screen went (2026-11-27). Small controls (--ctl-h, never under 52 px) under the start: the
+     whole cover is still the start, and these are the only places on it that are not. */
+  .attract-options {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--gap-s) var(--gap-m);
+    /* As wide as the sheet allows: on a landscape tablet the three sit on one row in every
+       language (English needs about 870 px), which is all the height a landscape cover has for
+       them. The inset keeps them off the binding at the sheet's edge (.journal-spine), the same
+       one the welcome screen kept. */
+    width: 100%;
+    max-width: calc(100% - 2 * clamp(4px, 1.6 * var(--bw), 28px));
+    cursor: default;
+  }
+  /* The language buttons are as tall as the controls beside them (never under 52 px, D88): the
+     switch's usual 4 px inset would leave them at 48. */
+  .attract-options .booth-seg-btn {
+    min-height: var(--ctl-h);
+  }
+  .attract-mobile {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+  .attract-mobile-paused {
+    flex-basis: 100%;
+    text-align: center;
   }
 
   /* 1 · Welcome: the two big choices. Equal size; the camera one is the filled primary. */
@@ -1339,7 +1399,7 @@ body {
     color: var(--color-ink);
   }
 
-  /* 3 · Review and 5 · Select: six 4:3 prints (seven after one extra) fit the stage. The grid works its
+  /* 3 · Review and 5 · Select: the session's 4:3 prints (five since 2026-11-27) fit the stage. The grid works its
      own width out from the stage's height (rows, gaps and whatever sits under each print), so
      the prints are as large as they can be and the buttons stay on screen. */
   .fit-stage {
@@ -1369,7 +1429,7 @@ body {
   }
   .review,
   .select {
-    gap: var(--gap-m);
+    gap: var(--select-gap, var(--gap-m));
   }
   .review-head,
   .select-head {
@@ -1410,7 +1470,7 @@ body {
     height: 100%;
     object-fit: cover;
   }
-  /* No per-photo retake: 「다시 찍기」 (a secondary button) replaces all six, after asking. */
+  /* One button: the shots are final (no 「다시 찍기」 since 2026-11-27). */
   .review-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1437,12 +1497,39 @@ body {
   .select-grid.has-extra {
     --rows: 4;
   }
+  /* Five prints (2026-11-27): the row that is one short is centred, not left hanging to one
+     side. Each print spans two half-columns, so the short row can start half a print in. A print
+     is two tracks and the gap between them: exactly the width it has in the plain grid, so the
+     size the grid works out for --cols × --rows still holds. */
+  .fit-grid[data-count="5"] {
+    grid-template-columns: repeat(calc(var(--cols) * 2), minmax(0, 1fr));
+  }
+  .fit-grid[data-count="5"] > * {
+    grid-column: span 2;
+  }
+  /* Three across (the review, and the photo choice on a wide stage): the fourth print starts
+     the second row half a print in. Two across (the tall photo choice): the fifth sits alone in
+     the middle. `--short-4` / `--short-5` are where those two start. */
+  .fit-grid[data-count="5"] > :nth-child(4) {
+    grid-column: var(--short-4, 2) / span 2;
+  }
+  .fit-grid[data-count="5"] > :nth-child(5) {
+    grid-column: var(--short-5, auto) / span 2;
+  }
+  .select-grid[data-count="5"] {
+    --short-4: auto;
+    --short-5: 2;
+  }
   /* Two columns of three or three of two: whichever makes the prints larger in the room there
      is. The break-even is a stage as wide as one print is (4:3). */
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
       --cols: 3;
       --rows: 2;
+    }
+    .select-grid[data-count="5"] {
+      --short-4: 2;
+      --short-5: auto;
     }
     .select-grid.has-extra {
       --rows: 3;
@@ -1564,11 +1651,20 @@ body {
   /* With the colour row (on by default since 2026-11-25) the prints give it a little room, so
      the main button stays on screen without scrolling: at 768 × 1024 the screen was 22 px too
      tall, at 820 × 1060 39 px (measured). */
+  /* 2026-11-27: the head has one more line (how to change the photos that are already chosen,
+     .select-change-hint in the markup), and the prints give that room too: with 23 the screen
+     was 5 px too tall again at 768 × 1024 and 23 px at 820 × 1060 (measured). */
   .select.has-looks .fit-stage {
-    --fit-min: clamp(160px, 23 * var(--bh), 320px);
+    --fit-min: clamp(160px, 20.5 * var(--bh), 320px);
   }
   .select.has-looks.select-has-retouch .fit-stage {
     --fit-min: clamp(140px, 15 * var(--bh), 300px);
+  }
+  /* Both rows on: the prints are at their floor already (129 px at 768 × 1024 with the new
+     line, 8 px of scrolling; measured), so here that line's room comes from the gaps between
+     the screen's parts instead (the tall composition only: the wide one sets its own gap). */
+  .select.has-looks.select-has-retouch {
+    --select-gap: var(--gap-s);
   }
   .select.has-looks.select-has-retouch .select-retouch {
     flex-direction: row;
@@ -2151,7 +2247,7 @@ body {
     .look-row {
       grid-area: looks;
     }
-    /* Stacked beside the prints: the main button on top, 「다시 찍기」 under it. */
+    /* Beside the prints. */
     .review-actions {
       flex-direction: column-reverse;
       flex-wrap: nowrap;
@@ -2162,6 +2258,10 @@ body {
     .select-grid {
       --cols: 3;
       --rows: 2;
+    }
+    .select-grid[data-count="5"] {
+      --short-4: 2;
+      --short-5: auto;
     }
     .select-actions {
       flex-direction: column-reverse;
@@ -2983,12 +3083,14 @@ main input:focus-visible,
 
 .journal-cover-edition {
   position: absolute;
-  bottom: 7%;
+  bottom: var(--attract-edition-bottom, 7%);
   left: 10%;
   width: 80%;
   color: var(--color-button-text);
   font-family: var(--font-display);
-  font-size: clamp(20px, 3 * var(--bw), 30px);
+  /* One size with the room .attract keeps for this line (--attract-foot). */
+  font-size: var(--attract-edition-fs, clamp(20px, 3 * var(--bw), 30px));
+  line-height: 1.5;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-align: center;
