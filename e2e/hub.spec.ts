@@ -232,7 +232,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
   await expect(panel.getByTestId("help-looks-status")).toHaveAttribute("data-state", "on");
   await panel.getByTestId("help-reset").click();
 
-  // And the six shots they choose from are already in the frame's look, with the colour row.
+  // And the six shots they choose from are already in the frame's tone (원본), with the colour row.
   await openWelcome(kiosk);
   await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
   await confirmFrame(kiosk, "film35", { color: "mono" });

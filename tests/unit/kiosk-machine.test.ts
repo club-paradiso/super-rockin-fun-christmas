@@ -567,6 +567,11 @@ describe("the colour look a guest chooses with the photos", () => {
     ).toBe("lamp");
   });
 
+  it("takes 원본 (no look) back after a look", () => {
+    const s = run(choosing(), { type: "SET_LOOK", lookId: "ink" });
+    expect(run(s, { type: "SET_LOOK", lookId: "none" }).lookId).toBe("none");
+  });
+
   it("refuses a look that does not exist", () => {
     const s = choosing();
     expect(run(s, { type: "SET_LOOK", lookId: "sparkle" })).toBe(s);
