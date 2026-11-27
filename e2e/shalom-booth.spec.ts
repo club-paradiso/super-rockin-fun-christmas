@@ -82,7 +82,8 @@ test("이전 sits in the bottom bar beside 처음으로, never in the header", a
 test("이전: none once the shots are taken (the choice itself can still change); the phone QR → cover", async ({
   page,
 }) => {
-  await shootAllWithMock(page);
+  // 필름 · 세피아: three photos of four, so one is left to choose.
+  await shootAllWithMock(page, "film", { color: "sepia" });
   // The photo choice is the first screen after the shots: no step back from it, only 처음으로.
   await expect(page.getByTestId("go-back")).toHaveCount(0);
   await expect(page.getByTestId("go-home")).toBeVisible();

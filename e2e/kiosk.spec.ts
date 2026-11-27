@@ -141,7 +141,8 @@ test("decline path: consent NO leaves the download working and nothing queued fo
 test("v2: no extra photo, no second frame choice, no retake, the steps are dots only", async ({
   page,
 }) => {
-  await shootAllWithMock(page);
+  // 필름 · 세피아: three photos of four, so one is left to choose.
+  await shootAllWithMock(page, "film", { color: "sepia" });
   // The photo choice is the first screen after the shots (2026-11-27): no review screen.
   const select = page.getByTestId("screen-select");
   await expect(page.locator("[data-testid='screen-review']")).toHaveCount(0);

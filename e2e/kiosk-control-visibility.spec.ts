@@ -59,6 +59,8 @@ for (const viewport of [
     await page.getByTestId("confirm-pick").click();
     for (const color of ["cream", "red", "mono", "sepia"])
       await expectTouchable(page.getByTestId(`option-color-${color}`));
+    // 세피아: the three-photo strip, so the choice below has a photo left over.
+    await page.getByTestId("option-color-sepia").click();
     await expectTouchable(page.getByTestId("confirm-options"));
     await page.getByTestId("confirm-options").click();
 
