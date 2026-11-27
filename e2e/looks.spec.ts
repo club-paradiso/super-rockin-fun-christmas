@@ -149,8 +149,8 @@ test.describe("comparison sheet on an iPad mini in portrait", () => {
     const size = (id: string) =>
       page.getByTestId(id).evaluate((c: HTMLCanvasElement) => [c.width, c.height]);
     await expect.poll(async () => (await size("frame-after"))[0]).toBeGreaterThan(300);
-    // 필름 4컷 · 크림 opens with its mapped look, Linen.
-    await expect(page.getByLabel("룩 고르기")).toHaveValue("linen");
+    // No frame comes with a look (2026-11-26): the sheet opens on its first look, Paper.
+    await expect(page.getByLabel("룩 고르기")).toHaveValue("paper");
     const before = await pixels("frame-before");
     const linen = await pixels("frame-after");
     expect(linen).not.toBe(before);
@@ -178,9 +178,9 @@ test.describe("comparison sheet on an iPad mini in portrait", () => {
     await page.getByLabel("틀에 얹은 룩의 세기").fill("100");
     await expect.poll(distance).toBeGreaterThan(3);
 
-    // Another frame brings its own default look; a wide frame keeps its shape.
+    // Another frame starts on Paper again; a wide frame keeps its shape.
     await page.getByLabel("틀 고르기").selectOption("polaroid1");
-    await expect(page.getByLabel("룩 고르기")).toHaveValue("album");
+    await expect(page.getByLabel("룩 고르기")).toHaveValue("paper");
     await expect
       .poll(async () => {
         const [w, h] = await size("frame-after");
@@ -188,7 +188,7 @@ test.describe("comparison sheet on an iPad mini in portrait", () => {
       })
       .toBeLessThan(0.01);
     await page.getByLabel("틀 고르기").selectOption("film3-mono-logo");
-    await expect(page.getByLabel("룩 고르기")).toHaveValue("ink");
+    await expect(page.getByLabel("룩 고르기")).toHaveValue("paper");
   });
 });
 
@@ -359,12 +359,16 @@ test.describe("the booth with looks", () => {
     });
   }
 
-  async function sessionToConsent(page: Page, url: string, card: string) {
+  async function sessionToConsent(page: Page, url: string, card: string, look?: string) {
     await page.goto(url);
     await startSession(page, card);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await toSelect(page);
+    if (look) {
+      await page.getByTestId(`look-${look}`).click();
+      await expect(page.getByTestId(`look-${look}`)).toHaveAttribute("aria-checked", "true");
+    }
     await selectDefaultPhotos(page);
     await expect(page.getByTestId("screen-consent")).toBeVisible();
     await expect(page.getByTestId("final-image")).toBeVisible();
@@ -395,10 +399,10 @@ test.describe("the booth with looks", () => {
     ).toBe(0);
   });
 
-  test("?looks=1: the saved photo carries the frame's look, and the QR copy is that photo", async ({
+  test("?looks=1: a guest who picks nothing gets 원본; a picked look is in the saved photo and the QR copy", async ({
     page,
   }) => {
-    test.setTimeout(150_000);
+    test.setTimeout(200_000);
     await enrollKiosk(page);
     const errors: string[] = [];
     page.on("console", (message) => {
@@ -412,12 +416,18 @@ test.describe("the booth with looks", () => {
     page.on("request", (request) => {
       if (request.url().endsWith(".cube")) cubes.push(new URL(request.url()).pathname);
     });
+    // No frame comes with a look (2026-11-26): untouched, the photo is the original.
     await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film4");
+    const untouched = await firstPhotoColour(page);
+    expect(Math.hypot(...untouched.map((c, k) => c - plain[k]!))).toBeLessThan(1.5);
+    // Every look is loaded all the same: the guest chooses from all of them.
+    for (const id of ["paper", "linen", "ink", "walnut"])
+      expect(cubes).toContain(`/looks/${id}.cube`);
+
+    // Linen, picked on the photo choice screen: a visibly different colour.
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film4", "linen");
     const graded = await firstPhotoColour(page);
-    // Linen on the same mock picture: a visibly different colour, not a rounding difference.
-    const distance = Math.hypot(...graded.map((c, k) => c - plain[k]!));
-    expect(distance).toBeGreaterThan(3);
-    expect(cubes).toContain("/looks/linen.cube");
+    expect(Math.hypot(...graded.map((c, k) => c - plain[k]!))).toBeGreaterThan(3);
     expect(errors).toEqual([]);
 
     const preview = await page.getByTestId("final-image").evaluate(async (el: HTMLImageElement) => {
@@ -472,7 +482,7 @@ test.describe("the booth with looks", () => {
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
   });
 
-  test("looks on, a colour frame: the camera view is left alone and the shots are graded", async ({
+  test("looks on, a colour frame: the camera view and the shots are as taken until the guest picks a look", async ({
     page,
   }) => {
     test.setTimeout(150_000);
@@ -482,16 +492,23 @@ test.describe("the booth with looks", () => {
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    // 원본: the shots as taken (no graded copy is made).
     for (const index of [0, 5])
       await expect(page.getByTestId(`review-shot-${index}`).locator("img")).toHaveAttribute(
         "src",
-        /^data:image\/jpeg/,
+        /^blob:/,
       );
     await toSelect(page);
+    await expect(page.getByTestId("look-none")).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("select-shot-0").locator("img")).toHaveAttribute("src", /^blob:/);
+    await page.getByTestId("look-linen").click();
     await expect(page.getByTestId("select-shot-0").locator("img")).toHaveAttribute(
       "src",
       /^data:image\/jpeg/,
     );
+    // And back to 원본.
+    await page.getByTestId("look-none").click();
+    await expect(page.getByTestId("select-shot-0").locator("img")).toHaveAttribute("src", /^blob:/);
   });
 
   /** Largest gap between channels in the middle of an <img>: 0 is grey. */
@@ -528,7 +545,7 @@ test.describe("the booth with looks", () => {
     ["portrait", 768, 1024],
     ["landscape", 1024, 768],
   ] as const)
-    test(`the guest picks a colour (${shape}): four looks, "다음" for the rest, shots and print follow`, async ({
+    test(`the guest picks a colour (${shape}): 원본 first, four at a time, "다음" for the rest, shots and print follow`, async ({
       browser,
     }) => {
       test.setTimeout(150_000);
@@ -541,12 +558,14 @@ test.describe("the booth with looks", () => {
       await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
       await toSelect(page);
 
-      // Four of eight, opening on the frame's own look (필름 4컷 크림: linen), which is chosen.
+      // 원본 and the eight looks, four at a time, opening on 원본, which is chosen (no frame
+      // comes with a look since 2026-11-26).
       const row = page.getByTestId("look-row");
       await expect(row).toBeVisible();
       await expect(row.getByRole("radio")).toHaveCount(4);
-      await expect(page.getByTestId("look-page")).toHaveText("1 / 2");
-      await expect(page.getByTestId("look-linen")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("look-page")).toHaveText("1 / 3");
+      await expect(page.getByTestId("look-none")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("look-linen")).toHaveAttribute("aria-checked", "false");
       await expect(page.getByTestId("look-turn")).toHaveText("다음 ›");
 
       // Nothing runs off the screen and every control is a touch target.
@@ -566,12 +585,22 @@ test.describe("the booth with looks", () => {
       const confirm = (await page.getByTestId("confirm-selection").boundingBox())!;
       expect(confirm.y + confirm.height).toBeLessThanOrEqual(height);
 
-      // The other four, and back.
+      // The next four, the last one, and back.
       await page.getByTestId("look-turn").click();
-      await expect(page.getByTestId("look-page")).toHaveText("2 / 2");
+      await expect(page.getByTestId("look-page")).toHaveText("2 / 3");
       await expect(page.getByTestId("look-ink")).toBeVisible();
-      await expect(page.getByTestId("look-linen")).toHaveCount(0);
-      await expect(page.getByTestId("look-turn")).toHaveText("‹ 앞장");
+      await expect(page.getByTestId("look-none")).toHaveCount(0);
+      await expect(page.getByTestId("look-turn")).toHaveText("다음 ›");
+      await page.getByTestId("look-turn").click();
+      await expect(page.getByTestId("look-page")).toHaveText("3 / 3");
+      await expect(page.getByTestId("look-walnut")).toBeVisible();
+      await expect(page.getByTestId("look-turn")).toHaveText("‹ 첫 장");
+      // The last page goes back to the first, so 「원본」 is always in reach (never 2 ↔ 3).
+      await page.getByTestId("look-turn").click();
+      await expect(page.getByTestId("look-page")).toHaveText("1 / 3");
+      await expect(page.getByTestId("look-none")).toBeVisible();
+      await page.getByTestId("look-turn").click();
+      await expect(page.getByTestId("look-page")).toHaveText("2 / 3");
 
       // Black and white: the six shots turn grey at once, and so does the finished photo.
       const before = await page.getByTestId("select-shot-0").locator("img").getAttribute("src");

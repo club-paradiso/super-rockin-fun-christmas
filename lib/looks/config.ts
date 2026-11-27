@@ -1,10 +1,12 @@
 import mapping from "@/config/looks/frame-looks.json";
-import { getLook, LOOK_IDS } from "@/config/looks";
+import { getLook, LOOK_IDS, NO_LOOK } from "@/config/looks";
+import { getFrame, isKnownFrameId } from "@/config/frames";
 import type { LookDefinition } from "./types";
 
 /**
  * Which look a frame gets is data: config/looks/frame-looks.json. A frame that is not listed gets
- * `default`. tests/unit/looks-config.test.ts checks the file against the looks and the frames.
+ * `default`. `"none"` (`NO_LOOK`) is no look: since 2026-11-26 every frame starts with it and the
+ * guest chooses. tests/unit/looks-config.test.ts checks the file against the looks and the frames.
  */
 export interface FrameLook {
   look: string;
@@ -18,12 +20,16 @@ export interface FrameLookMap {
 
 export const FRAME_LOOKS: FrameLookMap = mapping;
 
-/** The look and strength of a frame; null when the file names a look that does not exist. */
+/**
+ * The look and strength of a frame; null when it has none (`NO_LOOK`) or the file names a look
+ * that does not exist (frameLookProblems reports that one).
+ */
 export function lookForFrame(
   frameId: string,
   map: FrameLookMap = FRAME_LOOKS,
 ): { look: LookDefinition; strength: number } | null {
   const entry = map.frames[frameId] ?? map.default;
+  if (entry.look === NO_LOOK) return null;
   const look = getLook(entry.look);
   return look ? { look, strength: entry.strength } : null;
 }
@@ -37,7 +43,8 @@ export function frameLookProblems(
   const problems: string[] = [];
   const check = (where: string, entry: FrameLook | undefined) => {
     if (!entry || typeof entry.look !== "string") return void problems.push(`${where}: no look`);
-    if (!lookIds.includes(entry.look)) problems.push(`${where}: unknown look "${entry.look}"`);
+    if (entry.look !== NO_LOOK && !lookIds.includes(entry.look))
+      problems.push(`${where}: unknown look "${entry.look}"`);
     if (!(typeof entry.strength === "number" && entry.strength >= 0 && entry.strength <= 1))
       problems.push(`${where}: strength must be 0–1`);
   };
@@ -94,7 +101,12 @@ export type LookView = "mono" | "sepia" | null;
 
 export function lookViewForFrame(frameId: string, map: FrameLookMap = FRAME_LOOKS): LookView {
   const entry = lookForFrame(frameId, map);
-  if (!entry?.look.grade.mono || entry.strength * entry.look.strength < 0.5) return null;
+  // No look: the photo keeps the frame's own tone, so the camera shows that tone.
+  if (!entry) {
+    const tone = isKnownFrameId(frameId) ? getFrame(frameId).photoTone : undefined;
+    return tone === "mono" || tone === "sepia" ? tone : null;
+  }
+  if (!entry.look.grade.mono || entry.strength * entry.look.strength < 0.5) return null;
   // A toned black and white (walnut) has a warm shadow tint; a neutral one (ink) has almost none.
   return entry.look.grade.shadowTint.b > 0.01 ? "sepia" : "mono";
 }
@@ -102,18 +114,24 @@ export function lookViewForFrame(frameId: string, map: FrameLookMap = FRAME_LOOK
 /** How many looks the photo choice screen shows at a time (Figma 956:1589: four, then "다음"). */
 export const LOOKS_PER_PAGE = 4;
 
-/** The look a session's photos get: the guest's choice, else the one the frame comes with. */
+/**
+ * The look a session's photos get: the guest's choice, else the one the frame comes with
+ * (`NO_LOOK`, "원본", for every frame since 2026-11-26).
+ */
 export function sessionLookId(
   frameId: string,
   chosen: string | null,
   map: FrameLookMap = FRAME_LOOKS,
-): string | null {
-  if (chosen && getLook(chosen)) return chosen;
-  return lookForFrame(frameId, map)?.look.id ?? null;
+): string {
+  if (chosen === NO_LOOK || (chosen && getLook(chosen))) return chosen;
+  return lookForFrame(frameId, map)?.look.id ?? NO_LOOK;
 }
 
-/** The pages of the colour row, in the order of config/looks. */
-export function lookPages(lookIds: readonly string[] = LOOK_IDS): string[][] {
+/** The choices of the colour row: "원본" first, then every look in the order of config/looks. */
+export const LOOK_CHOICES: readonly string[] = [NO_LOOK, ...LOOK_IDS];
+
+/** The pages of the colour row ("원본", then the looks in the order of config/looks). */
+export function lookPages(lookIds: readonly string[] = LOOK_CHOICES): string[][] {
   const pages: string[][] = [];
   for (let i = 0; i < lookIds.length; i += LOOKS_PER_PAGE)
     pages.push(lookIds.slice(i, i + LOOKS_PER_PAGE));
@@ -121,7 +139,10 @@ export function lookPages(lookIds: readonly string[] = LOOK_IDS): string[][] {
 }
 
 /** The page a look is on: the row opens where the frame's own look is. */
-export function lookPageOf(lookId: string | null, lookIds: readonly string[] = LOOK_IDS): number {
+export function lookPageOf(
+  lookId: string | null,
+  lookIds: readonly string[] = LOOK_CHOICES,
+): number {
   const index = lookId ? lookIds.indexOf(lookId) : -1;
   return index < 0 ? 0 : Math.floor(index / LOOKS_PER_PAGE);
 }
