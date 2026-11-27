@@ -35,6 +35,8 @@ const MASKS: Record<string, Rect[]> = {
   "film4-cream": [{ x: 30, y: 1592, w: 386, h: 96 }],
   "film4-red": [{ x: 30, y: 1592, w: 386, h: 96 }],
   polaroid1: [{ x: 60, y: 1200, w: 640, h: 150 }],
+  // 「오늘 날짜」: the shooting day and the star after it (Figma 877:1687).
+  "polaroid1-date": [{ x: 60, y: 1225, w: 460, h: 140 }],
   polaroid3: [
     { x: 358, y: 404, w: 147, h: 58 },
     { x: 406, y: 893, w: 146, h: 56 },
@@ -48,7 +50,13 @@ const LIMIT = 0.01;
 const SHIFT_LIMIT = 1 * SCALE;
 
 /** The three tones of 필름 35mm show the same four example photos in Figma: one set of files. */
-const photoSet = (frameId: string) => (frameId.startsWith("film35-") ? "film35" : frameId);
+/** Likewise the ten captions of 폴라로이드 1컷 (Figma 877:1665): the same photo, one file. */
+const photoSet = (frameId: string) =>
+  frameId.startsWith("film35-")
+    ? "film35"
+    : frameId.startsWith("polaroid1-")
+      ? "polaroid1"
+      : frameId;
 
 const ref = (name: string) =>
   REF_DIR && existsSync(join(REF_DIR, `${name}.png`))
@@ -75,7 +83,11 @@ test.beforeAll(async () => {
   if (SAVE) await mkdir(OUT, { recursive: true });
 });
 
-async function compose(page: Page, frameId: string, opts: { handFont: string; stamp: string }) {
+async function compose(
+  page: Page,
+  frameId: string,
+  opts: { handFont: string; stamp: string; date: string },
+) {
   const frame = getFrame(frameId);
   const photos = await Promise.all(
     frame.slots.map((_, i) => dataUrl(ref(`photo-${photoSet(frameId)}-${i + 1}`))),
@@ -116,11 +128,19 @@ for (const frame of V2_FRAMES) {
       h: m.h * SCALE,
     }));
     const any = await toRaw(
-      await compose(page, frame.id, { handFont: "rock-salt", stamp: "'26 11 28" }),
+      await compose(page, frame.id, {
+        handFont: "rock-salt",
+        stamp: "'26 11 28",
+        date: "2026.11.28",
+      }),
     );
     const masked = diff(want, any, DELTA_E, masks);
     // Pass 2: font 1 (Caveat) and the Figma sample date, nothing masked.
-    const fixedPng = await compose(page, frame.id, { handFont: "caveat", stamp: "'26 12 24" });
+    const fixedPng = await compose(page, frame.id, {
+      handFont: "caveat",
+      stamp: "'26 12 24",
+      date: "2026.12.24",
+    });
     const fixed = await toRaw(fixedPng);
     const full = diff(want, fixed, DELTA_E);
     // Where each photo sits: the shift (output pixels) that best lays the code's photo on Figma's.

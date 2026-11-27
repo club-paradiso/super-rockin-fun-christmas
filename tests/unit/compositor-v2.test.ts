@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
-import { composeFrame, formatStampLabel } from "@/lib/compositor/compose";
+import { POLAROID1_VARIANTS } from "@/config/frames/v2";
+import { composeFrame, formatHandDate, formatStampLabel } from "@/lib/compositor/compose";
 import { frameFontRequests } from "@/lib/compositor/fonts";
 import { applyTone, greyLevel, toneTable } from "@/lib/compositor/tone";
 import type { CanvasFactory } from "@/lib/canvas";
@@ -253,6 +254,68 @@ describe("handwriting", () => {
       expect(requests.some((r) => r.spec.includes(`"${f.family}"`))).toBe(true);
     const stamp = frameFontRequests([getFrame("polaroid3")]);
     expect(stamp.some((r) => r.spec.includes('"VT323"') && r.text.includes("'"))).toBe(true);
+  });
+});
+
+describe("폴라로이드 1컷 문구 (2026-11-26): Figma's own font, never the session's", () => {
+  const drawCaption = (frameId: string, handFont: string, dateLabel = "2026.12.24") => {
+    const { factory, created } = pixelFactory(300);
+    const frame = getFrame(frameId);
+    const srcs = frame.decorations.flatMap((d) =>
+      d.type === "image" ? [d.src] : d.type === "hand" && d.heart ? [d.heart.src] : [],
+    );
+    composeFrame(frame, [photo()], {
+      createCanvas: factory,
+      context: { dateLabel, handFont, assets: assets(srcs) },
+    });
+    return created[0]!;
+  };
+  const calls = (c: FakeCanvas) => JSON.stringify(c.calls.filter((x) => x.name !== "getImageData"));
+
+  it("「오늘 날짜」 writes the shooting day in Caveat Bold 80, whatever the session's font", () => {
+    const a = drawCaption("polaroid1-date", "rock-salt");
+    expect(a.callsTo("fillText").map((c) => c.args[0])).toEqual(["12. 24. 2026"]);
+    expect(a.callsTo("strokeText")).toHaveLength(0);
+    // The same drawing with any other session font: the font is not the session's.
+    for (const f of HAND_FONTS) expect(calls(drawCaption("polaroid1-date", f.id))).toBe(calls(a));
+    const font = (a.getContext() as unknown as { font: string }).font;
+    expect(font).toBe('700 80px "Caveat", cursive');
+  });
+
+  it("the star follows the end of the date (Figma 877:1686)", () => {
+    const at = (c: FakeCanvas) => c.callsTo("translate").map((t) => t.args[0] as number);
+    const { factory: f1, created: c1 } = pixelFactory(300);
+    const { factory: f2, created: c2 } = pixelFactory(340);
+    for (const [factory] of [[f1], [f2]] as const)
+      composeFrame(getFrame("polaroid1-date"), [photo()], {
+        createCanvas: factory,
+        context: {
+          dateLabel: "2026.12.24",
+          assets: assets(["/frames/v2/polaroid1-star-1a1717.svg"]),
+        },
+      });
+    expect(at(c2[0]!)[1]! - at(c1[0]!)[1]!).toBeCloseTo(40, 5);
+  });
+
+  it("the other eight captions are Figma's art, drawn the same for every session font", () => {
+    for (const [caption, frame] of Object.entries(POLAROID1_VARIANTS)) {
+      if (caption === "village" || caption === "date") continue;
+      const a = drawCaption(frame.id, "caveat");
+      expect(a.callsTo("fillText")).toHaveLength(0);
+      expect(calls(drawCaption(frame.id, "rock-salt"))).toBe(calls(a));
+    }
+  });
+
+  it("dates as a pen writes them: month. day. year, no leading zeros", () => {
+    expect(formatHandDate("2026.12.24")).toBe("12. 24. 2026");
+    expect(formatHandDate("2026.12.01")).toBe("12. 1. 2026");
+    expect(formatHandDate("")).toBe("");
+  });
+
+  it("asks only for Caveat, with the digits of any day", () => {
+    expect(frameFontRequests([getFrame("polaroid1-date")])).toEqual([
+      { spec: '700 80px "Caveat"', text: "0123456789. " },
+    ]);
   });
 });
 
