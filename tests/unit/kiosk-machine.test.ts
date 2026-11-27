@@ -8,6 +8,8 @@ import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
   canGoBack,
+  isShooting,
+  needsCamera,
   capturedCount,
   createInitialState as attractState,
   currentPose,
@@ -110,6 +112,88 @@ describe("countdown", () => {
     let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
     s = shoot(s, "a");
     expect([s.phase, s.shotIndex, s.remaining]).toEqual(["countdown", 1, 3]);
+  });
+});
+
+describe("the breather between two shots (2026-11-27, a user decision)", () => {
+  // 5 s countdown → flash → a short rest → 5 s countdown. The rest is a phase of its own.
+  const withRest = () =>
+    run(
+      createInitialState<string>({ shotCount: SHOTS, countdownSeconds: 3, restSeconds: 2 }),
+      { type: "CONFIRM_PICK", random: 0 },
+      { type: "CONFIRM_OPTIONS", random: 0 },
+      { type: "CAMERA_READY" },
+      { type: "BEGIN_SHOOTING", guide: false },
+    );
+
+  it("after a shot the booth rests, then counts down the next one", () => {
+    const taken = run(withRest(), ...ticks(3), { type: "SHOT_CAPTURED", shot: "a" });
+    expect([taken.phase, taken.shotIndex]).toEqual(["rest", 1]);
+    expect(taken.shots[0]).toBe("a");
+    const next = run(taken, { type: "REST_DONE" });
+    expect([next.phase, next.shotIndex, next.remaining]).toEqual(["countdown", 1, 3]);
+  });
+
+  it("no rest after the last shot: the photo choice follows at once", () => {
+    let s = withRest();
+    for (let i = 0; i < SHOTS; i++) {
+      s = shoot(s, `shot-${i}`);
+      if (i < SHOTS - 1) {
+        expect(s.phase).toBe("rest");
+        s = run(s, { type: "REST_DONE" });
+      }
+    }
+    expect(s.phase).toBe("select");
+  });
+
+  it("a rest is not a countdown: a tick, a stray capture or a second REST_DONE change nothing", () => {
+    const rest = run(withRest(), ...ticks(3), { type: "SHOT_CAPTURED", shot: "a" });
+    expect(run(rest, { type: "TICK" })).toBe(rest);
+    expect(run(rest, { type: "SHOT_CAPTURED", shot: "b" })).toBe(rest);
+    const counting = run(rest, { type: "REST_DONE" });
+    expect(run(counting, { type: "REST_DONE" })).toBe(counting);
+    expect(run(withRest(), { type: "REST_DONE" }).phase).toBe("countdown");
+  });
+
+  it("the rest is part of shooting: the camera stays on and there is no way back, a lost camera is an error", () => {
+    const rest = run(withRest(), ...ticks(3), { type: "SHOT_CAPTURED", shot: "a" });
+    expect(needsCamera(rest.phase)).toBe(true);
+    expect(isShooting(rest.phase)).toBe(true);
+    expect(canGoBack(rest)).toBe(false);
+    expect(run(rest, { type: "CAMERA_FAILED", kind: "failed" } as never).phase).toBe(
+      "camera-error",
+    );
+  });
+
+  it("the pose guide shows the next shot's pose during the rest", () => {
+    const guided = run(
+      createInitialState<string>({ shotCount: SHOTS, countdownSeconds: 3, restSeconds: 2 }),
+      { type: "CONFIRM_PICK", random: 0 },
+      { type: "CONFIRM_OPTIONS", random: 0 },
+      { type: "CAMERA_READY" },
+      { type: "BEGIN_SHOOTING", guide: true },
+      ...ticks(3),
+      { type: "SHOT_CAPTURED", shot: "a" },
+    );
+    expect(guided.phase).toBe("rest");
+    expect(currentPose(guided)).toEqual(POSE_SEQUENCE[1]);
+  });
+
+  it("restSeconds 0 (or absent) means no rest: straight on, as before", () => {
+    const s = run(init(), ...[]);
+    const taken = shoot(run(toReady(s), { type: "BEGIN_SHOOTING", guide: false }), "a");
+    expect(taken.phase).toBe("countdown");
+    expect(taken.restSeconds).toBe(0);
+  });
+
+  it("a new session keeps the rest setting", () => {
+    const reset = run(withRest(), { type: "RESET" });
+    expect(reset.restSeconds).toBe(2);
+  });
+
+  it("the booth's own setting is a short rest, not a pause: 1 to 5 s", () => {
+    expect(KIOSK_CONFIG.restSeconds).toBeGreaterThanOrEqual(0);
+    expect(KIOSK_CONFIG.restSeconds).toBeLessThanOrEqual(5);
   });
 });
 

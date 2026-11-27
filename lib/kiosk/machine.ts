@@ -74,6 +74,7 @@ export type KioskPhase =
   | "ready" // live preview, waiting for the guest to press start
   | "countdown"
   | "capturing"
+  | "rest" // the breather between two shots (restSeconds): camera on, no number
   | "options" // colour / logo of the chosen card, before shooting (cards with options only)
   | "select" // the shots, the first ones chosen: exactly as many as the chosen frame takes
   | "consent"
@@ -107,6 +108,8 @@ export interface KioskState<Shot> {
   shotCount: number;
   /** Seconds per countdown (KIOSK_CONFIG.countdownSeconds). */
   countdownSeconds: number;
+  /** Seconds of rest after each shot but the last (KIOSK_CONFIG.restSeconds); 0: none. */
+  restSeconds: number;
   shots: (Shot | null)[];
   /** Index of the shot the countdown / capture is for. */
   shotIndex: number;
@@ -176,6 +179,8 @@ export type KioskAction<Shot> =
   | { type: "BEGIN_SHOOTING"; guide: boolean }
   | { type: "TICK" }
   | { type: "SHOT_CAPTURED"; shot: Shot }
+  /** The rest between two shots is over: the next countdown starts. */
+  | { type: "REST_DONE" }
   | { type: "CAPTURE_FAILED" }
   | { type: "TOGGLE_SHOT_SELECTION"; index: number }
   /** Another colour look for this session's photos; only while choosing the photos. */
@@ -214,6 +219,8 @@ export type KioskAction<Shot> =
 export interface KioskInit {
   shotCount: number;
   countdownSeconds: number;
+  /** Seconds of rest after each shot but the last. Absent: none (the pure machine's default). */
+  restSeconds?: number;
   /** The font the previous session on this booth had (kept across a page reload). */
   lastHandFont?: string | null;
   /** The booth's skin-retouch setting: "off" (default) offers the guest nothing. */
@@ -232,6 +239,7 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     sessionId: "",
     shotCount: init.shotCount,
     countdownSeconds: init.countdownSeconds,
+    restSeconds: init.restSeconds ?? 0,
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
     poseGuide: false,
@@ -308,6 +316,7 @@ export function kioskReducer<Shot>(
       return createInitialState<Shot>({
         shotCount: state.shotCount,
         countdownSeconds: state.countdownSeconds,
+        restSeconds: state.restSeconds,
         lastHandFont: state.handFont ?? state.lastHandFont,
         // Every guest starts at the booth's setting, never at the previous guest's answer.
         retouch: state.retouchDefault,
@@ -422,7 +431,7 @@ export function kioskReducer<Shot>(
 
     case "CAMERA_FAILED":
       // A camera can fail at any point while it is in use (unplugged mid-countdown).
-      return ["camera", "ready", "countdown", "capturing"].includes(state.phase)
+      return ["camera", "ready", "countdown", "capturing", "rest"].includes(state.phase)
         ? { ...state, phase: "camera-error", cameraError: action.kind }
         : state;
 
@@ -463,8 +472,15 @@ export function kioskReducer<Shot>(
       const base = { ...state, shots, captureFailures: 0 };
       const next = shots.findIndex((s) => s === null);
       if (next === -1) return toSelect(base);
+      // The breather (restSeconds), unless the booth is set to none: then straight on.
+      if (state.restSeconds > 0) return { ...base, phase: "rest", shotIndex: next, remaining: 0 };
       return { ...base, phase: "countdown", shotIndex: next, remaining: state.countdownSeconds };
     }
+
+    case "REST_DONE":
+      return state.phase === "rest"
+        ? { ...state, phase: "countdown", remaining: state.countdownSeconds }
+        : state;
 
     case "CAPTURE_FAILED": {
       if (state.phase !== "capturing") return state;
@@ -655,10 +671,16 @@ export function currentPose<Shot>(
 
 /** Phases where the camera must be running. */
 export function needsCamera(phase: KioskPhase): boolean {
-  return phase === "camera" || phase === "ready" || phase === "countdown" || phase === "capturing";
+  return (
+    phase === "camera" ||
+    phase === "ready" ||
+    phase === "countdown" ||
+    phase === "capturing" ||
+    phase === "rest"
+  );
 }
 
 /** Phases where the guest is mid-shoot; idle reset must not interrupt them. */
 export function isShooting(phase: KioskPhase): boolean {
-  return phase === "countdown" || phase === "capturing";
+  return phase === "countdown" || phase === "capturing" || phase === "rest";
 }

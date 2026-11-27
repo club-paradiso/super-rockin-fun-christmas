@@ -3,6 +3,12 @@ function positiveInt(value: string | undefined, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+function nonNegativeInt(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === "") return fallback;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
   /**
@@ -18,6 +24,14 @@ export const KIOSK_CONFIG = {
    * the E2E run does not wait 4 × 5 s per session. Do not set it on a real booth.
    */
   countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 5),
+  /**
+   * The breather between two shots (2026-11-27, a user decision: 5 s countdown → flash → a short
+   * rest → 5 s countdown): after a shot is taken the booth waits this long, with the camera on
+   * and no number, before the next countdown. 2 s is Claude's choice, the user did not say how
+   * long. There is no rest after the last shot (the photo choice follows at once). 0 turns the
+   * rest off. NEXT_PUBLIC_KIOSK_REST_SECONDS is a test-only override like the countdown's.
+   */
+  restSeconds: nonNegativeInt(process.env.NEXT_PUBLIC_KIOSK_REST_SECONDS, 2),
   /**
    * Every capture is center-cropped to this aspect ratio (width / height), and the live preview
    * box uses the same ratio with object-fit: cover, so what the guest sees is what is saved.

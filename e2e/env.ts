@@ -15,6 +15,8 @@ export const E2E_ENV: Record<string, string> = {
   NEXT_TELEMETRY_DISABLED: "1",
   // Test only (inlined at build): the booth counts 10 s per shot; the suite would take minutes.
   NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS: "3",
+  // Test only, like the countdown: the breather between two shots lasts 1 s, not 2.
+  NEXT_PUBLIC_KIOSK_REST_SECONDS: "1",
   // Allows the 127.0.0.1 origin in a production build. Ignored on Vercel.
   FTL_ALLOW_LOCAL_ORIGIN: "1",
   PUBLIC_BASE_URL: `http://127.0.0.1:${PORT}`,
