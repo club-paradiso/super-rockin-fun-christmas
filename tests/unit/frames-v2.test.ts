@@ -58,9 +58,10 @@ const bounds = (s: (typeof V2_FRAMES)[number]["slots"][number]) => {
   };
 };
 
-describe("틀 선택 v2: the nine cards", () => {
-  it("are the seven of Figma 898:1677 in its order, then 필름 35mm (924:2026) and 밈 4컷; 필름 3컷 preselected", () => {
+describe("틀 선택 v2: the cards", () => {
+  it("are 필름 (2026-11-27), the seven of Figma 898:1677 in its order, then 필름 35mm (924:2026) and 밈 4컷; 필름 preselected", () => {
     expect(FRAME_CARDS.map((c) => c.id)).toEqual([
+      "film",
       "film3",
       "film4",
       "polaroid1",
@@ -71,29 +72,52 @@ describe("틀 선택 v2: the nine cards", () => {
       "film35",
       "meme4",
     ]);
-    expect(DEFAULT_CARD_ID).toBe("film3");
-    expect(getCard("nope").id).toBe("film3");
+    expect(DEFAULT_CARD_ID).toBe("film");
+    expect(getCard("nope").id).toBe("film");
   });
 
-  it("three are taken down (2026-11-27): 레이스 · 폴라로이드 3컷 · 성경구절 4컷 are not offered", () => {
-    expect([...RETIRED_CARD_IDS].sort()).toEqual(["lace1", "polaroid3", "verse4"]);
-    expect(OFFERED_CARDS.map((c) => c.id)).toEqual([
+  it("five are taken down (2026-11-27): 레이스 · 폴라로이드 3컷 · 성경구절 4컷, and 필름 3컷 · 4컷 folded into 필름", () => {
+    expect([...RETIRED_CARD_IDS].sort()).toEqual([
       "film3",
       "film4",
+      "lace1",
+      "polaroid3",
+      "verse4",
+    ]);
+    expect(OFFERED_CARDS.map((c) => c.id)).toEqual([
+      "film",
       "polaroid1",
       "check2",
       "film35",
       "meme4",
     ]);
     // A retired id is never chosen: it is the default card, like an unknown one.
-    for (const id of RETIRED_CARD_IDS) expect(getCard(id).id).toBe("film3");
+    for (const id of RETIRED_CARD_IDS) expect(getCard(id).id).toBe("film");
     // Their frames are still known, so a photo already stored in one keeps its frame.
-    for (const id of RETIRED_CARD_IDS) {
+    const gone = ["polaroid3", "verse4", "lace1", "film3-mono-plain", "film3-sepia-plain"];
+    for (const id of gone) {
       expect(V2_FRAMES.some((f) => f.id === id)).toBe(true);
       expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
-      expect(cardOfFrame(id)?.id).toBe(id);
+      expect(RETIRED_CARD_IDS.has(cardOfFrame(id)!.id)).toBe(true);
     }
-    expect(OFFERED_V2_FRAMES.length).toBe(V2_FRAMES.length - RETIRED_CARD_IDS.size);
+    expect(OFFERED_V2_FRAMES.length).toBe(V2_FRAMES.length - gone.length);
+  });
+
+  it("필름 is one card: 크림 · 빨강 the four-photo strip, 흑백 · 세피아 the three-photo strip with the logo", () => {
+    const film = getCard("film");
+    const at = (color: string) => film.frame(cleanOptions(film, { color } as never));
+    expect(["cream", "red", "mono", "sepia"].map((c) => at(c).id)).toEqual([
+      "film4-cream",
+      "film4-red",
+      "film3-mono-logo",
+      "film3-sepia-logo",
+    ]);
+    expect(["cream", "red", "mono", "sepia"].map((c) => at(c).slots.length)).toEqual([4, 4, 3, 3]);
+    // The strips without the logo (로고 빼기) are made by no answer of any offered card.
+    for (const f of OFFERED_V2_FRAMES) expect(f.id).not.toMatch(/plain$/);
+    for (const id of ["film4-cream", "film4-red", "film3-mono-logo", "film3-sepia-logo"])
+      expect(cardOfFrame(id)?.id).toBe("film");
+    expect(defaultOptions(film)).toEqual({ color: "cream" });
   });
 
   it("offer exactly the options of the spec, defaults first", () => {
@@ -101,6 +125,8 @@ describe("틀 선택 v2: the nine cards", () => {
       FRAME_CARDS.map((c) => [c.id, c.options.map((o) => [o.key, [...o.values]])]),
     );
     expect(options).toEqual({
+      // 필름 (2026-11-27, a user decision): four colours.
+      film: [["color", ["cream", "red", "mono", "sepia"]]],
       film3: [
         ["color", ["mono", "sepia"]],
         ["logo", ["logoOn", "logoOff"]],
@@ -154,11 +180,12 @@ describe("틀 선택 v2: the nine cards", () => {
       }
     }
     // Every frame the booth can make, and no other, is in V2_FRAMES.
-    expect(combinations).toBe(V2_FRAMES.length);
+    // 필름 makes four frames that 필름 3컷 · 4컷 make too (both kept for stored photos).
+    expect(combinations).toBe(V2_FRAMES.length + getCard("film").options[0]!.values.length);
   });
 
-  it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
-    const ids = FRAME_CARDS.flatMap((card) =>
+  it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film 4, film35 3, film4 2, check2 2, others 1)", () => {
+    const ids = FRAME_CARDS.filter((c) => c.id !== "film").flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
           (acc, o) => acc.flatMap((a) => o.values.map((v) => ({ ...a, [o.key]: v }))),
@@ -198,7 +225,11 @@ describe("틀 선택 v2: the nine cards", () => {
       "meme4-analyzing",
     ]);
     expect(V2_FRAMES.map((f) => f.id)).toEqual(ids);
-    for (const id of ids) expect(cardOfFrame(id)?.id).toBe(id.split("-")[0]);
+    // 필름 comes first and owns the strips it makes; every other frame belongs to its own card.
+    for (const id of ids)
+      expect(cardOfFrame(id)?.id).toBe(
+        /^film[34]-/.test(id) && !id.endsWith("plain") ? "film" : id.split("-")[0],
+      );
     expect(cardOfFrame("navy-strip")).toBeNull();
   });
 
@@ -456,8 +487,7 @@ describe("v2 frame details (Figma measurements)", () => {
   });
 
   it("defaults of each card are its first values", () => {
-    expect(defaultOptions(getCard("film3"))).toEqual({ color: "mono", logo: "logoOn" });
-    expect(defaultOptions(getCard("film4"))).toEqual({ color: "cream" });
+    expect(defaultOptions(getCard("film"))).toEqual({ color: "cream" });
     expect(defaultOptions(getCard("check2"))).toEqual({ color: "red" });
     expect(defaultOptions(getCard("film35"))).toEqual({ color: "natural" });
   });

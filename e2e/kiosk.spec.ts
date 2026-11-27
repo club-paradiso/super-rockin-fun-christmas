@@ -36,7 +36,7 @@ test("happy path: frame → options → 4 shots → select → consent YES → u
   page,
   context,
 }) => {
-  await shootAllWithMock(page, "film4", { color: "red" });
+  await shootAllWithMock(page, "film", { color: "red" });
   // Straight on the photo choice after the fourth shot: step 3 of 5 (no review screen).
   await expect(page.getByTestId("step-progress")).toHaveText("3 / 5");
   for (let i = 0; i < 4; i++) {

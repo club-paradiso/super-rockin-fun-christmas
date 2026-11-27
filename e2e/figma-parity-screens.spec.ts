@@ -7,8 +7,9 @@ import { diff, toRaw, triptych, type Rect } from "../tests/parity/compare";
 import { enrollKiosk, openPicker } from "./helpers";
 
 /**
- * 「Figma 일치」, the five v2 screens at 768 × 1024 (Figma 1069:2245, 898:1938, 898:2006, 898:2083,
- * and 1055:3631, the polaroid's ten captions, 2026-11-26):
+ * 「Figma 일치」, the four v2 screens at 768 × 1024 (Figma 1085:1953, the large-print picker, and
+ * 1086:2006, 필름's four colours, both 2026-11-27; 898:2083, and 1055:3631, the polaroid's ten
+ * captions, 2026-11-26):
  *  - every element where Figma puts it, within ±2 px, and the same type sizes;
  *  - the screenshot against the Figma export: share of pixels with ΔE00 > 5 at most 2 %, with the
  *    frame previews masked (example photos, cycling handwriting).
@@ -49,91 +50,62 @@ const HEADER: Want[] = [
 ];
 const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 32 } };
 /**
- * The cards: six, five to a row (Figma 1082:1896, "2-A 틀 고르기 · 6개", 2026-11-27: 1069:2245
- * with 레이스 1컷, 폴라로이드 3컷 and 성경 구절 4컷 hidden, a user decision; the grid is Figma's
- * own wrap, so the rest moved up as in the booth). 116.8 × 357, 12 apart, rows at y 166 and 539,
- * the lone card of the second row centred. Names and hints break between words, as the booth's
- * `keep-all` does, and the pencil sits in the hint's first line.
+ * The cards, large print (Figma 1085:1953, "2-A 틀 고르기 · 5개 · 큰 글씨", 2026-11-27: 필름 3컷 and
+ * 4컷 became the one card 필름, and the picker was made readable for older guests, a user
+ * request). 200 × 334, 16 apart, three to a row at y 210, the second row of two centred at y 562
+ * (rows 18 apart). Inside a card: the preview 182 × 200 from 17 below its top, the name (25 px,
+ * one line) 8 under it, the hint (20 px, two lines' room) 8 under that.
  */
-const CARD_W = 116.8;
-const col = (i: number) => 100 + i * (CARD_W + 12);
-const ROW1 = ["film3", "film4", "polaroid1", "check2", "film35"];
-const ROW2 = ["meme4"];
-/** Figma's text boxes, [x, y, w, h], read from 1082:1896. */
-const NAMES: Record<string, Box> = {
-  film3: [109, 470, 98.8, 22],
-  film4: [234.8, 450, 104.8, 22],
-  polaroid1: [363.6, 445, 104.8, 44],
-  check2: [492.4, 450, 104.8, 22],
-  film35: [621.2, 428, 104.8, 44],
-  meme4: [363.6, 840, 104.8, 22],
-};
-const HINTS: Record<string, Box> = {
-  film3: [109, 498, 98.8, 17],
-  film4: [234.8, 478, 104.8, 34],
-  polaroid1: [363.6, 495, 104.8, 17],
-  check2: [492.4, 478, 104.8, 34],
-  film35: [621.2, 478, 104.8, 34],
-  meme4: [363.6, 868, 104.8, 17],
-};
-const centre = ([x, y, w, h]: Box, size: number) => ({ cx: x + w / 2, cy: y + h / 2, size });
-const cardX = (id: string) => (ROW1.includes(id) ? col(ROW1.indexOf(id)) : col(2));
-const cardY = (id: string) => (ROW1.includes(id) ? 166 : 539);
+const CARD_W = 200;
+const ROW1 = ["film", "polaroid1", "check2"];
+const ROW2 = ["film35", "meme4"];
+const cardX = (id: string) =>
+  ROW1.includes(id)
+    ? 100 + ROW1.indexOf(id) * (CARD_W + 16)
+    : 208 + ROW2.indexOf(id) * (CARD_W + 16);
+const cardY = (id: string) => (ROW1.includes(id) ? 210 : 562);
+const pickTitle: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 36 } };
 
 const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
   pick: {
     wants: [
       ...HEADER,
-      title,
+      pickTitle,
+      { sel: '[data-testid="pick-lead"]', text: { cx: 416, cy: 176, size: 24 } },
       { sel: '[data-testid="confirm-pick"]', box: [353, 924, 379, 76] },
       ...[...ROW1, ...ROW2].map((id) => ({
         sel: `[data-testid="frame-option-${id}"]`,
-        box: [cardX(id), cardY(id), CARD_W, 357] as Box,
+        box: [cardX(id), cardY(id), CARD_W, 334] as Box,
       })),
-      ...Object.entries(NAMES).map(([id, box]) => ({
+      ...[...ROW1, ...ROW2].map((id) => ({
         sel: `[data-testid="frame-option-${id}"] .pick-card-name`,
-        text: centre(box, 18),
+        text: { cx: cardX(id) + CARD_W / 2, cy: cardY(id) + 240, size: 25 },
       })),
-      ...Object.entries(HINTS).map(([id, box]) => ({
+      ...[...ROW1, ...ROW2].map((id) => ({
         sel: `[data-testid="frame-option-${id}"] .pick-card-hint`,
-        text: centre(box, 14),
+        box: [cardX(id) + 9, cardY(id) + 265, 182, 52] as Box,
       })),
     ],
     // The previews only (example photos; the frame art itself is compared in
-    // figma-parity.spec): inside each card, from its top padding to just above its name.
-    masks: Object.entries(NAMES).map(([id, [, nameY]]) => ({
-      x: cardX(id) + 3,
-      y: cardY(id) + 3,
-      w: CARD_W - 6,
-      h: nameY - 4 - (cardY(id) + 3),
+    // figma-parity.spec): the 182 × 200 box inside each card.
+    masks: [...ROW1, ...ROW2].map((id) => ({
+      x: cardX(id) + 9,
+      y: cardY(id) + 17,
+      w: 182,
+      h: 200,
     })),
   },
-  film3: {
-    wants: [
-      ...HEADER,
-      title,
-      { sel: '[data-testid="options-locked"]', text: { cx: 416, cy: 177, size: 18 } },
-      { sel: ".options-preview", box: [100, 200, 632, 540] },
-      {
-        sel: ".options-row:nth-of-type(1) .options-row-label",
-        text: { cx: 130, cy: 784, size: 20 },
-      },
-      { sel: '[data-testid="option-color-mono"]', box: [172, 754, 274, 60] },
-      { sel: '[data-testid="option-color-sepia"]', box: [458, 754, 274, 60] },
-      { sel: '[data-testid="option-logo-logoOn"]', box: [172, 830, 274, 60] },
-      { sel: '[data-testid="option-logo-logoOff"]', box: [458, 830, 274, 60] },
-      { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
-    ],
-    masks: [{ x: 100, y: 200, w: 632, h: 540 }],
-  },
-  film4: {
+  // 필름 (Figma 1086:2006, 2026-11-27): the 필름 4컷 screen with four colours on the row.
+  film: {
     wants: [
       ...HEADER,
       title,
       { sel: '[data-testid="options-locked"]', text: { cx: 416, cy: 177, size: 18 } },
       { sel: ".options-preview", box: [100, 200, 632, 616] },
-      { sel: '[data-testid="option-color-cream"]', box: [172, 830, 274, 60] },
-      { sel: '[data-testid="option-color-red"]', box: [458, 830, 274, 60] },
+      ...["cream", "red", "mono", "sepia"].map((c, i) => ({
+        sel: `[data-testid="option-color-${c}"]`,
+        box: [172 + i * 143, 830, 131, 60] as Box,
+      })),
       { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 616 }],

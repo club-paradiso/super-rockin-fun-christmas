@@ -40,12 +40,12 @@ export async function openPicker(page: Page) {
   await expect(picker).toBeVisible();
 }
 
-/** A card's options on the v2 options screen, e.g. `{ color: "sepia", logo: "logoOff" }`. */
+/** A card's options on the v2 options screen, e.g. `{ color: "sepia" }`. */
 export type CardOptions = Partial<Record<"color" | "logo" | "theme" | "caption", string>>;
 
 /**
  * 「틀 선택 v2」: on the picker a tap on a card goes on with it (2026-11-27); without `card` the
- * bottom bar's button goes on with the card that is marked (필름 3컷). On the options screen
+ * bottom bar's button goes on with the card that is marked (필름). On the options screen
  * (cards with options) set them and press "이대로 찍기".
  */
 export async function confirmFrame(page: Page, card?: string, options: CardOptions = {}) {

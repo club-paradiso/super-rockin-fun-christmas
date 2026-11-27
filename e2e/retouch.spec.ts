@@ -449,7 +449,7 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
       await page.setViewportSize({ width, height });
       await enrollKiosk(page);
       await page.goto("/kiosk?camera=mock&looks=1&retouch=natural");
-      await startSession(page, "film4");
+      await startSession(page, "film");
       await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 

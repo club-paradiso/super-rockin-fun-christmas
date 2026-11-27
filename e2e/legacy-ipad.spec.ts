@@ -20,7 +20,9 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("iPadOS 15 profile: 필름 3컷 세피아, 4 shots, small composite + QR", async ({ page }) => {
+test("iPadOS 15 profile: 필름 세피아 (3 photos), 4 shots, small composite + QR", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 768, height: 1024 });
   const errors: string[] = [];
@@ -40,7 +42,7 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 4 shots, small composite + QR", 
   expect(scripts).toContain("/kiosk-legacy-assets/entry.js");
   expect(scripts.some((path) => path.startsWith("/_next/"))).toBe(false);
   // The sepia tone is pixel arithmetic (no ctx.filter on Safari 15), at the 1× budget.
-  await startSession(page, "film3", { color: "sepia" });
+  await startSession(page, "film", { color: "sepia" });
   const flash = page.getByTestId("flash-toggle");
   await flash.click();
   await expect(flash).toHaveAttribute("aria-pressed", "true");

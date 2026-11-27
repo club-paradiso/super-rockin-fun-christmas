@@ -48,7 +48,7 @@ test("이전: frame pick → cover, camera → options → frame pick, never dur
   await expect(page.getByTestId("go-back")).toHaveCount(0);
 
   await startSession(page);
-  // 필름 3컷 has options: back from the camera is the options screen, then the picker.
+  // 필름 has options: back from the camera is the options screen, then the picker.
   await page.getByTestId("go-back").click();
   await expect(page.getByTestId("screen-options")).toBeVisible();
   await page.getByTestId("go-back").click();
@@ -166,13 +166,16 @@ test("English: the whole booth in English, the next guest back in Korean", async
 
   await openPicker(page);
   await expect(page.getByText("Pick a frame")).toBeVisible();
-  await expect(page.getByTestId("frame-option-film3")).toContainText("Film · 3 shots");
-  await expect(page.getByTestId("frame-option-film3")).toContainText("Color & logo");
+  await expect(page.getByText("Tap the one you like")).toBeVisible();
+  await expect(page.getByTestId("frame-option-film")).toContainText("Film");
+  await expect(page.getByTestId("frame-option-film")).toContainText("B&W or sepia");
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Choose color and logo")).toBeVisible();
+  await expect(page.getByText("Choose a color")).toBeVisible();
   await expect(page.getByTestId("options-locked")).toHaveText(
-    "Film · 3 shots · Can't be changed after shooting",
+    "Film · Can't be changed after shooting",
   );
+  // 흑백: the three-photo strip.
+  await page.getByTestId("option-color-mono").click();
   await expect(page.getByTestId("option-color-sepia")).toHaveText("Sepia");
   await page.getByRole("button", { name: "Start shooting" }).click();
   await page.getByRole("button", { name: "Pose freely" }).click();

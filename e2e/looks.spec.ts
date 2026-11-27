@@ -7,6 +7,7 @@ import { renderParams } from "../lib/looks/types";
 import {
   SHOOT_TIMEOUT,
   answerForQr,
+  type CardOptions,
   enrollKiosk,
   selectDefaultPhotos,
   startSession,
@@ -358,9 +359,15 @@ test.describe("the booth with looks", () => {
     });
   }
 
-  async function sessionToConsent(page: Page, url: string, card: string, look?: string) {
+  async function sessionToConsent(
+    page: Page,
+    url: string,
+    card: string,
+    look?: string,
+    options: CardOptions = {},
+  ) {
     await page.goto(url);
-    await startSession(page, card);
+    await startSession(page, card, options);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     if (look) {
@@ -390,7 +397,7 @@ test.describe("the booth with looks", () => {
         return original.apply(this, arguments as never);
       } as typeof original;
     });
-    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film4");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film");
     expect(cubes).toEqual([]);
     expect(
       await page.evaluate(() => (window as unknown as { __webglAsked: number }).__webglAsked),
@@ -407,7 +414,7 @@ test.describe("the booth with looks", () => {
       if (message.type() === "error" && message.text().includes("[looks]"))
         errors.push(message.text());
     });
-    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film4");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=0", "film");
     const plain = await firstPhotoColour(page);
 
     const cubes: string[] = [];
@@ -415,7 +422,7 @@ test.describe("the booth with looks", () => {
       if (request.url().endsWith(".cube")) cubes.push(new URL(request.url()).pathname);
     });
     // No frame comes with a look (2026-11-26): untouched, the photo is the original.
-    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film4");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film");
     const untouched = await firstPhotoColour(page);
     expect(Math.hypot(...untouched.map((c, k) => c - plain[k]!))).toBeLessThan(1.5);
     // Every look is loaded all the same: the guest chooses from all of them.
@@ -423,7 +430,7 @@ test.describe("the booth with looks", () => {
       expect(cubes).toContain(`/looks/${id}.cube`);
 
     // Linen, picked on the photo choice screen: a visibly different colour.
-    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film4", "linen");
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film", "linen");
     const graded = await firstPhotoColour(page);
     expect(Math.hypot(...graded.map((c, k) => c - plain[k]!))).toBeGreaterThan(3);
     expect(errors).toEqual([]);
@@ -485,7 +492,7 @@ test.describe("the booth with looks", () => {
     test.setTimeout(150_000);
     await enrollKiosk(page);
     await page.goto("/kiosk?camera=mock&looks=1");
-    await startSession(page, "film4");
+    await startSession(page, "film");
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
@@ -549,7 +556,7 @@ test.describe("the booth with looks", () => {
       const page = await context.newPage();
       await enrollKiosk(page);
       await page.goto("/kiosk?camera=mock&looks=1");
-      await startSession(page, "film4");
+      await startSession(page, "film");
       await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
@@ -647,7 +654,7 @@ test.describe("the booth with looks", () => {
       await expect(page.getByTestId("screen-attract")).toBeVisible();
     };
     const shootToSelect = async () => {
-      await startSession(page, "film4");
+      await startSession(page, "film");
       await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     };
@@ -679,7 +686,7 @@ test.describe("the booth with looks", () => {
     test.setTimeout(120_000);
     await enrollKiosk(page);
     await page.goto("/kiosk?camera=mock&looks=0");
-    await startSession(page, "film4");
+    await startSession(page, "film");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expect(page.getByTestId("select-shot-0")).toBeVisible();
@@ -704,8 +711,10 @@ test.describe("the booth with looks", () => {
         return original.apply(this, arguments as never);
       } as typeof original;
     });
-    // 필름 3컷 흑백: its own tone is 흑백, so the fallback must still be black and white.
-    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film3");
+    // 필름 · 흑백: its own tone is 흑백, so the fallback must still be black and white.
+    await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film", undefined, {
+      color: "mono",
+    });
     const [r, g, b] = await firstPhotoColour(page);
     expect(Math.abs(r! - g!)).toBeLessThan(2);
     expect(Math.abs(g! - b!)).toBeLessThan(2);

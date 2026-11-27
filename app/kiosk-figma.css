@@ -344,63 +344,51 @@
   text-align: center;
 }
 
-/* The cards, five to a row since 밈 4컷 made nine (2026-11-26). Figma's picker (898:1677) has
-   seven, four to a row at 149 × 357, 12 apart, rows 16 apart; the nine keep its height, gaps and
-   outer edges, so a card is (632 − 4 × 12) / 5 = 116.8 wide. Ten half-card tracks: a card takes
-   two, and a last row that is short starts half a card in per missing card, so it stays centred
-   (nine: five, then four starting half a card in). Figma has no nine-card picker yet. */
+/* The cards, large print (2026-11-27, a user request: "어르신들도 보기 쉽게"). Five cards, three
+   to a row at 200 wide, 16 apart: six half-card tracks, a card takes two, and a last row that is
+   short starts half a card in per missing card, so it stays centred (five: three, then two).
+   Names 25 px (one line in Korean), hints 20 px, a plain edge round every card so each one reads as a button, and the
+   marked card's edge in ink. */
 .kiosk-root .booth-screen-v2 .pick-cards {
   flex: 1 1 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(9, calc(64.4 * var(--fx))) calc(52.4 * var(--fx));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  row-gap: calc(16 * var(--fx));
-  justify-content: center;
+  column-gap: calc(16 * var(--fx));
+  row-gap: calc(18 * var(--fx));
+  margin-top: calc(6 * var(--fx));
 }
 .kiosk-root .booth-screen-v2 .pick-card {
   grid-column: span 2;
-  width: calc(116.8 * var(--fx));
-  min-width: 48px;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(6 * var(--fx));
-  /* Figma: 12 above, 6 beside, 11 below; the chosen card's 3 px stroke takes its room from the
-     padding beside and below, and pushes the content 3 px down, as in 898:2168. */
-  padding: calc(12 * var(--fx)) calc(6 * var(--fx)) calc(11 * var(--fx));
-  border: 0 solid var(--color-ink);
-  border-radius: calc(14 * var(--fx));
-  background: rgb(255 255 255 / 0.55);
+  gap: calc(8 * var(--fx));
+  padding: calc(14 * var(--fx)) calc(6 * var(--fx)) calc(14 * var(--fx));
+  border: max(2px, calc(3 * var(--fx))) solid rgb(43 26 16 / 0.22);
+  border-radius: calc(18 * var(--fx));
+  background: rgb(255 255 255 / 0.78);
   color: var(--color-ink);
   text-align: center;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-/* A last row that is short starts further in, so it stays centred: half a card per missing
-   card. Counted from the cards themselves, so adding or removing one in config/frames/v2.ts
-   needs no change here (up to ten cards). */
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(4) {
+/* A last row that is short starts further in, so it stays centred: half a card per missing card.
+   Counted from the cards themselves, so adding or removing one in config/frames/v2.ts needs no
+   change here. */
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(3n + 1):nth-last-child(2) {
   grid-column: 2 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(3) {
+.kiosk-root .booth-screen-v2 .pick-card:nth-child(3n + 1):nth-last-child(1) {
   grid-column: 3 / span 2;
 }
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(2) {
-  grid-column: 4 / span 2;
-}
-.kiosk-root .booth-screen-v2 .pick-card:nth-child(5n + 1):nth-last-child(1) {
-  grid-column: 5 / span 2;
-}
 .kiosk-root .booth-screen-v2 .pick-card[aria-pressed="true"] {
-  border-width: calc(3 * var(--fx));
-  padding: calc(12 * var(--fx)) calc(3 * var(--fx)) calc(5 * var(--fx));
-}
-.kiosk-root .booth-screen-v2 .pick-card-name:nth-last-child(2) {
-  /* No hint under the name (the sr-only line is last): Figma leaves 14 below it. */
-  margin-bottom: calc(3 * var(--fx));
+  border-color: var(--color-ink);
+  background: rgb(255 255 255 / 0.95);
 }
 .kiosk-root .booth-screen-v2 .pick-card:focus-visible {
   outline: 3px solid var(--color-button);
@@ -411,20 +399,44 @@
   filter: drop-shadow(1px 3px 3px rgb(0 0 0 / 0.18));
 }
 .kiosk-root .booth-screen-v2 .pick-card-name {
-  font-size: max(13px, calc(18 * var(--fx)));
+  text-wrap: balance;
+  font-size: max(18px, calc(25 * var(--fx)));
   font-weight: 700;
-  line-height: calc(22 * var(--fx));
+  line-height: calc(32 * var(--fx));
   word-break: keep-all;
 }
+/* Every hint keeps two lines' room, so the names of a row stand on one line. */
 .kiosk-root .booth-screen-v2 .pick-card-hint {
-  font-size: max(11px, calc(14 * var(--fx)));
-  line-height: calc(17 * var(--fx));
+  display: block;
+  align-self: stretch;
+  min-height: calc(2 * 26 * var(--fx));
+  font-size: max(15px, calc(20 * var(--fx)));
+  font-weight: 500;
+  line-height: calc(26 * var(--fx));
   color: var(--v2-hint);
   word-break: keep-all;
+  /* A hint may carry its own line break (lib/kiosk/copy.ts). */
+  white-space: pre-line;
 }
 :root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-name,
-:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-hint {
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-hint,
+:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-lead {
   word-break: normal;
+}
+.kiosk-root .booth-screen-v2 .pick-v2 .pick-head {
+  gap: calc(4 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-v2 .pick-head .booth-title {
+  font-size: max(26px, calc(36 * var(--fx)));
+  line-height: calc(46 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .pick-lead {
+  font-size: max(18px, calc(24 * var(--fx)));
+  font-weight: 500;
+  line-height: calc(32 * var(--fx));
+  color: var(--color-ink);
+  text-align: center;
+  word-break: keep-all;
 }
 
 /* Options: the result above (changes at once), one row per option, two answers each. */
@@ -448,7 +460,7 @@
 .kiosk-root .booth-screen-v2 .options-row {
   display: grid;
   /* The label, then one equal column per answer (two in the Figma screens, three for the 35mm
-     film's tone). */
+     film's tone, four for 필름's colour). */
   grid-template-columns: calc(60 * var(--fx));
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -614,9 +626,8 @@
   top: calc(-1 * var(--fx));
   letter-spacing: 0;
 }
-/* The check and the pencil are drawn (components/kiosk/kiosk-app.tsx), at Figma's sizes: the
-   check 16.6 × 18.9 beside a 22 px label, 5.2 before it; the pencil 12.8 × 9.3 beside a 14 px
-   hint, 4.5 before it. Both sit a little under the label's middle, as the glyphs do in Figma. */
+/* The check is drawn (components/kiosk/kiosk-app.tsx), at Figma's size: 16.6 × 18.9 beside a
+   22 px label, 5.2 before it, a little under the label's middle, as the glyph sits in Figma. */
 .kiosk-root .booth-screen-v2 .v2-mark {
   flex: none;
   fill: none;
@@ -630,31 +641,11 @@
   position: relative;
   top: calc(1.3 * var(--fx));
 }
-.kiosk-root .booth-screen-v2 .v2-mark-pencil {
-  width: calc(12.8 * var(--fx));
-  height: calc(9.3 * var(--fx));
-  stroke-width: 1;
-  position: relative;
-  top: calc(1 * var(--fx));
-}
 .kiosk-root .booth-screen-v2 .options-choice {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: calc(5.2 * var(--fx));
-}
-/* The pencil sits in the hint's first line, as in Figma: a hint that wraps (five cards to a row)
-   goes on under the text, not under the pencil. */
-.kiosk-root .booth-screen-v2 .pick-card-hint {
-  display: block;
-  text-align: center;
-  /* A hint may carry its own line break (lib/kiosk/copy.ts). */
-  white-space: pre-line;
-}
-.kiosk-root .booth-screen-v2 .pick-card-hint .v2-mark-pencil {
-  display: inline-block;
-  vertical-align: baseline;
-  margin-right: calc(4.5 * var(--fx));
 }
 /* The bar's two buttons start on the same line (924); the main button is flat in Figma
    (898:1677: a plain #412D1B pill, no bevel, no cast shadow). */
@@ -680,6 +671,7 @@
    em) and the difference is taken out here. It is set on each text itself, because an em here is
    that text's own size and a button does not inherit word spacing. */
 .kiosk-root .booth-screen-v2 .pick-head .booth-title,
+.kiosk-root .booth-screen-v2 .pick-lead,
 .kiosk-root .booth-screen-v2 .options-locked,
 .kiosk-root .booth-screen-v2 .pick-card-name,
 .kiosk-root .booth-screen-v2 .pick-card-hint,

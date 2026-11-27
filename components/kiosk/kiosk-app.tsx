@@ -2337,8 +2337,9 @@ function Screen(p: ScreenProps) {
       );
 
     case "pick": {
-      // 「틀 선택 v2」 (Figma 1069:2245): nine cards, five to a row. A tap on a card goes on with
-      // it; the bottom bar's button, as Figma draws it, goes on with the card that is marked.
+      // 「틀 선택 v2」, large print since 2026-11-27 (a user request: older guests must read it):
+      // five cards, three to a row, a line under the title saying what to do. A tap on a card goes
+      // on with it; the bottom bar's button goes on with the card that is marked.
       const card = getCard(state.cardId);
       return (
         <BoothScreen
@@ -2359,6 +2360,9 @@ function Screen(p: ScreenProps) {
         >
           <div className="pick-head">
             <h1 className="booth-title">{t.frame.pickTitle}</h1>
+            <p className="pick-lead" data-testid="pick-lead">
+              {t.frame.pickLead}
+            </p>
           </div>
           <div className="pick-cards" data-testid="frame-options">
             {OFFERED_CARDS.map((c) => (
@@ -2444,7 +2448,8 @@ function Screen(p: ScreenProps) {
                     : "options-row"
                 }
                 data-many={
-                  option.values.length > 3 && option.values.length < OPTIONS_GRID_MIN
+                  // Up to four answers sit on one line (필름: 크림 · 빨강 · 흑백 · 세피아).
+                  option.values.length > 4 && option.values.length < OPTIONS_GRID_MIN
                     ? ""
                     : undefined
                 }
@@ -3108,37 +3113,22 @@ function FrameCardButton({
         )}
       </span>
       <span className="pick-card-name">{t.name[card.id]}</span>
-      {hint && (
-        <span className="pick-card-hint">
-          <PencilMark />
-          {hint}
-        </span>
-      )}
+      {hint && <span className="pick-card-hint">{hint}</span>}
       <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
     </button>
   );
 }
 
 /**
- * The two small marks of the v2 screens, drawn instead of typed. "✓" and "✎" are not in the
- * booth's font, so as text they came from whatever font each device had: a different shape and
- * width on every machine (and the reason the Figma comparison differed between computers).
- * Sizes and positions are Figma's (898:1938 "✓ 흑백", 898:1677 "✎ 색·로고 선택"); see .v2-mark.
+ * The check of the options screen, drawn instead of typed. "✓" is not in the booth's font, so as
+ * text it came from whatever font each device had: a different shape and width on every machine
+ * (and the reason the Figma comparison differed between computers). Size and position are
+ * Figma's (898:1938 "✓ 흑백"); see .v2-mark.
  */
 function CheckMark() {
   return (
     <svg className="v2-mark v2-mark-check" viewBox="0 0 17 19" aria-hidden focusable="false">
       <path d="M1.5 10.8 5.7 16.4 14.9 1.6" />
-    </svg>
-  );
-}
-
-function PencilMark() {
-  return (
-    <svg className="v2-mark v2-mark-pencil" viewBox="0 0 13 10" aria-hidden focusable="false">
-      <g transform="rotate(34 6.5 5)">
-        <path d="M1.2 3.3h7.6l2.9 1.7-2.9 1.7H1.2a1 1 0 0 1-1-1V4.3a1 1 0 0 1 1-1ZM2.9 3.3v3.4M8.8 3.3v3.4" />
-      </g>
     </svg>
   );
 }
