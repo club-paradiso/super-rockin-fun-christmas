@@ -34,7 +34,7 @@ function watchPaths(page: Page): string[] {
 const frameArt = (paths: string[]) =>
   paths.filter((p) => p.startsWith("/frames/v2/") && !p.startsWith("/frames/v2/samples/"));
 
-/** The five shots: ends on the photo choice, the first photos already chosen. */
+/** The four shots: ends on the photo choice, the first photos already chosen. */
 async function shootToChoice(page: Page) {
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });

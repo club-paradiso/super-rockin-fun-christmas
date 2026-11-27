@@ -1406,7 +1406,7 @@ body {
     min-height: var(--fit-min, 240px);
   }
   .fit-grid {
-    --cols: 3;
+    --cols: 2;
     --rows: 2;
     --gap: var(--gap-s);
     --extra: 0px;
@@ -1491,7 +1491,7 @@ body {
   }
   .select-grid {
     --cols: 2;
-    --rows: 3;
+    --rows: 2;
     --extra: 16px;
   }
   .select-grid.has-extra {
@@ -1524,7 +1524,7 @@ body {
      is. The break-even is a stage as wide as one print is (4:3). */
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
-      --cols: 3;
+      --cols: 2;
       --rows: 2;
     }
     .select-grid[data-count="5"] {
@@ -2256,7 +2256,7 @@ body {
       flex-basis: auto;
     }
     .select-grid {
-      --cols: 3;
+      --cols: 2;
       --rows: 2;
     }
     .select-grid[data-count="5"] {

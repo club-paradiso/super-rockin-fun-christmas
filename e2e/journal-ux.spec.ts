@@ -40,15 +40,15 @@ test("the six v2 cards show one marked card, 필름 3컷 first; a tap on a card 
   await expect(page.getByTestId("screen-options")).toBeVisible();
 });
 
-test("after the shots: the photo choice with five photos, no sixth, and no 다시 찍기 (2026-11-27)", async ({
+test("after the shots: the photo choice with four photos, no fifth, and no 다시 찍기 (2026-11-27)", async ({
   page,
 }) => {
   await shootAllWithMock(page);
-  // No review screen: the five shots are the tiles of the photo choice.
+  // No review screen: the four shots are the tiles of the photo choice.
   const select = page.getByTestId("screen-select");
   await expect(page.locator(".review-photo, [data-testid='review-grid']")).toHaveCount(0);
-  await expect(select.locator(".select-tile")).toHaveCount(5);
-  await expect(select.locator(".select-tile img")).toHaveCount(5);
+  await expect(select.locator(".select-tile")).toHaveCount(4);
+  await expect(select.locator(".select-tile img")).toHaveCount(4);
   await expect(select.getByTestId("take-extra-shot")).toHaveCount(0);
   // Once the shots are taken there is no way back to the camera.
   await expect(select.getByTestId("retake")).toHaveCount(0);

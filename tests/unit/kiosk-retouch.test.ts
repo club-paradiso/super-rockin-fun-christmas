@@ -8,7 +8,7 @@ import {
 
 type Shot = string;
 const init = (retouch?: "off" | "natural" | "glow") =>
-  createInitialState<Shot>({ shotCount: 5, countdownSeconds: 3, retouch });
+  createInitialState<Shot>({ shotCount: 4, countdownSeconds: 3, retouch });
 const run = (state: KioskState<Shot>, ...actions: KioskAction<Shot>[]) =>
   actions.reduce(kioskReducer<Shot>, state);
 
