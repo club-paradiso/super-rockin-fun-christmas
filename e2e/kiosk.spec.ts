@@ -231,3 +231,33 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(page.getByTestId("countdown-number")).toBeVisible();
   await expect(pose).toHaveCount(0);
 });
+
+test("the breather between shots: a rest after every shot but the last, then the next countdown", async ({
+  page,
+}) => {
+  await page.goto("/kiosk?camera=mock");
+  await startSession(page);
+  // Which shot was about to be counted down each time the rest appeared (the E2E build rests 1 s).
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    const root = document.querySelector(".kiosk-root")!;
+    let resting = false;
+    new MutationObserver(() => {
+      const now = !!document.querySelector('[data-testid="rest-note"]');
+      if (now && !resting) {
+        seen.push(document.querySelector('[data-testid="shot-label"]')?.textContent ?? "?");
+        root.setAttribute("data-test-rests", seen.join("|"));
+      }
+      resting = now;
+    }).observe(root, { childList: true, subtree: true, characterData: true });
+  });
+  await page.getByTestId("shoot-free").click();
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  // Three rests for four shots, each one before the next shot's countdown; none after the last.
+  expect((await page.locator(".kiosk-root").getAttribute("data-test-rests"))!.split("|")).toEqual([
+    "2번째 사진",
+    "3번째 사진",
+    "4번째 사진",
+  ]);
+  await expect(page.getByTestId("rest-note")).toHaveCount(0);
+});

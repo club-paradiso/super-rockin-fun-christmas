@@ -82,7 +82,7 @@ export function useCameraEngine(
   useEffect(() => {
     const current = engineRef.current;
     if (!current) return;
-    if (phase === "countdown" || phase === "capturing") current.lock();
+    if (phase === "countdown" || phase === "capturing" || phase === "rest") current.lock();
     else if (phase === "attract") current.newSession();
   }, [phase]);
 

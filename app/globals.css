@@ -2468,6 +2468,13 @@ main input:focus-visible,
 .countdown-number {
   text-shadow: 3px 4px 10px rgb(43 26 16 / 0.65);
 }
+/* The breather between two shots (2026-11-27): the same light-on-picture reading as the digits,
+   at the size of a title, with no number. */
+.rest-note {
+  color: var(--color-button-text);
+  text-shadow: 3px 4px 10px rgb(43 26 16 / 0.65);
+  text-align: center;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .countdown-pop {
