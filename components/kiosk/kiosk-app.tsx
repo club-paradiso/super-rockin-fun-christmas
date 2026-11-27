@@ -2418,10 +2418,14 @@ function Screen(p: ScreenProps) {
             </CameraPreview>
           </div>
           <div className="shoot-panel">
-            <p className="booth-title" data-testid="shot-label">
-              {t.shoot.shot(state.shotIndex + 1)}
-            </p>
-            <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
+            {/* On a tall screen the shot's name and the strip share one line, so the preview
+                above gets the height (on a wide one the wrapper is display: contents). */}
+            <div className="shoot-head">
+              <p className="booth-title" data-testid="shot-label">
+                {t.shoot.shot(state.shotIndex + 1)}
+              </p>
+              <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
+            </div>
             <p className="booth-lead">
               <Lines text={t.shoot.lead} />
             </p>
@@ -2443,23 +2447,28 @@ function Screen(p: ScreenProps) {
                     {t.shoot.guide}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  data-testid="flash-toggle"
-                  aria-pressed={p.flashEnabled}
-                  className="booth-btn-m"
-                  onClick={p.onToggleFlash}
-                >
-                  {p.flashEnabled ? t.shoot.flashOff : t.shoot.flashOn}
-                </button>
-                <p className="booth-caption" data-testid="shoot-plan">
-                  {t.shoot.plan(state.countdownSeconds, total)}
-                </p>
-                {p.videoNotice && (
-                  <p className="booth-caption" data-testid="video-notice">
-                    {t.shoot.video}
-                  </p>
-                )}
+                {/* Tall screen: the flash switch beside the two small notes, one line. */}
+                <div className="shoot-foot">
+                  <button
+                    type="button"
+                    data-testid="flash-toggle"
+                    aria-pressed={p.flashEnabled}
+                    className="booth-btn-m"
+                    onClick={p.onToggleFlash}
+                  >
+                    {p.flashEnabled ? t.shoot.flashOff : t.shoot.flashOn}
+                  </button>
+                  <div className="shoot-notes">
+                    <p className="booth-caption" data-testid="shoot-plan">
+                      {t.shoot.plan(state.countdownSeconds, total)}
+                    </p>
+                    {p.videoNotice && (
+                      <p className="booth-caption" data-testid="video-notice">
+                        {t.shoot.video}
+                      </p>
+                    )}
+                  </div>
+                </div>
                 {p.guestCameraChoice && p.devices.length > 1 && (
                   <label className="booth-field">
                     {t.camera.choose}
