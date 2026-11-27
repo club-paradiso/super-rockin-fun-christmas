@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, PORT, USE_SUPABASE } from "./env";
+import { POLAROID1_CAPTIONS } from "../config/frames/v2";
 import { createEnrollmentCode, enrollWithCode, newPage } from "./staff-helpers";
 
 /**
@@ -175,9 +176,9 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
     "data-frame",
     "polaroid1",
   );
-  // 폴라로이드 1컷 offers the booth's ten captions (2026-11-26), the first already chosen.
+  // 폴라로이드 1컷 offers the booth's five captions (ten until 2026-11-27), the first already chosen.
   const captions = guest.getByTestId("mobile-frame-options").getByRole("radio");
-  await expect(captions).toHaveCount(10);
+  await expect(captions).toHaveCount(POLAROID1_CAPTIONS.length);
   await expect(guest.getByTestId("mobile-option-caption-village")).toHaveAttribute(
     "aria-checked",
     "true",
