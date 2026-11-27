@@ -666,6 +666,8 @@ export class MemorySettingsRepository implements SettingsRepository {
     moderationMode: "auto",
     // On (2026-11-25, a user decision): the guest chooses a colour on the photo choice screen.
     photoLooks: true,
+    // Off (2026-11-27, a user decision): the phone way in only once staff open it.
+    mobileUpload: false,
     // Off until it has been checked on the real tablet (docs/CAMERA_ENGINE.md).
     cameraEngine: defaultCameraEngine(),
     updatedAt: now(),
@@ -689,6 +691,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         wall_look: s.wallLook,
         moderation_mode: s.moderationMode,
         photo_looks: s.photoLooks,
+        mobile_upload: s.mobileUpload,
         camera_engine: s.cameraEngine,
       });
     this.value = {
@@ -706,6 +709,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         : before.wallLook,
       moderationMode: patch.moderationMode ?? before.moderationMode,
       photoLooks: patch.photoLooks ?? before.photoLooks,
+      mobileUpload: patch.mobileUpload ?? before.mobileUpload,
       cameraEngine: patch.cameraEngine ? { ...patch.cameraEngine } : before.cameraEngine,
       updatedAt: now(),
       updatedBy: staffUserId,

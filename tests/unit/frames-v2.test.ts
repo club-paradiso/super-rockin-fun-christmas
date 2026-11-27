@@ -3,6 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALL_FRAMES, FRAMES, getFrame, isKnownFrameId } from "@/config/frames";
 import {
+  OFFERED_CARDS,
+  OFFERED_V2_FRAMES,
+  RETIRED_CARD_IDS,
   DEFAULT_CARD_ID,
   FRAME_CARDS,
   V2_FRAMES,
@@ -70,6 +73,27 @@ describe("틀 선택 v2: the nine cards", () => {
     ]);
     expect(DEFAULT_CARD_ID).toBe("film3");
     expect(getCard("nope").id).toBe("film3");
+  });
+
+  it("three are taken down (2026-11-27): 레이스 · 폴라로이드 3컷 · 성경구절 4컷 are not offered", () => {
+    expect([...RETIRED_CARD_IDS].sort()).toEqual(["lace1", "polaroid3", "verse4"]);
+    expect(OFFERED_CARDS.map((c) => c.id)).toEqual([
+      "film3",
+      "film4",
+      "polaroid1",
+      "check2",
+      "film35",
+      "meme4",
+    ]);
+    // A retired id is never chosen: it is the default card, like an unknown one.
+    for (const id of RETIRED_CARD_IDS) expect(getCard(id).id).toBe("film3");
+    // Their frames are still known, so a photo already stored in one keeps its frame.
+    for (const id of RETIRED_CARD_IDS) {
+      expect(V2_FRAMES.some((f) => f.id === id)).toBe(true);
+      expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
+      expect(cardOfFrame(id)?.id).toBe(id);
+    }
+    expect(OFFERED_V2_FRAMES.length).toBe(V2_FRAMES.length - RETIRED_CARD_IDS.size);
   });
 
   it("offer exactly the options of the spec, defaults first", () => {
@@ -435,6 +459,6 @@ describe("v2 frame details (Figma measurements)", () => {
     expect(defaultOptions(getCard("film3"))).toEqual({ color: "mono", logo: "logoOn" });
     expect(defaultOptions(getCard("film4"))).toEqual({ color: "cream" });
     expect(defaultOptions(getCard("check2"))).toEqual({ color: "red" });
-    expect(defaultOptions(getCard("lace1"))).toEqual({});
+    expect(defaultOptions(getCard("film35"))).toEqual({ color: "natural" });
   });
 });

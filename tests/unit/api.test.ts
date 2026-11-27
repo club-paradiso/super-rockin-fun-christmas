@@ -346,6 +346,8 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
       wallPublic: false,
       aiReview: false,
       photoLooks: true,
+      // 「내 사진으로 참여하기」: off until staff turn it on.
+      mobileUpload: false,
       // 「카메라 자동 보정」: off until staff turn it on.
       cameraEngine: defaultCameraEngine(),
       // The booth dates photos by the server's clock, never the tablet's (v2 date stamp).

@@ -593,8 +593,10 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
     0,
   );
   await expect(page.getByRole("heading", { name: KIOSK_COPY.en.frame.pickTitle })).toBeVisible();
-  // 폴라로이드 3컷 has no options: a tap on the card goes straight to the camera.
-  await page.getByTestId("frame-option-polaroid3").click();
+  // A tap on a card is its options; "이대로 찍기" is the camera.
+  await page.getByTestId("frame-option-polaroid1").click();
+  await expect(page.getByTestId("screen-options")).toBeVisible();
+  await page.getByTestId("confirm-options").click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
     0,

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { FRAME_CARDS } from "@/config/frames/v2";
+import { OFFERED_CARDS } from "@/config/frames/v2";
 import { thumbFingerprintInput } from "@/lib/kiosk/pick-thumbs";
 
 /** Node side of lib/kiosk/pick-thumbs.ts: the fingerprints as the files on disk give them. */
@@ -12,7 +12,7 @@ const sha = (data: string | Buffer) => createHash("sha256").update(data).digest(
 export function thumbFingerprints(): Record<string, string> {
   const fileHash = (src: string) => sha(readFileSync(path.join(PUBLIC_DIR, src)));
   return Object.fromEntries(
-    FRAME_CARDS.map((card) => [card.id, sha(thumbFingerprintInput(card, fileHash))]),
+    OFFERED_CARDS.map((card) => [card.id, sha(thumbFingerprintInput(card, fileHash))]),
   );
 }
 

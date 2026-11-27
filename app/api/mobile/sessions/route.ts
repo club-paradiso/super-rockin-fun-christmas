@@ -27,6 +27,7 @@ const limiter = new RateLimiter(20, 60_000);
  *  - Hub without a cloud: the QR opens the hub itself (`via: "lan"`): only phones on the event
  *    Wi-Fi can use it, and the booth says so.
  *
+ * 404 {error:"mobile_upload_off"} while the staff switch 「내 사진으로 참여하기」 is off (the default).
  * 409 {error:"paused"} while staff pause submissions: a phone photo is nothing but a wall
  * submission. Booth photography and QR downloads are untouched.
  */
@@ -36,8 +37,11 @@ export const POST = route("mobile_session", async (request: Request) => {
     return jsonError(403, "cross-origin request refused");
   const auth = await authenticateKioskRequest(request);
   if (!auth.ok) return jsonError(401, "kiosk not enrolled");
+  const settings = await getBackend().settings.get();
+  // Off (the default): the booth shows no button, and no QR is issued to one that asks anyway.
+  if (!settings.mobileUpload) return jsonError(404, "mobile_upload_off");
   if (!limiter.take(auth.kioskId ?? "dev")) return jsonError(429, "too many requests");
-  if ((await getBackend().settings.get()).pauseSubmissions) return jsonError(409, "paused");
+  if (settings.pauseSubmissions) return jsonError(409, "paused");
 
   const headers: Record<string, string> = { ...NO_STORE };
   if (auth.renewCookie) headers["set-cookie"] = kioskCookieHeader(request, auth.renewCookie);

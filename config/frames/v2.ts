@@ -720,11 +720,35 @@ export const FRAME_CARDS: readonly FrameCard[] = [
   },
 ];
 
+/**
+ * Cards taken down (2026-11-27, a user decision: "레이스 빼고, 폴라로이드 3컷 빼고, 성경구절 4컷
+ * 빼고"). Neither the booth nor the phone page offers them, and a new phone upload in one is
+ * refused. Their frames stay in `FRAME_CARDS` / `V2_FRAMES` so a photo already stored in one keeps
+ * hanging and being cut for review exactly as before. To bring one back, take it off this list.
+ */
+export const RETIRED_CARD_IDS: ReadonlySet<FrameCardId> = new Set<FrameCardId>([
+  "polaroid3",
+  "verse4",
+  "lace1",
+]);
+
+/** The cards a guest can choose today, on the booth and on the phone, in picker order. */
+export const OFFERED_CARDS: readonly FrameCard[] = FRAME_CARDS.filter(
+  (c) => !RETIRED_CARD_IDS.has(c.id),
+);
+
+/** Every frame a guest can make today (each option combination once): `V2_FRAMES` minus retired. */
+export const OFFERED_V2_FRAMES: readonly FrameDefinition[] = V2_FRAMES.filter((f) => {
+  const card = cardOfFrame(f.id);
+  return card !== null && !RETIRED_CARD_IDS.has(card.id);
+});
+
 /** 필름 3컷 is preselected for every guest. */
 export const DEFAULT_CARD_ID: FrameCardId = "film3";
 
+/** An offered card; an unknown or retired id is the default card. */
 export function getCard(id: string | null | undefined): FrameCard {
-  return FRAME_CARDS.find((c) => c.id === id) ?? FRAME_CARDS[0]!;
+  return OFFERED_CARDS.find((c) => c.id === id) ?? OFFERED_CARDS[0]!;
 }
 
 /** The default of every option of a card. */

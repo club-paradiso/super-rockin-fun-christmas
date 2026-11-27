@@ -453,6 +453,23 @@ export function opsContract(name: string, make: () => Promise<OpsFixture>) {
       expect(both).toMatchObject({ photoLooks: true, pauseWall: false });
     });
 
+    it("내 사진으로 참여하기: off by default, switched by staff, audited, kept by other changes", async () => {
+      const { backend, staffId } = await setup();
+      expect((await backend.settings.get()).mobileUpload).toBe(false);
+      const on = await backend.settings.update({ mobileUpload: true }, staffId);
+      expect(on).toMatchObject({ mobileUpload: true, updatedBy: staffId });
+      const [last] = await backend.audit.list({ subjectType: "settings", limit: 1 });
+      expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
+      expect(JSON.parse(last!.fromState!)).toMatchObject({ mobile_upload: false });
+      expect(JSON.parse(last!.toState!)).toMatchObject({ mobile_upload: true });
+      expect((await backend.settings.update({ pauseWall: true }, staffId)).mobileUpload).toBe(true);
+      const both = await backend.settings.update(
+        { mobileUpload: false, pauseWall: false },
+        staffId,
+      );
+      expect(both).toMatchObject({ mobileUpload: false, pauseWall: false });
+    });
+
     it("camera engine: off by default, stored whole, audited, kept by other changes", async () => {
       const { backend, staffId } = await setup();
       expect((await backend.settings.get()).cameraEngine).toEqual(defaultCameraEngine());

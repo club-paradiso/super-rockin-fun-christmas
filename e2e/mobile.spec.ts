@@ -68,6 +68,35 @@ test("setup: staff session and an enrolled booth", async ({ browser }) => {
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 });
 
+test("off in /admin (the default): the cover has no phone button and no QR is issued", async () => {
+  const toggle = staff.getByTestId("switch-mobileUpload");
+  await staff.goto("/admin");
+  // e2e/global-setup.ts turned it on for the run (after checking a fresh event starts off).
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  try {
+    await kiosk.goto("/kiosk?camera=mock");
+    const cover = kiosk.getByTestId("screen-attract");
+    await expect(cover).toBeVisible();
+    await expect(cover.getByTestId("attract-options")).toBeVisible();
+    await expect(kiosk.getByTestId("start-mobile")).toHaveCount(0);
+    // A booth that asks anyway (an old page) gets no QR.
+    const res = await kiosk.request.post("/api/mobile/sessions", { headers: { origin: ORIGIN } });
+    expect([res.status(), ((await res.json()) as { error: string }).error]).toEqual([
+      404,
+      "mobile_upload_off",
+    ]);
+  } finally {
+    await staff.goto("/admin");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+  }
+  // On again: the button comes back on the cover (with the heartbeat, or this reload).
+  await kiosk.goto("/kiosk?camera=mock");
+  await expect(kiosk.getByTestId("start-mobile")).toBeVisible();
+});
+
 test("the cover: one big start, and under it the phone button, the language and the sound switch", async () => {
   await kiosk.goto("/kiosk?camera=mock");
   // No welcome screen (2026-11-27): the two ways in are both on the cover. Taking photos is the
@@ -116,12 +145,21 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
   const guest = await phone(browser);
   await guest.goto(url);
   await expect(guest.getByTestId("mobile-upload")).toBeVisible();
-  // D103: the booth's order. First the frame: exactly the booth's nine cards (틀 선택 v2), the
-  // booth's default chosen. None of the frames the booth dropped on 2026-11-22.
+  // D103: the booth's order. First the frame: exactly the booth's six cards (틀 선택 v2), the
+  // booth's default chosen. None of the frames the booth dropped on 2026-11-22, and none of the
+  // three taken down on 2026-11-27.
   await expect(guest.getByTestId("mobile-step-frame")).toBeVisible();
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
-  await expect(frames).toHaveCount(9);
-  for (const old of ["navy-strip", "shalom-grid", "shalom-single", "shalom-letter"])
+  await expect(frames).toHaveCount(6);
+  for (const old of [
+    "navy-strip",
+    "shalom-grid",
+    "shalom-single",
+    "shalom-letter",
+    "lace1",
+    "polaroid3",
+    "verse4",
+  ])
     await expect(guest.locator(`[data-frame-id="${old}"]`)).toHaveCount(0);
   // Every frame name whole on a phone, as on the booth (no "35mm 필름 …").
   const cut = await guest
@@ -229,7 +267,7 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
   // The booth's cards in the booth's order; a card's options as on the booth's options screen.
   const frames = guest.getByTestId("mobile-frames").getByRole("radio");
   await expect(frames.first()).toHaveAttribute("data-frame-id", "film3");
-  await guest.locator('[data-frame-id="verse4"]').click();
+  await guest.locator('[data-frame-id="film4"]').click();
   await guest.locator('[data-frame-id="film3"]').click();
   await expect(guest.getByTestId("mobile-option-color-mono")).toHaveAttribute(
     "aria-checked",

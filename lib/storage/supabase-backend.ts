@@ -153,6 +153,8 @@ const toSettings = (r: Row): EventSettings => ({
   moderationMode: r.moderation_mode === "auto" ? "auto" : "manual",
   // Absent before the looks migration: off.
   photoLooks: r.photo_looks === true,
+  // Absent before the mobile-upload migration: off.
+  mobileUpload: r.mobile_upload === true,
   // Absent before the camera-engine migration, or null: the defaults (mode off).
   cameraEngine: normalizeCameraEngine(r.camera_engine),
   updatedAt: iso(r.updated_at)!,
@@ -557,11 +559,18 @@ class SupabaseSettingsRepository implements SettingsRepository {
   async update(patch: SettingsPatch, staffUserId: string) {
     // Looks have their own audited function (its own migration), so the call below keeps the
     // signature that exists with or without that migration.
-    const { photoLooks, cameraEngine, ...rest } = patch;
+    const { photoLooks, mobileUpload, cameraEngine, ...rest } = patch;
     let changed: Row[] | null = null;
     if (photoLooks !== undefined) {
       changed = await rpcRows(this.db, "ftl_settings_set_looks", {
         p_enabled: photoLooks,
+        p_actor_id: staffUserId,
+      });
+    }
+    // 「내 사진으로 참여하기」 too: its own column, its own audited function, its own migration.
+    if (mobileUpload !== undefined) {
+      changed = await rpcRows(this.db, "ftl_settings_set_mobile_upload", {
+        p_enabled: mobileUpload,
         p_actor_id: staffUserId,
       });
     }

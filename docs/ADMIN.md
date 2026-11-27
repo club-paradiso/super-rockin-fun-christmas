@@ -153,6 +153,13 @@ menu shows the state under 「사진 색 보정」: 켜짐 / 꺼짐 / 준비 중
 tablet without WebGL keeps the old colours). `?looks=0` or `?looks=1` in one tablet's address
 overrides the switch for that tablet.
 
+Below it is **내 사진으로 참여하기** (`settings.mobileUpload`, **off by default**, 2026-11-27, a user
+decision; no banner). Off: the booth cover shows no 「내 사진으로 참여하기」 button and
+`POST /api/mobile/sessions` answers 404 `mobile_upload_off`, so no new phone QR is issued. On: the
+button appears on the cover with the booth's next heartbeat (within 45 s) or page load. A QR shown
+before it was turned off still works until it expires (15 min). Audited (`update_settings`,
+`ftl_settings_set_mobile_upload` on Supabase).
+
 ## 미디어월 사진 속도 (설정, D92)
 
 - **한 장이 떠 있는 시간**: 5–120 s (default 14 s). Shorter turns photos over faster.

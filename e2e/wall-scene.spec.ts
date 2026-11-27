@@ -118,7 +118,7 @@ async function approve(request: APIRequestContext, sessionId: string) {
   approved++;
 }
 
-async function boothPhoto(frame: "film4" | "polaroid3" | "check2" | "lace1") {
+async function boothPhoto(frame: "film4" | "polaroid1" | "check2") {
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk, frame);
@@ -145,7 +145,7 @@ test("setup: staff, booth, wall display, and a line's worth of approved photos",
   await enrollWithCode(kiosk, await createEnrollmentCode(staff, "장면 부스"));
   await expect(kiosk).toHaveURL(/\/kiosk$/);
 
-  for (const frame of ["film4", "lace1"] as const)
+  for (const frame of ["film4", "polaroid1"] as const)
     await approve(staff.request, await boothPhoto(frame));
 
   for (let n = 0; n < 9; n++) {

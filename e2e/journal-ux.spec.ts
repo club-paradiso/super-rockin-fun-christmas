@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("the nine v2 cards show one marked card, 필름 3컷 first; a tap on a card goes on with it", async ({
+test("the six v2 cards show one marked card, 필름 3컷 first; a tap on a card goes on with it", async ({
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
@@ -13,25 +13,27 @@ test("the nine v2 cards show one marked card, 필름 3컷 first; a tap on a card
 
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(9);
+  await expect(cards).toHaveCount(6);
+  // Taken down on 2026-11-27 (a user decision).
+  for (const id of ["lace1", "polaroid3", "verse4"])
+    await expect(page.getByTestId(`frame-option-${id}`)).toHaveCount(0);
   await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
   await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("confirm-pick")).toHaveText("다음");
 
-  // A tap on a card is the choice (2026-11-27): a card without options is at the camera at once.
-  await page.getByTestId("frame-option-lace1").click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
-  await expect(page.getByTestId("screen-options")).toHaveCount(0);
-  // "이전" before the first shot: the picker again, with that card the one marked, and the
-  // bottom bar's button names what it does for a card without options.
+  // A tap on a card is the choice (2026-11-27): every card offered today has options, so a
+  // tap is its options screen at once.
+  await page.getByTestId("frame-option-polaroid1").click();
+  await expect(page.getByTestId("screen-options")).toBeVisible();
+  // "이전": the picker again, with that card the one marked.
   await page.getByTestId("go-back").click();
   await expect(pick).toBeVisible();
-  await expect(page.getByTestId("frame-option-lace1")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("frame-option-polaroid1")).toHaveAttribute("aria-pressed", "true");
   await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
-  await expect(page.getByTestId("confirm-pick")).toHaveText("이 틀로 찍기");
+  await expect(page.getByTestId("confirm-pick")).toHaveText("다음");
   // The bottom bar's button goes on with the marked card, as a tap on the card did.
   await page.getByTestId("confirm-pick").click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-options")).toBeVisible();
   // A card with options: one tap is its options screen.
   await page.getByTestId("go-back").click();
   await page.getByTestId("frame-option-film4").click();

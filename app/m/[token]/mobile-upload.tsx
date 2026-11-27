@@ -7,7 +7,7 @@ import { StampTicket } from "@/components/studio/stamp-ticket";
 import { cleanOrdinal } from "@/lib/studio/day";
 import {
   DEFAULT_CARD_ID,
-  FRAME_CARDS,
+  OFFERED_CARDS,
   cleanOptions,
   defaultOptions,
   getCard,
@@ -288,7 +288,7 @@ export function MobileUpload({
   const thumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!context || !thumbSource || !onFrameScreen) return out;
-    for (const c of FRAME_CARDS) {
+    for (const c of OFFERED_CARDS) {
       const f = c.frame(defaultOptions(c));
       const canvas = composeFrame(f, fill(f, thumbSource), {
         createCanvas: createDomCanvas,
@@ -487,7 +487,7 @@ export function MobileUpload({
               onChange={(key, value) => setOptions((o) => ({ ...o, [key]: value }))}
             />
             <FramePicker
-              frames={FRAME_CARDS.map((c) => ({
+              frames={OFFERED_CARDS.map((c) => ({
                 id: c.id,
                 label: BOOTH.name[c.id],
                 thumb: thumbs[c.id],

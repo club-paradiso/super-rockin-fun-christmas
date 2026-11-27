@@ -89,34 +89,6 @@ test("the shortest way to the QR is six touches for a frame with options", async
   expect(pressed.length).toBeLessThanOrEqual(7);
 });
 
-test("a frame without options is five touches", async ({ page }) => {
-  await countClicks(page);
-  await page.goto("/kiosk?camera=mock");
-  await expect(page.getByTestId("mock-badge")).toBeVisible();
-
-  await page.getByTestId("attract-start").click();
-  // 레이스 1컷 has no options: the card is the camera.
-  await page.getByTestId("frame-option-lace1").click();
-  await expect(page.getByTestId("screen-options")).toHaveCount(0);
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await page.getByTestId("confirm-selection").click();
-  await expect(page.getByTestId("screen-consent")).toBeVisible();
-  await page.getByTestId("consent-no").click();
-
-  await expectRealQr(page);
-  const pressed = await clicks(page);
-  expect(pressed).toEqual([
-    "attract-start",
-    "frame-option-lace1",
-    "shoot-free",
-    "confirm-selection",
-    "consent-no",
-  ]);
-  expect(pressed.length).toBe(5);
-});
-
 test('"아니요" still gives the QR and the photo, and nothing goes to the wall', async ({
   page,
 }) => {

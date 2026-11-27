@@ -49,38 +49,35 @@ const HEADER: Want[] = [
 ];
 const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, size: 32 } };
 /**
- * The cards: nine, five to a row (Figma 1069:2245, "2-A 틀 고르기 · 9개", made 2026-11-26 when
- * 밈 4컷 joined; 898:1677 is the earlier seven-card screen). 116.8 × 357, 12 apart, rows at y 166
- * and 539, the second row of four centred. Names and hints break between words, as the booth's
+ * The cards: six, five to a row (Figma 1082:1896, "2-A 틀 고르기 · 6개", 2026-11-27: 1069:2245
+ * with 레이스 1컷, 폴라로이드 3컷 and 성경 구절 4컷 hidden, a user decision; the grid is Figma's
+ * own wrap, so the rest moved up as in the booth). 116.8 × 357, 12 apart, rows at y 166 and 539,
+ * the lone card of the second row centred. Names and hints break between words, as the booth's
  * `keep-all` does, and the pencil sits in the hint's first line.
  */
 const CARD_W = 116.8;
 const col = (i: number) => 100 + i * (CARD_W + 12);
-const ROW1 = ["film3", "film4", "polaroid1", "polaroid3", "verse4"];
-const ROW2 = ["check2", "lace1", "film35", "meme4"];
-/** Figma's text boxes, [x, y, w, h], read from 1069:2245. */
+const ROW1 = ["film3", "film4", "polaroid1", "check2", "film35"];
+const ROW2 = ["meme4"];
+/** Figma's text boxes, [x, y, w, h], read from 1082:1896. */
 const NAMES: Record<string, Box> = {
   film3: [109, 470, 98.8, 22],
   film4: [234.8, 450, 104.8, 22],
   polaroid1: [363.6, 445, 104.8, 44],
-  polaroid3: [492.4, 465, 104.8, 44],
-  verse4: [621.2, 487, 104.8, 22],
-  check2: [170.4, 823, 104.8, 22],
-  lace1: [299.2, 860, 104.8, 22],
-  film35: [428, 801, 104.8, 44],
-  meme4: [556.8, 840, 104.8, 22],
+  check2: [492.4, 450, 104.8, 22],
+  film35: [621.2, 428, 104.8, 44],
+  meme4: [363.6, 840, 104.8, 22],
 };
 const HINTS: Record<string, Box> = {
   film3: [109, 498, 98.8, 17],
   film4: [234.8, 478, 104.8, 34],
   polaroid1: [363.6, 495, 104.8, 17],
-  check2: [170.4, 851, 104.8, 34],
-  film35: [428, 851, 104.8, 34],
-  meme4: [556.8, 868, 104.8, 17],
+  check2: [492.4, 478, 104.8, 34],
+  film35: [621.2, 478, 104.8, 34],
+  meme4: [363.6, 868, 104.8, 17],
 };
 const centre = ([x, y, w, h]: Box, size: number) => ({ cx: x + w / 2, cy: y + h / 2, size });
-const cardX = (id: string) =>
-  ROW1.includes(id) ? col(ROW1.indexOf(id)) : col(ROW2.indexOf(id) + 0.5);
+const cardX = (id: string) => (ROW1.includes(id) ? col(ROW1.indexOf(id)) : col(2));
 const cardY = (id: string) => (ROW1.includes(id) ? 166 : 539);
 
 const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
@@ -226,7 +223,7 @@ test.beforeEach(async ({ page }) => {
       "nextjs-portal{display:none!important}",
   });
   await openPicker(page);
-  await expect(page.getByTestId("frame-option-lace1").locator("img")).toBeVisible();
+  await expect(page.getByTestId("frame-option-meme4").locator("img")).toBeVisible();
 });
 
 for (const [name, spec] of Object.entries(SCREENS)) {

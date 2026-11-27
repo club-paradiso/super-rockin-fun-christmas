@@ -102,12 +102,15 @@ looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
   or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
-  offers the nine cards of `config/frames/v2.ts` (the seven of Figma 898:1677, then 필름 35mm
-  4컷, Figma 924:2026, added 2026-11-24, then 밈 4컷, added 2026-11-26: the five meme frames of
-  Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD", the black one, is
-  left out by a user decision); a card with options (colour, logo, meme) has an options screen,
+  offers the cards of `OFFERED_CARDS` in `config/frames/v2.ts`: six since 2026-11-27 (a user
+  decision: 레이스 1컷, 폴라로이드 3컷 and 성경 구절 4컷 taken down, `RETIRED_CARD_IDS`; their
+  frames stay in `FRAME_CARDS`/`V2_FRAMES` so stored photos keep hanging, but `getCard` never
+  returns one and the phone page refuses a new upload in one). The catalogue was the seven of Figma
+  898:1677, then 필름 35mm 4컷, Figma 924:2026, added 2026-11-24, then 밈 4컷, added 2026-11-26: the
+  five meme frames of Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD",
+  the black one, is left out by a user decision; every card offered today has options; a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
-  to a line); the picker shows the nine five to a row, and a tap on a card goes on with it (below); the guest
+  to a line); the picker shows them five to a row, and a tap on a card goes on with it (below); the guest
   then shoots four, 5 s apart, and chooses the photos
   (2026-11-27, a user decision, final: 4 shots × 5 s, no retake; `KIOSK_CONFIG.shotsPerSession`, six and five before;
   no frame holds more than four photos, so the choice is the order, not leaving one out).
@@ -225,9 +228,15 @@ looks:measure`). `/looks` is the comparison
   as it holds in tap order, then the booth's yes/no wall question with equal weight. "No" sends
   nothing and both answers can save the framed picture on the phone. Never make the wall answer a
   condition for getting the picture, and never send it without "yes".
+- **「내 사진으로 참여하기」 is behind a staff switch, off by default** (2026-11-27, a user decision):
+  `settings.mobileUpload` (audited through `ftl_settings_set_mobile_upload`, migration
+  `20261127120000`). Off: the cover shows no phone button (`onStartMobile` null) and
+  `/api/mobile/sessions` refuses with 404 `mobile_upload_off` before minting anything. It reaches a
+  booth with its heartbeat. The E2E run checks the fresh default is off, then turns it on
+  (`e2e/global-setup.ts`); `e2e/mobile.spec.ts` checks the off state.
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put photos in one of the booth's
-  v2 frames on the phone (D93, D113: the booth's nine cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
+  v2 frames on the phone (D93, D113: the booth's offered cards and options, `MOBILE_FRAMES` = `OFFERED_V2_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
   the wall like that frame; each photo sits in its slot where the guest dragged it,
   `ComposeImage.focus` = CSS `object-position`, starting a third from the top,
   `MOBILE_UPLOAD_CONFIG.defaultFocus`; booth shots carry no focus and stay centred), `phone-photo` for a plain photo from a page older than D93. Test a phone
@@ -294,8 +303,8 @@ looks:measure`). `/looks` is the comparison
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; `OPEN` (a session id with it) leaves it for the
   frame picker, `START_MOBILE` for the phone QR.
-- **Fewer touches, the same rules** (2026-11-27, a user request; about 13 touches → 6, or 5 for a
-  frame without options: start · frame · (options) · shoot · finish · wall answer;
+- **Fewer touches, the same rules** (2026-11-27, a user request; about 13 touches → 6; every card
+  offered today has options, so the five-touch path went with the cards taken down: start · frame · (options) · shoot · finish · wall answer;
   `tests/unit/kiosk-machine.test.ts` and `e2e/kiosk-touches.spec.ts` count them). One touch on
   the cover starts a session at the picker: there is no welcome screen, and the language, the
   sound switch and "내 사진으로 참여하기" are small controls on the cover (`.attract-options`; a
@@ -316,7 +325,7 @@ looks:measure`). `/looks` is the comparison
   `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
   once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
   missing file must never break a layout or a touch target. The shutter stays the screen's one
-  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 1069:2245; 898:1677 before 밈 4컷), not
+  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 1082:1896; 1069:2245 with nine cards, 898:1677 before 밈 4컷), not
   postcards on the desk; nothing on the picker or the options screen sits on the binder rings
   (`--ring-safe` in `app/kiosk-figma.css`).
 - **One light, top left (135°)** (D101): every cast shadow falls to +x +y: the `--shadow-*`,
@@ -336,9 +345,9 @@ looks:measure`). `/looks` is the comparison
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. The picker's reference is Figma 1069:2245 (「2-A 틀 고르기 · 9개」, 2026-11-26; its
-  header and the four options screens' show five dots since 2026-11-27, exported again): nine
-  cards five to a row, names and hints broken between words as the booth's `keep-all` breaks them,
+  to pass. The picker's reference is Figma 1082:1896 (「2-A 틀 고르기 · 6개」, 2026-11-27: a copy of
+  1069:2245, the nine-card screen, with the three retired cards hidden and Figma's own wrap moving
+  the rest; five dots): six cards five to a row, the last one centred, names and hints broken between words as the booth's `keep-all` breaks them,
   the pencil in the hint's first line; only the card previews are masked. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a

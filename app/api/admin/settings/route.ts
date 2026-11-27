@@ -30,6 +30,7 @@ export const GET = staffRoute("admin_settings", async () =>
  * POST any of {"pauseSubmissions","pauseWall","showHoldingScreen"} as booleans,
  * "wallForce": "auto" | "on" | "off", "wallHours": {"start":"HH:MM","end":"HH:MM"} | null,
  * "wallPublic": boolean (D86), "photoLooks": boolean (colour looks on the booth's photos),
+ * "mobileUpload": boolean (「내 사진으로 참여하기」 on the booth cover, off by default),
  * "wallLook": {"theme","rotate","rotateMinutes","rotation":[theme ids]} (D85),
  * "wallPace": {"showSeconds","halfLifeMinutes"} (D92; stored inside the look),
  * "moderationMode": "manual" | "auto" (D95; "auto" is refused with 409 while no AI provider is
@@ -47,6 +48,7 @@ export const POST = staffRoute("admin_settings_update", async (request, { staff 
     "showHoldingScreen",
     "wallPublic",
     "photoLooks",
+    "mobileUpload",
   ] as const) {
     if (body && key in body) {
       if (typeof body[key] !== "boolean") return jsonError(400, `${key} must be boolean`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_FRAMES, FRAMES, RETIRED_FRAME_IDS } from "@/config/frames";
-import { V2_FRAMES } from "@/config/frames/v2";
+import { OFFERED_V2_FRAMES, V2_FRAMES } from "@/config/frames/v2";
 import {
   framedPhotoFrame,
   isMobileFrameId,
@@ -29,12 +29,18 @@ describe("phone photos in booth frames (D93)", () => {
   });
 
   it("the phone offers exactly the booth's frames (틀 선택 v2), never the dropped ones", () => {
-    expect(MOBILE_FRAMES).toEqual(V2_FRAMES);
+    expect(MOBILE_FRAMES).toEqual(OFFERED_V2_FRAMES);
     for (const f of FRAMES) {
       expect(mobileOfferedFrame(f.id), f.id).toBeNull();
       expect(MOBILE_FRAMES).not.toContain(f);
     }
-    for (const f of V2_FRAMES) expect(mobileOfferedFrame(f.id)).toBe(f);
+    for (const f of OFFERED_V2_FRAMES) expect(mobileOfferedFrame(f.id)).toBe(f);
+    // Taken down on 2026-11-27: not offered for a new upload, still known for a stored one.
+    for (const id of ["lace1", "polaroid3", "verse4"]) {
+      expect(mobileOfferedFrame(id), id).toBeNull();
+      expect(V2_FRAMES.some((f) => f.id === id)).toBe(true);
+      expect(mobileBoothFrame(mobileFrameId(id))?.id).toBe(id);
+    }
     for (const n of [1, 2, 3, 4])
       expect(mobileFramesFor(n).length, `${n} photos`).toBeGreaterThan(0);
     // A guest may pick more photos than any frame holds, and chooses among them.

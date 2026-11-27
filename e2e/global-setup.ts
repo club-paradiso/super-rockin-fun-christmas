@@ -10,6 +10,10 @@ import { ENROLL_SECRET, HUB_CLOUD_PORT, PORT, USE_SUPABASE } from "./env";
  * (the main one and, on hub runs, the hub-with-a-cloud of e2e/cloud.spec.ts), this checks the
  * fresh default first (a failure here means the default changed), then sets manual for the run.
  * `e2e/zz-ai-review.spec.ts` switches auto on for itself and puts manual back.
+ *
+ * 「내 사진으로 참여하기」 is off by default (2026-11-27, a user decision). Many specs use the cover's
+ * phone button, so this checks the fresh default is off, then turns it on for the run;
+ * `e2e/mobile.spec.ts` switches it off for itself and checks the button is gone, then back on.
  */
 export default async function globalSetup() {
   const ports = USE_SUPABASE ? [PORT] : [PORT, HUB_CLOUD_PORT];
@@ -23,8 +27,13 @@ async function startInManual(baseURL: string) {
     if (!login.ok())
       throw new Error(`${baseURL}: admin login for E2E setup: HTTP ${login.status()}`);
     const before = (await (await api.get("/api/admin/settings")).json()) as {
-      settings: { moderationMode: string };
+      settings: { moderationMode: string; mobileUpload: boolean };
     };
+    if (before.settings.mobileUpload !== false)
+      throw new Error(`${baseURL}: 「내 사진으로 참여하기」 should start off on a fresh event`);
+    const phone = await api.post("/api/admin/settings", { data: { mobileUpload: true } });
+    if (!phone.ok())
+      throw new Error(`${baseURL}: could not turn the phone way in on: HTTP ${phone.status()}`);
     if (before.settings.moderationMode !== "auto")
       throw new Error(
         `${baseURL}: a fresh event should start in AI review ("auto"), found "${before.settings.moderationMode}"`,
