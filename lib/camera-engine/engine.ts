@@ -1,7 +1,7 @@
 import { CAMERA_ENGINE, cameraProfile } from "@/config/camera-engine";
 import { createDomCanvas, type CanvasFactory, type CanvasLike } from "@/lib/canvas";
 import type { Rect } from "@/lib/compositor/geometry";
-import { smoothstep } from "./mat3";
+import { clamp, smoothstep } from "./mat3";
 import { outputToSource } from "./model";
 import { tiltFromDeviceUp, type CameraFacing, type Tilt } from "./orientation";
 import { planCorrection, type Plan } from "./plan";
@@ -88,6 +88,9 @@ interface Geometry {
 }
 
 const TINY = 1e-3;
+/** An angle in degrees brought into −180 … 180. */
+const wrapDegrees = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
+const round = (value: number, perUnit: number) => Math.round(value * perUnit) / perUnit;
 
 export class CameraEngine {
   private settings: CameraEngineSettings = defaultCameraEngine();
@@ -108,7 +111,8 @@ export class CameraEngine {
   private watchdog: unknown = null;
   private usable = false;
   private startedAt: number | null = null;
-  private previewWorks = true;
+  /** The trust last planned with: a change of it is a change of plan (see `checkUsable`). */
+  private plannedConfidence = -1;
 
   constructor(private readonly env: EngineEnv = browserEngineEnv()) {
     this.sensors = new TiltSensors(env.win, env.now, (reading) => this.onReading(reading));
@@ -141,7 +145,17 @@ export class CameraEngine {
    */
   requestPermission(): void {
     if (this.settings.mode !== "auto") return;
-    void this.sensors.request().then(() => this.bump());
+    const before = this.sensors.permission();
+    void this.sensors.request().then((answer) => {
+      if (answer === "granted" && before !== "granted" && this.settings.mode === "auto") {
+        // Listeners added before the answer are added again after it, and the wait for a first
+        // reading starts now: a browser that only delivers to listeners registered once it is
+        // allowed must not leave the booth reading "no sensor".
+        this.stop();
+        this.start();
+      }
+      this.bump();
+    });
   }
 
   setCamera(camera: EngineCamera | null): void {
@@ -166,9 +180,11 @@ export class CameraEngine {
 
   /** The guest is gone: back to watching the sensors, and WebGL is tried again. */
   newSession(): void {
-    const changed = this.locked !== null || this.renderFailed;
+    const changed = this.locked !== null || this.renderFailed || this.error !== null;
     this.locked = null;
     this.renderFailed = false;
+    // A failure is reported for the guest it happened to, not for the rest of the day.
+    this.error = null;
     this.warper.newSession();
     if (changed) this.bump();
   }
@@ -179,13 +195,10 @@ export class CameraEngine {
     return () => this.listeners.delete(listener);
   }
 
-  /** The preview could not be given the correction (a browser without what it needs). */
-  setPreviewWorks(works: boolean): void {
-    this.previewWorks = works;
-  }
-
   planFor(srcWidth: number, srcHeight: number, aspect: number): Plan {
-    const key = `${srcWidth}x${srcHeight}:${aspect}:${this.version}`;
+    // The page's rotation is part of the key: a tablet turned upside down keeps its stream's
+    // size, and a plan made for the other way up must not be handed out again.
+    const key = `${srcWidth}x${srcHeight}:${aspect}:${this.sensors.screenAngle()}:${this.version}`;
     if (this.cache?.key === key) return this.cache.plan;
     // A stream that has not said its size yet is not a stream to describe to staff.
     if (srcWidth > 0 && srcHeight > 0 && aspect > 0)
@@ -274,18 +287,21 @@ export class CameraEngine {
       permission: this.sensors.permission(),
       sensor: resolved.sensor,
       backend: this.renderFailed ? "none" : this.warper.backend(),
-      roll: resolved.tilt ? resolved.tilt.roll : null,
-      pitch: resolved.tilt ? resolved.tilt.pitch : null,
-      appliedRoll: plan.appliedRoll,
-      appliedPitch: plan.appliedPitch,
-      strength: plan.strength,
-      zoom: plan.zoom,
-      loss: plan.loss,
-      confidence: resolved.confidence,
+      // Rounded here, on the tablet: nothing finer than a tenth of a degree leaves the page.
+      roll: resolved.tilt ? round(resolved.tilt.roll, 10) : null,
+      pitch: resolved.tilt ? round(resolved.tilt.pitch, 10) : null,
+      appliedRoll: round(plan.appliedRoll, 10),
+      appliedPitch: round(plan.appliedPitch, 10),
+      strength: round(plan.strength, 100),
+      zoom: round(plan.zoom, 100),
+      loss: round(plan.loss, 100),
+      confidence: round(resolved.confidence, 100),
       profile: profile.id,
       profileSource,
       locked: this.locked !== null,
-      previewMatches: this.previewWorks || plan.identity,
+      // The preview is given the plan's own matrix, so it shows what the photo gets. The field
+      // stays for a renderer that could not promise that.
+      previewMatches: true,
       pitchWarning: plan.pitchWarning,
       error: this.error ?? (glError && glError !== "no-webgl" ? glError : null),
     };
@@ -327,6 +343,7 @@ export class CameraEngine {
     // published direction really moves.
     if (this.stab.published?.up !== before && !this.locked) {
       this.usable = true;
+      this.plannedConfidence = round(this.resolveLive().confidence, 20);
       this.bump();
     } else this.checkUsable();
   }
@@ -334,8 +351,12 @@ export class CameraEngine {
   private checkUsable(): void {
     if (this.locked || this.settings.mode !== "auto") return;
     const usable = viewStabilizer(this.stab, this.env.now()).up !== null;
-    if (usable !== this.usable) {
+    // Two sensors drifting apart lower the trust slowly and publish nothing: without this the
+    // preview would go on showing a plan the next photo no longer gets.
+    const confidence = usable ? round(this.resolveLive().confidence, 20) : 0;
+    if (usable !== this.usable || confidence !== this.plannedConfidence) {
       this.usable = usable;
+      this.plannedConfidence = confidence;
       this.bump();
     }
   }
@@ -393,7 +414,12 @@ export class CameraEngine {
     if (!measured) return none("low-confidence", view.sensor);
     const { disagreeDeg } = CAMERA_ENGINE.sensor;
     return {
-      tilt: { roll: measured.roll + s.rollOffset, pitch: measured.pitch + s.pitchOffset },
+      // Staff's offsets on top of the reading, kept inside what an angle can be (a tablet
+      // lying nearly flat plus an offset is still at most straight up).
+      tilt: {
+        roll: wrapDegrees(measured.roll + s.rollOffset),
+        pitch: clamp(measured.pitch + s.pitchOffset, -90, 90),
+      },
       // Two sensors that tell different stories are each believed half as much.
       confidence: 1 - 0.5 * smoothstep(disagreeDeg, disagreeDeg * 2, this.sensors.disagreement()),
       reason: null,

@@ -580,6 +580,31 @@ describe("FrameWarper: what draws the picture, and what happens when it cannot",
     }
   });
 
+  it("does not ask for context after context when one cannot be set up", () => {
+    const { factory } = fakeCanvasFactory();
+    let made = 0;
+    const lostContexts: string[] = [];
+    const warper = new FrameWarper({
+      createCanvas: factory,
+      createGlCanvas: () => {
+        made++;
+        const { canvas, calls } = glCanvas({ compile: false });
+        lostContexts.push(...calls.filter((c) => c === "getExtension"));
+        return canvas;
+      },
+    });
+    // The staff menu reads the status every second; six photos are taken.
+    for (let i = 0; i < 10; i++) expect(warper.backend()).toBe("canvas2d");
+    for (let i = 0; i < 6; i++)
+      expect(warper.render(input(factory, rollOnly()))!.backend).toBe("canvas2d");
+    expect(made).toBe(1);
+    expect(warper.lastError()).toBe("shader");
+    // The next guest gets one more try, and no more than one.
+    warper.newSession();
+    for (let i = 0; i < 5; i++) warper.backend();
+    expect(made).toBe(2);
+  });
+
   it("throws away a picture that came out black where the camera's frame was not", () => {
     // A canvas whose pixels can be read: the frame is bright, the "warped" picture is black.
     const level = new Map<object, number>();

@@ -260,6 +260,25 @@ describe("a session is photographed with one correction", () => {
     expect(engine.correct(shot(canvases.factory, { srcWidth: 720, srcHeight: 1280 }))).toBeNull();
   });
 
+  it("drops it even when the turned page keeps the stream's size (upside down)", () => {
+    const { engine, stand, win, canvases } = setup();
+    stand(5, 9);
+    engine.lock();
+    // The preview has planned for this stream already; the plan is in the cache.
+    expect(engine.planFor(1280, 720, 4 / 3).identity).toBe(false);
+    (win as { orientation?: number }).orientation = 180;
+    expect(engine.planFor(1280, 720, 4 / 3).identity).toBe(true);
+    expect(engine.preview(1280, 720, 400, 300, 4 / 3, true)).toBeNull();
+    expect(engine.correct(shot(canvases.factory))).toBeNull();
+    // And the status says one thing, not two.
+    expect(engine.status()).toMatchObject({
+      state: "original",
+      reason: "orientation-changed",
+      appliedRoll: 0,
+      appliedPitch: 0,
+    });
+  });
+
   it("uses the same tilt for a stream of another size", () => {
     const { engine, stand } = setup();
     stand(5, 0);
@@ -270,6 +289,24 @@ describe("a session is photographed with one correction", () => {
 });
 
 describe("sensors that are missing, refused or silent", () => {
+  it("listens afresh once iOS has said yes, and only then starts waiting for a reading", async () => {
+    const { engine, win, wait } = setup(
+      {},
+      { win: { DeviceMotionEvent: { requestPermission: () => Promise.resolve("granted") } } },
+    );
+    const add = vi.spyOn(win, "addEventListener");
+    // Ten minutes on the first screen before anyone touches it.
+    wait(600_000);
+    engine.requestPermission();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(add.mock.calls.map((c) => c[0]).sort()).toEqual(["devicemotion", "deviceorientation"]);
+    expect(win.count()).toBe(2);
+    // Not "no sensor" the instant it is allowed: the three silent seconds start now.
+    expect(engine.status().reason).toBe("sensor-settling");
+    wait(3500);
+    expect(engine.status().reason).toBe("no-sensor");
+  });
+
   it("asks iOS once from the touch, and works after the answer", async () => {
     const ask = vi.fn(() => Promise.resolve("granted"));
     const { engine, stand } = setup({}, { win: { DeviceMotionEvent: { requestPermission: ask } } });
@@ -424,6 +461,18 @@ describe("when drawing fails", () => {
     expect(engine.status()).toMatchObject({ state: "full", backend: "webgl" });
   });
 
+  it("reports a failure for the guest it happened to, not for the rest of the day", () => {
+    const { engine, stand, canvases, gl } = setup();
+    stand(5, 9);
+    engine.lock();
+    gl.lost = true;
+    engine.correct(shot(canvases.factory));
+    expect(engine.status().error).toBe("context-lost");
+    gl.lost = false;
+    engine.newSession();
+    expect(engine.status()).toMatchObject({ state: "full", backend: "webgl", error: null });
+  });
+
   it("gives the picture back to the usual path when nothing can draw it", () => {
     const { engine, stand } = setup();
     stand(5, 9);
@@ -464,6 +513,68 @@ describe("when drawing fails", () => {
       { width: 0, height: 0 },
     ])
       expect(() => engine.correct(shot(canvases.factory, bad))).not.toThrow();
+  });
+});
+
+describe("what leaves the tablet", () => {
+  it("is rounded on the tablet: a tenth of a degree, a hundredth of the rest", () => {
+    const { engine, stand } = setup();
+    stand(4.123456, 9.87654);
+    const status = engine.status();
+    const tenths = (v: number) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9;
+    const hundredths = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9;
+    for (const v of [status.roll!, status.pitch!, status.appliedRoll, status.appliedPitch])
+      expect(tenths(v)).toBe(true);
+    for (const v of [status.strength, status.zoom, status.loss, status.confidence])
+      expect(hundredths(v)).toBe(true);
+    expect(status.roll).toBeCloseTo(4.1, 9);
+  });
+
+  it("stays inside the contract when an offset pushes a reading past what an angle can be", () => {
+    // Lying nearly flat plus a pitch offset; nearly upside down plus a roll offset.
+    for (const [roll, pitch, over] of [
+      [0, 88, { pitchOffset: 5 }],
+      [175, 0, { rollOffset: 10 }],
+      [-176, -86, { rollOffset: -15, pitchOffset: -25 }],
+    ] as const) {
+      const { engine, stand } = setup(over);
+      stand(roll, pitch);
+      const status = engine.status();
+      expect(Math.abs(status.pitch!)).toBeLessThanOrEqual(90);
+      expect(Math.abs(status.roll!)).toBeLessThanOrEqual(180);
+      expect(parseCameraEngineStatus(JSON.parse(JSON.stringify(status)))).not.toBeNull();
+      expect(status.state).toBe("original");
+    }
+  });
+});
+
+describe("two sensors that disagree", () => {
+  it("lower the trust, and the preview is told so before the photos differ from it", () => {
+    const { engine, win, changes, wait } = setup();
+    // Orientation says upright and rolled 6°; later the accelerometer says 20° further back.
+    const run = (ms: number, withMotion: boolean) => {
+      for (let t = 0; t < ms; t += 100) {
+        wait(100);
+        win.fire("deviceorientation", { beta: 84, gamma: 90 });
+        if (withMotion)
+          win.fire("devicemotion", {
+            accelerationIncludingGravity: { x: 0.96, y: -9.16, z: -3.35 },
+          });
+      }
+    };
+    run(2000, false);
+    const before = engine.planFor(1280, 720, 4 / 3);
+    expect(before.appliedRoll).toBeCloseTo(6, 1);
+    changes.mockClear();
+    // The direction orientation publishes does not move at all from here on.
+    run(20_000, true);
+    expect(engine.status().confidence).toBeLessThan(0.75);
+    expect(changes).toHaveBeenCalled();
+    // The plan the preview now gets is the one a lock would fix.
+    const preview = engine.planFor(1280, 720, 4 / 3);
+    expect(preview.appliedRoll).toBeLessThan(before.appliedRoll);
+    engine.lock();
+    expect(engine.planFor(1280, 720, 4 / 3).appliedRoll).toBeCloseTo(preview.appliedRoll, 1);
   });
 });
 

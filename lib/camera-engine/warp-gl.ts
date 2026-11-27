@@ -83,12 +83,12 @@ export function normalizedMap(
 export class GlWarper {
   readonly canvas: GlCanvas;
   private gl: WebGLRenderingContext;
-  private program: WebGLProgram;
-  private texture: WebGLTexture;
-  private uImage: WebGLUniformLocation | null;
-  private uMap: WebGLUniformLocation | null;
+  private program!: WebGLProgram;
+  private texture!: WebGLTexture;
+  private uImage: WebGLUniformLocation | null = null;
+  private uMap: WebGLUniformLocation | null = null;
   private lost = false;
-  readonly maxTextureSize: number;
+  maxTextureSize = 0;
 
   constructor(canvas: GlCanvas) {
     this.canvas = canvas;
@@ -107,7 +107,20 @@ export class GlWarper {
     canvas.addEventListener?.("webglcontextlost", () => {
       this.lost = true;
     });
+    try {
+      this.setUp(gl);
+    } catch (err) {
+      // Nothing will ever draw with this context: give it back before reporting.
+      try {
+        (gl.getExtension?.("WEBGL_lose_context") as WEBGL_lose_context | null)?.loseContext();
+      } catch {
+        // Already lost.
+      }
+      throw err;
+    }
+  }
 
+  private setUp(gl: WebGLRenderingContext): void {
     const compile = (type: number, source: string) => {
       const shader = gl.createShader(type);
       if (!shader) throw new WarpUnavailableError("shader", "Could not create a shader");

@@ -65,6 +65,9 @@ export class FrameWarper {
       this.glGaveUp = false;
       this.glProbed = false;
     }
+    // "No WebGL here at all" is a fact about the browser and stays; anything else was that
+    // guest's failure.
+    if (this.error !== "no-webgl") this.error = null;
   }
 
   render(input: WarpInput): { canvas: CanvasLike; backend: EngineBackend } | null {
@@ -110,6 +113,10 @@ export class FrameWarper {
     } catch (err) {
       this.error = err instanceof WarpUnavailableError ? err.code : "no-webgl";
       this.gl = null;
+      // A context that exists but cannot be set up (lost at birth, a shader that will not
+      // build) is not asked for again and again: every try would be one more live context, and
+      // older WebKit takes the oldest away from whoever holds it. Until the next guest.
+      this.glGaveUp = true;
     }
     return this.gl;
   }
