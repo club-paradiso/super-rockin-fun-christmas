@@ -53,8 +53,9 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   const picker = page.getByTestId("screen-pick");
   await expect(picker.getByTestId("go-home")).toBeVisible();
   await expect(picker.getByTestId("fullscreen-toggle")).toHaveCount(0);
-  // A tap on a card without options is the camera (no second press).
-  await picker.getByTestId("frame-option-lace1").click();
+  // A tap on a card is its options (no second press), and one more the camera.
+  await picker.getByTestId("frame-option-polaroid1").click();
+  await page.getByTestId("confirm-options").click();
   const ready = page.getByTestId("screen-ready");
   await expect(ready.getByTestId("fullscreen-toggle")).toBeVisible();
   await expect(ready.getByTestId("go-home")).toBeVisible();
@@ -96,7 +97,8 @@ test("once fullscreen is on, no guest screen shows a fullscreen control", async 
   await openPicker(page);
   const picker = page.getByTestId("screen-pick");
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
-  await picker.getByTestId("frame-option-lace1").click();
+  await picker.getByTestId("frame-option-polaroid1").click();
+  await page.getByTestId("confirm-options").click();
   const ready = page.getByTestId("screen-ready");
   await expect(ready.getByTestId("go-home")).toBeVisible();
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);

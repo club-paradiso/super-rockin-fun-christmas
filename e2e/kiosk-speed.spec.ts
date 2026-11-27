@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { FRAME_CARDS } from "../config/frames/v2";
+import { OFFERED_CARDS } from "../config/frames/v2";
 import {
   answerForQr,
   confirmFrame,
@@ -57,8 +57,8 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
     await openPicker(page);
 
-    // Nine cards, each a file from public/kiosk-thumbs, each really loaded.
-    for (const card of FRAME_CARDS) {
+    // Six cards, each a file from public/kiosk-thumbs, each really loaded.
+    for (const card of OFFERED_CARDS) {
       const img = page.getByTestId(`frame-option-${card.id}`).locator("img");
       await expect(img).toHaveAttribute("src", `/kiosk-thumbs/${card.id}.jpg`);
       await expect
@@ -122,7 +122,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     await page.route("**/kiosk-thumbs/**", (route) => route.abort());
     await page.goto("/kiosk?camera=mock");
     await openPicker(page);
-    for (const card of FRAME_CARDS)
+    for (const card of OFFERED_CARDS)
       await expect(page.getByTestId(`frame-option-${card.id}`).locator("img")).toHaveAttribute(
         "src",
         /^data:image\/jpeg/,
@@ -165,7 +165,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
   }) => {
     test.setTimeout(150_000);
     await page.goto("/kiosk?camera=mock&perf=1");
-    await startSession(page, "lace1");
+    await startSession(page, "polaroid1");
     await shootToChoice(page);
     const row = page.getByTestId("look-row");
     await expect(row).toBeVisible();
@@ -204,7 +204,7 @@ test.describe("every booth", () => {
     const paths = watchPaths(page);
     await page.goto("/kiosk?camera=mock");
     await openPicker(page);
-    for (const card of FRAME_CARDS)
+    for (const card of OFFERED_CARDS)
       await expect(page.getByTestId(`frame-option-${card.id}`).locator("img")).toHaveAttribute(
         "src",
         /^data:image\/jpeg/,

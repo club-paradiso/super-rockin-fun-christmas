@@ -111,6 +111,8 @@ class FileDb {
         moderationMode: db.settings.moderationMode ?? "auto",
         // Files written before looks: on, the default since 2026-11-25. A stored answer stays.
         photoLooks: db.settings.photoLooks ?? true,
+        // Files written before 2026-11-27: off, the default. A stored answer stays.
+        mobileUpload: db.settings.mobileUpload ?? false,
         // Files written before the camera engine: off. A damaged field reads as its default.
         cameraEngine: normalizeCameraEngine(db.settings.cameraEngine),
       };

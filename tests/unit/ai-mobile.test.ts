@@ -98,6 +98,9 @@ describe("phone photos and the AI review", () => {
   let cookie: string;
   beforeAll(async () => {
     cookie = await enroll();
+    // Off by default (2026-11-27): staff turn 「내 사진으로 참여하기」 on before any QR.
+    const { getBackend } = await import("@/lib/storage/server");
+    await getBackend().settings.update({ mobileUpload: true }, crypto.randomUUID());
   });
 
   it("the event starts in AI review: a clearly fine phone photo goes up without a person", async () => {

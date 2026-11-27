@@ -1,4 +1,4 @@
-import { FRAME_CARDS } from "../config/frames/v2";
+import { OFFERED_CARDS } from "../config/frames/v2";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,7 +15,7 @@ import {
 } from "./helpers";
 
 /**
- * 「틀 선택 v2」 (2026-11-22) end to end: each of the nine cards and every option combination,
+ * 「틀 선택 v2」 (2026-11-22) end to end: each of the cards offered and every option combination,
  * from the picker to a real QR, with the mock camera. Also: the handwriting font over 20
  * sessions, the date stamp against a wrong tablet clock, and the Figma screens at three tablet
  * sizes with nothing placed on the binder rings.
@@ -40,11 +40,8 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   // 문구 (2026-11-26): the date in Figma's Caveat, and a caption drawn as Figma's art.
   ["polaroid1", { caption: "date" }, "polaroid1-date", [1200, 1459]],
   ["polaroid1", { caption: "hooray" }, "polaroid1-yaho", [1200, 1459]],
-  ["polaroid3", {}, "polaroid3", [600, 1800]],
-  ["verse4", {}, "verse4", [600, 1800]],
   ["check2", {}, "check2-red", [600, 1800]],
   ["check2", { color: "blue" }, "check2-blue", [600, 1800]],
-  ["lace1", {}, "lace1", [1200, 1500]],
   ["film35", {}, "film35-natural", [600, 1800]],
   ["film35", { color: "mono" }, "film35-mono", [600, 1800]],
   ["film35", { color: "sepia" }, "film35-sepia", [600, 1800]],
@@ -187,7 +184,7 @@ test("date stamp: a tablet clock years off still stamps the server's day", async
   await page.clock.setSystemTime(new Date("2020-01-01T03:00:00Z"));
   await page.goto("/kiosk?camera=mock");
   expect(await page.evaluate(() => new Date().getUTCFullYear())).toBe(2020);
-  await startSession(page, "polaroid3");
+  await startSession(page, "polaroid1", { caption: "date" });
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(page);
@@ -226,7 +223,7 @@ for (const [width, height] of [
     await page.goto("/kiosk?camera=mock");
     await page.addStyleTag({ content: '[data-testid="mock-badge"]{display:none!important}' });
     await openPicker(page);
-    for (const c of FRAME_CARDS.map((card) => card.id))
+    for (const c of OFFERED_CARDS.map((card) => card.id))
       await expect(page.getByTestId(`frame-option-${c}`).locator("img")).toBeVisible();
     expect(await page.evaluate(onTheRings)).toEqual([]);
     if (SAVE)

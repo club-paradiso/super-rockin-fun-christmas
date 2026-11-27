@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { FRAME_CARDS } from "@/config/frames/v2";
+import { OFFERED_CARDS } from "@/config/frames/v2";
 import { cardThumbFrame, pickThumbUrl, staticPickThumbs } from "@/lib/kiosk/pick-thumbs";
 import { THUMB_DIR, THUMB_MANIFEST, thumbFingerprints } from "../helpers/pick-thumbs";
 
@@ -21,7 +21,7 @@ function jpegSize(data: Buffer): { width: number; height: number } {
 
 describe("the picker's ready-made previews (public/kiosk-thumbs)", () => {
   it("every card has one: a JPEG in the frame's own shape, small enough to load at once", () => {
-    for (const card of FRAME_CARDS) {
+    for (const card of OFFERED_CARDS) {
       const file = path.join(THUMB_DIR, `${card.id}.jpg`);
       expect(existsSync(file), `${card.id}: run npm run thumbs:build`).toBe(true);
       const data = readFileSync(file);
@@ -46,7 +46,7 @@ describe("the picker's ready-made previews (public/kiosk-thumbs)", () => {
   });
 
   it("the booth asks for exactly these files", () => {
-    expect(Object.keys(staticPickThumbs())).toEqual(FRAME_CARDS.map((c) => c.id));
+    expect(Object.keys(staticPickThumbs())).toEqual(OFFERED_CARDS.map((c) => c.id));
     expect(pickThumbUrl("film3")).toBe("/kiosk-thumbs/film3.jpg");
   });
 });

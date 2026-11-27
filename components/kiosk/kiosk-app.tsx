@@ -13,8 +13,8 @@ import {
 } from "react";
 import { getFrame } from "@/config/frames";
 import {
-  FRAME_CARDS,
-  V2_FRAMES,
+  OFFERED_CARDS,
+  OFFERED_V2_FRAMES,
   defaultOptions,
   getCard,
   usesHandwriting,
@@ -417,6 +417,7 @@ export function KioskApp({
   initialWallPublic = false,
   initialAiReview = false,
   initialPhotoLooks = false,
+  initialMobileUpload = false,
   staffHelp = false,
   frontend = "modern",
   serverNow,
@@ -435,6 +436,8 @@ export function KioskApp({
   initialAiReview?: boolean;
   /** Staff have 「사진 색 보정」 on (lib/looks): each frame's look is applied to its photos. */
   initialPhotoLooks?: boolean;
+  /** Staff have 「내 사진으로 참여하기」 on: the cover shows its button. Off by default. */
+  initialMobileUpload?: boolean;
   /** Hub: staff help mode (corner hold + PIN). Camera choice then lives there, not with guests. */
   staffHelp?: boolean;
   /** The server's clock at page load (lib/kiosk/bootstrap.ts): photos are dated by it. */
@@ -918,7 +921,7 @@ export function KioskApp({
     let live = true;
     const done = boothPerf().start("boot_assets");
     void frameKit()
-      .ensure(V2_FRAMES)
+      .ensure(OFFERED_V2_FRAMES)
       .then(() => {
         done();
         if (live) setKit({ assets: frameKit().snapshot(), all: true, frames: new Set() });
@@ -989,7 +992,7 @@ export function KioskApp({
     const lutsLoaded = boothPerf().start("boot_luts");
     // Every look, whatever the frames start with: the guest chooses from all of them.
     looksLoadRef.current = Promise.all([
-      created.preload(V2_FRAMES.map((frame) => frame.id)),
+      created.preload(OFFERED_V2_FRAMES.map((frame) => frame.id)),
       created.preloadLooks(LOOK_IDS),
     ]).then(() => undefined);
     void looksLoadRef.current.then(() => {
@@ -1240,7 +1243,7 @@ export function KioskApp({
     // 속도 기록: only when a card had to be drawn now (nothing was drawn ahead for it).
     const drawn = boothPerf().start("thumbs");
     let misses = 0;
-    for (const card of FRAME_CARDS) {
+    for (const card of OFFERED_CARDS) {
       const job = preview(card.frame(defaultOptions(card)), thumbScale);
       if (!job.done()) misses++;
       const url = kept(job);
@@ -1260,7 +1263,7 @@ export function KioskApp({
     // While the LUTs are loading the previews would be drawn twice: wait for them.
     if (!looks && looksActive(window.location.search, looksNow)) return;
     return prefetch(
-      FRAME_CARDS.map((card) => {
+      OFFERED_CARDS.map((card) => {
         const job = preview(card.frame(defaultOptions(card)), thumbScale);
         return { done: job.done, run: job.make };
       }),
@@ -1464,6 +1467,8 @@ export function KioskApp({
   const [wallPublic, setWallPublic] = useState(initialWallPublic);
   // Automatic check (D95), kept current the same way.
   const [aiReview, setAiReview] = useState(initialAiReview);
+  // 「내 사진으로 참여하기」 (staff switch, off by default), kept current the same way.
+  const [mobileUpload, setMobileUpload] = useState(initialMobileUpload);
   // The session whose guest said yes while the automatic check was on, and the line the QR screen
   // shows for it. Any other session shows the usual line.
   const [aiConsent, setAiConsent] = useState<{ sessionId: string; line: ReviewLine } | null>(null);
@@ -1913,6 +1918,7 @@ export function KioskApp({
             wallPublic?: boolean;
             aiReview?: boolean;
             photoLooks?: boolean;
+            mobileUpload?: boolean;
             cameraEngine?: unknown;
             serverNow?: string;
           };
@@ -1921,6 +1927,7 @@ export function KioskApp({
           if (typeof data.wallPublic === "boolean") setWallPublic(data.wallPublic);
           if (typeof data.aiReview === "boolean") setAiReview(data.aiReview);
           if (typeof data.photoLooks === "boolean") setPhotoLooks(data.photoLooks);
+          if (typeof data.mobileUpload === "boolean") setMobileUpload(data.mobileUpload);
           // Taken up at the next "화면을 눌러 시작", never under a guest.
           if (data.cameraEngine) engineHeardRef.current(normalizeCameraEngine(data.cameraEngine));
         }
@@ -2015,7 +2022,7 @@ export function KioskApp({
               dispatch({ type: "OPEN", sessionId: newSessionId() });
             }}
             engine={engineNow}
-            onStartMobile={() => dispatch({ type: "START_MOBILE" })}
+            onStartMobile={mobileUpload ? () => dispatch({ type: "START_MOBILE" }) : null}
             mobileQrSvg={
               mobileQr &&
               state.mobile.status === "ready" &&
@@ -2163,7 +2170,8 @@ interface ScreenProps {
   onConsent: (c: "yes" | "no") => void;
   onReset: () => void;
   onOpen: () => void;
-  onStartMobile: () => void;
+  /** Null while staff have 「내 사진으로 참여하기」 off (the default): the cover shows no button. */
+  onStartMobile: (() => void) | null;
   mobileQrSvg: string | null;
   /** The guest's language choice on the cover (D78). */
   onSetLang: (lang: KioskState<Shot>["lang"]) => void;
@@ -2284,18 +2292,20 @@ function Screen(p: ScreenProps) {
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              className="booth-btn-m attract-mobile"
-              data-testid="start-mobile"
-              disabled={!p.wallSubmissionsOpen}
-              // Paused: the reason is said where the button is, not only by greying it.
-              aria-describedby={p.wallSubmissionsOpen ? undefined : "attract-mobile-paused"}
-              onClick={p.onStartMobile}
-            >
-              <LineIcon name="phone" />
-              {t.attract.mobile}
-            </button>
+            {p.onStartMobile && (
+              <button
+                type="button"
+                className="booth-btn-m attract-mobile"
+                data-testid="start-mobile"
+                disabled={!p.wallSubmissionsOpen}
+                // Paused: the reason is said where the button is, not only by greying it.
+                aria-describedby={p.wallSubmissionsOpen ? undefined : "attract-mobile-paused"}
+                onClick={p.onStartMobile}
+              >
+                <LineIcon name="phone" />
+                {t.attract.mobile}
+              </button>
+            )}
             {p.onToggleSound && (
               <button
                 type="button"
@@ -2308,7 +2318,7 @@ function Screen(p: ScreenProps) {
                 {t.sound}
               </button>
             )}
-            {!p.wallSubmissionsOpen && (
+            {p.onStartMobile && !p.wallSubmissionsOpen && (
               <p className="booth-caption attract-mobile-paused" id="attract-mobile-paused">
                 {t.attract.mobilePaused}
               </p>
@@ -2351,7 +2361,7 @@ function Screen(p: ScreenProps) {
             <h1 className="booth-title">{t.frame.pickTitle}</h1>
           </div>
           <div className="pick-cards" data-testid="frame-options">
-            {FRAME_CARDS.map((c) => (
+            {OFFERED_CARDS.map((c) => (
               <FrameCardButton
                 key={c.id}
                 card={c}

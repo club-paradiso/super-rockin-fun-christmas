@@ -265,8 +265,8 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   await expect(page.locator("html")).toHaveAttribute("lang", "ko");
 });
 
-test("레이스 1컷: one oval photo, 2400 × 3000 at 2×, delivered by QR", async ({ page }) => {
-  await shootAllWithMock(page, "lace1");
+test("폴라로이드 1컷: one photo, 2400 × 2918 at 2×, delivered by QR", async ({ page }) => {
+  await shootAllWithMock(page, "polaroid1");
   await expect(page.getByTestId("select-required")).toHaveAttribute("data-required", "1");
   await selectDefaultPhotos(page);
   const finalImage = page.getByTestId("final-image");
@@ -275,13 +275,7 @@ test("레이스 1컷: one oval photo, 2400 × 3000 at 2×, delivered by QR", asy
     await el.decode();
     return [el.naturalWidth, el.naturalHeight];
   });
-  expect(dims).toEqual([2400, 3000]); // 1200 × 1500 at 2×
-  const loaded = await page.evaluate(() =>
-    performance
-      .getEntriesByType("resource")
-      .some((e) => e.name.endsWith("/frames/v2/lace1-base.jpg")),
-  );
-  expect(loaded).toBe(true);
+  expect(dims).toEqual([2400, 2918]); // 1200 × 1459 at 2×
   const url = await answerForQr(page, "yes");
   expect(url).toMatch(/\/p\/[A-Za-z0-9_-]{32}$/);
 });

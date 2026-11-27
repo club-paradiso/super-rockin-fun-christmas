@@ -16,6 +16,8 @@ export async function kioskBootstrap(
     initialWallPublic: settings.wallPublic,
     initialAiReview: await getAiReview().active(),
     initialPhotoLooks: settings.photoLooks,
+    // 「내 사진으로 참여하기」: hidden on the cover unless staff turned it on.
+    initialMobileUpload: settings.mobileUpload,
     // 「카메라 자동 보정」 (lib/camera-engine): off unless staff turned it on.
     initialCameraEngine: settings.cameraEngine,
     staffHelp: getServerConfig().staffAuth?.mode === "pin",

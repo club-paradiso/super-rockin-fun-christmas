@@ -62,7 +62,7 @@ export function EmergencyPanel({
     router.refresh();
   }
 
-  async function toggle(key: (typeof SWITCHES)[number]["key"] | "photoLooks") {
+  async function toggle(key: (typeof SWITCHES)[number]["key"] | "photoLooks" | "mobileUpload") {
     setBusy(key);
     setError(null);
     const res = await postJson("/api/admin/settings", { [key]: !settings[key] });
@@ -132,6 +132,30 @@ export function EmergencyPanel({
           <span className="admin-switch-track" data-on={settings.photoLooks} aria-hidden />
           <span className="text-[13px] leading-none font-semibold text-ink/75">
             {busy === "photoLooks" ? "…" : settings.photoLooks ? "켜짐" : "꺼짐"}
+          </span>
+        </span>
+      </button>
+      {/* 「내 사진으로 참여하기」 (off by default, 2026-11-27): the booth cover's phone way in. */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={settings.mobileUpload}
+        disabled={busy !== null}
+        onClick={() => toggle("mobileUpload")}
+        data-testid="switch-mobileUpload"
+        className="admin-switch-row w-full border-t border-ink/10"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold">내 사진으로 참여하기</span>
+          <span className="admin-help mt-0.5 block">
+            켜면 키오스크 첫 화면에 「내 사진으로 참여하기」 버튼이 나타나 손님이 휴대폰 사진을
+            미디어월에 보낼 수 있어요. 끄면 버튼이 사라지고 새 QR도 나가지 않아요(기본: 꺼짐).
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-center gap-1">
+          <span className="admin-switch-track" data-on={settings.mobileUpload} aria-hidden />
+          <span className="text-[13px] leading-none font-semibold text-ink/75">
+            {busy === "mobileUpload" ? "…" : settings.mobileUpload ? "켜짐" : "꺼짐"}
           </span>
         </span>
       </button>

@@ -361,6 +361,12 @@ export interface EventSettings {
    */
   photoLooks: boolean;
   /**
+   * "내 사진으로 참여하기" (D66) on the booth cover. Off (default, 2026-11-27, a user decision): the
+   * cover shows no such button and the booth server issues no phone QR; staff turn it on in
+   * /admin. Takes effect on the cover with the booth's next heartbeat.
+   */
+  mobileUpload: boolean;
+  /**
    * Intelligent Camera Engine (「카메라 자동 보정」, lib/camera-engine/settings.ts). Mode "off"
    * (default): the booth photographs exactly as before. Takes effect at the next session.
    */
@@ -381,6 +387,7 @@ export type SettingsPatch = Partial<
     | "wallLook"
     | "moderationMode"
     | "photoLooks"
+    | "mobileUpload"
     | "cameraEngine"
   >
 >;

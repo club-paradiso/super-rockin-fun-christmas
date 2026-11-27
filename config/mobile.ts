@@ -1,5 +1,5 @@
 import { ALL_FRAMES, getFrame } from "@/config/frames";
-import { V2_FRAMES } from "@/config/frames/v2";
+import { OFFERED_V2_FRAMES } from "@/config/frames/v2";
 import type { FrameDefinition } from "@/lib/compositor/types";
 
 /**
@@ -7,8 +7,9 @@ import type { FrameDefinition } from "@/lib/compositor/types";
  * their own phone, puts them in one of the booth's frames and sends that one picture to the
  * media-wall review queue. Change limits here, not inside routes or components.
  *
- * The phone offers exactly the booth's frames: the eight cards of 「틀 선택 v2」 with their options
- * (`MOBILE_FRAMES` = V2_FRAMES). The frames the booth dropped on 2026-11-22 are never offered again;
+ * The phone offers exactly the booth's frames: the cards of 「틀 선택 v2」 the booth offers, with
+ * their options (`MOBILE_FRAMES` = OFFERED_V2_FRAMES). The frames the booth dropped on 2026-11-22,
+ * and the cards taken down on 2026-11-27, are never offered again;
  * a photo already stored in one keeps its id and still hangs in it (`mobileBoothFrame`).
  */
 export const MOBILE_UPLOAD_CONFIG = {
@@ -79,8 +80,11 @@ export function mobileFrameId(boothFrameId: string): string {
   return `${PREFIX}${boothFrameId}`;
 }
 
-/** The frames a guest can put photos in on the phone: the booth's own (v2), nothing else. */
-export const MOBILE_FRAMES: readonly FrameDefinition[] = V2_FRAMES;
+/**
+ * The frames a guest can put photos in on the phone: the booth's own (v2) that the booth offers
+ * today, nothing else. The cards taken down on 2026-11-27 (`RETIRED_CARD_IDS`) are not offered.
+ */
+export const MOBILE_FRAMES: readonly FrameDefinition[] = OFFERED_V2_FRAMES;
 
 /**
  * The booth frame a phone photo was composed in, or null for a plain phone photo (no frame) and

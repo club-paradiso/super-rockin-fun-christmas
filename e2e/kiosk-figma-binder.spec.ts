@@ -19,7 +19,7 @@ test("the Figma olive cover and edge-bound binder use different backgrounds", as
   await expect(inside.locator(".journal-tab")).toBeHidden();
 });
 
-test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine cards, five to a row)", async ({
+test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (six cards, five to a row)", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
@@ -27,20 +27,18 @@ test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine c
   await openPicker(page);
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(9);
+  await expect(cards).toHaveCount(6);
   const boxes = await cards.evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
       return { x: r.x, w: r.width, y: r.y, h: r.height };
     }),
   );
-  // Figma's picker (seven cards, 149 × 357, 12 apart, between x 100 and 732). With 밈 4컷 there
-  // are nine: five to a row in the same width, (632 − 4 × 12) / 5 = 116.8 wide, the second row of
-  // four centred half a card in. Figma has no nine-card picker yet.
+  // Figma's picker (seven cards, 149 × 357, 12 apart, between x 100 and 732). Since 2026-11-27
+  // six (three taken down): five to a row in the same width, (632 − 4 × 12) / 5 = 116.8 wide,
+  // the lone card of the second row centred (Figma 1082:1896).
   const col = (i: number) => 100 + i * 128.8;
-  expect(boxes.map((b) => b.x)).toEqual(
-    [0, 1, 2, 3, 4, 0.5, 1.5, 2.5, 3.5].map((i) => expect.closeTo(col(i), 0)),
-  );
+  expect(boxes.map((b) => b.x)).toEqual([0, 1, 2, 3, 4, 2].map((i) => expect.closeTo(col(i), 0)));
   for (const b of boxes) {
     expect(b.w).toBeCloseTo(116.8, 0);
     expect(b.h).toBeCloseTo(357, 0);
@@ -60,12 +58,12 @@ test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine c
   expect(home!.x + home!.width).toBeLessThan(next!.x);
 });
 
-test("narrow phones keep all nine cards tappable", async ({ page }) => {
+test("narrow phones keep all six cards tappable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/kiosk?camera=mock");
   await openPicker(page);
   const cards = page.getByTestId("screen-pick").locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(9);
+  await expect(cards).toHaveCount(6);
   for (const card of await cards.all()) {
     const box = (await card.boundingBox())!;
     expect(box.width).toBeGreaterThanOrEqual(48);

@@ -16,7 +16,7 @@ const LEGACY_UA =
   "(KHTML, like Gecko) Version/15.8 Mobile/15E148 Safari/604.1";
 const GUESTS = Number(process.env.LEAK_GUESTS) || (process.env.MEASURE_LEAK ? 20 : 3);
 // The frames differ in size and in how many photos they take, as guests' choices do.
-const CARDS = ["film3", "meme4", "polaroid1", "film4", "lace1", "verse4"];
+const CARDS = ["film3", "meme4", "polaroid1", "film4", "check2", "film35"];
 
 test.use({ userAgent: LEGACY_UA, hasTouch: true });
 

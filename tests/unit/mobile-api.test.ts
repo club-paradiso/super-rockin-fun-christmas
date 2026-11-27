@@ -118,6 +118,16 @@ describe("phone upload (D66)", () => {
     cookie = await enroll("mobile booth");
   });
 
+  it("off by default (2026-11-27): no QR until staff turn 「내 사진으로 참여하기」 on", async () => {
+    const { getBackend } = await routes.storage();
+    expect((await getBackend().settings.get()).mobileUpload).toBe(false);
+    const off = await newQr(cookie);
+    expect(off.status).toBe(404);
+    expect(await off.json()).toEqual({ error: "mobile_upload_off" });
+    // On: the next test asks for (and gets) a QR. (One booth may ask 20 times a minute.)
+    await getBackend().settings.update({ mobileUpload: true }, crypto.randomUUID());
+  });
+
   it("only an enrolled booth can ask for a QR; the QR is a phone page on the public address", async () => {
     expect((await newQr(null)).status).toBe(401);
     const res = await newQr(cookie);

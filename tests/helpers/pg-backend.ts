@@ -99,11 +99,17 @@ export function createPgAiBackend(
       return fromDb.settings(r!);
     },
     async update(patch: SettingsPatch, staffUserId: string) {
-      const { photoLooks, cameraEngine, ...rest } = patch;
+      const { photoLooks, mobileUpload, cameraEngine, ...rest } = patch;
       let changed: Row | undefined;
       if (photoLooks !== undefined) {
         [changed] = await one("select * from public.ftl_settings_set_looks($1,$2)", [
           photoLooks,
+          staffUserId,
+        ]);
+      }
+      if (mobileUpload !== undefined) {
+        [changed] = await one("select * from public.ftl_settings_set_mobile_upload($1,$2)", [
+          mobileUpload,
           staffUserId,
         ]);
       }

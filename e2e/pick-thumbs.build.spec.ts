@@ -2,13 +2,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { FRAME_CARDS } from "../config/frames/v2";
+import { OFFERED_CARDS } from "../config/frames/v2";
 import { THUMB_DIR, THUMB_MANIFEST, thumbFingerprints } from "../tests/helpers/pick-thumbs";
 import { enrollKiosk, openPicker } from "./helpers";
 
 /**
  * Builds the frame picker's ready-made previews (`public/kiosk-thumbs`, lib/kiosk/pick-thumbs.ts):
- * the booth draws its nine picker cards as it always does, and each picture is saved as it is.
+ * the booth draws its picker cards as it always does, and each picture is saved as it is.
  * Not a test and not part of `npm run test:e2e`. After a build with the E2E environment:
  *
  *   npm run thumbs:build
@@ -26,13 +26,13 @@ test("write public/kiosk-thumbs from the booth's own picker previews", async ({ 
   await page.goto("/kiosk?camera=mock&looks=0");
   await openPicker(page);
   await mkdir(THUMB_DIR, { recursive: true });
-  for (const card of FRAME_CARDS) {
+  for (const card of OFFERED_CARDS) {
     const img = page.getByTestId(`frame-option-${card.id}`).locator("img");
     await expect(img).toBeVisible();
     const src = (await img.getAttribute("src"))!;
     // The booth's own drawing (a JPEG data URL), not a ready-made file being copied onto itself.
     expect(src.startsWith("data:image/jpeg;base64,"), card.id).toBe(true);
-    // Scaled to what a card needs (about 120 CSS px wide on a 2× screen): nine small files.
+    // Scaled to what a card needs (about 120 CSS px wide on a 2× screen): six small files.
     const drawn = Buffer.from(src.slice(src.indexOf(",") + 1), "base64");
     const small = await sharp(drawn)
       .resize({ width: THUMB_WIDTH })

@@ -1,10 +1,10 @@
-import { FRAME_CARDS, defaultOptions, type FrameCard } from "@/config/frames/v2";
+import { OFFERED_CARDS, defaultOptions, type FrameCard } from "@/config/frames/v2";
 import { frameAssetSources } from "@/lib/compositor/assets";
 import type { FrameDefinition } from "@/lib/compositor/types";
 
 /**
- * The frame picker's nine previews as ready-made pictures (`public/kiosk-thumbs/<card>.jpg`), for
- * a booth that should not draw nine frames on a canvas just to show the picker: the iPad mini 4
+ * The frame picker's previews as ready-made pictures (`public/kiosk-thumbs/<card>.jpg`), for
+ * a booth that should not draw every frame on a canvas just to show the picker: the iPad mini 4
  * render budget (lib/kiosk/legacy-ios.ts). They are the booth's own previews, saved by
  * `npm run thumbs:build` (the same compositor, the same sample photos), never hand-made; a card's
  * picture is the frame with its default options.
@@ -25,7 +25,7 @@ export function cardThumbFrame(card: FrameCard): FrameDefinition {
 
 /** Every card's ready-made picture, by card id. */
 export function staticPickThumbs(): Record<string, string> {
-  return Object.fromEntries(FRAME_CARDS.map((card) => [card.id, pickThumbUrl(card.id)]));
+  return Object.fromEntries(OFFERED_CARDS.map((card) => [card.id, pickThumbUrl(card.id)]));
 }
 
 /** The four sample photos the previews are drawn with (components/kiosk/frame-preview.ts). */

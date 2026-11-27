@@ -151,6 +151,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       aiReview: await getAiReview().active(),
       // Colour looks (lib/looks): the booth takes this up at its next session, never mid-session.
       photoLooks: settings.photoLooks,
+      // 「내 사진으로 참여하기」: the cover shows the button only while staff have it on.
+      mobileUpload: settings.mobileUpload,
       // Camera engine (lib/camera-engine): taken up at the booth's next session, like the looks.
       cameraEngine: settings.cameraEngine,
       // The booth keeps its clock offset from this (polaroid date stamp, never the tablet clock).
