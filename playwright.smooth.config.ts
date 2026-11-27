@@ -9,7 +9,7 @@ import { E2E_ENV, PORT } from "./e2e/env";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /kiosk-smoothness\.spec\.ts$/,
+  testMatch: /kiosk-(?:smoothness|perf-measure)\.spec\.ts$/,
   timeout: 0,
   retries: 0,
   workers: 1,

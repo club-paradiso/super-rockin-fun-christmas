@@ -348,6 +348,15 @@ looks:measure`). `/looks` is the comparison
   arrays (`cpu.ts`); a change to one is a change to both (`e2e/retouch.spec.ts` compares them).
   `/retouch-lab` (standalone, Safari 15) is the acceptance tool; iPad mini 4 timings are a
   person's measurement, never a desktop number.
+- **The speed log is codes and numbers, nothing else** (「속도 기록」, 2026-11-27, a user request:
+  measure the iPad mini 4 before changing anything for it). `lib/kiosk/perf.ts` times the booth's
+  own steps (each screen from tap to paint, thumbnails, camera, one shot, colour row, final
+  composite, upload, QR) with the codes of `PERF_CODES`; staff read the table on the tablet (help
+  menu on a hub, `?perf=1` on the first screen elsewhere) and the heartbeat sends the samples since
+  the last beat, which the server logs as `kiosk_perf` (`cleanPerfReport`: known codes, whole
+  milliseconds; anything else is dropped; logged, never stored). Never put a photo, a face, a
+  token, a session id or free text in it, and never let a measurement delay a guest. A number
+  measured on a desktop (even with the CPU slowed) is never written down as an iPad number.
 - **The camera engine is off by default, on the device, and may fail without the booth failing**
   (「카메라 자동 보정」, D120, 2026-11-27, `docs/CAMERA_ENGINE.md`). It turns back the tablet's own
   tilt: roll (Smart Level) and, partly, pitch (Smart Perspective), read from the motion sensors.
@@ -468,6 +477,7 @@ config/camera-engine.ts every camera-engine number: limits, dead zones, guard, c
 camera-lab/            /camera-lab page (own Vite bundle for Safari 15) · app/camera-lab (route, gated)
 lib/kiosk/render-cache.ts  screen pictures (frame previews, graded shots, colour chips) drawn once,
                        kept, and drawn ahead one per task; a miss is drawn on the spot as before
+lib/kiosk/perf.ts      속도 기록: the booth's own step timings (codes + ms), table for staff, heartbeat report
 lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch; the colour look is composeFrame's grade)
 config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag
 retouch-lab/           /retouch-lab page (own Vite bundle for Safari 15) · app/retouch-lab (route, gated)

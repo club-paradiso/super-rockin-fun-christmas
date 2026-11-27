@@ -7,7 +7,7 @@ import { getBackend } from "@/lib/storage/server";
 
 export async function kioskBootstrap(
   camera?: string,
-  query: { retouch?: string; retouchHud?: string } = {},
+  query: { retouch?: string; retouchHud?: string; perf?: string } = {},
 ) {
   const settings = await getBackend().settings.get();
   return {
@@ -25,5 +25,7 @@ export async function kioskBootstrap(
     skinRetouch: resolveRetouchLevel(query.retouch, process.env.SKIN_RETOUCH),
     // Timings on screen, for measuring a device: always in development, by `?retouchHud=1` else.
     retouchHud: query.retouchHud === "1" || process.env.NODE_ENV !== "production",
+    // 속도 기록 on the first screen (`?perf=1`), for a booth without the staff help menu.
+    perfHud: query.perf === "1",
   };
 }

@@ -38,6 +38,7 @@ export const GET = route("kiosk_legacy", async (request: Request) => {
   const props = await kioskBootstrap(cameras.length === 1 ? cameras[0] : undefined, {
     retouch: params.get("retouch") ?? undefined,
     retouchHud: params.get("retouchHud") ?? undefined,
+    perf: params.get("perf") ?? undefined,
   });
   return kioskHtml(
     `<div id="legacy-kiosk" data-config="${escapeHtml(JSON.stringify(props))}">

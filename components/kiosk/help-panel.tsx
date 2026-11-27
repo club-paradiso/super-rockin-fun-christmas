@@ -9,6 +9,7 @@ import { looksStatus } from "@/lib/looks/status";
 import { engineStatusLine, engineStatusRows } from "@/lib/camera-engine/status";
 import type { BoothCameraEngine } from "./camera-engine";
 import { HelpFullscreen } from "./fullscreen";
+import { PerfNote, PerfTable } from "./perf-table";
 import {
   HELP_CLOSED,
   HELP_PIN_LENGTH,
@@ -352,6 +353,12 @@ function HelpMenu(p: {
         <p className="text-xl" data-testid="help-looks-status" data-state={looksLine.state}>
           {looksLine.text}
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2" data-testid="help-perf">
+        <h3 className="text-2xl font-bold">속도 기록</h3>
+        <PerfTable />
+        <PerfNote />
       </section>
 
       <HelpCameraEngine cameraEngine={p.cameraEngine} />

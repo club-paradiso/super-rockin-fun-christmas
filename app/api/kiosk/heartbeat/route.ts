@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseCameraEngineStatus } from "@/lib/camera-engine/status";
 import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { cleanPerfReport, formatPerfReport } from "@/lib/kiosk/perf";
 import { getAiReview, sweepAiReviewSoon } from "@/lib/moderation/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
@@ -52,6 +53,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     retouchFailures?: unknown;
     retouchError?: unknown;
     looksError?: unknown;
+    perf?: unknown;
+    perfProfile?: unknown;
     cameraEngine?: unknown;
   };
   // Skin retouch failed on that booth since its last beat: a code and a count for the log, so a
@@ -80,6 +83,16 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       { kioskId: auth.kioskId ?? "dev", code: body.looksError },
       "warn",
     );
+  // 속도 기록 (lib/kiosk/perf.ts): how long that booth's steps took since its last beat. Known
+  // codes and whole numbers only (`code=n:last/median/max` ms); anything else is dropped, and
+  // nothing about a photo or a session is in it. Logged, never stored.
+  const perf = cleanPerfReport(body.perf);
+  if (perf)
+    logEvent("kiosk_perf", {
+      kioskId: auth.kioskId ?? "dev",
+      profile: body.perfProfile === "legacy" ? "legacy" : "modern",
+      perf: formatPerfReport(perf),
+    });
   // Camera engine (lib/camera-engine/status.ts): what the booth says about its own correction,
   // as codes and rounded numbers. A booth that says nothing, or something outside the contract,
   // leaves the stored status as it is (undefined): dropped, never stored.
