@@ -458,6 +458,8 @@ lib/camera-engine      camera engine (D120, off by default): sensors → up vect
 config/camera-engine.ts every camera-engine number: limits, dead zones, guard, crop, sensor filter,
                        camera profiles
 camera-lab/            /camera-lab page (own Vite bundle for Safari 15) · app/camera-lab (route, gated)
+lib/kiosk/render-cache.ts  screen pictures (frame previews, graded shots, colour chips) drawn once,
+                       kept, and drawn ahead one per task; a miss is drawn on the spot as before
 lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch; the colour look is composeFrame's grade)
 config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag
 retouch-lab/           /retouch-lab page (own Vite bundle for Safari 15) · app/retouch-lab (route, gated)
