@@ -194,7 +194,23 @@ function film4(color: keyof typeof FILM4): FrameDefinition {
  * 「오늘 날짜」 writes the shooting day in Caveat with the star after it. F (장소 + 날짜) was
  * dropped in Figma and is not here. The photo, the paper and the logo are the same in all ten.
  */
-export const POLAROID1_CAPTIONS = [
+export const POLAROID1_CAPTIONS = ["village", "date", "verse", "merry", "circle"] as const;
+/**
+ * Captions taken down (2026-11-27, a user decision: 메리 크리스마스(한글), with my people, peace!,
+ * 크리스마스 야호, us at Christmas Village). The booth and the phone page no longer offer them. Their
+ * frames stay in `POLAROID1_VARIANTS` / `V2_FRAMES` so a photo already stored in one keeps hanging.
+ */
+export const POLAROID1_RETIRED_CAPTIONS = [
+  "us",
+  "merryKo",
+  "hooray",
+  "checklist",
+  "peace",
+] as const;
+export type Polaroid1Caption =
+  (typeof POLAROID1_CAPTIONS)[number] | (typeof POLAROID1_RETIRED_CAPTIONS)[number];
+/** Every caption that has a frame, in the order the ten were drawn. */
+const POLAROID1_ALL: readonly Polaroid1Caption[] = [
   "village",
   "date",
   "verse",
@@ -205,8 +221,7 @@ export const POLAROID1_CAPTIONS = [
   "checklist",
   "peace",
   "circle",
-] as const;
-export type Polaroid1Caption = (typeof POLAROID1_CAPTIONS)[number];
+];
 
 /** Figma node and file name of each outlined caption (the frame-sized SVG, 1200 × 1459). */
 const POLAROID1_ART: Record<Exclude<Polaroid1Caption, "village" | "date">, [string, string]> = {
@@ -324,7 +339,7 @@ function polaroid1(caption: Polaroid1Caption): FrameDefinition {
 }
 
 export const POLAROID1_VARIANTS = Object.fromEntries(
-  POLAROID1_CAPTIONS.map((c) => [c, polaroid1(c)]),
+  POLAROID1_ALL.map((c) => [c, polaroid1(c)]),
 ) as Record<Polaroid1Caption, FrameDefinition>;
 
 // ── 폴라로이드 3컷 · 스크랩 (Figma 836:1616) ─────────────────────────────────────────────────
@@ -665,6 +680,8 @@ export interface FrameCard {
   options: readonly FrameCardOption[];
   /** The frame for a full set of options. */
   frame: (options: FrameOptions) => FrameDefinition;
+  /** Frames of this card no longer offered; stored photos in them keep hanging. */
+  retiredFrames?: readonly FrameDefinition[];
 }
 
 function only(frame: FrameDefinition): FrameCard["frame"] {
@@ -705,14 +722,15 @@ export const FRAME_CARDS: readonly FrameCard[] = [
   },
   {
     id: "polaroid1",
-    // 문구 (2026-11-26): ten captions, the one the booth always had first.
+    // 문구 (2026-11-26): ten captions; five left on 2026-11-27, the one the booth always had first.
     options: [{ key: "caption", values: POLAROID1_CAPTIONS }],
     frame: (o) =>
       POLAROID1_VARIANTS[
-        POLAROID1_CAPTIONS.includes(o.caption as Polaroid1Caption)
+        (POLAROID1_CAPTIONS as readonly string[]).includes(o.caption as string)
           ? (o.caption as Polaroid1Caption)
           : "village"
       ],
+    retiredFrames: POLAROID1_RETIRED_CAPTIONS.map((c) => POLAROID1_VARIANTS[c]),
   },
   { id: "polaroid3", options: [], frame: only(polaroid3) },
   { id: "verse4", options: [], frame: only(verse4) },
@@ -759,7 +777,11 @@ export const OFFERED_CARDS: readonly FrameCard[] = FRAME_CARDS.filter(
 /** Every frame a guest can make today (each option combination once): `V2_FRAMES` minus retired. */
 export const OFFERED_V2_FRAMES: readonly FrameDefinition[] = V2_FRAMES.filter((f) => {
   const card = cardOfFrame(f.id);
-  return card !== null && !RETIRED_CARD_IDS.has(card.id);
+  return (
+    card !== null &&
+    !RETIRED_CARD_IDS.has(card.id) &&
+    !(card.retiredFrames ?? []).some((r) => r.id === f.id)
+  );
 });
 
 /** 필름 is preselected for every guest. */
@@ -793,6 +815,7 @@ export function cardOfFrame(frameId: string): FrameCard | null {
       [{}],
     );
     if (combos.some((c) => card.frame(c).id === frameId)) return card;
+    if (card.retiredFrames?.some((r) => r.id === frameId)) return card;
   }
   return null;
 }

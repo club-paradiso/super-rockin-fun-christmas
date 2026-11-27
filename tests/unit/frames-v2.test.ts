@@ -13,6 +13,7 @@ import {
   cleanOptions,
   defaultOptions,
   getCard,
+  POLAROID1_RETIRED_CAPTIONS,
   POLAROID1_VARIANTS,
   isMemeFrame,
   usesHandwriting,
@@ -100,7 +101,9 @@ describe("틀 선택 v2: the cards", () => {
       expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
       expect(RETIRED_CARD_IDS.has(cardOfFrame(id)!.id)).toBe(true);
     }
-    expect(OFFERED_V2_FRAMES.length).toBe(V2_FRAMES.length - gone.length);
+    expect(OFFERED_V2_FRAMES.length).toBe(
+      V2_FRAMES.length - gone.length - POLAROID1_RETIRED_CAPTIONS.length,
+    );
   });
 
   it("필름 is one card: 크림 · 빨강 the four-photo strip, 흑백 · 세피아 the three-photo strip with the logo", () => {
@@ -132,24 +135,8 @@ describe("틀 선택 v2: the cards", () => {
         ["logo", ["logoOn", "logoOff"]],
       ],
       film4: [["color", ["cream", "red"]]],
-      // 문구 (2026-11-26): ten captions, the one the booth always had first.
-      polaroid1: [
-        [
-          "caption",
-          [
-            "village",
-            "date",
-            "verse",
-            "merry",
-            "us",
-            "merryKo",
-            "hooray",
-            "checklist",
-            "peace",
-            "circle",
-          ],
-        ],
-      ],
+      // 문구 (2026-11-26): ten captions; five taken down on 2026-11-27, the first the booth always had.
+      polaroid1: [["caption", ["village", "date", "verse", "merry", "circle"]]],
       polaroid3: [],
       verse4: [],
       check2: [["color", ["red", "blue"]]],
@@ -179,12 +166,16 @@ describe("틀 선택 v2: the cards", () => {
         expect(frame.slots.length, frame.id).toBeLessThanOrEqual(4);
       }
     }
-    // Every frame the booth can make, and no other, is in V2_FRAMES.
+    // Every frame the booth can make, and no other, is in V2_FRAMES (plus the retired captions).
     // 필름 makes four frames that 필름 3컷 · 4컷 make too (both kept for stored photos).
-    expect(combinations).toBe(V2_FRAMES.length + getCard("film").options[0]!.values.length);
+    expect(combinations).toBe(
+      V2_FRAMES.length -
+        POLAROID1_RETIRED_CAPTIONS.length +
+        getCard("film").options[0]!.values.length,
+    );
   });
 
-  it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film 4, film35 3, film4 2, check2 2, others 1)", () => {
+  it("map every option combination to its own frame (polaroid1 5, meme4 5, film3 4, film 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.filter((c) => c.id !== "film").flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
@@ -204,11 +195,6 @@ describe("틀 선택 v2: the cards", () => {
       "polaroid1-date",
       "polaroid1-verse",
       "polaroid1-merry",
-      "polaroid1-us",
-      "polaroid1-merry-ko",
-      "polaroid1-yaho",
-      "polaroid1-checklist",
-      "polaroid1-peace",
       "polaroid1-circle",
       "polaroid3",
       "verse4",
@@ -224,7 +210,20 @@ describe("틀 선택 v2: the cards", () => {
       "meme4-takel",
       "meme4-analyzing",
     ]);
-    expect(V2_FRAMES.map((f) => f.id)).toEqual(ids);
+    // The five retired captions keep their frames, so stored photos still hang.
+    const retired = [
+      "polaroid1-us",
+      "polaroid1-merry-ko",
+      "polaroid1-yaho",
+      "polaroid1-checklist",
+      "polaroid1-peace",
+    ];
+    const at = ids.indexOf("polaroid1-merry") + 1;
+    expect(V2_FRAMES.map((f) => f.id)).toEqual([...ids.slice(0, at), ...retired, ...ids.slice(at)]);
+    for (const id of retired) {
+      expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
+      expect(cardOfFrame(id)?.id).toBe("polaroid1");
+    }
     // 필름 comes first and owns the strips it makes; every other frame belongs to its own card.
     for (const id of ids)
       expect(cardOfFrame(id)?.id).toBe(

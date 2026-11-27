@@ -2392,11 +2392,12 @@ function Screen(p: ScreenProps) {
 
     case "options": {
       // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷), 1055:3631 (폴라로이드
-      // 1컷 문구: ten answers in two columns, no row label).
+      // 1컷 문구: five answers in two columns of three rows, no row label; ten until 2026-11-27).
       const card = getCard(state.cardId);
-      // Many answers (the ten captions) sit in a two-column grid with no row label, which spaces
-      // the screen a little differently; four or five (밈 4컷) keep the row with its label.
-      const grid = card.options.some((o) => o.values.length >= OPTIONS_GRID_MIN);
+      // The captions (and any option with many answers) sit in a two-column grid with no row
+      // label, which spaces the screen a little differently; four or five (밈 4컷) keep the row
+      // with its label.
+      const grid = card.options.some(optionIsGrid);
       const key = card.options.length === 1 ? card.options[0]!.key : null;
       const title =
         key === "caption"
@@ -2448,21 +2449,15 @@ function Screen(p: ScreenProps) {
             {card.options.map((option) => (
               <div
                 key={option.key}
-                className={
-                  option.values.length >= OPTIONS_GRID_MIN
-                    ? "options-row options-grid"
-                    : "options-row"
-                }
+                className={optionIsGrid(option) ? "options-row options-grid" : "options-row"}
                 data-many={
                   // Up to four answers sit on one line (필름: 크림 · 빨강 · 흑백 · 세피아).
-                  option.values.length > 4 && option.values.length < OPTIONS_GRID_MIN
-                    ? ""
-                    : undefined
+                  option.values.length > 4 && !optionIsGrid(option) ? "" : undefined
                 }
                 role="radiogroup"
                 aria-label={t.label[option.key]}
               >
-                {option.values.length < OPTIONS_GRID_MIN && (
+                {!optionIsGrid(option) && (
                   <span className="options-row-label" aria-hidden>
                     {t.label[option.key]}
                   </span>
@@ -3088,6 +3083,15 @@ function MobileScreen({
 
 /** From this many answers an option is a two-column grid without its row label (Figma 1055:3631). */
 const OPTIONS_GRID_MIN = 6;
+
+/**
+ * The 폴라로이드 1컷 문구 is always the grid, however many captions are offered (five since
+ * 2026-11-27, Figma 1055:3631: two columns, three rows, the last one alone at the left): long
+ * captions need the width of a column, which three to a line would not give them.
+ */
+function optionIsGrid(option: { key: string; values: readonly unknown[] }): boolean {
+  return option.key === "caption" || option.values.length >= OPTIONS_GRID_MIN;
+}
 
 /** One card of the v2 picker: the frame with sample photos and its name (no hint since 2026-11-27). */
 function FrameCardButton({
