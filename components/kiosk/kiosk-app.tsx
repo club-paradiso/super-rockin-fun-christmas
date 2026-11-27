@@ -936,8 +936,12 @@ export function KioskApp({
               `${frame.id}|${scale}`,
             ),
           });
-          // A drawing that failed is tried again next time, as it always was.
-          if (url && lookState !== "failed") previews.pictures.set(key, url);
+          // A drawing that failed is tried again next time, as it always was. The look is asked
+          // again after drawing: WebGL can fail during it, and then the frame's own tone was drawn,
+          // which must not be kept as the graded picture for a later guest whose WebGL works.
+          const lookAfter = looks ? (looks.problem() === null ? "graded" : "failed") : "none";
+          if (url && lookState !== "failed" && lookAfter === lookState)
+            previews.pictures.set(key, url);
           return url;
         },
       };
