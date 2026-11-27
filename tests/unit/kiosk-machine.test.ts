@@ -28,7 +28,7 @@ function createInitialState<Shot>(init: Parameters<typeof attractState>[0]): Kio
   return kioskReducer(attractState<Shot>(init), { type: "OPEN", sessionId: SESSION });
 }
 const SESSION = "11111111-2222-4333-8444-555555555555";
-/** Shots per session: five since 2026-11-27 (a user decision). */
+/** Shots per session: four, 5 s apart, final since 2026-11-27 (a user decision). */
 const SHOTS = KIOSK_CONFIG.shotsPerSession;
 
 function init(): S {
@@ -66,7 +66,7 @@ function shootAll(ready: S): S {
 /** Every shot taken: the photo choice, as it opens (there is no review screen since 2026-11-27). */
 const toShot = (): S => shootAll(toReady());
 
-/** A card (and its options) on the picker, then the camera and the five shots. */
+/** A card (and its options) on the picker, then the camera and the four shots. */
 function toShotWith(cardId: string, options: KioskAction<string>[] = []): S {
   let s = run(init(), { type: "SELECT_CARD", cardId });
   s = run(s, { type: "CONFIRM_PICK", random: 0 });
@@ -113,15 +113,15 @@ describe("countdown", () => {
   });
 });
 
-describe("exactly five captures (2026-11-27, a user decision)", () => {
-  it("the booth shoots five", () => {
-    expect(SHOTS).toBe(5);
+describe("exactly four captures (2026-11-27, a user decision)", () => {
+  it("the booth shoots four", () => {
+    expect(SHOTS).toBe(4);
   });
 
-  it("goes to the photo choice after the fifth shot, in order, the first photos already chosen", () => {
+  it("goes to the photo choice after the fourth shot, in order, the first photos already chosen", () => {
     const s = toShot();
     expect(s.phase).toBe("select");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3", "shot-4"]);
+    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3"]);
     expect(capturedCount(s)).toBe(SHOTS);
     // 필름 3컷: the first three, in shooting order. One press finishes.
     expect(s.selectedShotIndices).toEqual([0, 1, 2]);
@@ -139,12 +139,12 @@ describe("exactly five captures (2026-11-27, a user decision)", () => {
       const s = toShotWith(card);
       expect(getFrame(s.frameId).slots.length, card).toBe(slots);
       expect(s.selectedShotIndices, card).toEqual(Array.from({ length: slots }, (_, i) => i));
-      // Always at least one photo left over to swap in.
-      expect(SHOTS - slots, card).toBeGreaterThanOrEqual(1);
+      // No frame takes more than the session shoots: every shot has a place.
+      expect(slots, card).toBeLessThanOrEqual(SHOTS);
     }
   });
 
-  it("the fourth shot is not the last: the countdown runs exactly five times", () => {
+  it("the countdown runs exactly four times", () => {
     let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
     const countdowns: number[] = [];
     for (let i = 0; i < SHOTS; i++) {
@@ -152,7 +152,7 @@ describe("exactly five captures (2026-11-27, a user decision)", () => {
       countdowns.push(s.shotIndex);
       s = shoot(s, `shot-${i}`);
     }
-    expect(countdowns).toEqual([0, 1, 2, 3, 4]);
+    expect(countdowns).toEqual([0, 1, 2, 3]);
     expect(s.phase).toBe("select");
   });
 
@@ -166,7 +166,7 @@ describe("exactly five captures (2026-11-27, a user decision)", () => {
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
-  it("the photo choice opens only when all five exist: four shots are still shooting", () => {
+  it("the photo choice opens only when all four exist: three shots are still shooting", () => {
     let partial = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
     for (let i = 0; i < SHOTS - 1; i++) partial = shoot(partial, `p-${i}`);
     expect(partial.phase).toBe("countdown");
@@ -179,7 +179,7 @@ describe("exactly five captures (2026-11-27, a user decision)", () => {
 });
 
 describe("no extra photo, no second frame choice (v2)", () => {
-  it("has no sixth slot: the session holds exactly five and an unknown action changes nothing", () => {
+  it("has no fifth slot: the session holds exactly four and an unknown action changes nothing", () => {
     const all = toShot();
     expect(all.shots).toHaveLength(SHOTS);
     expect("extraShotPending" in all).toBe(false);
@@ -217,10 +217,10 @@ describe("이전 where nothing is lost (2026-11-25, 2026-11-27)", () => {
     const select = run(
       toShot(),
       { type: "TOGGLE_SHOT_SELECTION", index: 2 },
-      { type: "TOGGLE_SHOT_SELECTION", index: 4 },
+      { type: "TOGGLE_SHOT_SELECTION", index: 3 },
       { type: "SET_LOOK", lookId: "ink" },
     );
-    expect(select.selectedShotIndices).toEqual([0, 1, 4]);
+    expect(select.selectedShotIndices).toEqual([0, 1, 3]);
     expect(canGoBack(select)).toBe(false);
     expect(run(select, { type: "BACK" })).toBe(select);
   });
@@ -687,7 +687,7 @@ describe("the colour look a guest chooses with the photos", () => {
 });
 
 describe("ordered selection", () => {
-  // 성경 구절 4컷: four of the five. The screen opens with 0, 1, 2, 3 chosen.
+  // 성경 구절 4컷: all four. The screen opens with 0, 1, 2, 3 chosen.
   const prepare = (cardId = "verse4") => toShotWith(cardId);
 
   it("opens complete: one press finishes with the first photos, in shooting order", () => {
@@ -701,45 +701,46 @@ describe("ordered selection", () => {
     let s = cleared(prepare());
     expect(s.selectedShotIndices).toEqual([]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
-    s = run(s, ...[4, 1, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
-    expect(s.selectedShotIndices).toEqual([4, 1, 3]);
+    s = run(s, ...[3, 1, 2].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
+    expect(s.selectedShotIndices).toEqual([3, 1, 2]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
     s = run(
       s,
       { type: "TOGGLE_SHOT_SELECTION", index: 0 },
       { type: "CONFIRM_SELECTION", askConsent: true },
     );
-    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [4, 1, 3, 0]]);
+    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [3, 1, 2, 0]]);
   });
 
-  it("swapping one photo: take one out, put the spare in (it goes last)", () => {
+  it("changing the order: take one out, put it back in (it goes last)", () => {
     const s = run(
       prepare(),
       { type: "TOGGLE_SHOT_SELECTION", index: 1 },
-      { type: "TOGGLE_SHOT_SELECTION", index: 4 },
+      { type: "TOGGLE_SHOT_SELECTION", index: 1 },
     );
-    expect(s.selectedShotIndices).toEqual([0, 2, 3, 4]);
+    expect(s.selectedShotIndices).toEqual([0, 2, 3, 1]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
 
   it("a full frame of several photos takes no extra one: nothing is dropped for the guest", () => {
-    const s = prepare();
-    expect(run(s, { type: "TOGGLE_SHOT_SELECTION", index: 4 })).toBe(s);
+    // A frame of three, with four shots: the fourth photo does not push one of the three out.
+    const s = prepare("polaroid3");
+    expect(run(s, { type: "TOGGLE_SHOT_SELECTION", index: 3 })).toBe(s);
     let two = prepare("check2");
     expect(two.selectedShotIndices).toEqual([0, 1]);
     expect(run(two, { type: "TOGGLE_SHOT_SELECTION", index: 3 })).toBe(two);
     two = run(
       cleared(two),
-      ...[2, 4, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      ...[2, 0, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
-    expect(two.selectedShotIndices).toEqual([2, 4]);
+    expect(two.selectedShotIndices).toEqual([2, 0]);
     expect(run(two, { type: "CONFIRM_SELECTION", askConsent: false }).phase).toBe("delivery");
     let three = cleared(prepare("polaroid3"));
     three = run(
       three,
-      ...[4, 3, 2, 1].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      ...[3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
-    expect(three.selectedShotIndices).toEqual([4, 3, 2]);
+    expect(three.selectedShotIndices).toEqual([3, 2, 1]);
     expect(run(three, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
 
@@ -838,7 +839,7 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(s.phase).toBe("select");
   });
 
-  it("guide mode shows the pose of the shot being counted down, five shots as always", () => {
+  it("guide mode shows the pose of the shot being counted down, four shots as always", () => {
     let s = begin(true);
     expect(currentPose(toReady())).toBeNull(); // not before shooting starts
     for (let i = 0; i < SHOTS; i++) {

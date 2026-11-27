@@ -11,7 +11,7 @@ import {
 
 /**
  * STUDIO SHALOM booth (D77, D78, D79, D80): the star in the O, "이전", the English screens, the 2×2
- * frame, the journal-cover attract screen and its QR bookmark. The rules (five shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
+ * frame, the journal-cover attract screen and its QR bookmark. The rules (four shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -88,13 +88,13 @@ test("이전: none once the shots are taken (the choice itself can still change)
   await expect(page.getByTestId("go-home")).toBeVisible();
   // What "이전" used to protect is still the guest's: the choice changes on this screen. The
   // first three are chosen; a full choice ignores a tap on another photo until one is taken out.
-  await page.getByTestId("select-shot-4").click();
-  await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "false");
+  await page.getByTestId("select-shot-3").click();
+  await expect(page.getByTestId("select-shot-3")).toHaveAttribute("aria-pressed", "false");
   await page.getByTestId("select-shot-1").click();
   await expect(page.getByTestId("select-shot-1")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("confirm-selection")).toBeDisabled();
-  await page.getByTestId("select-shot-4").click();
-  await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("select-shot-3").click();
+  await expect(page.getByTestId("select-shot-3")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("select-shot-0")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("select-shot-2")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("confirm-selection")).toBeEnabled();
@@ -121,7 +121,7 @@ test("다시 찍기 is gone (2026-11-27): no button and no dialog on any screen 
   await page.goto("/kiosk?camera=mock");
   await startSession(page);
   await noRetake("ready");
-  // The countdown runs exactly five times: one shot label per shot, never a sixth.
+  // The countdown runs exactly four times: one shot label per shot, never a fifth.
   await page.evaluate(() => {
     const seen = new Set<string>();
     const root = document.querySelector(".kiosk-root")!;
@@ -136,11 +136,11 @@ test("다시 찍기 is gone (2026-11-27): no button and no dialog on any screen 
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
   expect(
     (await page.locator(".kiosk-root").getAttribute("data-test-countdowns"))!.split("|"),
-  ).toEqual(["1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진"]);
+  ).toEqual(["1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진"]);
   // No review screen between the shots and the photo choice.
   await expect(page.locator(".review-photo, [data-testid='review-grid']")).toHaveCount(0);
-  await expect(page.getByTestId("select-grid").locator(".select-tile")).toHaveCount(5);
-  await expect(page.getByTestId("select-grid").locator(".select-tile img")).toHaveCount(5);
+  await expect(page.getByTestId("select-grid").locator(".select-tile")).toHaveCount(4);
+  await expect(page.getByTestId("select-grid").locator(".select-tile img")).toHaveCount(4);
   await noRetake("select");
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
@@ -177,7 +177,7 @@ test("English: the whole booth in English, the next guest back in Korean", async
   await page.getByRole("button", { name: "Start shooting" }).click();
   await page.getByRole("button", { name: "Pose freely" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Pick 3 of your 5 photos", { exact: true })).toBeVisible();
+  await expect(page.getByText("Pick 3 of your 4 photos", { exact: true })).toBeVisible();
   await expect(page.getByTestId("select-change-hint")).toHaveText(
     "The first ones are picked. To change, tap one to take it out, then tap the one you want.",
   );
@@ -247,7 +247,7 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   // The recommended pose is shown in Chinese during the countdown.
   await expect(page.getByTestId("pose-guide")).toContainText("面对面");
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("请从 5 张中选 2 张", { exact: true })).toBeVisible();
+  await expect(page.getByText("请从 4 张中选 2 张", { exact: true })).toBeVisible();
   await expect(page.getByTestId("select-change-hint")).toHaveText(
     "已按顺序选好前几张。想换的话，先点要去掉的，再点要放进去的。",
   );
@@ -335,7 +335,7 @@ test("the photo choice (the first screen after the shots) fits without scrolling
     await shootAllWithMock(page);
     const confirm = page.getByTestId("confirm-selection");
     await expect(confirm).toBeInViewport({ ratio: 1 });
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       await expect(page.getByTestId(`select-shot-${i}`)).toBeInViewport({ ratio: 1 });
     }
     // Neither the page nor the booth's own scroll area (.kiosk-scroll) has anything to scroll.

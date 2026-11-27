@@ -65,7 +65,7 @@ test("the shortest way to the QR is six touches for a frame with options", async
   // 3 · "이대로 찍기"
   await page.getByTestId("confirm-options").click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
-  // 4 · "자유 포즈로 찍기", then five shots with no touch at all
+  // 4 · "자유 포즈로 찍기", then four shots with no touch at all
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   // 5 · the photos are already chosen: one press finishes

@@ -22,7 +22,7 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * effects in response to phases and dispatches the results back here. That keeps every rule
  * (exactly N shots, the frame fixed before shooting, reset) unit-testable.
  *
- * 2026-11-27, a user decision: 5 shots, no retake. A session shoots five (KIOSK_CONFIG
+ * 2026-11-27, a user decision: 4 shots, no retake. A session shoots four (KIOSK_CONFIG
  * .shotsPerSession) and there is no way back past the shots: 「다시 찍기」 (2026-11-25) is gone,
  * with its action, its allowance and its dialog.
  *

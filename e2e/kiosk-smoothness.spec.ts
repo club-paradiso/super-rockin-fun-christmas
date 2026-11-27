@@ -73,7 +73,7 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     // The photo choice appears by itself after the last shot (no review screen): measured from
     // the last shot's countdown to the choice on screen.
-    await expect(page.getByTestId("shot-label")).toHaveText("5번째 사진", {
+    await expect(page.getByTestId("shot-label")).toHaveText("4번째 사진", {
       timeout: SHOOT_TIMEOUT * 2,
     });
     results[`guest${guest}: last shot → choice`] = await longTasks(
@@ -83,7 +83,7 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
       },
       2500,
     );
-    // A tap on another colour: the five shots are shown again in that look.
+    // A tap on another colour: the four shots are shown again in that look.
     await page.waitForTimeout(1500);
     const chipId = await page
       .locator('.look-chip[aria-checked="false"]')
