@@ -21,6 +21,8 @@
     "test:supabase": "bash scripts/test-supabase.sh",
     "staff:add": "node scripts/staff-add.mjs",
     "looks:build": "node scripts/looks-build.mjs",
+    "thumbs:build": "BUILD_THUMBS=1 playwright test -c playwright.smooth.config.ts pick-thumbs",
+    "kiosk:lite": "node scripts/kiosk-lite-assets.mjs",
     "looks:preview": "node scripts/looks-preview.mjs",
     "looks:measure": "node scripts/looks-measure.mjs",
     "build:kiosk-legacy": "vite build --config legacy-kiosk/vite.config.mts",

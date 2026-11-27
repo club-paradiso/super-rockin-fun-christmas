@@ -686,3 +686,41 @@
 .kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
   word-spacing: calc(var(--space-fix, 0) * 1em);
 }
+
+/* 속도 (2026-11-27, a user request) · the iPad mini 4 render budget. The same booth, drawn with
+   less work on an A8: nothing here changes a layout, a size or a touch target, and no other
+   booth sees it (the Figma comparisons run without this attribute).
+   - The two page pictures as JPEG (they are opaque): 94 KB and 171 KB to fetch and decode
+     instead of 1.5 MB and 1.8 MB of PNG. Made by `npm run kiosk:lite`.
+   - The paper grain as a ready 240 px tile, not an SVG noise filter the tablet has to run.
+   - `filter: drop-shadow()` gives every element its own off-screen layer. The frame pictures
+     are plain rectangles, so a box shadow draws the same shadow (same offset: the one light,
+     top left). The shutter knob, the QR ticket and the stamp ticket, whose outlines a box
+     shadow cannot follow, lie flat. */
+.kiosk-root[data-legacy-ios15="true"] {
+  --grain-ink: url("/studio/grain-ink.png");
+}
+.kiosk-root[data-legacy-ios15="true"] .booth-screen {
+  background-image: url("/studio/kiosk-edge-spine.jpg");
+}
+.kiosk-root[data-legacy-ios15="true"] .booth-screen[data-testid="screen-attract"] {
+  background-image: url("/studio/kiosk-intro-olive.jpg");
+}
+.kiosk-root[data-legacy-ios15="true"] .booth-screen-v2 .pick-card-art {
+  filter: none;
+}
+.kiosk-root[data-legacy-ios15="true"] .booth-screen-v2 .pick-card-art > img {
+  box-shadow: 1px 3px 3px rgb(0 0 0 / 0.18);
+}
+.kiosk-root[data-legacy-ios15="true"] .booth-screen-v2 .options-preview .frame-art > img {
+  filter: none;
+  box-shadow: 1px 5px 5px rgb(0 0 0 / 0.2);
+}
+.kiosk-root[data-legacy-ios15="true"] .wax-seal,
+.kiosk-root[data-legacy-ios15="true"] .shutter-knob,
+.kiosk-root[data-legacy-ios15="true"] .shutter-btn:active:not(:disabled) .shutter-knob,
+.kiosk-root[data-legacy-ios15="true"] .kraft-envelope,
+.kiosk-root[data-legacy-ios15="true"] .qr-ticket-shadow,
+.kiosk-root[data-legacy-ios15="true"] .stamp-ticket-shadow {
+  filter: none;
+}

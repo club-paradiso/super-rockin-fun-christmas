@@ -35,9 +35,9 @@ import {
 import type { CanvasLike } from "@/lib/canvas";
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
 import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
-import { loadFrameAssets } from "@/lib/compositor/assets";
+import { FrameKit } from "@/lib/kiosk/frame-kit";
+import { staticPickThumbs } from "@/lib/kiosk/pick-thumbs";
 import type { FrameDefinition } from "@/lib/compositor/types";
-import { loadFrameFonts } from "@/lib/compositor/fonts";
 import { LOOK_IDS, NO_LOOK } from "@/config/looks";
 import { applyTone } from "@/lib/compositor/tone";
 import {
@@ -50,6 +50,7 @@ import {
   type BoothLooks,
 } from "@/lib/looks/booth";
 import {
+  LOOK_CHOICES,
   looksActive,
   lookPageOf,
   lookPages,
@@ -156,6 +157,8 @@ interface FinalImage {
   /** What was written on it: the session's handwriting font and the date stamp (checked in E2E). */
   handFont: string | null;
   stamp: string;
+  /** Every picture the frame draws was in hand when it was composed (lib/kiosk/frame-kit.ts). */
+  artComplete: boolean;
   blob: Blob;
   url: string;
   width: number;
@@ -189,13 +192,16 @@ function useBoothSound(): { sound: BoothSound | null; muted: boolean } {
   return { sound, muted };
 }
 
-/** One look of the colour row: its id and the guest's first shot in it. */
+/**
+ * One look of the colour row: its id and the guest's first shot in it. `url` is null while that
+ * chip has not been drawn yet (a page the guest has not turned to).
+ */
 export interface LookChip {
   id: string;
-  url: string;
+  url: string | null;
 }
-/** Longest edge of the picture on a look chip. */
-const LOOK_CHIP_EDGE = 280;
+/** The picker's ready-made previews (lib/kiosk/pick-thumbs.ts): the same nine for every guest. */
+const STATIC_PICK_THUMBS = staticPickThumbs();
 /**
  * Frame previews kept between guests: the eight picker cards plus the options screen's pictures
  * (one per option and handwriting font). Small JPEG data URLs; the oldest go first.
@@ -212,24 +218,22 @@ const PREFETCH_QUIET_AFTER_TAP_MS = 600;
 /** 속도 기록: a screen that appears this soon after a tap is that tap's screen. */
 const SCREEN_TAP_WINDOW_MS = 1500;
 
-/** Longest edge of a graded shot on the review and choice screens: they are shown small. */
-const GRADED_SHOT_EDGE = 480;
-
 /**
  * One shot in its frame's look, as a small JPEG data URL, or null when it could not be made (the
  * screen then shows the shot as taken). The grader's canvas is shared, so the picture is copied
  * out of it at once.
  */
 /** A shot as taken, small, for the "원본" chip of a frame without a tone. */
-function plainShotUrl(shot: CapturedFrame): string | null {
-  return gradedShotUrl(shot, (photo) => photo as unknown as CanvasImageSource, 0, LOOK_CHIP_EDGE);
+function plainShotUrl(shot: CapturedFrame, edge: number): string | null {
+  return gradedShotUrl(shot, (photo) => photo as unknown as CanvasImageSource, 0, edge);
 }
 
+/** `edge`: the longest edge of the copy (the render budget's, lib/kiosk/legacy-ios.ts). */
 function gradedShotUrl(
   shot: CapturedFrame,
   grade: PhotoGrader,
   index: number,
-  edge = GRADED_SHOT_EDGE,
+  edge: number,
 ): string | null {
   try {
     const scale = Math.min(1, edge / Math.max(shot.width, shot.height));
@@ -298,6 +302,7 @@ function gradedShotFor(
   lookId: string | null,
   shot: CapturedFrame,
   index: number,
+  edge: number,
 ): string | null {
   const override = chosenLook(frameId, lookId);
   return keptShotPicture(
@@ -308,12 +313,15 @@ function gradedShotFor(
       // The session's look, else the frame's own tone (흑백 stays 흑백 with 「원본」); with
       // neither there is nothing to draw and the screen shows the shot as taken.
       const grade = previewGrader(looks, frameId, seed, lookId);
-      return grade ? gradedShotUrl(shot, grade, index) : null;
+      return grade ? gradedShotUrl(shot, grade, index, edge) : null;
     },
   );
 }
 
-/** One chip of the colour row: the shot in one look. */
+/**
+ * One chip of the colour row: the shot in one look, or ("원본", `NO_LOOK`) with no look, in the
+ * frame's own tone (흑백, 세피아, ...), which is what the print does with no look.
+ */
 function lookChipFor(
   store: ShotPictures,
   looks: BoothLooks,
@@ -321,11 +329,27 @@ function lookChipFor(
   seed: number,
   lookId: string,
   shot: CapturedFrame,
+  edge: number,
 ): string | null {
   return keptShotPicture(store, shot, chipKey(frameId, lookId, seed), () => {
+    if (lookId === NO_LOOK) {
+      const tone = frameToneGrader(frameId);
+      return tone ? gradedShotUrl(shot, tone, 0, edge) : plainShotUrl(shot, edge);
+    }
     const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
-    return grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+    return grade ? gradedShotUrl(shot, grade, 0, edge) : null;
   });
+}
+
+/** A chip already drawn for this shot, or null: never draws. */
+function keptLookChip(
+  store: ShotPictures,
+  frameId: string,
+  seed: number,
+  lookId: string,
+  shot: CapturedFrame,
+): string | null {
+  return store.get(shot)?.get(chipKey(frameId, lookId, seed)) ?? null;
 }
 
 /** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
@@ -333,11 +357,18 @@ function lookChipFor(
  * The photo with no look ("원본"): as taken, in the frame's own tone (흑백, 세피아, ...), which is
  * what the print does with no look. Undefined for a frame without a tone: nothing to do.
  */
+/**
+ * One canvas for every tone preview, like the looks' renderer: each picture is copied out of it
+ * at once (gradedShotUrl). A new canvas per shot was never emptied, and a 2 GB tablet gets a
+ * canvas's memory back only when the browser gets round to it.
+ */
+let toneCanvas: HTMLCanvasElement | null = null;
+
 function frameToneGrader(frameId: string): PhotoGrader | undefined {
   const tone = getFrame(frameId).photoTone;
   if (!tone) return undefined;
   return (photo, width, height) => {
-    const canvas = document.createElement("canvas");
+    const canvas = (toneCanvas ??= document.createElement("canvas"));
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
@@ -360,24 +391,24 @@ function previewGrader(
   return looks.graderFor(frameId, seed, chosenLook(frameId, lookId)) ?? frameToneGrader(frameId);
 }
 
+/**
+ * The colour row: every choice ("원본" first), with the chips of `page` drawn now and the others
+ * as far as they have been drawn already. Only the page on show costs anything here: the rest is
+ * drawn in the background, or when the guest turns to it. Empty when a chip of that page cannot
+ * be made: the row is all or nothing.
+ */
 function lookChipsFor(
   store: ShotPictures,
   looks: BoothLooks,
   frameId: string,
   seed: number,
   shot: CapturedFrame,
+  page: readonly string[],
+  edge: number,
 ): LookChip[] {
-  // "원본" first: the shot with no look, in the frame's own tone.
-  const tone = frameToneGrader(frameId);
-  const plain = tone ? gradedShotUrl(shot, tone, 0, LOOK_CHIP_EDGE) : plainShotUrl(shot);
-  if (!plain) return [];
-  const chips: LookChip[] = [{ id: NO_LOOK, url: plain }];
-  for (const lookId of LOOK_IDS) {
-    const url = lookChipFor(store, looks, frameId, seed, lookId, shot);
-    if (!url) return [];
-    chips.push({ id: lookId, url });
-  }
-  return chips;
+  for (const lookId of page)
+    if (!lookChipFor(store, looks, frameId, seed, lookId, shot, edge)) return [];
+  return LOOK_CHOICES.map((id) => ({ id, url: keptLookChip(store, frameId, seed, id, shot) }));
 }
 
 function readStoredDevice(): string | undefined {
@@ -889,24 +920,84 @@ export function KioskApp({
   // ── Fonts and frame artwork: loaded once, before any frame is drawn (canvas waits for
   // neither). Both are bundled, so this is quick and works offline. Only the booth's own frames
   // (v2). A 1× booth (iPad mini 4) loads the 1× art.
-  const fontsRef = useRef<Promise<boolean> | null>(null);
-  const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
-  const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
+  //
+  // The iPad mini 4 budget (lib/kiosk/legacy-ios.ts) shows the picker with ready-made pictures
+  // and loads only the chosen frame's art and fonts, when it is chosen (lib/kiosk/frame-kit.ts):
+  // about fifty decoded pictures less at the start. If a ready-made picture is missing, that
+  // booth draws its cards itself, as every other booth does, and so loads everything.
+  const [staticThumbsBroken, setStaticThumbsBroken] = useState(false);
+  const staticThumbs = renderBudget.staticPickThumbs && !staticThumbsBroken;
+  const lazyKit = renderBudget.lazyFrameKit && staticThumbs;
+  const kitRef = useRef<FrameKit | null>(null);
+  const lowResArt = renderBudget.outputScale <= 1;
+  const frameKit = useCallback(
+    () => (kitRef.current ??= new FrameKit({ lowRes: lowResArt })),
+    [lowResArt],
+  );
+  // What is ready to draw with: every frame (`all`), or the frames asked for so far.
+  const [kit, setKit] = useState<{
+    assets: Map<string, ComposeImage>;
+    all: boolean;
+    frames: ReadonlySet<string>;
+  } | null>(null);
+  const assets = kit?.assets ?? null;
   useEffect(() => {
-    if (!fontsRef.current) {
-      const done = boothPerf().start("boot_fonts");
-      fontsRef.current = loadFrameFonts(V2_FRAMES).finally(done);
-    }
-    if (!assetsRef.current) {
-      const done = boothPerf().start("boot_assets");
-      assetsRef.current = loadFrameAssets(V2_FRAMES, undefined, {
-        lowRes: renderBudget.outputScale <= 1,
-      })
-        .then((r) => r.assets)
-        .finally(done);
-    }
-    void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
-  }, [renderBudget.outputScale]);
+    if (lazyKit) return;
+    let live = true;
+    const done = boothPerf().start("boot_assets");
+    void frameKit()
+      .ensure(V2_FRAMES)
+      .then(() => {
+        done();
+        if (live) setKit({ assets: frameKit().snapshot(), all: true, frames: new Set() });
+      });
+    return () => {
+      live = false;
+    };
+  }, [lazyKit, frameKit]);
+  // The chosen frame's kit, as soon as there is a chosen frame: the options screen draws with
+  // it, and the final picture waits for it (again, below, in case this try lost its network).
+  const kitFrameId =
+    lazyKit && !["attract", "welcome", "pick", "mobile"].includes(state.phase)
+      ? state.frameId
+      : null;
+  useEffect(() => {
+    if (!kitFrameId) return;
+    let live = true;
+    const done = boothPerf().start("frame_kit");
+    void frameKit()
+      .ensure([getFrame(kitFrameId)])
+      .then(({ changed }) => {
+        // Only a load is a measurement: a frame already in hand takes no time.
+        if (changed) done();
+        if (!live) return;
+        setKit((cur) =>
+          cur && !changed && (cur.all || cur.frames.has(kitFrameId))
+            ? cur
+            : {
+                assets: changed || !cur ? frameKit().snapshot() : cur.assets,
+                all: cur?.all ?? false,
+                frames: new Set([...(cur?.frames ?? []), kitFrameId]),
+              },
+        );
+      });
+    return () => {
+      live = false;
+    };
+  }, [kitFrameId, frameKit]);
+  // The ready-made picker pictures, fetched while nobody is at the booth.
+  const thumbImagesRef = useRef<HTMLImageElement[]>([]);
+  useEffect(() => {
+    if (!staticThumbs) return;
+    thumbImagesRef.current = Object.values(STATIC_PICK_THUMBS).map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
+    return () => {
+      thumbImagesRef.current = [];
+    };
+  }, [staticThumbs]);
 
   // ── Looks (lib/looks): behind a flag, off by default. While off, none of this runs and the
   // booth composes exactly as before. Previews and the final composite share `looksRef`.
@@ -958,6 +1049,7 @@ export function KioskApp({
   // Kept per shot (shotPictures), and drawn ahead in the background (below): a tap on another
   // colour usually finds its six pictures ready.
   const [shotPictures] = useState<ShotPictures>(() => new WeakMap());
+  const { gradedShotEdge, lookChipEdge } = renderBudget;
   const gradedShots = useMemo(() => {
     const out: (string | null)[] = [];
     if (!looks || !lookFrameId) return out;
@@ -973,50 +1065,129 @@ export function KioskApp({
               state.lookId,
               shot.frame,
               index,
+              gradedShotEdge,
             )
           : null,
       );
     // Only a round that put a look on a photo is a measurement (원본 draws nothing).
     if (out.some((url) => url !== null)) drawn();
     return out;
-  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId, shotPictures]);
-  // The colour row of the choice screen: the guest's first shot in each of the eight looks.
+  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId, shotPictures, gradedShotEdge]);
+  // The colour row of the choice screen: the guest's first shot in 「원본」 and the eight looks.
   // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
+  // Only the page on show is drawn with the screen (four chips, not nine); the other pages are
+  // drawn in the background below, or at once when the guest turns to one (`showLookPage`).
   const lookRowFrameId = state.phase === "select" ? state.frameId : null;
   const firstShot = state.shots[0] ?? null;
-  const lookChips = useMemo(
+  const firstFrame = firstShot?.frame ?? null;
+  // Chips drawn since (a background chip, a turned page): the row is read again.
+  const [chipsDrawn, setChipsDrawn] = useState(0);
+  // A chip that could not be made: no row for that shot.
+  const [chipsFailed, setChipsFailed] = useState<CapturedFrame | null>(null);
+  const lookRowPage = useMemo(
     () =>
-      looks && lookRowFrameId && firstShot
-        ? boothPerf().time("look_row", () =>
-            lookChipsFor(shotPictures, looks, lookRowFrameId, lookSeed, firstShot.frame),
-          )
+      lookRowFrameId
+        ? (lookPages()[lookPageOf(sessionLookId(lookRowFrameId, state.lookId))] ?? [])
         : [],
-    [looks, lookRowFrameId, lookSeed, firstShot, shotPictures],
+    [lookRowFrameId, state.lookId],
   );
-  // While the guest looks at the review screen, draw the colour row (needed next), then the six
-  // shots in every other look (needed on a tap), one picture per task.
+  const lookChips = useMemo(
+    () => {
+      if (!looks || !lookRowFrameId || !firstFrame || chipsFailed === firstFrame) return [];
+      const missing = lookRowPage.some(
+        (id) => !hasShotPicture(shotPictures, firstFrame, chipKey(lookRowFrameId, id, lookSeed)),
+      );
+      const draw = () =>
+        lookChipsFor(
+          shotPictures,
+          looks,
+          lookRowFrameId,
+          lookSeed,
+          firstFrame,
+          lookRowPage,
+          lookChipEdge,
+        );
+      // 속도 기록: only when the page on show had to be drawn now.
+      return missing ? boothPerf().time("look_row", draw) : draw();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `chipsDrawn`: chips drawn since
+    [
+      looks,
+      lookRowFrameId,
+      lookSeed,
+      firstFrame,
+      shotPictures,
+      lookRowPage,
+      lookChipEdge,
+      chipsFailed,
+      chipsDrawn,
+    ],
+  );
+  /** The guest turned the colour row: that page's chips, now, if they are not drawn yet. */
+  const showLookPage = useCallback(
+    (ids: readonly string[]) => {
+      if (!looks || !lookRowFrameId || !firstFrame) return;
+      for (const id of ids)
+        if (
+          !lookChipFor(shotPictures, looks, lookRowFrameId, lookSeed, id, firstFrame, lookChipEdge)
+        )
+          return setChipsFailed(firstFrame);
+      setChipsDrawn((n) => n + 1);
+    },
+    [looks, lookRowFrameId, lookSeed, firstFrame, shotPictures, lookChipEdge],
+  );
+  // In the background, one picture per task: the rest of the colour row, then (not on the iPad
+  // mini 4 budget) the shots in every other look, so a tap on a colour finds them ready. There
+  // they are drawn when the guest taps that colour.
   const allShot = state.shots.every((s) => s !== null);
+  const prefetchLookShots = renderBudget.prefetchLookShots;
   useEffect(() => {
     if (!looks || !lookFrameId || !allShot) return;
     const store = shotPictures;
     const shots = state.shots.map((s) => s!.frame);
     const jobs: PrefetchJob[] = [];
     const first = shots[0]!;
-    for (const lookId of LOOK_IDS)
+    for (const lookId of LOOK_CHOICES)
       jobs.push({
         done: () => hasShotPicture(store, first, chipKey(lookFrameId, lookId, lookSeed)),
-        run: () => lookChipFor(store, looks, lookFrameId, lookSeed, lookId, first),
+        run: () => {
+          const url = lookChipFor(store, looks, lookFrameId, lookSeed, lookId, first, lookChipEdge);
+          if (url) setChipsDrawn((n) => n + 1);
+          else setChipsFailed(first);
+        },
       });
-    for (const lookId of LOOK_IDS) {
-      const look = chosenLook(lookFrameId, lookId)?.lookId ?? "own";
-      for (const [index, shot] of shots.entries())
-        jobs.push({
-          done: () => hasShotPicture(store, shot, shotKey(lookFrameId, look, lookSeed, index)),
-          run: () => gradedShotFor(store, looks, lookFrameId, lookSeed, lookId, shot, index),
-        });
-    }
+    if (prefetchLookShots)
+      for (const lookId of LOOK_IDS) {
+        const look = chosenLook(lookFrameId, lookId)?.lookId ?? "own";
+        for (const [index, shot] of shots.entries())
+          jobs.push({
+            done: () => hasShotPicture(store, shot, shotKey(lookFrameId, look, lookSeed, index)),
+            run: () =>
+              gradedShotFor(
+                store,
+                looks,
+                lookFrameId,
+                lookSeed,
+                lookId,
+                shot,
+                index,
+                gradedShotEdge,
+              ),
+          });
+      }
     return prefetch(jobs, globalThis, PREFETCH_GAP_MS, PREFETCH_GAP_MS, guestBusy);
-  }, [looks, lookFrameId, lookSeed, state.shots, allShot, shotPictures, guestBusy]);
+  }, [
+    looks,
+    lookFrameId,
+    lookSeed,
+    state.shots,
+    allShot,
+    shotPictures,
+    guestBusy,
+    lookChipEdge,
+    gradedShotEdge,
+    prefetchLookShots,
+  ]);
 
   // The live camera picture of a black-and-white frame is black and white too.
   const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
@@ -1091,9 +1262,12 @@ export function KioskApp({
   const kept = (job: ReturnType<typeof preview>) =>
     job.done() ? (previews.pictures.get(job.key) ?? null) : job.make();
   const thumbScale = renderBudget.thumbScale;
+  const kitAll = kit?.all ?? false;
   const pickThumbs = useMemo(() => {
+    // Ready-made pictures (the iPad mini 4 budget): nothing is drawn for the picker at all.
+    if (staticThumbs) return STATIC_PICK_THUMBS;
     const out: Record<string, string> = {};
-    if (!samples || !assets || !previewing) return out;
+    if (!samples || !assets || !kitAll || !previewing) return out;
     // 속도 기록: only when a card had to be drawn now (nothing was drawn ahead for it).
     const drawn = boothPerf().start("thumbs");
     let misses = 0;
@@ -1106,13 +1280,14 @@ export function KioskApp({
     if (misses > 0) drawn();
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
-  }, [samples, assets, previewing, thumbScale, preview, previews]);
+  }, [samples, assets, kitAll, staticThumbs, previewing, thumbScale, preview, previews]);
   // Between guests: the picker cards, ahead of time, only on "화면을 눌러 시작" and only once it has
   // been quiet for a moment. Never on the welcome screen: a drawing there holds up the guest's
   // first deliberate tap, and a late tap slips past the double-tap guard (lib/kiosk/tap-guard.ts).
   const betweenGuests = state.phase === "attract";
   useEffect(() => {
-    if (!betweenGuests || !samples || !assets) return;
+    // Nothing to draw ahead where the picker shows ready-made pictures.
+    if (!betweenGuests || !samples || !assets || !kitAll || staticThumbs) return;
     // While the LUTs are loading the previews would be drawn twice: wait for them.
     if (!looks && looksActive(window.location.search, looksNow)) return;
     return prefetch(
@@ -1125,23 +1300,36 @@ export function KioskApp({
       PREVIEW_PREFETCH_QUIET_MS,
       guestBusy,
     );
-  }, [betweenGuests, samples, assets, looks, looksNow, preview, thumbScale, guestBusy]);
+  }, [
+    betweenGuests,
+    samples,
+    assets,
+    kitAll,
+    staticThumbs,
+    looks,
+    looksNow,
+    preview,
+    thumbScale,
+    guestBusy,
+  ]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
   // Each font's picture is kept, and the next font is drawn ahead in the 1.2 s before it shows.
   const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
   const previewFont = useHandFontCycle(!!optionsFrame && usesHandwriting(optionsFrame));
   const optionScale = thumbScale * 1.4;
+  const optionsKitReady = !!optionsFrame && !!kit && (kit.all || kit.frames.has(optionsFrame.id));
   const optionPreview = useMemo(() => {
-    if (!optionsFrame || !samples || !assets) return null;
+    // Not before this frame's art and fonts are in: a picture drawn without them would be kept.
+    if (!optionsFrame || !samples || !assets || !optionsKitReady) return null;
     const job = preview(optionsFrame, optionScale, previewFont);
     return job.done() ? kept(job) : boothPerf().time("option_preview", () => kept(job));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
-  }, [optionsFrame, samples, assets, previewFont, optionScale, preview]);
+  }, [optionsFrame, samples, assets, optionsKitReady, previewFont, optionScale, preview]);
   const optionsFrameId = optionsFrame?.id ?? null;
   const cyclingFonts = !!optionsFrame && usesHandwriting(optionsFrame);
   useEffect(() => {
-    if (!optionsFrameId || !cyclingFonts) return;
+    if (!optionsFrameId || !cyclingFonts || !optionsKitReady) return;
     const at = HAND_FONTS.findIndex((f) => f.id === previewFont);
     const nextFont = HAND_FONTS[(at + 1) % HAND_FONTS.length]!.id;
     const job = preview(getFrame(optionsFrameId), optionScale, nextFont);
@@ -1152,7 +1340,7 @@ export function KioskApp({
       PREFETCH_GAP_MS,
       guestBusy,
     );
-  }, [optionsFrameId, cyclingFonts, previewFont, optionScale, preview, guestBusy]);
+  }, [optionsFrameId, cyclingFonts, optionsKitReady, previewFont, optionScale, preview, guestBusy]);
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
@@ -1179,13 +1367,18 @@ export function KioskApp({
     const lookForFinal = state.lookId;
     // A font or asset that failed to load must not block the guest: compose without it.
     // The LUTs are waited for only briefly: without them the frame keeps its own tone.
+    // The frame's own art and fonts are asked for once more here: what is in hand costs nothing,
+    // and a file that failed earlier (a lost network moment) gets its second chance.
     void Promise.all([
-      fontsRef.current,
-      assetsRef.current,
+      frameKit().ensure([frame]),
       settleWithin(looksLoadRef.current, LOOKS_WAIT_MS),
     ])
-      .then(async ([, loaded]) => {
+      .then(async ([kitState]) => {
         if (cancelled) return;
+        const loaded = frameKit().snapshot();
+        // Never silently: a frame that goes out without a piece of its art says so here.
+        if (!kitState.complete)
+          console.error(`[frame-kit] "${frame.id}" was composed without all of its art`);
         // Skin retouch runs here, before the frame; the colour look (`grade`, lib/looks) is
         // applied by composeFrame to each photo as it is drawn: 촬영 → 피부 보정 → 색감 → 틀.
         // A stage that fails hands the photos back as they were: the frame is always made.
@@ -1202,7 +1395,7 @@ export function KioskApp({
               dateLabel: formatDateLabel(shotAt),
               stampLabel: formatStampLabel(shotAt),
               handFont: handFont ?? undefined,
-              assets: loaded ?? undefined,
+              assets: loaded,
             },
             scale: renderBudget.outputScale,
             grade: looksRef.current?.graderFor(
@@ -1229,6 +1422,7 @@ export function KioskApp({
             selectionKey,
             handFont: usesHandwriting(frame) ? (handFont ?? null) : null,
             stamp: formatStampLabel(shotAt),
+            artComplete: kitState.complete,
             blob,
             url: trackUrl(URL.createObjectURL(blob)),
             width: canvas.width,
@@ -1263,6 +1457,7 @@ export function KioskApp({
     handFont,
     clock,
     photoStages,
+    frameKit,
   ]);
 
   // The print has come up (the wall question shows it): a soft chime. The QR ticket: a stamp.
@@ -1411,6 +1606,10 @@ export function KioskApp({
       const done = new Promise<void>((r) => (resolve = r));
       entry = { done, resolve };
       photoQueuedRef.current.set(sessionId, entry);
+      // A session that never answers the wall question (paused, abandoned) leaves its entry:
+      // keep the last few only, so a long day does not pile them up.
+      const entries = photoQueuedRef.current;
+      while (entries.size > 8) entries.delete(entries.keys().next().value!);
     }
     return entry;
   }, []);
@@ -1823,6 +2022,8 @@ export function KioskApp({
             flashEnabled={flashEnabled}
             onToggleFlash={() => setFlashEnabled((enabled) => !enabled)}
             thumbs={pickThumbs}
+            onThumbError={staticThumbs ? () => setStaticThumbsBroken(true) : undefined}
+            onLookPage={showLookPage}
             optionPreview={optionPreview}
             gradedShots={gradedShots}
             lookChips={lookChips}
@@ -1997,6 +2198,10 @@ interface ScreenProps {
   onToggleFlash: () => void;
   /** Picker previews by card id (sample photos). */
   thumbs: Record<string, string>;
+  /** A ready-made preview did not load: the booth then draws the cards itself. */
+  onThumbError?: () => void;
+  /** The guest turned the colour row to these looks. */
+  onLookPage: (lookIds: readonly string[]) => void;
   /** The shots in their frame's look (lib/looks), by index; empty or null where there is none. */
   gradedShots: readonly (string | null)[];
   /** How the live camera picture is shown (a black-and-white frame: black and white). */
@@ -2234,6 +2439,7 @@ function Screen(p: ScreenProps) {
                 card={c}
                 selected={c.id === state.cardId}
                 thumb={p.thumbs[c.id]}
+                onThumbError={p.onThumbError}
                 t={t}
                 onSelect={() => dispatch({ type: "SELECT_CARD", cardId: c.id })}
               />
@@ -2596,6 +2802,7 @@ function Screen(p: ScreenProps) {
               chips={p.lookChips}
               chosen={sessionLookId(state.frameId, state.lookId)}
               onChoose={(lookId) => dispatch({ type: "SET_LOOK", lookId })}
+              onPage={p.onLookPage}
               t={t}
             />
           )}
@@ -2979,12 +3186,14 @@ function FrameCardButton({
   card,
   selected,
   thumb,
+  onThumbError,
   t,
   onSelect,
 }: {
   card: FrameCard;
   selected: boolean;
   thumb: string | undefined;
+  onThumbError?: () => void;
   t: KioskCopy;
   onSelect: () => void;
 }) {
@@ -3002,7 +3211,7 @@ function FrameCardButton({
       <span className="pick-card-art frame-art">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element -- generated data URL
-          <img src={thumb} alt="" />
+          <img src={thumb} alt="" onError={onThumbError} />
         ) : (
           <span className="frame-art-wait animate-pulse" />
         )}
@@ -3069,6 +3278,7 @@ function FinalPreview({
           data-height={finalImage.height}
           data-hand-font={finalImage.handFont ?? undefined}
           data-stamp={finalImage.stamp}
+          data-art={finalImage.artComplete ? "complete" : "partial"}
         />
       ) : (
         <div
@@ -3097,11 +3307,14 @@ function LookRow({
   chips,
   chosen,
   onChoose,
+  onPage,
   t,
 }: {
   chips: readonly LookChip[];
   chosen: string | null;
   onChoose: (lookId: string) => void;
+  /** Called with a page's looks as the guest turns to it: its chips are drawn then. */
+  onPage: (lookIds: readonly string[]) => void;
   t: KioskCopy;
 }) {
   const ids = chips.map((chip) => chip.id);
@@ -3124,7 +3337,11 @@ function LookRow({
             type="button"
             className="booth-btn-m look-turn"
             data-testid="look-turn"
-            onClick={() => setPage(last ? 0 : page + 1)}
+            onClick={() => {
+              const next = last ? 0 : page + 1;
+              onPage(pages[next] ?? []);
+              setPage(next);
+            }}
           >
             {last ? `‹ ${t.select.lookFirst}` : `${t.select.lookNext} ›`}
           </button>
@@ -3145,8 +3362,12 @@ function LookRow({
               className="look-chip"
               onClick={() => onChoose(id)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
-              <img src={chip.url} alt="" />
+              {chip.url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data URL
+                <img src={chip.url} alt="" />
+              ) : (
+                <span className="look-chip-wait animate-pulse" aria-hidden />
+              )}
               <span className="look-name">{name}</span>
             </button>
           );

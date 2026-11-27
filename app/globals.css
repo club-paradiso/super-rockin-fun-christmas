@@ -1666,12 +1666,17 @@ body {
     background: var(--color-ink);
     color: var(--color-paper);
   }
-  .look-chip img {
+  .look-chip img,
+  .look-chip-wait {
     display: block;
     width: 100%;
     aspect-ratio: 4 / 3;
     border-radius: 9px;
     object-fit: cover;
+  }
+  /* A chip not drawn yet (a page being turned to): the same box, so nothing moves. */
+  .look-chip-wait {
+    background: rgb(43 26 16 / 0.12);
   }
   .look-name {
     overflow: hidden;

@@ -77,7 +77,7 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", 
   // v2: six shots only, no extra.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
   // Colour looks are on by default (2026-11-25): the review shows each 960 × 720 shot as a
-  // graded 480 × 360 copy in the frame's look (sepia → walnut), drawn on this WebKit's WebGL.
+  // graded 320 × 240 copy (the iPad mini 4 budget's size) in the frame's look (sepia → walnut), drawn on this WebKit's WebGL.
   const reviewShot = page.getByTestId("review-shot-5").locator("img");
   await expect(reviewShot).toHaveAttribute("src", /^data:image\/jpeg/);
   expect(
@@ -85,7 +85,7 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", 
       await img.decode();
       return [img.naturalWidth, img.naturalHeight];
     }),
-  ).toEqual([480, 360]);
+  ).toEqual([320, 240]);
 
   // Keep the strip private and queued while the network is unavailable. Once the route is
   // reachable, retry uses the same session ID and only the server response can create a QR.
