@@ -111,8 +111,8 @@ describe("틀 선택 v2: the nine cards", () => {
     });
   });
 
-  it("no card, with any combination of its options, takes more photos than a session shoots (five, 2026-11-27)", () => {
-    expect(KIOSK_CONFIG.shotsPerSession).toBe(5);
+  it("no card, with any combination of its options, takes more photos than a session shoots (four, 2026-11-27)", () => {
+    expect(KIOSK_CONFIG.shotsPerSession).toBe(4);
     let combinations = 0;
     for (const card of FRAME_CARDS) {
       const combos = card.options.reduce<Record<string, string>[]>(
@@ -123,8 +123,8 @@ describe("틀 선택 v2: the nine cards", () => {
         const frame = card.frame(cleanOptions(card, combo));
         combinations++;
         expect(frame.slots.length, frame.id).toBeGreaterThanOrEqual(1);
-        // The guest chooses from the session's shots: there must be enough of them, and with
-        // five shots and at most four slots there is always at least one to leave out.
+        // The guest chooses from the session's shots: there must be enough of them (four shots,
+        // at most four slots: every shot has a place).
         expect(frame.slots.length, frame.id).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
         expect(frame.slots.length, frame.id).toBeLessThanOrEqual(4);
       }

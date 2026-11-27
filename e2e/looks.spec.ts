@@ -490,7 +490,7 @@ test.describe("the booth with looks", () => {
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     // 원본: the shots as taken (no graded copy is made).
-    for (const index of [0, 4])
+    for (const index of [0, 3])
       await expect(page.getByTestId(`select-shot-${index}`).locator("img")).toHaveAttribute(
         "src",
         /^blob:/,
@@ -597,7 +597,7 @@ test.describe("the booth with looks", () => {
       await page.getByTestId("look-turn").click();
       await expect(page.getByTestId("look-page")).toHaveText("2 / 3");
 
-      // Black and white: the five shots turn grey at once, and so does the finished photo.
+      // Black and white: the four shots turn grey at once, and so does the finished photo.
       const before = await page.getByTestId("select-shot-0").locator("img").getAttribute("src");
       await page.getByTestId("look-ink").click();
       await expect(page.getByTestId("look-ink")).toHaveAttribute("aria-checked", "true");

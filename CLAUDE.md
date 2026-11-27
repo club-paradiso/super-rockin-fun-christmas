@@ -108,8 +108,9 @@ looks:measure`). `/looks` is the comparison
   left out by a user decision); a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
   to a line); the picker shows the nine five to a row, and a tap on a card goes on with it (below); the guest
-  then shoots five and chooses the photos
-  (2026-11-27, a user decision: 5 shots, no retake; `KIOSK_CONFIG.shotsPerSession`, six before).
+  then shoots four, 5 s apart, and chooses the photos
+  (2026-11-27, a user decision, final: 4 shots × 5 s, no retake; `KIOSK_CONFIG.shotsPerSession`, six and five before;
+  no frame holds more than four photos, so the choice is the order, not leaving one out).
   There is no "one more shot", no second frame choice and no second round after shooting
   (`lib/kiosk/machine.ts`): 「다시 찍기」 (2026-11-25) was removed with its button, dialog, action
   and allowance, and must not come back as a setting. No v2 frame, with any combination of its

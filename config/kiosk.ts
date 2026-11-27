@@ -6,15 +6,16 @@ function positiveInt(value: string | undefined, fallback: number): number {
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
   /**
-   * Shots per guest: 5 (2026-11-27, a user decision: 5 shots, no retake; six before). No v2
-   * frame takes more than four (tests/unit/frames-v2.test.ts), so there is always one to spare.
+   * Shots per guest: 4 × 5 s, final (2026-11-27, a user decision: 4 shots, no retake; six, then
+   * five, before). No v2 frame takes more than four (tests/unit/frames-v2.test.ts), so every shot
+   * has a place and the photo choice is about the order, not about leaving one out.
    * There is no 「다시 찍기」: once the shots are taken the guest goes on with them.
    */
-  shotsPerSession: 5,
+  shotsPerSession: 4,
   /**
    * Seconds counted before every shot (D71). The single kiosk flow has no easy-mode override (D89).
    * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
-   * the E2E run does not wait 5 × 5 s per session. Do not set it on a real booth.
+   * the E2E run does not wait 4 × 5 s per session. Do not set it on a real booth.
    */
   countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 5),
   /**
@@ -41,7 +42,7 @@ export const KIOSK_CONFIG = {
    * last `videoSecondsPerShot` seconds of the countdown plus the capture moment are recorded.
    */
   videoSecondsPerShot: 3,
-  /** The reel never grows past this (5 shots × 4 s is 20 s; a shot taken again adds to it). */
+  /** The reel never grows past this (4 shots × 4 s is 16 s; a shot taken again adds to it). */
   videoMaxSeconds: 30,
   videoBitsPerSecond: 1_000_000,
   /**

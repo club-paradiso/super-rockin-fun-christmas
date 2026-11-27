@@ -75,9 +75,9 @@ for (const viewport of [
     // Changing the choice: take the first one out, put the last one in.
     await expectTouchable(page.getByTestId("select-shot-0"));
     await page.getByTestId("select-shot-0").click();
-    await expectTouchable(page.getByTestId("select-shot-4"));
-    await page.getByTestId("select-shot-4").click();
-    await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
+    await expectTouchable(page.getByTestId("select-shot-3"));
+    await page.getByTestId("select-shot-3").click();
+    await expect(page.getByTestId("select-shot-3")).toHaveAttribute("aria-pressed", "true");
     await expectTouchable(page.getByTestId("confirm-selection"));
     await expect(page.getByTestId("confirm-selection")).toBeEnabled();
     // Scrolling inside the booth must never make the document itself overflow sideways.

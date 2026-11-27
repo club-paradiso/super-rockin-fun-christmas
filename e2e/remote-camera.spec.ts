@@ -96,7 +96,7 @@ async function liveBooth(page: Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("pair from /admin, preview, shoot five, choose, consent, QR", async ({ browser, page }) => {
+test("pair from /admin, preview, shoot four, choose, consent, QR", async ({ browser, page }) => {
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
@@ -128,13 +128,13 @@ test("pair from /admin, preview, shoot five, choose, consent, QR", async ({ brow
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   const sizes: Array<[number, number]> = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 4; i++) {
     const img = page.getByTestId(`select-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     sizes.push(await img.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight]));
   }
   for (const [w, h] of sizes) expect(w / h).toBeCloseTo(4 / 3, 2);
-  await expect(phone.getByTestId("shots")).toHaveText("촬영 5장");
+  await expect(phone.getByTestId("shots")).toHaveText("촬영 4장");
 
   // v2: no extra photo; straight on to the photo choice, consent, a real QR.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);

@@ -32,14 +32,14 @@ test("guest kiosk never asks for a name on the cover or the frame picker", async
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
-test("happy path: frame → options → 5 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
+test("happy path: frame → options → 4 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
   page,
   context,
 }) => {
   await shootAllWithMock(page, "film4", { color: "red" });
-  // Straight on the photo choice after the fifth shot: step 3 of 5 (no review screen).
+  // Straight on the photo choice after the fourth shot: step 3 of 5 (no review screen).
   await expect(page.getByTestId("step-progress")).toHaveText("3 / 5");
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 4; i++) {
     const img = page.getByTestId(`select-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     const [w, h] = await img.evaluate((el: HTMLImageElement) => [
@@ -145,15 +145,15 @@ test("v2: no extra photo, no second frame choice, no retake, the steps are dots 
   // The photo choice is the first screen after the shots (2026-11-27): no review screen.
   const select = page.getByTestId("screen-select");
   await expect(page.locator("[data-testid='screen-review']")).toHaveCount(0);
-  await expect(page.getByText("5장 중 3장을 골라주세요")).toBeVisible();
+  await expect(page.getByText("4장 중 3장을 골라주세요")).toBeVisible();
   // It opens with the first three chosen, in shooting order, and can finish at once.
   for (const i of [0, 1, 2])
     await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "true");
-  for (const i of [3, 4])
+  for (const i of [3])
     await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("confirm-selection")).toBeEnabled();
   await expect(page.getByTestId("select-change-hint")).toBeVisible();
-  // The five photos, the finish button and 처음으로 (plus the colour row and the fullscreen
+  // The four photos, the finish button and 처음으로 (plus the colour row and the fullscreen
   // switch): never a sixth photo, and no 다시 찍기 of any kind (2026-11-27).
   const labels = await select
     .locator(
@@ -163,7 +163,7 @@ test("v2: no extra photo, no second frame choice, no retake, the steps are dots 
   expect(labels.map((l) => l.replace(/\s+/g, " ").trim()).sort()).toEqual(
     ["← 처음으로", "이 사진으로 완성하기"].sort(),
   );
-  await expect(page.locator("[data-testid^='select-shot-']")).toHaveCount(5);
+  await expect(page.locator("[data-testid^='select-shot-']")).toHaveCount(4);
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기|다시 찍기/)).toHaveCount(0);
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
   await expect(page.getByTestId("select-shot-5")).toHaveCount(0);

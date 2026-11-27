@@ -7,7 +7,7 @@ describe("pose guide data (D71)", () => {
     expect(POSE_SEQUENCE.length).toBe(KIOSK_CONFIG.shotsPerSession);
   });
 
-  it("every pose has an id and a short label; with five shots each pose gets one or two tries", () => {
+  it("every pose has an id and a short label; with four shots the first pose gets two tries", () => {
     const counts = new Map<string, number>();
     for (const pose of POSE_SEQUENCE) {
       expect(pose.id).toMatch(/^[a-z-]+$/);
@@ -15,9 +15,9 @@ describe("pose guide data (D71)", () => {
       expect(pose.label.length).toBeLessThanOrEqual(12);
       counts.set(pose.id, (counts.get(pose.id) ?? 0) + 1);
     }
-    // Five shots (2026-11-27), three poses in turn: two of them twice, the last once.
-    expect(POSE_SEQUENCE).toHaveLength(5);
-    expect([...counts.values()].sort()).toEqual([1, 2, 2]);
+    // Four shots (2026-11-27), three poses in turn and the first once more.
+    expect(POSE_SEQUENCE).toHaveLength(4);
+    expect([...counts.values()].sort()).toEqual([1, 1, 2]);
   });
 
   it("every pose has an English and a Chinese label (D78, D89)", () => {

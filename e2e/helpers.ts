@@ -68,7 +68,7 @@ export async function startSession(page: Page, card?: string, options: CardOptio
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 }
 
-/** The five shots with the mock camera: ends on the photo choice (there is no review screen). */
+/** The four shots with the mock camera: ends on the photo choice (there is no review screen). */
 export async function shootAllWithMock(page: Page, card?: string, options: CardOptions = {}) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
