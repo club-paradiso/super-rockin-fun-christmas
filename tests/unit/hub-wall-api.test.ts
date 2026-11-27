@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { feedSize } from "@/lib/wall/rotation";
 import { WALL_CONFIG } from "@/config/wall";
 import type { WallFeed } from "@/lib/wall/states";
+import { defaultCameraEngine } from "@/lib/camera-engine/settings";
+import type { CameraEngineStatus } from "@/lib/camera-engine/status";
 import { JPEG, uuid } from "../helpers/images";
 
 /**
@@ -224,56 +226,151 @@ describe("wall heartbeat metrics", () => {
   });
 });
 
-describe("속도 기록 in the heartbeat", () => {
-  it("logs known codes and whole numbers; drops everything else; needs an enrolled booth", async () => {
+describe("camera engine: the staff setting and the booth's status", () => {
+  const admin = async (body: unknown, cookie = staff) => {
+    const { POST } = await import("@/app/api/admin/settings/route");
+    return POST(post("/api/admin/settings", body, cookie), { params: Promise.resolve({}) });
+  };
+  // The heartbeat route allows 12 beats a minute per kiosk: this file stays under that, and a
+  // beat that is refused fails here rather than as a puzzling assertion later.
+  const beat = async (body: unknown) => {
     const { POST } = await import("@/app/api/kiosk/heartbeat/route");
-    const log = vi.mocked(console.log);
-    const perfLines = () =>
-      log.mock.calls
-        .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
-        .filter((entry) => entry.event === "kiosk_perf");
-    const before = perfLines().length;
-    const beat = (body: unknown, cookie = kiosk) =>
-      POST(post("/api/kiosk/heartbeat", body, cookie));
+    const res = await POST(post("/api/kiosk/heartbeat", body, kiosk));
+    expect(res.status).toBe(200);
+    return res;
+  };
+  const kioskId = async () => {
+    const { authenticateKiosk } = await import("@/lib/kiosk-auth/server");
+    const auth = await authenticateKiosk(kiosk.slice(kiosk.indexOf("=") + 1));
+    return auth.ok ? auth.kioskId! : "";
+  };
+  const status: CameraEngineStatus = {
+    state: "full",
+    reason: null,
+    permission: "granted",
+    sensor: "ok",
+    backend: "webgl",
+    roll: 3.04,
+    pitch: 5.96,
+    appliedRoll: 3.04,
+    appliedPitch: 4.21,
+    strength: 0.706,
+    zoom: 1.0749,
+    loss: 0.081,
+    confidence: 0.988,
+    profile: "generic-front",
+    profileSource: "assumed",
+    locked: false,
+    previewMatches: true,
+    pitchWarning: false,
+    error: null,
+  };
 
-    expect(
-      (
-        await beat({
-          queueDepth: 0,
-          perfProfile: "legacy",
-          perf: {
-            compose: { n: 2, last: 812.4, max: 900, med: 850 },
-            finish: { n: 1, last: 4100, max: 4100, med: 4100 },
-            // Not a code the booth has: dropped, whatever it carries.
-            selfie: { n: 1, last: 1, max: 1, med: 1, data: "data:image/jpeg;base64,AAAA" },
-            upload: { n: 1, last: "soon", max: 1, med: 1 },
-          },
-        })
-      ).status,
-    ).toBe(200);
-    const lines = perfLines().slice(before);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({
-      profile: "legacy",
-      perf: "compose=2:812/850/900 finish=1:4100/4100/4100",
+  it("is off by default, reaches the booth with the heartbeat, and is audited", async () => {
+    const { getBackend } = await import("@/lib/storage/server");
+    expect((await (await beat({ queueDepth: 0 })).json()).cameraEngine).toEqual(
+      defaultCameraEngine(),
+    );
+    const auto = { ...defaultCameraEngine(), mode: "auto", rollOffset: -1.5, calibration: 1 };
+    const res = await admin({ cameraEngine: auto });
+    expect(res.status).toBe(200);
+    expect((await res.json()).settings.cameraEngine).toEqual(auto);
+    expect((await (await beat({ queueDepth: 0 })).json()).cameraEngine).toEqual(auto);
+    const [last] = await getBackend().audit.list({ subjectType: "settings", limit: 1 });
+    expect(last).toMatchObject({ action: "update_settings", actorId: staffId });
+    expect(JSON.parse(last!.toState!)).toMatchObject({ camera_engine: auto });
+    // Another setting saved afterwards leaves it where it is.
+    expect((await admin({ pauseWall: false })).status).toBe(200);
+    expect((await getBackend().settings.get()).cameraEngine).toEqual(auto);
+    expect((await admin({ cameraEngine: defaultCameraEngine() })).status).toBe(200);
+  });
+
+  it("refuses anything that is not the whole setting, and anyone who is not staff", async () => {
+    const good = defaultCameraEngine();
+    for (const bad of [
+      null,
+      "auto",
+      [],
+      { mode: "auto" },
+      { ...good, mode: "on" },
+      { ...good, level: 1 },
+      { ...good, rollOffset: 15.1 },
+      { ...good, pitchOffset: "3" },
+      { ...good, pitchOffset: Number.NaN },
+      { ...good, profile: "ipad-mini-4" },
+      { ...good, fov: 20 },
+      { ...good, calibration: -1 },
+      { ...good, calibration: 1.5 },
+      { ...good, extra: true },
+    ]) {
+      const res = await admin({ cameraEngine: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect((await res.json()).error).toMatch(/^cameraEngine/);
+    }
+    expect((await admin({ cameraEngine: good }, kiosk)).status).toBe(401);
+    const { getBackend } = await import("@/lib/storage/server");
+    expect((await getBackend().settings.get()).cameraEngine).toEqual(good);
+  });
+
+  it("stores a booth's status rounded, keeps it when a beat says nothing, drops what it cannot read", async () => {
+    const { getBackend } = await import("@/lib/storage/server");
+    const id = await kioskId();
+    const stored = async () => (await getBackend().kiosks.get(id))!.cameraEngine;
+    // A raw sensor reading sent along is not part of the contract and is never stored.
+    await beat({ queueDepth: 0, cameraEngine: { ...status, gravity: [0.1, 9.7, 0.4] } });
+    expect(await stored()).not.toHaveProperty("gravity");
+    expect(await stored()).toEqual({
+      ...status,
+      roll: 3,
+      pitch: 6,
+      appliedRoll: 3,
+      appliedPitch: 4.2,
+      strength: 0.71,
+      zoom: 1.07,
+      loss: 0.08,
+      confidence: 0.99,
     });
-    expect(JSON.stringify(lines[0])).not.toContain("data:");
+    const kept = await stored();
+    // Nothing said, or something outside the contract: the last status stays, nothing odd is stored.
+    // (Every way a status can be wrong is in tests/unit/camera-engine-status.test.ts.)
+    for (const body of [
+      { queueDepth: 0 },
+      { queueDepth: 0, cameraEngine: { ...status, state: "perfect" } },
+      { queueDepth: 0, cameraEngine: { ...status, error: "Sensor <b>text</b> from somewhere" } },
+    ]) {
+      await beat(body);
+      expect(await stored()).toEqual(kept);
+    }
+    // The staff view carries it; an explicit null (engine off on that booth) clears it.
+    const { GET } = await import("@/app/api/admin/kiosks/route");
+    const list = (await (
+      await GET(new Request(`${ORIGIN}/api/admin/kiosks`, { headers: { cookie: staff } }), {
+        params: Promise.resolve({}),
+      })
+    ).json()) as { kiosks: { id: string; cameraEngine: CameraEngineStatus | null }[] };
+    expect(list.kiosks.find((k) => k.id === id)!.cameraEngine).toMatchObject({ state: "full" });
+    await beat({ queueDepth: 0, cameraEngine: null });
+    expect(await stored()).toBeNull();
+  });
 
-    // Nothing usable: no line at all. An unknown profile is logged as the usual one.
-    await beat({ queueDepth: 0, perf: { selfie: { n: 1, last: 1, max: 1, med: 1 } } });
-    await beat({ queueDepth: 0, perf: "fast" });
-    await beat({ queueDepth: 0 });
-    expect(perfLines().slice(before)).toHaveLength(1);
+  it("writes a failure to the log as a code, never as text", async () => {
+    const log = vi.mocked(console.log);
+    log.mockClear();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     await beat({
       queueDepth: 0,
-      perfProfile: "<script>",
-      perf: { qr: { n: 1, last: 3, max: 3, med: 3 } },
+      cameraEngine: { ...status, state: "roll-only", reason: "gl-failed", error: "context-lost" },
     });
-    expect(perfLines().slice(before)[1]).toMatchObject({ profile: "modern", perf: "qr=1:3/3/3" });
-
-    // No kiosk session: refused before anything is read.
-    expect((await beat({ perf: { qr: { n: 1, last: 3, max: 3, med: 3 } } }, "")).status).toBe(401);
-    expect(perfLines().slice(before)).toHaveLength(2);
+    const lines = [...log.mock.calls, ...warn.mock.calls, ...error.mock.calls].map((c) =>
+      String(c[0]),
+    );
+    const line = lines.find((l) => l.includes("kiosk_camera_engine_failed"));
+    expect(line).toBeDefined();
+    expect(line).toContain("context-lost");
+    expect(line).toContain("roll-only");
+    warn.mockRestore();
+    error.mockRestore();
   });
 });
 

@@ -1,4 +1,5 @@
 import type { CanvasLike } from "@/lib/canvas";
+import type { FrameCorrector } from "@/lib/camera-engine/engine";
 
 export type CameraErrorKind =
   /** The guest or the OS refused camera access. */
@@ -32,6 +33,12 @@ export interface CaptureOptions {
   mirror: boolean;
   /** Maximum output width in pixels. */
   maxWidth: number;
+  /**
+   * The Intelligent Camera Engine's correction for this photo (lib/camera-engine), or nothing.
+   * It returns the finished picture, or null to have it taken the usual way; whatever it does,
+   * the size, the crop's shape and the mirror flag are the same as without it.
+   */
+  correct?: FrameCorrector;
 }
 
 export interface CapturedFrame {

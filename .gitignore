@@ -45,6 +45,8 @@ public/kiosk-legacy-assets/
 public/retouch-lab-assets/
 # Stand-alone look comparison sheet (generated the same way)
 public/looks-sheet-assets/
+# Stand-alone camera engine check page (generated the same way)
+public/camera-lab-assets/
 
 # Written by `next dev` / `next build` (agent rules for Next.js); not part of this project.
 /AGENTS.md

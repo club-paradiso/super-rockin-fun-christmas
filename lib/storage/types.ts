@@ -1,3 +1,5 @@
+import type { CameraEngineSettings } from "@/lib/camera-engine/settings";
+import type { CameraEngineStatus } from "@/lib/camera-engine/status";
 import type { VideoMime } from "@/lib/video/format";
 import type { WallLook } from "@/lib/wall/themes";
 
@@ -265,6 +267,11 @@ export interface KioskRow {
   /** Wall displays only: frames per second and JS heap (MB) from the last heartbeat. */
   frameRate: number | null;
   memoryMb: number | null;
+  /**
+   * Booths with 「카메라 자동 보정」 on: what the booth last said about its camera engine
+   * (lib/camera-engine/status.ts: codes and rounded numbers, never a sensor stream or a photo).
+   */
+  cameraEngine: CameraEngineStatus | null;
 }
 
 export interface KioskHeartbeat {
@@ -273,6 +280,8 @@ export interface KioskHeartbeat {
   cameraState: CameraState;
   frameRate?: number | null;
   memoryMb?: number | null;
+  /** Undefined: leave the stored status as it is. Null: clear it. */
+  cameraEngine?: CameraEngineStatus | null;
   appBuild: string | null;
 }
 
@@ -351,6 +360,11 @@ export interface EventSettings {
    * light, and off again from anywhere if it goes wrong. Takes effect at the next session.
    */
   photoLooks: boolean;
+  /**
+   * Intelligent Camera Engine (「카메라 자동 보정」, lib/camera-engine/settings.ts). Mode "off"
+   * (default): the booth photographs exactly as before. Takes effect at the next session.
+   */
+  cameraEngine: CameraEngineSettings;
   updatedAt: string;
   updatedBy: string | null;
 }
@@ -367,6 +381,7 @@ export type SettingsPatch = Partial<
     | "wallLook"
     | "moderationMode"
     | "photoLooks"
+    | "cameraEngine"
   >
 >;
 

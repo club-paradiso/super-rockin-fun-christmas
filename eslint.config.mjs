@@ -12,6 +12,7 @@ const config = [
       "test-results/**",
       "public/kiosk-legacy-assets/**",
       "public/retouch-lab-assets/**",
+      "public/camera-lab-assets/**",
       "public/retouch/mediapipe/**",
       "public/looks-sheet-assets/**",
       "next-env.d.ts",

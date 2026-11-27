@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function KiosksPage() {
   await requireStaff();
   const backend = getBackend();
-  const [kiosks, codes] = await Promise.all([
+  const [kiosks, codes, settings] = await Promise.all([
     backend.kiosks.list(),
     backend.enrollmentCodes.listRecent(10),
+    backend.settings.get(),
   ]);
   const views = kiosks
     .map((k) => toStaffKioskView(k))
@@ -24,7 +25,7 @@ export default async function KiosksPage() {
         온라인: {ONLINE_WITHIN_MS / 60_000}분 안에 신호 · 응답 지연: {STALE_WITHIN_MS / 60_000}분 안
         · 그 이상은 오프라인
       </p>
-      <KioskManager kiosks={views} />
+      <KioskManager kiosks={views} cameraEngineOn={settings.cameraEngine.mode !== "off"} />
       <EnrollmentCodeCreator />
       {codes.length > 0 && (
         <section className="admin-card p-4">

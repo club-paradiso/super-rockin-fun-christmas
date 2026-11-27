@@ -99,14 +99,21 @@ export function createPgAiBackend(
       return fromDb.settings(r!);
     },
     async update(patch: SettingsPatch, staffUserId: string) {
-      const { photoLooks, ...rest } = patch;
+      const { photoLooks, cameraEngine, ...rest } = patch;
+      let changed: Row | undefined;
       if (photoLooks !== undefined) {
-        const [changed] = await one("select * from public.ftl_settings_set_looks($1,$2)", [
+        [changed] = await one("select * from public.ftl_settings_set_looks($1,$2)", [
           photoLooks,
           staffUserId,
         ]);
-        if (Object.keys(rest).length === 0) return fromDb.settings(changed!);
       }
+      if (cameraEngine !== undefined) {
+        [changed] = await one("select * from public.ftl_settings_set_camera_engine($1,$2)", [
+          JSON.stringify(cameraEngine),
+          staffUserId,
+        ]);
+      }
+      if (changed && Object.keys(rest).length === 0) return fromDb.settings(changed);
       const [r] = await one(
         "select * from public.ftl_settings_update($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
         [

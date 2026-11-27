@@ -27,6 +27,9 @@ export const E2E_ENV: Record<string, string> = {
   // The skin-retouch lab page (e2e/retouch.spec.ts). Skin retouch itself stays off: the specs
   // that want it ask for it on the booth URL (?retouch=).
   RETOUCH_LAB: "1",
+  // The camera engine check page (e2e/camera-engine.spec.ts). The engine itself stays off: the
+  // specs that want it ask for it on the booth URL (?engine=) or through the staff setting.
+  CAMERA_LAB: "1",
   ...(USE_SUPABASE
     ? {
         PHOTO_STORE: "supabase",

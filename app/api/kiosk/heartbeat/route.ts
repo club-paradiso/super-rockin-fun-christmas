@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseCameraEngineStatus } from "@/lib/camera-engine/status";
 import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
 import { cleanPerfReport, formatPerfReport } from "@/lib/kiosk/perf";
 import { getAiReview, sweepAiReviewSoon } from "@/lib/moderation/server";
@@ -31,7 +32,7 @@ const LOOKS_ERROR = new Set([
 
 /**
  * Enrolled kiosk → "I'm alive". Carries only operational state (queue depth, camera state,
- * build) — never photos. The response tells the kiosk whether wall submissions are paused.
+ * build, the camera engine's status) — never photos. The response tells the kiosk whether wall submissions are paused.
  */
 export const POST = route("kiosk_heartbeat", async (request: Request) => {
   const config = getServerConfig();
@@ -54,6 +55,7 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     looksError?: unknown;
     perf?: unknown;
     perfProfile?: unknown;
+    cameraEngine?: unknown;
   };
   // Skin retouch failed on that booth since its last beat: a code and a count for the log, so a
   // booth that is quietly sending unretouched photos is seen (nothing about a face is sent).
@@ -91,6 +93,18 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       profile: body.perfProfile === "legacy" ? "legacy" : "modern",
       perf: formatPerfReport(perf),
     });
+  // Camera engine (lib/camera-engine/status.ts): what the booth says about its own correction,
+  // as codes and rounded numbers. A booth that says nothing, or something outside the contract,
+  // leaves the stored status as it is (undefined): dropped, never stored.
+  // An explicit null is the booth saying its engine is off: the stored status is cleared.
+  const cameraEngine =
+    body.cameraEngine === null ? null : (parseCameraEngineStatus(body.cameraEngine) ?? undefined);
+  if (cameraEngine?.error)
+    logEvent(
+      "kiosk_camera_engine_failed",
+      { kioskId: auth.kioskId ?? "dev", code: cameraEngine.error, state: cameraEngine.state },
+      "warn",
+    );
   // Wall displays only (docs/ARCHITECTURE.md 1.8). Anything odd is dropped, not stored.
   const frameRate =
     typeof body.frameRate === "number" && body.frameRate >= 0 && body.frameRate <= 240
@@ -120,6 +134,7 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       appBuild: config.appBuild,
       frameRate,
       memoryMb,
+      cameraEngine,
     });
   }
   const settings = await backend.settings.get();
@@ -136,6 +151,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       aiReview: await getAiReview().active(),
       // Colour looks (lib/looks): the booth takes this up at its next session, never mid-session.
       photoLooks: settings.photoLooks,
+      // Camera engine (lib/camera-engine): taken up at the booth's next session, like the looks.
+      cameraEngine: settings.cameraEngine,
       // The booth keeps its clock offset from this (polaroid date stamp, never the tablet clock).
       serverNow: new Date().toISOString(),
     },
