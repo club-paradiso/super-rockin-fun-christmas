@@ -13,6 +13,9 @@ export default defineConfig({
     "process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS": JSON.stringify(
       process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS ?? "",
     ),
+    "process.env.NEXT_PUBLIC_KIOSK_REST_SECONDS": JSON.stringify(
+      process.env.NEXT_PUBLIC_KIOSK_REST_SECONDS ?? "",
+    ),
     "process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS": JSON.stringify(
       process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS ?? "90",
     ),

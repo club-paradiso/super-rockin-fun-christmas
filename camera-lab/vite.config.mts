@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: { alias: { "@": fromRoot("../") } },
   define: {
     "process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS": JSON.stringify(""),
+    "process.env.NEXT_PUBLIC_KIOSK_REST_SECONDS": JSON.stringify(""),
     "process.env.NEXT_PUBLIC_KIOSK_IDLE_RESET_SECONDS": JSON.stringify("90"),
   },
   oxc: { jsx: { runtime: "automatic" } },

@@ -111,7 +111,7 @@ looks:measure`). `/looks` is the comparison
   the black one, is left out by a user decision; every card offered today has options; a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
   to a line); the picker shows them five to a row, and a tap on a card goes on with it (below); the guest
-  then shoots four, 5 s apart, and chooses the photos
+  then shoots four, each one a 5 s countdown → the flash (when the guest switched it on) → a short rest (`KIOSK_CONFIG.restSeconds`, phase `rest`, 2026-11-27, a user decision; none after the last shot) → the next countdown, and chooses the photos
   (2026-11-27, a user decision, final: 4 shots × 5 s, no retake; `KIOSK_CONFIG.shotsPerSession`, six and five before;
   no frame holds more than four photos, so the choice is the order, not leaving one out).
   There is no "one more shot", no second frame choice and no second round after shooting
@@ -265,8 +265,8 @@ looks:measure`). `/looks` is the comparison
   selection, consent or upload rules.
 - **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
   decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, five since
-  2026-11-27, text only; no invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26).
-  `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
+  2026-11-27, text only; no invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26), and the booth rests `KIOSK_CONFIG.restSeconds` between two shots (phase `rest`, `REST_DONE`; the pose guide then shows the next shot's pose).
+  `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` and `NEXT_PUBLIC_KIOSK_REST_SECONDS` are for the E2E build only.
 - **The booth language is a view too** (D78, D89): `lang` in `lib/kiosk/machine.ts` (Korean,
   English or Simplified Chinese; every guest starts in Korean). Every guest string lives in
   `lib/kiosk/copy.ts` in all three languages; never hard-code booth copy in a component. A frame
