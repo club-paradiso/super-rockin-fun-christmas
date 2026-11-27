@@ -281,7 +281,7 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
   await expect(page.getByTestId("countdown-number")).toBeInViewport({ ratio: 1 });
 
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
-  for (let i = 0; i < 6; i++)
+  for (let i = 0; i < 4; i++)
     await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
   await at("review");
   await expect(page.getByRole("button", { name: copy.review.confirm })).toBeInViewport({

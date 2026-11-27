@@ -12,7 +12,7 @@ import {
 
 /**
  * STUDIO SHALOM booth (D77, D78, D79, D80): the star in the O, "이전", the English screens, the 2×2
- * frame, the journal-cover attract screen and its QR bookmark. The rules (six shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
+ * frame, the journal-cover attract screen and its QR bookmark. The rules (four shots, consent, upload, QR) are the same as in e2e/kiosk.spec.ts.
  */
 
 test.beforeEach(async ({ page }) => {

@@ -95,7 +95,7 @@ async function liveBooth(page: Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ browser, page }) => {
+test("pair from /admin, preview, shoot four, choose, consent, QR", async ({ browser, page }) => {
   await enrollKiosk(page, KIOSK_LABEL);
   const { ctx: adminCtx, page: admin } = await adminPage(browser);
   const phoneCtx = await browser.newContext({
