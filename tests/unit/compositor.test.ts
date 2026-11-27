@@ -168,6 +168,40 @@ describe("geometry helpers", () => {
     expect(coverCrop(1200, 1600, 4 / 3)).toEqual({ x: 0, y: 350, width: 1200, height: 900 });
   });
 
+  it("coverCrop moves the cut by its focus, as CSS object-position does", () => {
+    // 1200 × 1600 into 4:3 leaves 700 px to spare vertically.
+    expect(coverCrop(1200, 1600, 4 / 3, { x: 0.5, y: 0 }).y).toBe(0);
+    expect(coverCrop(1200, 1600, 4 / 3, { x: 0.5, y: 1 }).y).toBe(700);
+    expect(coverCrop(1200, 1600, 4 / 3, { x: 0.5, y: 0.25 }).y).toBe(175);
+    // Wide source: only x moves; out-of-range values are kept inside the photo.
+    expect(coverCrop(1600, 900, 1, { x: 1, y: 0 })).toEqual({
+      x: 700,
+      y: 0,
+      width: 900,
+      height: 900,
+    });
+    expect(coverCrop(1600, 900, 1, { x: 7, y: -3 }).x).toBe(700);
+    expect(coverCrop(1600, 900, 1, { x: Number.NaN, y: 0 }).x).toBe(350);
+  });
+
+  it("composeFrame cuts a photo where its focus says, and centres one without", () => {
+    const frame = getFrame("navy-strip");
+    const slot = frame.slots[0]!;
+    const tall = (focus?: { x: number; y: number }) => ({ ...photo(0, 900, 1600), focus });
+    const firstCrop = (focus?: { x: number; y: number }) => {
+      const { factory, created } = fakeCanvasFactory();
+      composeFrame(frame, [tall(focus), photo(1), photo(2), photo(3)], {
+        createCanvas: factory,
+        context: ctx,
+      });
+      return created[0]!.callsTo("drawImage")[0]!.args.slice(1, 5);
+    };
+    const c = coverCrop(900, 1600, slot.width / slot.height);
+    expect(firstCrop()).toEqual([c.x, c.y, c.width, c.height]);
+    expect(firstCrop({ x: 0.5, y: 0 })).toEqual([0, 0, c.width, c.height]);
+    expect(firstCrop({ x: 0.5, y: 1 })).toEqual([0, 2 * c.y, c.width, c.height]);
+  });
+
   it("coverCrop rejects nonsense", () => {
     expect(() => coverCrop(0, 100, 1)).toThrow();
   });

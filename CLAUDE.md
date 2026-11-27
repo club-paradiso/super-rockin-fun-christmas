@@ -218,7 +218,9 @@ looks:measure`). `/looks` is the comparison
 - **Phone uploads (D66) are ordinary photos** whose `frame_id` starts with `phone-`
   (`config/mobile.ts`): `phone-<booth frame id>` when the guest put photos in one of the booth's
   v2 frames on the phone (D93, D113: the booth's nine cards and options, `MOBILE_FRAMES`; composed there with `composeFrame`, shape checked on the server, hung on
-  the wall like that frame), `phone-photo` for a plain photo from a page older than D93. Test a phone
+  the wall like that frame; each photo sits in its slot where the guest dragged it,
+  `ComposeImage.focus` = CSS `object-position`, starting a third from the top,
+  `MOBILE_UPLOAD_CONFIG.defaultFocus`; booth shots carry no focus and stay centred), `phone-photo` for a plain photo from a page older than D93. Test a phone
   photo with `isMobilePhoto`, never by comparing to one id. One picture per booth QR (the signed `lib/mobile/token.ts` session id is the photo's unique
   `session_id`), re-encoded on the server (`lib/mobile/image.ts`: no EXIF/GPS), entering review
   as PENDING only through `PhotoService.putMobile` with explicit consent. No guest link, no QR

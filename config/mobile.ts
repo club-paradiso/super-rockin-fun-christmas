@@ -42,6 +42,13 @@ export const MOBILE_UPLOAD_CONFIG = {
    */
   sourceLongEdge: 1600,
   /**
+   * Where a phone photo sits in a frame slot until the guest drags it (coverCrop's focus, as CSS
+   * `object-position`). Phone photos are mostly upright and the slots mostly wide, so a centred
+   * cut keeps the middle band and drops heads; a third from the top keeps the upper part, where
+   * people usually are. A rule of thumb, not a detector (no face anything): the guest moves it.
+   */
+  defaultFocus: { x: 0.5, y: 1 / 3 },
+  /**
    * A framed picture is composed at the booth's saved size (KIOSK_CONFIG.outputScale, at most
    * 1200 × 3600 for a strip); the server keeps it at that size instead of shrinking it to the
    * plain-photo bound.
