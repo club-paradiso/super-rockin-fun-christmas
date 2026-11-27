@@ -39,7 +39,7 @@ const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [num
   ["polaroid1", {}, "polaroid1", [1200, 1459]],
   // 문구 (2026-11-26): the date in Figma's Caveat, and a caption drawn as Figma's art.
   ["polaroid1", { caption: "date" }, "polaroid1-date", [1200, 1459]],
-  ["polaroid1", { caption: "hooray" }, "polaroid1-yaho", [1200, 1459]],
+  ["polaroid1", { caption: "circle" }, "polaroid1-circle", [1200, 1459]],
   ["check2", {}, "check2-red", [600, 1800]],
   ["check2", { color: "blue" }, "check2-blue", [600, 1800]],
   ["film35", {}, "film35-natural", [600, 1800]],

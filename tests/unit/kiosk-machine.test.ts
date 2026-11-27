@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { POSE_SEQUENCE } from "@/config/poses";
 import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
-import { OFFERED_CARDS, POLAROID1_CAPTIONS, RETIRED_CARD_IDS } from "@/config/frames/v2";
+import {
+  OFFERED_CARDS,
+  POLAROID1_CAPTIONS,
+  POLAROID1_RETIRED_CAPTIONS,
+  RETIRED_CARD_IDS,
+} from "@/config/frames/v2";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
@@ -1004,9 +1009,9 @@ describe("language (D78): a view, per guest", () => {
             : [];
     // A polaroid caption is shown as it is written on the photo, in every language (「메리
     // 크리스마스」 stays Korean on an English screen); only the two that describe it are translated.
-    const captions = POLAROID1_CAPTIONS.filter((c) => c !== "date" && c !== "circle").map(
-      (c) => `.value.${c}`,
-    );
+    const captions = [...POLAROID1_CAPTIONS, ...POLAROID1_RETIRED_CAPTIONS]
+      .filter((c) => c !== "date" && c !== "circle")
+      .map((c) => `.value.${c}`);
     // Korean only where it names something Korean on purpose: the language picker's own label.
     const allowed = new Set([".langGroup", ...captions]);
     for (const [path, text] of strings(KIOSK_COPY.en))

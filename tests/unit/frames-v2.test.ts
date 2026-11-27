@@ -13,6 +13,7 @@ import {
   cleanOptions,
   defaultOptions,
   getCard,
+  POLAROID1_RETIRED_CAPTIONS,
   POLAROID1_VARIANTS,
   isMemeFrame,
   usesHandwriting,
@@ -93,7 +94,9 @@ describe("틀 선택 v2: the nine cards", () => {
       expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
       expect(cardOfFrame(id)?.id).toBe(id);
     }
-    expect(OFFERED_V2_FRAMES.length).toBe(V2_FRAMES.length - RETIRED_CARD_IDS.size);
+    expect(OFFERED_V2_FRAMES.length).toBe(
+      V2_FRAMES.length - RETIRED_CARD_IDS.size - POLAROID1_RETIRED_CAPTIONS.length,
+    );
   });
 
   it("offer exactly the options of the spec, defaults first", () => {
@@ -106,24 +109,8 @@ describe("틀 선택 v2: the nine cards", () => {
         ["logo", ["logoOn", "logoOff"]],
       ],
       film4: [["color", ["cream", "red"]]],
-      // 문구 (2026-11-26): ten captions, the one the booth always had first.
-      polaroid1: [
-        [
-          "caption",
-          [
-            "village",
-            "date",
-            "verse",
-            "merry",
-            "us",
-            "merryKo",
-            "hooray",
-            "checklist",
-            "peace",
-            "circle",
-          ],
-        ],
-      ],
+      // 문구 (2026-11-26): ten captions; five taken down on 2026-11-27, the first the booth always had.
+      polaroid1: [["caption", ["village", "date", "verse", "merry", "circle"]]],
       polaroid3: [],
       verse4: [],
       check2: [["color", ["red", "blue"]]],
@@ -153,11 +140,11 @@ describe("틀 선택 v2: the nine cards", () => {
         expect(frame.slots.length, frame.id).toBeLessThanOrEqual(4);
       }
     }
-    // Every frame the booth can make, and no other, is in V2_FRAMES.
-    expect(combinations).toBe(V2_FRAMES.length);
+    // Every frame the booth can make, and no other, is in V2_FRAMES (plus the retired captions).
+    expect(combinations).toBe(V2_FRAMES.length - POLAROID1_RETIRED_CAPTIONS.length);
   });
 
-  it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
+  it("map every option combination to its own frame (polaroid1 5, meme4 5, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.flatMap((card) =>
       card.options
         .reduce<Record<string, string>[]>(
@@ -177,11 +164,6 @@ describe("틀 선택 v2: the nine cards", () => {
       "polaroid1-date",
       "polaroid1-verse",
       "polaroid1-merry",
-      "polaroid1-us",
-      "polaroid1-merry-ko",
-      "polaroid1-yaho",
-      "polaroid1-checklist",
-      "polaroid1-peace",
       "polaroid1-circle",
       "polaroid3",
       "verse4",
@@ -197,7 +179,20 @@ describe("틀 선택 v2: the nine cards", () => {
       "meme4-takel",
       "meme4-analyzing",
     ]);
-    expect(V2_FRAMES.map((f) => f.id)).toEqual(ids);
+    // The five retired captions keep their frames, so stored photos still hang.
+    const retired = [
+      "polaroid1-us",
+      "polaroid1-merry-ko",
+      "polaroid1-yaho",
+      "polaroid1-checklist",
+      "polaroid1-peace",
+    ];
+    const at = ids.indexOf("polaroid1-merry") + 1;
+    expect(V2_FRAMES.map((f) => f.id)).toEqual([...ids.slice(0, at), ...retired, ...ids.slice(at)]);
+    for (const id of retired) {
+      expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
+      expect(cardOfFrame(id)?.id).toBe("polaroid1");
+    }
     for (const id of ids) expect(cardOfFrame(id)?.id).toBe(id.split("-")[0]);
     expect(cardOfFrame("navy-strip")).toBeNull();
   });
