@@ -1,7 +1,7 @@
 /**
  * Prevent a fast second finger tap from activating a different button after a screen switch.
- * A time window since render alone is insufficient: the review screen also appears AUTOMATICALLY
- * after six captures, and a legitimate first touch there must never silently disappear.
+ * A time window since render alone is insufficient: the photo choice also appears AUTOMATICALLY
+ * after the last capture, and a legitimate first touch there must never silently disappear.
  */
 export const TAP_GUARD_MS = 350;
 
@@ -29,7 +29,18 @@ export function isStrayTap(input: TouchGuardInput): boolean {
   );
 }
 
+/**
+ * The frame picker opens on the one touch that starts a session, and a tap on a card there goes
+ * straight on (2026-11-27). A guest who taps the cover twice must not have picked a frame with
+ * the second tap, so the picker waits longer for a second finger than any other screen: nobody
+ * reads nine cards and chooses one in under this.
+ */
+export const PICK_TAP_GUARD_MS = 800;
+
 /** The initial attract surface never has a prior button to protect against. */
 export function shouldBlockKioskTap(input: TouchGuardInput & { phase: string }): boolean {
-  return input.phase !== "attract" && isStrayTap(input);
+  if (input.phase === "attract") return false;
+  return isStrayTap(
+    input.phase === "pick" ? { ...input, guardMs: input.guardMs ?? PICK_TAP_GUARD_MS } : input,
+  );
 }

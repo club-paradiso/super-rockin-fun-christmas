@@ -1,10 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { enrollKiosk, openWelcome, SHOOT_TIMEOUT } from "./helpers";
+import { enrollKiosk, SHOOT_TIMEOUT } from "./helpers";
 
 /**
  * How long the booth's main thread is blocked at the moments a guest feels it: entering the frame
- * picker (first and second guest), the options screen with its cycling handwriting, and review →
- * photo choice. A measurement, not a pass/fail check: timings depend on the machine, so it runs
+ * picker (first and second guest), the options screen with its cycling handwriting, and the last
+ * shot → photo choice. A measurement, not a pass/fail check: timings depend on the machine, so it runs
  * only with MEASURE_SMOOTH=1 and prints its numbers.
  *
  *   MEASURE_SMOOTH=1 npx playwright test e2e/kiosk-smoothness.spec.ts
@@ -49,20 +49,21 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
 
   const results: Record<string, Window> = {};
   for (const guest of [1, 2]) {
-    await openWelcome(page);
+    // One touch on the cover is the frame picker (no welcome screen).
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
     results[`guest${guest}: enter frame picker`] = await longTasks(
       page,
       async () => {
-        await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+        await page.getByTestId("attract-start").click();
         await expect(page.getByTestId("screen-pick")).toBeVisible();
       },
       2500,
     );
-    await page.getByTestId("frame-option-film4").click();
+    // A tap on a card is its options screen.
     results[`guest${guest}: options screen, 6 s`] = await longTasks(
       page,
       async () => {
-        await page.getByTestId("confirm-pick").click();
+        await page.getByTestId("frame-option-film4").click();
         await expect(page.getByTestId("screen-options")).toBeVisible();
       },
       6000,
@@ -70,17 +71,19 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
     await page.getByTestId("confirm-options").click();
     await expect(page.getByTestId("screen-ready")).toBeVisible();
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
-    await page.waitForTimeout(2500);
-    results[`guest${guest}: review → choice`] = await longTasks(
+    // The photo choice appears by itself after the last shot (no review screen): measured from
+    // the last shot's countdown to the choice on screen.
+    await expect(page.getByTestId("shot-label")).toHaveText("5번째 사진", {
+      timeout: SHOOT_TIMEOUT * 2,
+    });
+    results[`guest${guest}: last shot → choice`] = await longTasks(
       page,
       async () => {
-        await page.getByRole("button", { name: "이대로 좋아요" }).click();
-        await expect(page.getByTestId("screen-select")).toBeVisible();
+        await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
       },
       2500,
     );
-    // A tap on another colour: the six shots are shown again in that look.
+    // A tap on another colour: the five shots are shown again in that look.
     await page.waitForTimeout(1500);
     const chipId = await page
       .locator('.look-chip[aria-checked="false"]')
@@ -100,9 +103,7 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
       .first()
       .click();
     await page.getByTestId("confirm-home-yes").click();
-    await expect(
-      page.getByTestId("screen-attract").or(page.getByTestId("screen-welcome")),
-    ).toBeVisible();
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
   }
   console.log("\nkiosk smoothness, 4× CPU slowdown (ms of long tasks)");
   for (const [k, v] of Object.entries(results))

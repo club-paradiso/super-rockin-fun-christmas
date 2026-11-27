@@ -4,7 +4,7 @@ import {
   answerForQr,
   enrollKiosk,
   photoForToken,
-  shootWithMock,
+  shootAllWithMock,
   toConsent,
   tokenFromUrl,
 } from "./helpers";
@@ -56,7 +56,7 @@ test("manual mode: a yes waits for a person, and the booth says staff can hide p
 
   const booth = await browser.newPage();
   await enrollKiosk(booth);
-  await shootWithMock(booth);
+  await shootAllWithMock(booth);
   await toConsent(booth);
   // Said on every consent screen, whatever the mode (D96): staff can hide a photo.
   await expect(booth.getByTestId("screen-consent")).toContainText(
@@ -93,7 +93,7 @@ test("auto mode: staff switch it on, a yes reaches the wall without a person, st
   // The booth learns on load that a check is running (it only changes the line under the QR).
   const booth = await browser.newPage();
   await enrollKiosk(booth);
-  await shootWithMock(booth);
+  await shootAllWithMock(booth);
   await toConsent(booth);
   // The consent screen is the same as in manual mode (D96): no line about the check, and the
   // line that staff can hide a photo.
@@ -155,7 +155,7 @@ test("auto mode: staff switch it on, a yes reaches the wall without a person, st
 test("auto mode: a no is never sent anywhere", async ({ browser }) => {
   const booth = await browser.newPage();
   await enrollKiosk(booth);
-  await shootWithMock(booth);
+  await shootAllWithMock(booth);
   await toConsent(booth);
   const noUrl = await answerForQr(booth, "no");
   await expect(booth.getByTestId("review-line")).toHaveCount(0);
@@ -179,7 +179,7 @@ test("auto mode: the emergency switch takes AI-approved photos off the wall, and
   await enrollKiosk(wall);
   await wall.goto("/wall");
   // Emergency: one switch takes every photo off the wall, AI-approved or not.
-  await shootWithMock(booth);
+  await shootAllWithMock(booth);
   await toConsent(booth);
   await answerForQr(booth, "yes");
   await expect(booth.getByTestId("review-line")).toHaveAttribute("data-review", "approved", {

@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 import { FRAME_CARDS } from "../config/frames/v2";
 import { THUMB_DIR, THUMB_MANIFEST, thumbFingerprints } from "../tests/helpers/pick-thumbs";
-import { enrollKiosk, openWelcome } from "./helpers";
+import { enrollKiosk, openPicker } from "./helpers";
 
 /**
  * Builds the frame picker's ready-made previews (`public/kiosk-thumbs`, lib/kiosk/pick-thumbs.ts):
@@ -24,10 +24,7 @@ test("write public/kiosk-thumbs from the booth's own picker previews", async ({ 
   await page.setViewportSize({ width: 768, height: 1024 });
   await enrollKiosk(page);
   await page.goto("/kiosk?camera=mock&looks=0");
-  await openWelcome(page);
-  const start = page.getByTestId("start-camera");
-  if (await start.isVisible().catch(() => false)) await start.click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  await openPicker(page);
   await mkdir(THUMB_DIR, { recursive: true });
   for (const card of FRAME_CARDS) {
     const img = page.getByTestId(`frame-option-${card.id}`).locator("img");

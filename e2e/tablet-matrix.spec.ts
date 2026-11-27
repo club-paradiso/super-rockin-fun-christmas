@@ -1,10 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, request as apiRequest, test, type Page } from "@playwright/test";
 import { KIOSK_COPY } from "../lib/kiosk/copy";
+import { ENROLL_SECRET, PORT } from "./env";
 import { SHOOT_TIMEOUT, enrollKiosk, confirmFrame } from "./helpers";
 
 /**
  * The booth on tablets, portrait and landscape (Chromium at tablet sizes; this is not iPad
- * Safari, and it says nothing about a real device). One whole session per viewport, attract to
+ * Safari, and it says nothing about a real device). One whole session per viewport, cover to
  * QR, and at every screen the same layout rules:
  *
  *  - nothing is wider than the screen;
@@ -215,6 +216,79 @@ async function expectSoundLayout(page: Page, screen: string, { fits = true } = {
   return report;
 }
 
+/**
+ * The cover (2026-11-27: it holds what the welcome screen held). Its small controls sit under
+ * the start with its two captions, clear of the edition line at the foot of the cover, each at
+ * least 52 px tall (D88), and the paused line, when there is one, is with them.
+ */
+async function expectCoverClear(page: Page, screen: string) {
+  // The cover comes in with a short entrance (a scale): measured where it comes to rest.
+  await page
+    .getByTestId("screen-attract")
+    .evaluate((el) =>
+      Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+  const report = await page.evaluate(() => {
+    const box = (selector: string) => {
+      const r = document.querySelector(selector)!.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+    };
+    const options = document.querySelector<HTMLElement>('[data-testid="attract-options"]')!;
+    return {
+      start: box(".attract-start"),
+      options: box('[data-testid="attract-options"]'),
+      edition: box(".journal-cover-edition"),
+      inside: [...options.children].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+      }),
+      controls: [...options.querySelectorAll<HTMLElement>("button")].map((el) => ({
+        name: el.dataset.testid ?? el.textContent ?? "",
+        height: el.getBoundingClientRect().height,
+      })),
+    };
+  });
+  expect(report.options.top, `${screen}: controls under the start`).toBeGreaterThanOrEqual(
+    report.start.bottom,
+  );
+  expect(report.edition.top, `${screen}: edition line under the controls`).toBeGreaterThanOrEqual(
+    report.options.bottom,
+  );
+  for (const child of report.inside) {
+    expect(child.top, `${screen}: inside the controls' box`).toBeGreaterThanOrEqual(
+      report.options.top - 0.5,
+    );
+    expect(child.bottom, `${screen}: inside the controls' box`).toBeLessThanOrEqual(
+      report.options.bottom + 0.5,
+    );
+    expect(child.left, `${screen}: inside the controls' box`).toBeGreaterThanOrEqual(
+      report.options.left - 0.5,
+    );
+    expect(child.right, `${screen}: inside the controls' box`).toBeLessThanOrEqual(
+      report.options.right + 0.5,
+    );
+  }
+  expect(report.controls.map((c) => c.name).sort(), screen).toEqual(
+    ["lang-en", "lang-ko", "lang-zh", "sound-toggle", "start-mobile"].sort(),
+  );
+  for (const control of report.controls)
+    expect(control.height, `${screen}: ${control.name}`).toBeGreaterThanOrEqual(52);
+}
+
+/** The staff switch PAUSE SUBMISSIONS, set as e2e/global-setup.ts sets the review mode. */
+async function pauseSubmissions(paused: boolean) {
+  const origin = `http://127.0.0.1:${PORT}`;
+  const api = await apiRequest.newContext({ baseURL: origin, extraHTTPHeaders: { origin } });
+  try {
+    const login = await api.post("/api/admin/auth/password", { data: { password: ENROLL_SECRET } });
+    expect(login.ok(), "staff login for the switch").toBe(true);
+    const res = await api.post("/api/admin/settings", { data: { pauseSubmissions: paused } });
+    expect(res.ok(), "PAUSE SUBMISSIONS").toBe(true);
+  } finally {
+    await api.dispose();
+  }
+}
+
 /** One whole session, checked at every screen. */
 async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } = {}) {
   const copy = KIOSK_COPY[lang];
@@ -222,31 +296,39 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
     expectSoundLayout(page, `${lang === "zh" ? "中文 · " : ""}${screen}`);
 
   await page.goto("/kiosk?camera=mock");
-  await expect(page.getByTestId("screen-attract")).toBeVisible();
-  await at("attract");
+  const cover = page.getByTestId("screen-attract");
+  await expect(cover).toBeVisible();
+  // The cover holds the start and, under it, what the welcome screen held (2026-11-27): the
+  // language, "내 사진으로 참여하기" and the sound switch. Sound in every language, and a touch
+  // on one of them starts nothing.
+  await at("cover");
+  await expectCoverClear(page, "cover");
+  await page.getByTestId("lang-en").click();
+  await at("cover (English)");
+  await expectCoverClear(page, "cover (English)");
+  await page.getByTestId("lang-zh").click();
+  await at("cover (中文)");
+  await expectCoverClear(page, "cover (中文)");
+  await page.getByTestId(`lang-${lang}`).click();
+  await expect(cover).toBeVisible();
+  for (const id of ["lang-ko", "lang-en", "lang-zh", "start-mobile", "sound-toggle"])
+    await expect(page.getByTestId(id)).toBeInViewport({ ratio: 1 });
 
   await page.getByTestId("attract-start").click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
-  await at("welcome");
-  await page.getByTestId("lang-en").click();
-  await at("welcome (English)");
-  await page.getByTestId("lang-zh").click();
-  await at("welcome (中文)");
-  await page.getByTestId(`lang-${lang}`).click();
-
-  await page.getByTestId("start-camera").click();
   {
     await expect(page.getByTestId("screen-pick")).toBeVisible();
-    // "이전" sits in the bottom bar beside "처음으로" (2026-11-25).
+    // "이전" sits in the bottom bar beside "처음으로" (2026-11-25): from the picker it is the cover.
     await page.getByTestId("go-back").click();
-    await expect(page.getByTestId("screen-welcome")).toBeVisible();
-    await page.getByTestId("start-camera").click();
+    await expect(cover).toBeVisible();
+    await expect(page.getByTestId(`lang-${lang}`)).toHaveAttribute("aria-checked", "true");
+    await page.getByTestId("attract-start").click();
     await expect(page.getByTestId("frame-option-film3").locator("img")).toBeVisible();
     await at("frame choice");
     // Every frame is on screen at once: none hidden in a scrolling list.
     for (const tile of await page.getByTestId("frame-options").getByRole("button").all())
       await expect(tile).toBeInViewport({ ratio: 1 });
-    // 필름 3컷 (options) → the options screen; each option row laid out soundly.
+    // 필름 3컷 (options) is the card marked: the bottom bar's button → the options screen; each
+    // option row laid out soundly.
     await page.getByRole("button", { name: copy.frame.next }).click();
     await expect(page.getByTestId("screen-options")).toBeVisible();
     await expect(page.getByTestId("frame-preview-image")).toBeVisible();
@@ -259,9 +341,10 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
     );
     await at("options: film 3, sepia, no logo");
     await page.getByTestId("go-back").click();
-    // 필름 4컷: the handwriting preview cycles while the screen is shown.
+    // 필름 4컷: a tap on the card is its options screen (no second press); the handwriting
+    // preview cycles while the screen is shown.
     await page.getByTestId("frame-option-film4").click();
-    await page.getByRole("button", { name: copy.frame.next }).click();
+    await expect(page.getByTestId("screen-options")).toBeVisible();
     await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-hand", "cycling");
     await at("options: film 4");
     await page.getByRole("button", { name: copy.option.shoot }).click();
@@ -280,19 +363,25 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
   await expect(page.getByTestId("camera-preview-box")).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId("countdown-number")).toBeInViewport({ ratio: 1 });
 
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
-  for (let i = 0; i < 4; i++)
-    await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
-  await at("review");
-  await expect(page.getByRole("button", { name: copy.review.confirm })).toBeInViewport({
-    ratio: 1,
-  });
-
-  await page.getByRole("button", { name: copy.review.confirm }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible();
-  await at("photo selection");
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT * 2 });
+  for (let i = 0; i < 5; i++)
+    await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();
+  // The photo choice is the first screen after the shots, and it opens with the first photos
+  // chosen: the finish button is on screen and live at once.
+  await at("photo selection, as it opens");
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
-  for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
+  for (let i = 0; i < required; i++)
+    await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("select-change-hint")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId("confirm-selection")).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId("confirm-selection")).toBeEnabled();
+  await expect(page.getByTestId("go-back")).toHaveCount(0);
+  // Changing it: one out (the button waits), the last one in.
+  await page.getByTestId("select-shot-0").click();
+  await expect(page.getByTestId("confirm-selection")).toBeDisabled();
+  await at("photo selection, one taken out");
+  await page.getByTestId("select-shot-4").click();
+  await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
   await at("photo selection, chosen");
 
   await page.getByTestId("confirm-selection").click();
@@ -344,7 +433,7 @@ test("the other screens: phone QR, camera refused, the way-home question", async
     await page.setViewportSize(viewport);
     const size = `${viewport.width}×${viewport.height}`;
     await page.goto("/kiosk?camera=mock");
-    await page.getByTestId("attract-start").click();
+    // "내 사진으로 참여하기" is on the cover.
     await page.getByTestId("start-mobile").click();
     await expect(page.getByTestId("mobile-qr").locator("svg")).toBeVisible();
     await expectSoundLayout(page, `${size} phone QR`);
@@ -352,13 +441,58 @@ test("the other screens: phone QR, camera refused, the way-home question", async
     await page.getByTestId("go-home").click();
     await expect(page.getByTestId("screen-attract")).toBeVisible();
     await page.getByTestId("attract-start").click();
-    await page.getByTestId("start-camera").click();
+    await expect(page.getByTestId("screen-pick")).toBeVisible();
     await page.getByTestId("go-home").click();
     await expect(page.getByTestId("confirm-home")).toBeVisible();
     await expectSoundLayout(page, `${size} way-home question`);
     await page.getByTestId("confirm-home-yes").click();
     await expect(page.getByTestId("screen-attract")).toBeVisible();
   }
+});
+
+test("PAUSE SUBMISSIONS: the cover says why the phone button is off, nothing runs into the edition line, and the session has four dots", async ({
+  page,
+}) => {
+  await pauseSubmissions(true);
+  try {
+    // Landscape first: it has the least height for one more line.
+    for (const viewport of [MATRIX[1]!, MATRIX[3]!, MATRIX[2]!, MATRIX[0]!]) {
+      await page.setViewportSize(viewport);
+      const size = `${viewport.width}×${viewport.height}`;
+      await page.goto("/kiosk?camera=mock");
+      const cover = page.getByTestId("screen-attract");
+      await expect(cover).toBeVisible();
+      await expect(page.locator("main")).toHaveAttribute("data-wall-submissions", "paused");
+      const mobile = page.getByTestId("start-mobile");
+      for (const lang of ["ko", "en", "zh"] as const) {
+        await page.getByTestId(`lang-${lang}`).click();
+        // The other way in is off, and the reason is said beside it (not only by greying it).
+        await expect(mobile).toBeDisabled();
+        const why = cover.locator(".attract-mobile-paused");
+        await expect(why).toHaveText(KIOSK_COPY[lang].attract.mobilePaused);
+        await expect(why).toBeInViewport({ ratio: 1 });
+        await expect(mobile).toHaveAttribute("aria-describedby", (await why.getAttribute("id"))!);
+        await expectSoundLayout(page, `${size} paused cover (${lang})`);
+        await expectCoverClear(page, `${size} paused cover (${lang})`);
+      }
+      await page.getByTestId("lang-ko").click();
+      // Taking photos is not paused: one touch still opens the picker, and the dots count the
+      // steps this session really has (no wall question: four).
+      await page.getByTestId("attract-start").click();
+      await expect(page.getByTestId("screen-pick")).toBeVisible();
+      await expect(page.getByTestId("step-progress")).toHaveText("1 / 4");
+      await expect(page.locator(".booth-steps-dot")).toHaveCount(4);
+    }
+  } finally {
+    await pauseSubmissions(false);
+  }
+  // Open again: the phone button is back, the line is gone, five dots.
+  await page.goto("/kiosk?camera=mock");
+  await expect(page.getByTestId("start-mobile")).toBeEnabled();
+  await expect(page.locator(".attract-mobile-paused")).toHaveCount(0);
+  await page.getByTestId("attract-start").click();
+  await expect(page.getByTestId("step-progress")).toHaveText("1 / 5");
+  await expect(page.locator(".booth-steps-dot")).toHaveCount(5);
 });
 
 test("camera refused: a screen with a way to try again and a way home, at tablet sizes", async ({
@@ -375,7 +509,6 @@ test("camera refused: a screen with a way to try again and a way home, at tablet
     await page.setViewportSize(viewport);
     await page.goto("/kiosk");
     await page.getByTestId("attract-start").click();
-    await page.getByTestId("start-camera").click();
     await confirmFrame(page);
     await expect(page.getByTestId("screen-camera-error")).toBeVisible();
     await expectSoundLayout(page, `${viewport.width}×${viewport.height} camera error`);
@@ -389,7 +522,6 @@ test("turning the tablet: the preview stays 4:3 and on screen, both ways", async
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/kiosk?camera=mock");
   await page.getByTestId("attract-start").click();
-  await page.getByTestId("start-camera").click();
   await confirmFrame(page);
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   const box = page.getByTestId("camera-preview-box");
@@ -418,10 +550,20 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
   // Far shorter than any tablet: the deliberate fallback, not the normal case.
   await page.setViewportSize({ width: 700, height: 460 });
   await page.goto("/kiosk?camera=mock");
-  await page.getByTestId("attract-start").click();
-  await expect(page.getByTestId("screen-welcome")).toBeVisible();
-  const report = await expectSoundLayout(page, "welcome on a very short screen", { fits: false });
+  // The cover carries the language, the phone button and the sound switch now. In English they
+  // take two rows: on a screen this short the cover is the one that has to scroll, and what it
+  // must never do instead is draw them over the edition line at its foot.
+  const cover = page.getByTestId("screen-attract");
+  await expect(cover).toBeVisible();
+  // Choosing a language is that control's own touch: it starts nothing, here either.
+  await page.getByTestId("lang-zh").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(cover).toBeVisible();
+  await page.getByTestId("lang-en").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  const report = await expectSoundLayout(page, "cover on a very short screen", { fits: false });
   expect(report.scrollY).toBeGreaterThan(0);
+  await expectCoverClear(page, "cover on a very short screen");
   // The page itself never scrolls (Safari's toolbars stay put); the booth's own area does.
   expect(
     await page.evaluate(
@@ -429,17 +571,29 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
     ),
   ).toBe(0);
   await expect(page.getByTestId("scroll-hint")).toBeVisible();
-  // Playwright scrolls the booth's area to reach the switch at the bottom, as a finger would.
-  await page.getByTestId("lang-zh").click();
-  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
-  await expect(page.getByTestId("lang-zh")).toBeInViewport({ ratio: 1 });
+  // The booth's area scrolls down to the cover's last line, as under a finger.
+  const scrollToEnd = () =>
+    page.evaluate(() => {
+      const area = document.querySelector<HTMLElement>("[data-booth-scroll]")!;
+      area.scrollTop = area.scrollHeight;
+      return area.scrollTop;
+    });
+  expect(await scrollToEnd()).toBeGreaterThan(0);
+  const edition = cover.locator(".journal-cover-edition");
+  await expect(edition).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId("sound-toggle")).toBeInViewport({ ratio: 1 });
 
-  // A new screen starts at its top, whatever the last one was scrolled to.
-  await page.getByTestId("start-camera").click();
+  // A new screen starts at its top, whatever the last one was scrolled to. A touch on the
+  // cover's paper (here its last line, scrolled to) opens the picker.
+  const line = (await edition.boundingBox())!;
+  await page.mouse.click(line.x + line.width / 2, line.y + line.height / 2);
   await expect(page.getByTestId("screen-pick")).toBeVisible();
-  // 폴라로이드 3컷 has no options: "이 틀로 찍기" goes straight to the camera.
+  expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
+    0,
+  );
+  await expect(page.getByRole("heading", { name: KIOSK_COPY.en.frame.pickTitle })).toBeVisible();
+  // 폴라로이드 3컷 has no options: a tap on the card goes straight to the camera.
   await page.getByTestId("frame-option-polaroid3").click();
-  await page.getByRole("button", { name: KIOSK_COPY.zh.frame.shoot }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
     0,
@@ -457,30 +611,35 @@ test.describe("finger taps", () => {
     await page.goto("/kiosk?camera=mock");
     const start = page.getByTestId("attract-start");
     await expect(start).toBeVisible();
-    // Past the first moment of the attract screen itself.
+    // Past the first moment of the cover itself.
     await page.waitForTimeout(500);
 
-    // Two taps in the middle of the first welcome choice's place: the first opens the letter,
-    // the second lands where "여기서 사진 찍기" has just appeared.
+    // Two taps: the first opens the journal on the frame picker, the second lands on a card
+    // that has just appeared there. A tap on a card goes on with it (2026-11-27), so this second
+    // tap must not have chosen a frame: the picker waits 800 ms for it (PICK_TAP_GUARD_MS).
     await start.tap();
-    await expect(page.getByTestId("screen-welcome")).toBeVisible();
-    const choice = (await page.getByTestId("start-camera").boundingBox())!;
-    await page.touchscreen.tap(choice.x + choice.width / 2, choice.y + choice.height / 2);
-    await page.waitForTimeout(200);
-    await expect(page.getByTestId("screen-welcome")).toBeVisible();
-    await expect(page.locator("main")).toHaveAttribute("data-phase", "welcome");
-
-    // A moment later the same tap is a deliberate one.
-    await page.waitForTimeout(400);
-    await page.touchscreen.tap(choice.x + choice.width / 2, choice.y + choice.height / 2);
     await expect(page.getByTestId("screen-pick")).toBeVisible();
+    const card = (await page.getByTestId("frame-option-film4").boundingBox())!;
+    await page.touchscreen.tap(card.x + card.width / 2, card.y + card.height / 2);
+    await page.waitForTimeout(200);
+    await expect(page.getByTestId("screen-pick")).toBeVisible();
+    await expect(page.locator("main")).toHaveAttribute("data-phase", "pick");
+    // Not even marked: the stray tap did nothing at all.
+    await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("frame-option-film4")).toHaveAttribute("aria-pressed", "false");
+
+    // A moment later the same tap is a deliberate one: that card, and on to its options.
+    await page.waitForTimeout(800);
+    await page.touchscreen.tap(card.x + card.width / 2, card.y + card.height / 2);
+    await expect(page.getByTestId("screen-options")).toBeVisible();
+    await expect(page.getByTestId("confirm-options")).toHaveAttribute("data-frame", /^film4/);
   });
 });
 
-test.describe("attract screen first tap", () => {
+test.describe("cover first tap", () => {
   test.use({ hasTouch: true });
 
-  test("tap on the paper or the main button enters welcome without a startup delay", async ({
+  test("tap on the paper or the main button opens the frame picker without a startup delay, and a tap on the cover's own controls does not", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 820, height: 1180 });
@@ -489,11 +648,25 @@ test.describe("attract screen first tap", () => {
 
     // No artificial 500 ms pause: an intentional first tap should always work.
     await page.getByTestId("attract-start").tap();
-    await expect(page.getByTestId("screen-welcome")).toBeVisible();
+    await expect(page.getByTestId("screen-pick")).toBeVisible();
 
     await page.reload();
-    await expect(page.getByTestId("screen-attract")).toBeVisible();
-    await page.touchscreen.tap(410, 590);
-    await expect(page.getByTestId("screen-welcome")).toBeVisible();
+    const cover = page.getByTestId("screen-attract");
+    await expect(cover).toBeVisible();
+    // The language, the sound switch: finger taps on them are theirs, and start nothing.
+    await page.getByTestId("lang-en").tap();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    const sound = page.getByTestId("sound-toggle");
+    const wasOn = await sound.getAttribute("aria-pressed");
+    await sound.tap();
+    await expect(sound).not.toHaveAttribute("aria-pressed", wasOn!);
+    await page.waitForTimeout(200);
+    await expect(cover).toBeVisible();
+    await expect(page.locator("main")).toHaveAttribute("data-phase", "attract");
+    // The paper itself (here: the lockup, far from every control) is the start.
+    const lockup = (await cover.locator(".attract-lockup").boundingBox())!;
+    await page.touchscreen.tap(lockup.x + lockup.width / 2, lockup.y + lockup.height / 2);
+    await expect(page.getByTestId("screen-pick")).toBeVisible();
+    await expect(page.getByText("Pick a frame")).toBeVisible();
   });
 });

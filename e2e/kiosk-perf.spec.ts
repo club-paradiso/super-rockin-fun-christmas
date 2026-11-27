@@ -20,10 +20,10 @@ type Beat = { perf?: Record<string, Record<string, unknown>>; perfProfile?: stri
 async function oneSession(page: Page) {
   await startSession(page);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await toConsent(page);
   await answerForQr(page, "no");
-  await page.getByRole("button", { name: "다 받았어요" }).click();
+  await page.getByRole("button", { name: "다음 분 차례예요" }).click();
   await expect(page.getByTestId("screen-attract")).toBeVisible();
 }
 
@@ -59,7 +59,6 @@ test("?perf=1: the booth shows staff how long each step took, and the heartbeat 
   for (const code of [
     "screen_pick",
     "screen_ready",
-    "screen_review",
     "screen_select",
     "screen_consent",
     "screen_delivery",

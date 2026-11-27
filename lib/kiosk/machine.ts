@@ -22,14 +22,25 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * effects in response to phases and dispatches the results back here. That keeps every rule
  * (exactly N shots, the frame fixed before shooting, reset) unit-testable.
  *
- * 「틀 선택 v2」 (2026-11-22):
- * attract ("화면을 눌러 시작", D80) → welcome → pick (one of seven cards) → options (only for a
- *         card with options: colour, logo) → camera → ready → countdown ⇄ capturing → review →
- *         select (the photos for the frame) → consent → delivery (QR) → (reset) attract
+ * 2026-11-27, a user decision: 5 shots, no retake. A session shoots five (KIOSK_CONFIG
+ * .shotsPerSession) and there is no way back past the shots: 「다시 찍기」 (2026-11-25) is gone,
+ * with its action, its allowance and its dialog.
+ *
+ * 「틀 선택 v2」 (2026-11-22), with fewer touches (2026-11-27, a user request):
+ * attract ("화면을 눌러 시작", D80) → pick (one of nine cards; a tap on a card goes on) → options
+ *         (only for a card with options: colour, logo) → camera → ready → countdown ⇄ capturing
+ *         → select (the photos for the frame, the first ones already chosen) → consent →
+ *         delivery (QR) → (reset) attract
+ *
+ * Fewer touches (2026-11-27): one touch on the cover opens the frame picker (the welcome screen
+ * is gone; the language, the sound switch and "내 사진으로 참여하기" are on the cover); a tap on a
+ * card chooses it and goes on (PICK_CARD; the bottom bar's button still confirms the card
+ * marked); the review screen is gone: after the last shot the guest is on the photo choice with
+ * the first photos already chosen, and one press finishes.
  *
  * The frame, its colour and its logo are final once shooting starts (turnover): there is no
- * "one more shot" and no second frame choice after shooting; 「다시 찍기」 (below) shoots all six
- * again in the same frame. The handwriting font of the frames
+ * "one more shot", no second frame choice and no second round after shooting. The handwriting
+ * font of the frames
  * that carry one is drawn at that moment too, never the previous session's (`lastHandFont`).
  *
  * The upload starts as soon as the photos are chosen, so it runs while the guest answers the
@@ -37,21 +48,18 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * question is skipped while staff pause submissions (CONFIRM_SELECTION askConsent: false).
  *
  * Release 2.0:
- *  - welcome → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
+ *  - attract → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
  *    waits for the photo; no camera, no upload from the booth itself.
  *  - Pose guide (D71): on the ready screen the guest chooses free poses or recommended ones
  *    (BEGIN_SHOOTING guide). It only changes what is shown during the countdown (currentPose);
  *    the shots, countdown and every later step are the same.
  *
  * STUDIO SHALOM booth flow (D78):
- *  - Language: the guest picks Korean, English or Chinese on the welcome screen (SET_LANG). A
- *    view: no rule changes with it. Every new guest starts in Korean (RESET).
- *  - Back: one step back where nothing is lost (canGoBack): frame pick → welcome, options →
- *    frame pick, the camera before the first shot → options (or the pick), photo choice →
- *    review (the choice is kept), the phone QR → welcome.
- *  - Retake (「다시 찍기」, a user decision, 2026-11-25): on the review screen the guest may throw
- *    the six shots away and shoot again with the same frame, `retakesPerSession` times (RETAKE).
- *    The only way back past the shots, and it always asks first. Nothing has been uploaded yet.
+ *  - Language: the guest picks Korean, English or Chinese on the cover (SET_LANG). A view: no
+ *    rule changes with it. Every new guest starts in Korean (RESET).
+ *  - Back: one step back where nothing is lost (canGoBack): frame pick → cover, options →
+ *    frame pick, the camera before the first shot → options (or the pick), the phone QR →
+ *    cover. Never once a shot is taken: the photo choice has no way back.
  *
  * D89: the easy screen mode (D67) is gone. There is one booth screen; the guest's only per-guest
  * choice besides the language is the pose guide.
@@ -59,7 +67,6 @@ import type { KioskLang } from "@/lib/kiosk/copy";
 
 export type KioskPhase =
   | "attract" // "화면을 눌러 시작": the booth waiting for the next guest (D80)
-  | "welcome"
   | "pick" // choose a frame before shooting
   | "camera" // requesting permission / starting the camera
   | "camera-error"
@@ -67,8 +74,7 @@ export type KioskPhase =
   | "countdown"
   | "capturing"
   | "options" // colour / logo of the chosen card, before shooting (cards with options only)
-  | "review"
-  | "select" // order exactly the number of shots the chosen frame requires
+  | "select" // the shots, the first ones chosen: exactly as many as the chosen frame takes
   | "consent"
   | "delivery"
   | "mobile"; // "내 사진으로 참여하기": QR for the guest's phone (D66)
@@ -143,18 +149,19 @@ export interface KioskState<Shot> {
    */
   retouchDefault: RetouchLevelId;
   retouch: RetouchLevelId;
-  /** Retakes this guest may still use (「다시 찍기」). Starts at `retakesPerSession`. */
-  retakesLeft: number;
-  /** The booth's allowance per guest (KIOSK_CONFIG.retakesPerSession), for RESET. */
-  retakesPerSession: number;
 }
 
 export type KioskAction<Shot> =
-  /** The guest pressed start: a new session (and upload idempotency key) begins. */
-  | { type: "START"; sessionId: string }
-  /** A card on the picker (its options go back to their defaults). */
+  /**
+   * A touch on the cover: a new session (and upload idempotency key) begins, at the frame
+   * picker (D80; straight there since 2026-11-27).
+   */
+  | { type: "OPEN"; sessionId: string }
+  /** Marks a card on the picker without going on (its options go back to their defaults). */
   | { type: "SELECT_CARD"; cardId: string }
-  /** "다음" / "이 틀로 찍기": to the options, or straight to the camera. random ∈ [0, 1). */
+  /** A tap on a card: that card, and on to its options or straight to the camera. random ∈ [0, 1). */
+  | { type: "PICK_CARD"; cardId: string; random: number }
+  /** "다음" / "이 틀로 찍기" in the bottom bar: the same step for the card that is marked. */
   | { type: "CONFIRM_PICK"; random: number }
   | { type: "SET_OPTION"; key: OptionKey; value: OptionValue }
   /** "이대로 찍기": the frame is final, the camera turns on. random ∈ [0, 1). */
@@ -169,7 +176,6 @@ export type KioskAction<Shot> =
   | { type: "TICK" }
   | { type: "SHOT_CAPTURED"; shot: Shot }
   | { type: "CAPTURE_FAILED" }
-  | { type: "CONFIRM_SHOTS" }
   | { type: "TOGGLE_SHOT_SELECTION"; index: number }
   /** Another colour look for this session's photos; only while choosing the photos. */
   | { type: "SET_LOOK"; lookId: string }
@@ -182,9 +188,7 @@ export type KioskAction<Shot> =
   | { type: "DELIVERY_QUEUED"; reason: "network" | "auth" }
   | { type: "DELIVERY_FAILED"; message: string }
   | { type: "SET_CONSENT"; consent: Exclude<WallConsent, null> }
-  /** A touch on the attract screen opens the welcome choices (D80). */
-  | { type: "OPEN" }
-  /** "내 사진으로 참여하기" from the welcome screen. */
+  /** "내 사진으로 참여하기" from the cover. */
   | { type: "START_MOBILE" }
   | {
       type: "MOBILE_READY";
@@ -204,8 +208,6 @@ export type KioskAction<Shot> =
   | { type: "SET_RETOUCH"; level: RetouchLevelId }
   /** "이전": one step back, only where canGoBack allows it (D78). */
   | { type: "BACK" }
-  /** 「다시 찍기」: the shots are thrown away and the camera opens again (canRetake). */
-  | { type: "RETAKE" }
   | { type: "RESET" };
 
 export interface KioskInit {
@@ -215,8 +217,6 @@ export interface KioskInit {
   lastHandFont?: string | null;
   /** The booth's skin-retouch setting: "off" (default) offers the guest nothing. */
   retouch?: RetouchLevelId;
-  /** Retakes per guest (KIOSK_CONFIG.retakesPerSession). Default 0: none. */
-  retakesPerSession?: number;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
@@ -251,13 +251,43 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     lang: "ko",
     retouchDefault: init.retouch ?? "off",
     retouch: init.retouch ?? "off",
-    retakesLeft: Math.max(0, Math.floor(init.retakesPerSession ?? 0)),
-    retakesPerSession: Math.max(0, Math.floor(init.retakesPerSession ?? 0)),
   };
 }
 
 export function capturedCount<Shot>(state: KioskState<Shot>): number {
   return state.shots.filter((s) => s !== null).length;
+}
+
+/**
+ * Every shot is taken: on to the photo choice, with the first photos already chosen (as many as
+ * the frame takes, in shooting order). The guest may finish at once or change the choice.
+ */
+function toSelect<Shot>(state: KioskState<Shot>): KioskState<Shot> {
+  return {
+    ...state,
+    phase: "select",
+    selectedShotIndices: getFrame(state.frameId).slots.map((_, index) => index),
+  };
+}
+
+/** A card's first step after it is chosen: its options screen, or the camera. */
+function afterPick<Shot>(state: KioskState<Shot>, random: number): KioskState<Shot> {
+  return getCard(state.cardId).options.length
+    ? { ...state, phase: "options" }
+    : lockFrame(state, random);
+}
+
+/** The picker with `cardId` marked and its options at their defaults. */
+function withCard<Shot>(state: KioskState<Shot>, cardId: string): KioskState<Shot> {
+  const card = getCard(cardId);
+  const frameOptions = defaultOptions(card);
+  return {
+    ...state,
+    cardId: card.id,
+    frameOptions,
+    frameId: card.frame(frameOptions).id,
+    selectedShotIndices: [],
+  };
 }
 
 /** The frame is final: draw this session's handwriting font if the frame carries one. */
@@ -280,11 +310,12 @@ export function kioskReducer<Shot>(
         lastHandFont: state.handFont ?? state.lastHandFont,
         // Every guest starts at the booth's setting, never at the previous guest's answer.
         retouch: state.retouchDefault,
-        retakesPerSession: state.retakesPerSession,
       });
 
     case "OPEN":
-      return state.phase === "attract" ? { ...state, phase: "welcome" } : state;
+      return state.phase === "attract" && typeof action.sessionId === "string" && action.sessionId
+        ? { ...state, phase: "pick", sessionId: action.sessionId, cameraError: null }
+        : state;
 
     case "SET_LANG":
       return state.lang === action.lang ? state : { ...state, lang: action.lang };
@@ -303,15 +334,13 @@ export function kioskReducer<Shot>(
       if (!canGoBack(state)) return state;
       switch (state.phase) {
         case "pick":
-          return { ...state, phase: "welcome", sessionId: "" };
+          // Back on the cover: no session any more. The language chosen there is kept.
+          return { ...state, phase: "attract", sessionId: "" };
         case "options":
           return { ...state, phase: "pick" };
-        case "select":
-          // The shots are still there; the choice, look and retouch answer are kept.
-          return { ...state, phase: "review" };
         case "mobile":
           // The QR on screen is simply left; the phone page stops working when it expires.
-          return { ...state, phase: "welcome", mobile: { status: "idle" } };
+          return { ...state, phase: "attract", mobile: { status: "idle" } };
         case "ready":
           // Nothing is shot yet: the frame may change again, and the font is drawn again then.
           return {
@@ -324,35 +353,8 @@ export function kioskReducer<Shot>(
           return state;
       }
 
-    case "RETAKE":
-      if (!canRetake(state)) return state;
-      // Same frame and font; everything made from the shots goes with them.
-      return {
-        ...state,
-        phase: "camera",
-        shots: state.shots.map(() => null),
-        shotIndex: 0,
-        poseGuide: false,
-        remaining: state.countdownSeconds,
-        selectedShotIndices: [],
-        lookId: null,
-        retouch: state.retouchDefault,
-        captureFailures: 0,
-        cameraError: null,
-        retakesLeft: state.retakesLeft - 1,
-      };
-
-    case "START":
-      if (state.phase !== "welcome") return state;
-      return {
-        ...state,
-        phase: "pick",
-        sessionId: action.sessionId,
-        cameraError: null,
-      };
-
     case "START_MOBILE":
-      return state.phase === "welcome"
+      return state.phase === "attract"
         ? { ...state, phase: "mobile", mobile: { status: "loading" } }
         : state;
 
@@ -388,24 +390,16 @@ export function kioskReducer<Shot>(
         ? { ...state, mobile: { status: "loading" } }
         : state;
 
-    case "SELECT_CARD": {
-      if (state.phase !== "pick") return state;
-      const card = getCard(action.cardId);
-      const frameOptions = defaultOptions(card);
-      return {
-        ...state,
-        cardId: card.id,
-        frameOptions,
-        frameId: card.frame(frameOptions).id,
-        selectedShotIndices: [],
-      };
-    }
+    case "SELECT_CARD":
+      return state.phase === "pick" ? withCard(state, action.cardId) : state;
+
+    case "PICK_CARD":
+      return state.phase === "pick"
+        ? afterPick(withCard(state, action.cardId), action.random)
+        : state;
 
     case "CONFIRM_PICK":
-      if (state.phase !== "pick") return state;
-      return getCard(state.cardId).options.length
-        ? { ...state, phase: "options" }
-        : lockFrame(state, action.random);
+      return state.phase === "pick" ? afterPick(state, action.random) : state;
 
     case "SET_OPTION": {
       if (state.phase !== "options") return state;
@@ -444,7 +438,7 @@ export function kioskReducer<Shot>(
       {
         // Resume at the first empty slot (after a reconnect, earlier shots are kept).
         const firstEmpty = state.shots.findIndex((s) => s === null);
-        if (firstEmpty === -1) return { ...state, phase: "review" };
+        if (firstEmpty === -1) return toSelect(state);
         return {
           ...state,
           phase: "countdown",
@@ -467,7 +461,7 @@ export function kioskReducer<Shot>(
       shots[state.shotIndex] = action.shot;
       const base = { ...state, shots, captureFailures: 0 };
       const next = shots.findIndex((s) => s === null);
-      if (next === -1) return { ...base, phase: "review" };
+      if (next === -1) return toSelect(base);
       return { ...base, phase: "countdown", shotIndex: next, remaining: state.countdownSeconds };
     }
 
@@ -484,14 +478,6 @@ export function kioskReducer<Shot>(
         captureFailures: failures,
       };
     }
-
-    case "CONFIRM_SHOTS":
-      return state.phase === "review" &&
-        state.shots.length === state.shotCount &&
-        capturedCount(state) === state.shotCount
-        ? // Back from the photo choice ("이전") the guest's choice is still there: nothing is lost.
-          { ...state, phase: "select" }
-        : state;
 
     case "SET_LOOK":
       // Fixed with the photos: once they are confirmed the picture is being made and uploaded.
@@ -513,7 +499,11 @@ export function kioskReducer<Shot>(
       const selected = state.selectedShotIndices;
       if (selected.includes(index))
         return { ...state, selectedShotIndices: selected.filter((i) => i !== index) };
-      if (selected.length >= getFrame(state.frameId).slots.length) return state;
+      const slots = getFrame(state.frameId).slots.length;
+      // A frame of one photo: another photo simply takes its place (there is nothing to order,
+      // and the first one is already chosen when the screen opens).
+      if (slots === 1) return { ...state, selectedShotIndices: [index] };
+      if (selected.length >= slots) return state;
       return { ...state, selectedShotIndices: [...selected, index] };
     }
 
@@ -581,17 +571,17 @@ export function kioskReducer<Shot>(
 }
 
 /**
- * Where "이전" is offered (D78): only a step back that loses nothing the guest made. The camera
- * screen before the first shot goes back to the options (or the pick); after a shot it does not
- * (a reconnect keeps earlier shots, and going back would drop them). The photo choice goes back
- * to the review, where the shots are; the frame stays fixed (v2). Throwing the shots away is
- * not "이전" but 「다시 찍기」 (canRetake), which asks first.
+ * Where "이전" is offered (D78): only a step back that loses nothing the guest made. The picker
+ * goes back to the cover; the camera screen before the first shot goes back to the options (or
+ * the pick); after a shot it does not (a reconnect keeps earlier shots, and going back would
+ * drop them). Once the shots are taken there is no step back at all: the photo choice is the
+ * first screen after them (2026-11-27: no review screen, no retake), and the frame stays fixed
+ * (v2). "처음으로" ends the session instead, after asking.
  */
 export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
   switch (state.phase) {
     case "pick":
     case "options":
-    case "select":
       return true;
     case "ready":
       return capturedCount(state) === 0;
@@ -603,29 +593,18 @@ export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
   }
 }
 
-/**
- * 「다시 찍기」: only on the review screen, with every shot taken and a retake left. From the photo
- * choice the guest first goes back to the review ("이전"). Never once the photos are chosen: the
- * picture is then being made and uploaded.
- */
-export function canRetake<Shot>(state: KioskState<Shot>): boolean {
-  return (
-    state.phase === "review" && state.retakesLeft > 0 && capturedCount(state) === state.shotCount
-  );
-}
-
 /** The photo is final and on its way: the consent and delivery screens. */
 function uploading<Shot>(state: KioskState<Shot>): boolean {
   return state.phase === "consent" || state.phase === "delivery";
 }
 
 /**
- * The dots in the screen header (v2, Figma 898:1677): 틀 → 촬영 → 확인 → 사진 고르기 → 동의 →
- * QR, six dots and no number. The options screen is still step 1. Without the wall question the
- * guest sees five. Null on the attract screen.
+ * The dots in the screen header (v2, Figma 1069:2245): 틀 → 촬영 → 사진 고르기 → 동의 → QR,
+ * five dots and no number (six until 2026-11-27, when the review screen went). The options
+ * screen is still step 1. Without the wall question the guest sees four. Null on the cover.
  */
 /**
- * How many steps this session really has: six with the wall question, five without. Once the
+ * How many steps this session really has: five with the wall question, four without. Once the
  * photos are chosen that is a fact (`consentAsked`); before, it is what would happen now
  * (`submissionsOpen`, the staff switch as the booth last heard it).
  */
@@ -640,21 +619,18 @@ export function progressStep(
   phase: KioskPhase,
   askConsent: boolean,
 ): { step: number; total: number } | null {
-  const total = askConsent ? 6 : 5;
+  const total = askConsent ? 5 : 4;
   switch (phase) {
     case "attract":
-    case "welcome":
     case "mobile":
       return null;
     case "pick":
     case "options":
       return { step: 1, total };
-    case "review":
-      return { step: 3, total };
     case "select":
-      return { step: 4, total };
+      return { step: 3, total };
     case "consent":
-      return { step: 5, total };
+      return { step: 4, total };
     case "delivery":
       return { step: total, total };
     default:
@@ -664,7 +640,7 @@ export function progressStep(
 
 /**
  * The recommended pose for the shot being counted down or captured (D71). Null in free mode and
- * outside shooting. A retake of shot i shows pose i again.
+ * outside shooting. A shot taken again after a failed capture shows its pose again.
  */
 export function currentPose<Shot>(
   state: KioskState<Shot>,

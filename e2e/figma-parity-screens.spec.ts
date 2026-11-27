@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { POLAROID1_CAPTIONS } from "../config/frames/v2";
 import { diff, toRaw, triptych, type Rect } from "../tests/parity/compare";
-import { enrollKiosk, openWelcome } from "./helpers";
+import { enrollKiosk, openPicker } from "./helpers";
 
 /**
  * 「Figma 일치」, the five v2 screens at 768 × 1024 (Figma 1069:2245, 898:1938, 898:2006, 898:2083,
@@ -38,9 +38,12 @@ const HEADER: Want[] = [
   // The wordmark starts at the left margin; its box ends in letter spacing, so the left edge is
   // compared.
   { sel: ".booth-wordmark", text: { cx: 186.5, cy: 67, size: 30, left: 30 } },
-  ...[0, 1, 2, 3, 4, 5].map((i) => ({
+  // Five dots since 2026-11-27 (틀 → 촬영 → 사진 고르기 → 동의 → QR; the review step went, a
+  // user decision). Figma's five screens were changed with it and exported again: the dots sit
+  // at x = 602 + 30·i (six sat at 572 + 30·i), and there is no sixth.
+  ...[0, 1, 2, 3, 4].map((i) => ({
     sel: `.booth-steps-dot:nth-of-type(${i + 2})`,
-    box: [572 + 30 * i, 59, 16, 16] as Box,
+    box: [602 + 30 * i, 59, 16, 16] as Box,
   })),
   { sel: '[data-testid="go-home"]', box: [30, 924, 174, 75] },
 ];
@@ -222,16 +225,15 @@ test.beforeEach(async ({ page }) => {
       // `next dev` draws its own badge in the corner.
       "nextjs-portal{display:none!important}",
   });
-  await openWelcome(page);
-  await page.getByTestId("start-camera").click();
+  await openPicker(page);
   await expect(page.getByTestId("frame-option-lace1").locator("img")).toBeVisible();
 });
 
 for (const [name, spec] of Object.entries(SCREENS)) {
   test(`${name}: the screen matches Figma at 768 × 1024`, async ({ page }, info) => {
     if (name !== "pick") {
+      // A tap on a card goes on to its options (2026-11-27): no second press.
       await page.getByTestId(`frame-option-${name}`).click();
-      await page.getByTestId("confirm-pick").click();
       await expect(page.getByTestId("frame-preview-image")).toBeVisible();
     }
     await page.evaluate(() => document.fonts.ready);

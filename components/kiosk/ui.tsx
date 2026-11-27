@@ -152,7 +152,7 @@ export function BoothScreen({
   action?: React.ReactNode;
   /** Press the wax seal on this sheet's corner (D79, D80: the attract screen and the QR only). */
   seal?: boolean;
-  /** The attract and welcome screens have no header and no footer: the sheet is the screen. */
+  /** The cover has no header and no footer: the sheet is the screen. */
   header?: boolean;
   onClick?: () => void;
 }) {
@@ -173,11 +173,7 @@ export function BoothScreen({
           {progress && <Stepper step={progress.step} total={progress.total} />}
         </header>
       )}
-      <LetterSheet
-        seal={seal}
-        className={className}
-        chapter={progress?.step ?? (testId === "screen-welcome" ? 1 : undefined)}
-      >
+      <LetterSheet seal={seal} className={className} chapter={progress?.step}>
         {children}
       </LetterSheet>
       {header && <BoothFooter action={action} />}

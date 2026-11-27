@@ -29,15 +29,10 @@ const ko = {
   attract: {
     start: "화면을 눌러 시작",
     event: "Christmas Village 2026",
-  },
-  welcome: {
-    title: "크리스마스의 추억을 함께 남겨요",
-    lead: "사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.",
-    camera: "여기서 사진 찍기",
-    cameraLead: "네 장 찍고 골라서 휴대폰으로 받아요",
+    // The welcome screen is gone (2026-11-27, a user request: one touch starts). These two are
+    // its own lines, now on the cover: the other way in, and why it is off while paused.
     mobile: "내 사진으로 참여하기",
-    mobileLead: "휴대폰에 있는 사진을 미디어월로 보내요",
-    paused: "미디어월 게시 신청을 잠시 멈췄어요. 사진 찍기는 지금도 할 수 있어요",
+    mobilePaused: "미디어월 게시 신청을 잠시 멈췄어요. 사진 찍기는 지금도 할 수 있어요",
   },
   chrome: {
     back: "이전",
@@ -162,26 +157,18 @@ const ko = {
     pose: "추천 포즈",
     progress: (done: number, total: number) => `${total}장 중 ${done}장 촬영`,
   },
-  review: {
-    title: "잘 나왔나요?",
-    confirm: "이대로 좋아요",
-    // 「다시 찍기」 (2026-11-25): Claude's wording, not yet the user's (D76).
-    retake: "다시 찍기",
-    retakeTitle: "다시 찍을까요?",
-    retakeLead: (shots: number, left: number) =>
-      `지금 찍은 사진 ${shots}장은 지워지고, 같은 틀로 처음부터 다시 찍어요.` +
-      (left === 1
-        ? "\n다시 찍기는 한 번만 할 수 있어요."
-        : `\n다시 찍기는 ${left}번 할 수 있어요.`),
-    retakeYes: "다시 찍을게요",
-    retakeNo: "이대로 둘게요",
-  },
   select: {
     title: (required: number, total: number) => `${total}장 중 ${required}장을 골라주세요`,
     lead: (selected: number, required: number) =>
       `선택한 순서대로 프레임에 들어가요. ${selected} / ${required}장 선택했어요.`,
     choose: (n: number) => `${n}번째 사진 선택`,
     unchoose: (n: number) => `${n}번째 사진 선택 해제`,
+    // The first photos are already chosen when the screen opens (2026-11-27: no review screen):
+    // how to change them. Claude's wording, not yet the user's (D76).
+    change: (required: number): string =>
+      required === 1
+        ? "첫 사진을 골라 두었어요. 다른 사진을 누르면 바뀌어요."
+        : "앞에서부터 골라 두었어요. 바꾸려면 뺄 사진을 먼저 누르고, 넣을 사진을 눌러 주세요.",
     confirm: "이 사진으로 완성하기",
     // The colour row (2026-11-24, Figma 956:1589). Written by Claude as placeholders on the
     // user's instruction to build it first: the user's own wording replaces these (D76).
@@ -236,7 +223,8 @@ const ko = {
     // Shown once the server says the photo is on the wall (AI review on by default, 2026-11-25,
     // Figma 969:1690). Written by Claude, not yet the user's wording (D76).
     reviewApproved: "미디어월에 올라갔어요! 큰 화면에서 찾아보세요.",
-    done: "다 받았어요",
+    // "다 받았어요" until 2026-11-27: the user's words for the button that hands the booth on.
+    done: "다음 분 차례예요",
     resetSoon: "잠시 뒤 처음 화면으로 돌아가요",
     qrNote: "휴대폰으로 찍으면\n사진 파일을 받을 수 있어요",
     session: (code: string) => `세션 ${code}`,
@@ -316,16 +304,8 @@ const en: KioskCopy = {
   attract: {
     start: "Tap the screen to start",
     event: "Christmas Village 2026",
-  },
-  welcome: {
-    title: "Make a Christmas memory together",
-    lead: "Take photos and get them on your phone, or send your own photo to hang on the big screen.",
-    camera: "Take photos here",
-    // Figma KIOSK 1c (391:491), chosen by the user on 2026-11-23 (D113).
-    cameraLead: "Take photos, and get them on your phone",
     mobile: "Share a photo from your phone",
-    mobileLead: "Send a photo from your phone to the media wall",
-    paused: "Media wall submissions are paused right now. You can still take photos here",
+    mobilePaused: "Media wall submissions are paused right now. You can still take photos here",
   },
   chrome: {
     back: "Back",
@@ -446,23 +426,16 @@ const en: KioskCopy = {
     pose: "Try this pose",
     progress: (done, total) => `${done} of ${total} photos taken`,
   },
-  review: {
-    title: "How did they turn out?",
-    confirm: "Looks good",
-    retake: "Retake",
-    retakeTitle: "Retake your photos?",
-    retakeLead: (shots, left) =>
-      `These ${shots} photos will be deleted and you’ll start again with the same frame.` +
-      (left === 1 ? "\nYou can only do this once." : `\nYou can do this ${left} times.`),
-    retakeYes: "Retake",
-    retakeNo: "Keep these",
-  },
   select: {
     title: (required, total) => `Pick ${required} of your ${total} photos`,
     lead: (selected, required) =>
       `They go into the frame in the order you pick them. ${selected} of ${required} picked.`,
     choose: (n) => `Pick photo ${n}`,
     unchoose: (n) => `Unpick photo ${n}`,
+    change: (required) =>
+      required === 1
+        ? "The first photo is picked. Tap another to use it instead."
+        : "The first ones are picked. To change, tap one to take it out, then tap the one you want.",
     confirm: "Finish with these",
     lookTitle: "Colour",
     lookNext: "Next",
@@ -504,7 +477,7 @@ const en: KioskCopy = {
     reviewDelayed:
       "The check is taking a little longer. We will show your photo once it has been checked.",
     reviewApproved: "Your photo is on the media wall! Look for it on the big screen.",
-    done: "All done",
+    done: "Next guest, please",
     resetSoon: "This screen will reset in a moment",
     qrNote: "Scan it with your phone\nto download the photo",
     session: (code) => `Session ${code}`,
@@ -578,15 +551,8 @@ const zh: KioskCopy = {
   attract: {
     start: "点击屏幕开始",
     event: "Christmas Village 2026",
-  },
-  welcome: {
-    title: "一起留下圣诞的回忆",
-    lead: "拍照后用手机领取，或者把你的照片发上来，一起挂到大屏幕上。",
-    camera: "在这里拍照",
-    cameraLead: "拍四张，挑选后用手机领取",
     mobile: "用我的照片参与",
-    mobileLead: "把手机里的照片发送到媒体墙",
-    paused: "目前暂时停止接收照片",
+    mobilePaused: "目前暂时停止接收照片",
   },
   chrome: {
     back: "上一步",
@@ -707,22 +673,15 @@ const zh: KioskCopy = {
     pose: "推荐姿势",
     progress: (done, total) => `已拍 ${done} 张，共 ${total} 张`,
   },
-  review: {
-    title: "拍得好看吗？",
-    confirm: "就这样吧",
-    retake: "重拍",
-    retakeTitle: "要重拍吗？",
-    retakeLead: (shots, left) =>
-      `已拍的 ${shots} 张照片会被删除，用同一个相框从头重拍。` +
-      (left === 1 ? "\n只能重拍一次。" : `\n还可以重拍 ${left} 次。`),
-    retakeYes: "重拍",
-    retakeNo: "保留这些",
-  },
   select: {
     title: (required, total) => `请从 ${total} 张中选 ${required} 张`,
     lead: (selected, required) => `会按你选择的顺序放进相框。已选 ${selected} / ${required} 张。`,
     choose: (n) => `选择第 ${n} 张照片`,
     unchoose: (n) => `取消选择第 ${n} 张照片`,
+    change: (required) =>
+      required === 1
+        ? "已选好第一张。点别的照片就可以换。"
+        : "已按顺序选好前几张。想换的话，先点要去掉的，再点要放进去的。",
     confirm: "用这些照片完成",
     lookTitle: "色调",
     lookNext: "下一页",
@@ -763,7 +722,7 @@ const zh: KioskCopy = {
     reviewChecking: "正在确认照片，请稍等。",
     reviewDelayed: "照片确认需要多一点时间。确认无误后会显示在屏幕上。",
     reviewApproved: "照片已经上墙了！请在大屏幕上找找看。",
-    done: "已经领取了",
+    done: "轮到下一位了",
     resetSoon: "稍后会回到开头画面",
     qrNote: "用手机扫描后\n就能下载照片文件",
     session: (code) => `编号 ${code}`,
