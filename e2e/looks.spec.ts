@@ -705,12 +705,23 @@ test.describe("the booth with looks", () => {
         return original.apply(this, arguments as never);
       } as typeof original;
     });
-    // 필름 3컷 흑백: its own tone is 흑백, so the fallback must still be black and white.
+    // 필름 3컷 흑백: its own tone is 흑백, so the photo must still be black and white. A black-and-
+    // white frame offers no look (2026-11-27), so it never asks for WebGL: nothing to report.
     await sessionToConsent(page, "/kiosk?camera=mock&looks=1", "film3");
     const [r, g, b] = await firstPhotoColour(page);
     expect(Math.abs(r! - g!)).toBeLessThan(2);
     expect(Math.abs(g! - b!)).toBeLessThan(2);
-    expect(errors.length).toBeGreaterThan(0);
+    await answerForQr(page, "no");
+    await page.getByRole("button", { name: "다음 분 차례예요" }).click();
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+    // A colour frame does ask for it: the session still finishes, with no colour row, and says why.
+    await startSession(page, "film4");
+    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("look-row")).toHaveCount(0);
+    await selectDefaultPhotos(page);
+    await expect(page.getByTestId("final-image")).toBeVisible();
+    await expect.poll(() => errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("WebGL is not available");
     await answerForQr(page, "no");
   });
