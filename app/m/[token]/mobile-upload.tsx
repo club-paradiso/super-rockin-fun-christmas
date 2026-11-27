@@ -25,12 +25,15 @@ import { loadFrameAssets } from "@/lib/compositor/assets";
 import { composeFrame, formatDateLabel, formatStampLabel } from "@/lib/compositor/compose";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
 import { loadSamplePhotos, useServerClock } from "@/components/kiosk/frame-preview";
-import type { ComposeImage } from "@/lib/compositor/types";
+import type { CropFocus } from "@/lib/compositor/geometry";
+import type { ComposeImage, FrameDefinition } from "@/lib/compositor/types";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   decodePhotoFile,
   drawPhoto,
   limitPicked,
+  clampFocus,
+  placementRoom,
   settleSelection,
   toggleOrdered,
   type DecodeFailure,
@@ -184,6 +187,8 @@ export function MobileUpload({
   // and which of them go into the frame, in order (indices into `pool`).
   const [pool, setPool] = useState<ComposeImage[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
+  // Where each picked photo sits in its slot (indices into `pool`), once the guest has moved it.
+  const [focus, setFocus] = useState<Record<number, CropFocus>>({});
   const [dropped, setDropped] = useState(0);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
   // The booth's own sample photos (public/frames/v2/samples) for the frame picker.
@@ -202,7 +207,21 @@ export function MobileUpload({
   const card = getCard(cardId);
   const frame = card.frame(cleanOptions(card, options));
   const required = frame.slots.length;
-  const chosen = useMemo(() => selected.map((i) => pool[i]!), [selected, pool]);
+  // The pool as it goes into a frame: each photo where the guest put it, or the default place.
+  const placed = useMemo(
+    () => pool.map((p, i) => ({ ...p, focus: focus[i] ?? MOBILE_UPLOAD_CONFIG.defaultFocus })),
+    [pool, focus],
+  );
+  const chosen = useMemo(() => selected.map((i) => placed[i]!), [selected, placed]);
+  // Small JPEG copies of the picked photos for the grid and the placement windows.
+  const urls = useMemo(
+    () =>
+      pool.map((p) => {
+        const canvas = p.source as HTMLCanvasElement;
+        return "toDataURL" in canvas ? canvas.toDataURL("image/jpeg", 0.6) : "";
+      }),
+    [pool],
+  );
 
   // The QR stops working after its time; say so instead of failing on submit. A guest who kept
   // the picture for themselves needs no QR any more and keeps their screen.
@@ -259,9 +278,9 @@ export function MobileUpload({
   // own, repeated to fill frames that hold more than they picked.
   const thumbSource = useMemo(() => {
     if (!samples) return null;
-    if (pool.length === 0) return samples;
-    return [0, 1, 2, 3].map((i) => pool[i % pool.length]!);
-  }, [samples, pool]);
+    if (placed.length === 0) return samples;
+    return [0, 1, 2, 3].map((i) => placed[i % placed.length]!);
+  }, [samples, placed]);
   const fill = (f: { slots: readonly unknown[] }, photos: readonly ComposeImage[]) =>
     f.slots.map((_, i) => photos[i % photos.length]!);
 
@@ -375,6 +394,7 @@ export function MobileUpload({
     poolRef.current = [];
     setPool([]);
     setSelected([]);
+    setFocus({});
     setDropped(0);
   };
 
@@ -504,9 +524,20 @@ export function MobileUpload({
             </p>
             {pool.length > 0 && (
               <PhotoGrid
-                photos={pool}
+                urls={urls}
                 selected={selected}
                 onToggle={(i) => setSelected((s) => toggleOrdered(s, i, required))}
+              />
+            )}
+            {selected.length === required && pool.length >= required && (
+              <PhotoPlacement
+                frame={frame}
+                photos={chosen}
+                urls={selected.map((i) => urls[i] ?? "")}
+                onMove={(order, f) => {
+                  const index = selected[order];
+                  if (index !== undefined) setFocus((all) => ({ ...all, [index]: f }));
+                }}
               />
             )}
             {dropped > 0 && (
@@ -870,25 +901,17 @@ function FramePicker({
 
 /** The photos picked so far; a tap puts one in the frame (numbered in order) or takes it out. */
 function PhotoGrid({
-  photos,
+  urls,
   selected,
   onToggle,
 }: {
-  photos: ComposeImage[];
+  urls: string[];
   selected: number[];
   onToggle: (index: number) => void;
 }) {
-  const urls = useMemo(
-    () =>
-      photos.map((p) => {
-        const canvas = p.source as HTMLCanvasElement;
-        return "toDataURL" in canvas ? canvas.toDataURL("image/jpeg", 0.6) : "";
-      }),
-    [photos],
-  );
   return (
     <div className="grid grid-cols-3 gap-2" data-testid="mobile-photos">
-      {photos.map((_, i) => {
+      {urls.map((_, i) => {
         const order = selected.indexOf(i);
         return (
           <button
@@ -913,6 +936,140 @@ function PhotoGrid({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** How far one arrow-key press moves a photo in its slot (a share of the room it has). */
+const KEY_STEP = 0.05;
+
+/**
+ * One window per slot of the frame, in the slot's own shape, with the photo that goes there:
+ * drag it (or use the arrow keys) to choose which part shows. The window is the slot's cover crop
+ * at `object-position` = focus, the same rule `composeFrame` draws with, so what the guest sees
+ * here is what the picture gets (preview = result).
+ */
+function PhotoPlacement({
+  frame,
+  photos,
+  urls,
+  onMove,
+}: {
+  frame: FrameDefinition;
+  photos: ComposeImage[];
+  urls: string[];
+  onMove: (order: number, focus: CropFocus) => void;
+}) {
+  const anyRoom = frame.slots.some((slot, i) => {
+    const p = photos[i];
+    if (!p) return false;
+    const room = placementRoom(p.width / p.height, slot.width / slot.height);
+    return room.x > 0.01 || room.y > 0.01;
+  });
+  if (!anyRoom) return null;
+  return (
+    <div className="flex flex-col gap-3" data-testid="mobile-placement">
+      <h3 className="text-lg font-bold text-ink">사진 위치 맞추기</h3>
+      <p className="text-base leading-relaxed text-ink/75">
+        사진을 손가락으로 끌어서 칸 안에 잘 보이게 맞춰 주세요.
+      </p>
+      <div className={`grid gap-3 ${frame.slots.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {frame.slots.map((slot, i) => {
+          const p = photos[i];
+          if (!p) return null;
+          return (
+            <PlacementWindow
+              key={i}
+              order={i}
+              url={urls[i] ?? ""}
+              photoAspect={p.width / p.height}
+              slotAspect={slot.width / slot.height}
+              ellipse={slot.shape === "ellipse"}
+              focus={p.focus ?? MOBILE_UPLOAD_CONFIG.defaultFocus}
+              onMove={(f) => onMove(i, f)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PlacementWindow({
+  order,
+  url,
+  photoAspect,
+  slotAspect,
+  ellipse,
+  focus,
+  onMove,
+}: {
+  order: number;
+  url: string;
+  photoAspect: number;
+  slotAspect: number;
+  ellipse: boolean;
+  focus: CropFocus;
+  onMove: (focus: CropFocus) => void;
+}) {
+  const room = placementRoom(photoAspect, slotAspect);
+  const drag = useRef<{ id: number; x: number; y: number; focus: CropFocus } | null>(null);
+  const move = (f: CropFocus) => onMove(clampFocus(f, room));
+  return (
+    <div
+      role="group"
+      tabIndex={0}
+      aria-label={`${order + 1}번째 칸 사진 위치. 끌거나 화살표 키로 옮겨요`}
+      data-testid={`mobile-place-${order}`}
+      data-focus-x={focus.x.toFixed(3)}
+      data-focus-y={focus.y.toFixed(3)}
+      className={`relative cursor-grab touch-none select-none overflow-hidden border border-ink/30 bg-paper active:cursor-grabbing ${
+        ellipse ? "rounded-[50%]" : "rounded-lg"
+      }`}
+      style={{ aspectRatio: String(slotAspect) }}
+      onPointerDown={(e) => {
+        drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, focus };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        const box = e.currentTarget.getBoundingClientRect();
+        // Moving the photo by its whole spare width takes the focus from one edge to the other;
+        // dragging right shows more of the left, so the focus goes down.
+        const dx = room.x > 0 ? (e.clientX - d.x) / (box.width * room.x) : 0;
+        const dy = room.y > 0 ? (e.clientY - d.y) / (box.height * room.y) : 0;
+        move({ x: d.focus.x - dx, y: d.focus.y - dy });
+      }}
+      onPointerUp={() => {
+        drag.current = null;
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+      }}
+      onKeyDown={(e) => {
+        const step = {
+          ArrowLeft: [-KEY_STEP, 0],
+          ArrowRight: [KEY_STEP, 0],
+          ArrowUp: [0, -KEY_STEP],
+          ArrowDown: [0, KEY_STEP],
+        }[e.key];
+        if (!step) return;
+        e.preventDefault();
+        move({ x: focus.x + step[0]!, y: focus.y + step[1]! });
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+      <img
+        src={url}
+        alt=""
+        draggable={false}
+        className="pointer-events-none h-full w-full object-cover"
+        style={{ objectPosition: `${focus.x * 100}% ${focus.y * 100}%` }}
+      />
+      <span className="absolute left-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-ink text-base font-bold text-button-text">
+        {order + 1}
+      </span>
     </div>
   );
 }

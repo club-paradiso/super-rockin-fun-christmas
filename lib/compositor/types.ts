@@ -206,6 +206,11 @@ export interface ComposeImage {
   source: CanvasImageSource;
   width: number;
   height: number;
+  /**
+   * Where the photo sits in its slot (`coverCrop`'s focus, as CSS `object-position`). Booth shots
+   * have none and stay centred; a guest's phone photo carries the place the guest dragged it to.
+   */
+  focus?: { x: number; y: number };
 }
 
 export interface ComposeContext {

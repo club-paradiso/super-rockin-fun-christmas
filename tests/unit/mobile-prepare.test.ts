@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { drawPhoto, looksLikeHeic, nextRotation, planPhoto } from "@/lib/mobile/prepare";
+import { MOBILE_UPLOAD_CONFIG } from "@/config/mobile";
+import { coverCrop } from "@/lib/compositor/geometry";
+import {
+  clampFocus,
+  drawPhoto,
+  looksLikeHeic,
+  nextRotation,
+  placementRoom,
+  planPhoto,
+} from "@/lib/mobile/prepare";
 import { FakeCanvas, fakeCanvasFactory } from "../helpers/fake-canvas";
 
 describe("phone photo preparation (D66): preview = what is sent", () => {
@@ -55,5 +64,40 @@ describe("phone photo preparation (D66): preview = what is sent", () => {
     expect(looksLikeHeic({ type: "image/heic", name: "IMG_1.HEIC" })).toBe(true);
     expect(looksLikeHeic({ type: "", name: "IMG_2.heif" })).toBe(true);
     expect(looksLikeHeic({ type: "image/jpeg", name: "a.jpg" })).toBe(false);
+  });
+});
+
+describe("placing a phone photo in its slot", () => {
+  it("has room only on the axis the cover crop cuts", () => {
+    // Upright 3:4 photo in a wide 16:9-ish slot: only up and down.
+    const r = placementRoom(3 / 4, 1.76);
+    expect(r.x).toBe(0);
+    expect(r.y).toBeCloseTo(1.76 / 0.75 - 1, 6);
+    // A wide photo in a square slot: only sideways.
+    expect(placementRoom(16 / 9, 1)).toEqual({ x: 16 / 9 - 1, y: 0 });
+    expect(placementRoom(1, 1)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("dragging by the whole room moves the cut from one edge to the other", () => {
+    // The window (slot) is 1.76:1 and 100 px tall; the photo shown is 100 * room.y px taller.
+    const room = placementRoom(0.75, 1.76);
+    const spare = coverCrop(750, 1000, 1.76);
+    const spareShown = 100 * room.y; // px of photo outside a 100 px tall window
+    // The cut's spare in photo px, seen at the window's scale, is the same spare.
+    const windowScale = 100 / spare.height;
+    expect((1000 - spare.height) * windowScale).toBeCloseTo(spareShown, 6);
+  });
+
+  it("keeps the focus inside the photo and centred where it cannot move", () => {
+    expect(clampFocus({ x: 0.2, y: -1 }, { x: 0, y: 1 })).toEqual({ x: 0.5, y: 0 });
+    expect(clampFocus({ x: 2, y: 0.4 }, { x: 0.5, y: 0 })).toEqual({ x: 1, y: 0.5 });
+    expect(clampFocus({ x: Number.NaN, y: 0.4 }, { x: 0.5, y: 0 })).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  it("starts upright photos above the middle, where people usually are", () => {
+    const { y } = MOBILE_UPLOAD_CONFIG.defaultFocus;
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(0.5);
+    expect(MOBILE_UPLOAD_CONFIG.defaultFocus.x).toBe(0.5);
   });
 });

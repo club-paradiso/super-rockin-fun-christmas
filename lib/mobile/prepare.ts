@@ -1,4 +1,4 @@
-import { coverCrop, type Rect } from "@/lib/compositor/geometry";
+import { coverCrop, type CropFocus, type Rect } from "@/lib/compositor/geometry";
 import { get2d, type CanvasFactory, type CanvasLike } from "@/lib/canvas";
 
 /**
@@ -158,4 +158,21 @@ export function settleSelection(
   const kept = selected.filter((i) => i < available).slice(0, required);
   if (kept.length === 0 && available === required) return [...Array(required).keys()];
   return kept;
+}
+
+/**
+ * The room a photo has to move in a slot of `slotAspect` (both width / height), as a share of the
+ * slot: the part of the photo that a cover crop leaves outside it, per axis (0 where it fits).
+ * Dragging the photo by `room.x` slot widths takes its focus from one edge to the other.
+ */
+export function placementRoom(photoAspect: number, slotAspect: number): { x: number; y: number } {
+  return photoAspect > slotAspect
+    ? { x: photoAspect / slotAspect - 1, y: 0 }
+    : { x: 0, y: slotAspect / photoAspect - 1 };
+}
+
+/** A focus kept inside 0–1, and centred on an axis where the photo has no room to move. */
+export function clampFocus(focus: CropFocus, room: { x: number; y: number }): CropFocus {
+  const unit = (v: number) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5);
+  return { x: room.x > 0 ? unit(focus.x) : 0.5, y: room.y > 0 ? unit(focus.y) : 0.5 };
 }

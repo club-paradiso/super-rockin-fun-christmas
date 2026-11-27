@@ -260,6 +260,76 @@ test("several phone photos go into the frame the guest picks, at the booth's sav
   expect([meta.width, meta.height]).toEqual([1200, 3600]);
 });
 
+// An upright phone photo in a square slot: the guest drags it to choose what shows, and the
+// saved picture is cut exactly there (preview = result).
+test("the guest drags a phone photo in its slot and the picture is cut there", async ({
+  browser,
+}) => {
+  await kiosk.goto("/kiosk?camera=mock");
+  await openWelcome(kiosk);
+  await kiosk.getByTestId("start-mobile").click();
+  const url = (await kiosk.getByTestId("mobile-qr").getAttribute("data-url"))!;
+
+  const guest = await phone(browser);
+  await guest.goto(url);
+  await guest.locator('[data-frame-id="polaroid1"]').click();
+  await guest.getByTestId("mobile-frame-confirm").click();
+  // 900 × 1600, red above the middle, blue below.
+  const half = (r: number, b: number) =>
+    sharp({ create: { width: 900, height: 800, channels: 3, background: { r, g: 0, b } } })
+      .png()
+      .toBuffer();
+  const buffer = await sharp({
+    create: { width: 900, height: 1600, channels: 3, background: { r: 0, g: 0, b: 0 } },
+  })
+    .composite([
+      { input: await half(230, 0), top: 0, left: 0 },
+      { input: await half(0, 230), top: 800, left: 0 },
+    ])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+  await guest
+    .getByTestId("mobile-file")
+    .setInputFiles({ name: "IMG_tall.jpg", mimeType: "image/jpeg", buffer });
+  const place = guest.getByTestId("mobile-place-0");
+  // Starts a third from the top, not in the middle: the upper part, where people usually are.
+  await expect(place).toHaveAttribute("data-focus-y", "0.333");
+  await expect(place).toHaveAttribute("data-focus-x", "0.500");
+  // Drag the photo up by more than it can move: its bottom edge reaches the slot's.
+  await place.scrollIntoViewIfNeeded();
+  const box = (await place.boundingBox())!;
+  await guest.mouse.move(box.x + box.width / 2, box.y + box.height - 4);
+  await guest.mouse.down();
+  await guest.mouse.move(box.x + box.width / 2, box.y + 4, { steps: 6 });
+  await guest.mouse.move(box.x + box.width / 2, box.y - box.height, { steps: 4 });
+  await guest.mouse.up();
+  await expect(place).toHaveAttribute("data-focus-y", "1.000");
+  await guest.getByTestId("mobile-select-confirm").click();
+  await expect(guest.getByTestId("mobile-preview")).toBeVisible({ timeout: 15_000 });
+  await guest.getByTestId("mobile-no").click();
+  const [download] = await Promise.all([
+    guest.waitForEvent("download"),
+    guest.getByTestId("mobile-save").click(),
+  ]);
+  const saved = sharp(await readFile((await download.path())!));
+  const { width, height } = await saved.metadata();
+  const { data, info } = await saved.raw().toBuffer({ resolveWithObject: true });
+  const at = (fx: number, fy: number) => {
+    const i = (Math.round(fy * height!) * width! + Math.round(fx * width!)) * info.channels;
+    return { r: data[i]!, b: data[i + 2]! };
+  };
+  // polaroid1's slot is (61, 95, 1077 × 1077) on 1200 × 1459. The cut is the photo's bottom
+  // 900 px: red only in its top ninth, blue from there down.
+  const slotY = (f: number) => (95 + 1077 * f) / 1459;
+  expect(at(0.5, slotY(0.04)).r).toBeGreaterThan(150);
+  for (const f of [0.3, 0.5, 0.9]) {
+    const px = at(0.5, slotY(f));
+    expect(px.b).toBeGreaterThan(150);
+    expect(px.r).toBeLessThan(80);
+  }
+  await guest.context().close();
+});
+
 // D103: as on the booth, "no" to the wall still gives the guest their picture, and sends nothing.
 test("saying no on the phone: the guest saves the framed picture, nothing is sent", async ({
   browser,
