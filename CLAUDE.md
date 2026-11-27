@@ -119,7 +119,9 @@ looks:measure`). `/looks` is the comparison
   and allowance, and must not come back as a setting. No v2 frame, with any combination of its
   options, takes more photos than a session shoots (`tests/unit/frames-v2.test.ts`). Every option
   combination is its own frame id. 폴라로이드 1컷 has a 문구 option (2026-11-26, a user decision,
-  Figma 877:1665 / options screen 1055:3631): ten captions; only the first (`polaroid1`, the id photos
+  Figma 877:1665 / options screen 1055:3631): ten captions, five since 2026-11-27 (a user decision:
+  메리 크리스마스, with my people, peace!, 크리스마스 야호, us taken down, `POLAROID1_RETIRED_CAPTIONS`; their
+  frames stay so stored photos keep hanging); only the first (`polaroid1`, the id photos
   were stored under) draws the per-session random handwriting. Every other caption is Figma's own,
   never a random font: outlined caption SVGs, and 「오늘 날짜」 in a fixed Caveat (`hand.font`,
   `{handDate}`, the server's day). The earlier 20 frames (`FRAMES`) stay only for photos already
