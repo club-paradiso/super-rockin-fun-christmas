@@ -19,7 +19,6 @@ import {
   getCard,
   usesHandwriting,
   type FrameCard,
-  type FrameCardId,
 } from "@/config/frames/v2";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 import { blobToArrayBuffer, canvasToBlob, createDomCanvas } from "@/lib/canvas";
@@ -3077,7 +3076,7 @@ function MobileScreen({
 /** From this many answers an option is a two-column grid without its row label (Figma 1055:3631). */
 const OPTIONS_GRID_MIN = 6;
 
-/** One card of the v2 picker: the frame with sample photos, its name, and its options hint. */
+/** One card of the v2 picker: the frame with sample photos and its name (no hint since 2026-11-27). */
 function FrameCardButton({
   card,
   selected,
@@ -3093,7 +3092,6 @@ function FrameCardButton({
   t: KioskCopy;
   onSelect: () => void;
 }) {
-  const hint = (t.hint as Partial<Record<FrameCardId, string>>)[card.id];
   const frame = card.frame(defaultOptions(card));
   return (
     <button
@@ -3113,7 +3111,6 @@ function FrameCardButton({
         )}
       </span>
       <span className="pick-card-name">{t.name[card.id]}</span>
-      {hint && <span className="pick-card-hint">{hint}</span>}
       <span className="sr-only">{t.frame.slots(frame.slots.length)}</span>
     </button>
   );

@@ -53,8 +53,8 @@ const title: Want = { sel: ".pick-head .booth-title", text: { cx: 416, cy: 132, 
  * The cards, large print (Figma 1085:1953, "2-A 틀 고르기 · 5개 · 큰 글씨", 2026-11-27: 필름 3컷 and
  * 4컷 became the one card 필름, and the picker was made readable for older guests, a user
  * request). 200 × 334, 16 apart, three to a row at y 210, the second row of two centred at y 562
- * (rows 18 apart). Inside a card: the preview 182 × 200 from 17 below its top, the name (25 px,
- * one line) 8 under it, the hint (20 px, two lines' room) 8 under that.
+ * (rows 18 apart). Inside a card: the preview 182 × 260 from 17 below its top and the name (25 px,
+ * one line) 8 under it; the small hints went later that day (a user decision).
  */
 const CARD_W = 200;
 const ROW1 = ["film", "polaroid1", "check2"];
@@ -79,20 +79,16 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       })),
       ...[...ROW1, ...ROW2].map((id) => ({
         sel: `[data-testid="frame-option-${id}"] .pick-card-name`,
-        text: { cx: cardX(id) + CARD_W / 2, cy: cardY(id) + 240, size: 25 },
-      })),
-      ...[...ROW1, ...ROW2].map((id) => ({
-        sel: `[data-testid="frame-option-${id}"] .pick-card-hint`,
-        box: [cardX(id) + 9, cardY(id) + 265, 182, 52] as Box,
+        text: { cx: cardX(id) + CARD_W / 2, cy: cardY(id) + 301, size: 25 },
       })),
     ],
     // The previews only (example photos; the frame art itself is compared in
-    // figma-parity.spec): the 182 × 200 box inside each card.
+    // figma-parity.spec): the 182 × 260 box inside each card.
     masks: [...ROW1, ...ROW2].map((id) => ({
       x: cardX(id) + 9,
       y: cardY(id) + 17,
       w: 182,
-      h: 200,
+      h: 260,
     })),
   },
   // 필름 (Figma 1086:2006, 2026-11-27): the 필름 4컷 screen with four colours on the row.

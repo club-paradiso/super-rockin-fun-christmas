@@ -304,9 +304,8 @@
 }
 .kiosk-root .booth-screen.booth-screen-v2 {
   --ring-safe: calc(106.8 * max(calc(var(--bw) * 100 / 820), calc(var(--bh) * 100 / 1180)));
-  /* Figma: the subtitle #7A450E, the card hint #6B3D0D (both between accent and ink). */
+  /* Figma: the subtitle #7A450E (between accent and ink). */
   --v2-sub: #7a450e;
-  --v2-hint: #6b3d0d;
   /* Figma frame: 30 from the sides and the top, 24 from the bottom. */
   padding: max(calc(30 * var(--fx)), env(safe-area-inset-top))
     max(calc(30 * var(--fx)), env(safe-area-inset-right))
@@ -347,8 +346,9 @@
 /* The cards, large print (2026-11-27, a user request: "어르신들도 보기 쉽게"). Five cards, three
    to a row at 200 wide, 16 apart: six half-card tracks, a card takes two, and a last row that is
    short starts half a card in per missing card, so it stays centred (five: three, then two).
-   Names 25 px (one line in Korean), hints 20 px, a plain edge round every card so each one reads as a button, and the
-   marked card's edge in ink. */
+   Names 25 px (one line in Korean) and nothing else under the picture (the small hints went,
+   2026-11-27, a user decision), a plain edge round every card so each one reads as a button, and
+   the marked card's edge in ink. */
 .kiosk-root .booth-screen-v2 .pick-cards {
   flex: 1 1 0;
   min-height: 0;
@@ -405,21 +405,7 @@
   line-height: calc(32 * var(--fx));
   word-break: keep-all;
 }
-/* Every hint keeps two lines' room, so the names of a row stand on one line. */
-.kiosk-root .booth-screen-v2 .pick-card-hint {
-  display: block;
-  align-self: stretch;
-  min-height: calc(2 * 26 * var(--fx));
-  font-size: max(15px, calc(20 * var(--fx)));
-  font-weight: 500;
-  line-height: calc(26 * var(--fx));
-  color: var(--v2-hint);
-  word-break: keep-all;
-  /* A hint may carry its own line break (lib/kiosk/copy.ts). */
-  white-space: pre-line;
-}
 :root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-name,
-:root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-card-hint,
 :root:lang(zh-Hans) .kiosk-root .booth-screen-v2 .pick-lead {
   word-break: normal;
 }
@@ -674,7 +660,6 @@
 .kiosk-root .booth-screen-v2 .pick-lead,
 .kiosk-root .booth-screen-v2 .options-locked,
 .kiosk-root .booth-screen-v2 .pick-card-name,
-.kiosk-root .booth-screen-v2 .pick-card-hint,
 .kiosk-root .booth-screen-v2 .booth-footer-bar .booth-btn-primary {
   word-spacing: calc(var(--space-fix, 0) * 1em);
 }

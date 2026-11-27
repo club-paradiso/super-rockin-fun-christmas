@@ -352,7 +352,8 @@ looks:measure`). `/looks` is the comparison
   to pass. The picker's reference is Figma 1085:1953 (「2-A 틀 고르기 · 5개 · 큰 글씨」, 2026-11-27, a
   user request: older guests must be able to read it): a 36 px title with a 24 px line under it
   saying what to do (「마음에 드는 틀을 한 번 누르세요」), five cards of 200 × 334 three to a row, the
-  second row centred, names 25 px on one line, hints 20 px with two lines' room, no pencil, a plain
+  second row centred, the picture and a name of 25 px on one line and nothing else (the small hints
+  under the names were removed the same day, a user decision: do not bring them back), a plain
   edge round every card and the marked one in ink; only the card previews are masked. The 필름
   options screen is Figma 1086:2006 (the 필름 4컷 screen with four colour answers of 131 on the row). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
@@ -579,8 +580,7 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
 - Kiosk copy: short Korean, large touch targets: `.booth-btn-primary`/`-secondary` are ≥ 80 px tall
   (64–80 px only when the booth is under 760 px tall), smaller controls ≥ 52 px (D88). Exception:
   the v2 picker and options screens follow Figma (bottom bar 76 px at 768 × 1024, option buttons
-  60 px, scaled with the screen, never under 48 px; picker names never under 18 px, hints never
-  under 15 px).
+  60 px, scaled with the screen, never under 48 px; picker names never under 18 px).
 - Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
   backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
 - Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`; /admin opens with

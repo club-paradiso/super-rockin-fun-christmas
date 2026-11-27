@@ -70,16 +70,6 @@ const ko = {
     film35: "35mm 필름 4컷",
     meme4: "밈 4컷",
   },
-  hint: {
-    // A line break here is the card's own: "·" is no place keep-all breaks a line.
-    film: "크림·빨강\n흑백·세피아",
-    film3: "색·로고 선택",
-    film4: "크림·빨강 선택",
-    check2: "빨강·파랑 선택",
-    film35: "컬러·흑백·세피아",
-    polaroid1: "문구 선택",
-    meme4: "밈 5종 고르기",
-  },
   option: {
     titleColorLogo: "색과 로고를 골라주세요",
     titleColor: "색을 골라주세요",
@@ -345,15 +335,6 @@ const en: KioskCopy = {
     film35: "35mm film · 4 shots",
     meme4: "Meme · 4 shots",
   },
-  hint: {
-    film: "Cream, red,\nB&W or sepia",
-    film3: "Color & logo",
-    film4: "Cream or red",
-    check2: "Red or blue",
-    film35: "Color, B&W or sepia",
-    polaroid1: "Pick a caption",
-    meme4: "5 memes to pick",
-  },
   option: {
     titleColorLogo: "Choose color and logo",
     titleColor: "Choose a color",
@@ -594,15 +575,6 @@ const zh: KioskCopy = {
     lace1: "蕾丝 1格",
     film35: "35mm胶片 4格",
     meme4: "梗图 4格",
-  },
-  hint: {
-    film: "米色·红色\n黑白·复古棕",
-    film3: "可选颜色·标志",
-    film4: "可选米色·红色",
-    check2: "可选红色·蓝色",
-    film35: "彩色·黑白·复古棕",
-    polaroid1: "可选文字",
-    meme4: "5种梗图可选",
   },
   option: {
     titleColorLogo: "请选择颜色和标志",

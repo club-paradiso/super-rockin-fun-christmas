@@ -168,7 +168,6 @@ test("English: the whole booth in English, the next guest back in Korean", async
   await expect(page.getByText("Pick a frame")).toBeVisible();
   await expect(page.getByText("Tap the one you like")).toBeVisible();
   await expect(page.getByTestId("frame-option-film")).toContainText("Film");
-  await expect(page.getByTestId("frame-option-film")).toContainText("B&W or sepia");
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Choose a color")).toBeVisible();
   await expect(page.getByTestId("options-locked")).toHaveText(
