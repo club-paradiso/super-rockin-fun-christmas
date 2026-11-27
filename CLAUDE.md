@@ -417,6 +417,8 @@ lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/retouch            skin retouch: face finder (MediaPipe, lazy), face geometry + mask, each face's
                        skin colour model, per-face plan, WebGL 1 and CPU engines, pipeline (budgets,
                        failures), stats for the tests and the lab
+lib/kiosk/render-cache.ts  screen pictures (frame previews, graded shots, colour chips) drawn once,
+                       kept, and drawn ahead one per task; a miss is drawn on the spot as before
 lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch; the colour look is composeFrame's grade)
 config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag
 retouch-lab/           /retouch-lab page (own Vite bundle for Safari 15) · app/retouch-lab (route, gated)
