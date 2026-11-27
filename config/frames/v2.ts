@@ -200,10 +200,15 @@ export const POLAROID1_CAPTIONS = ["village", "date", "verse", "merry", "circle"
  * 크리스마스 야호, us at Christmas Village). The booth and the phone page no longer offer them. Their
  * frames stay in `POLAROID1_VARIANTS` / `V2_FRAMES` so a photo already stored in one keeps hanging.
  */
-export const POLAROID1_RETIRED_CAPTIONS = ["us", "merryKo", "hooray", "checklist", "peace"] as const;
+export const POLAROID1_RETIRED_CAPTIONS = [
+  "us",
+  "merryKo",
+  "hooray",
+  "checklist",
+  "peace",
+] as const;
 export type Polaroid1Caption =
-  | (typeof POLAROID1_CAPTIONS)[number]
-  | (typeof POLAROID1_RETIRED_CAPTIONS)[number];
+  (typeof POLAROID1_CAPTIONS)[number] | (typeof POLAROID1_RETIRED_CAPTIONS)[number];
 /** Every caption that has a frame, in the order the ten were drawn. */
 const POLAROID1_ALL: readonly Polaroid1Caption[] = [
   "village",

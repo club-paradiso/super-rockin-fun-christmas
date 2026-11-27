@@ -188,11 +188,7 @@ describe("틀 선택 v2: the nine cards", () => {
       "polaroid1-peace",
     ];
     const at = ids.indexOf("polaroid1-merry") + 1;
-    expect(V2_FRAMES.map((f) => f.id)).toEqual([
-      ...ids.slice(0, at),
-      ...retired,
-      ...ids.slice(at),
-    ]);
+    expect(V2_FRAMES.map((f) => f.id)).toEqual([...ids.slice(0, at), ...retired, ...ids.slice(at)]);
     for (const id of retired) {
       expect(OFFERED_V2_FRAMES.some((f) => f.id === id)).toBe(false);
       expect(cardOfFrame(id)?.id).toBe("polaroid1");
