@@ -184,9 +184,22 @@ test("screen flash can be toggled before shooting and lights the display only wh
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await expect(toggle).toHaveText("화면 플래시 끄기");
+  // The flash is lit for a fraction of a second before each shot, so polling for it can miss it
+  // (the rhythm of countdown + rest decides): count each time it appears instead.
+  await page.evaluate(() => {
+    const root = document.querySelector(".kiosk-root")!;
+    let on = false;
+    let count = 0;
+    new MutationObserver(() => {
+      const now = !!document.querySelector('[data-testid="screen-flash"]');
+      if (now && !on) root.setAttribute("data-test-flash-count", String(++count));
+      on = now;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await page.getByTestId("shoot-free").click();
-  await expect(page.getByTestId("screen-flash")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  // One flash for every shot, and none left on the photo choice.
+  await expect(page.locator(".kiosk-root")).toHaveAttribute("data-test-flash-count", "4");
   await expect(page.getByTestId("screen-flash")).toHaveCount(0);
   await page.getByTestId("go-home").click();
   await page.getByTestId("confirm-home-yes").click();
