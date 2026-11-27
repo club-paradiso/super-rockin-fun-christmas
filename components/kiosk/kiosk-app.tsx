@@ -36,6 +36,7 @@ import type { CanvasLike } from "@/lib/canvas";
 import { composeFrame, formatDateLabel, type ComposeImage } from "@/lib/compositor";
 import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
+import type { FrameDefinition } from "@/lib/compositor/types";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
 import { LOOK_IDS, NO_LOOK } from "@/config/looks";
 import { applyTone } from "@/lib/compositor/tone";
@@ -117,10 +118,13 @@ import {
   HAND_FONT_KEY,
   loadSamplePhotos,
   readStoredHandFont,
+  rememberingGrader,
   renderPreview,
   useHandFontCycle,
   useServerClock,
 } from "./frame-preview";
+import { prefetch, PREFETCH_GAP_MS, RenderCache, type PrefetchJob } from "@/lib/kiosk/render-cache";
+import { HAND_FONTS } from "@/config/hand-fonts";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
 import {
   BoothScreen,
@@ -183,6 +187,18 @@ export interface LookChip {
 }
 /** Longest edge of the picture on a look chip. */
 const LOOK_CHIP_EDGE = 280;
+/**
+ * Frame previews kept between guests: the eight picker cards plus the options screen's pictures
+ * (one per option and handwriting font). Small JPEG data URLs; the oldest go first.
+ */
+const PREVIEW_CACHE_LIMIT = 48;
+/** How long "화면을 눌러 시작" stays untouched before the picker cards are drawn ahead. */
+const PREVIEW_PREFETCH_QUIET_MS = 1500;
+/**
+ * No background drawing this long after a screen appears or a finger touches: longer than the
+ * double-tap guard's window (TAP_GUARD_MS, 350), so a drawing never delays a tap it must judge.
+ */
+const PREFETCH_QUIET_AFTER_TAP_MS = 600;
 
 /** Longest edge of a graded shot on the review and choice screens: they are shown small. */
 const GRADED_SHOT_EDGE = 480;
@@ -226,6 +242,80 @@ function gradedShotUrl(
   }
 }
 
+/**
+ * The graded pictures of one shot, kept while the shot lives (a retake makes new shots, so their
+ * pictures go with the old ones). Keys: `shotKey` and `chipKey`. A failure is never kept.
+ */
+type ShotPictures = WeakMap<CapturedFrame, Map<string, string>>;
+
+/** A shot in a look on the review and choice screens. `look` is chosenLook's id, or "own". */
+function shotKey(frameId: string, look: string, seed: number, index: number): string {
+  return `shot|${frameId}|${look}|${seed}|${index}`;
+}
+
+function chipKey(frameId: string, lookId: string, seed: number): string {
+  return `chip|${frameId}|${lookId}|${seed}`;
+}
+
+/** `make()` once per shot and key; a null (could not be graded) is not kept. */
+function keptShotPicture(
+  store: ShotPictures,
+  shot: CapturedFrame,
+  key: string,
+  make: () => string | null,
+): string | null {
+  let pictures = store.get(shot);
+  if (!pictures) store.set(shot, (pictures = new Map()));
+  const kept = pictures.get(key);
+  if (kept) return kept;
+  const url = make();
+  if (url) pictures.set(key, url);
+  return url;
+}
+
+function hasShotPicture(store: ShotPictures, shot: CapturedFrame, key: string): boolean {
+  return store.get(shot)?.has(key) ?? false;
+}
+
+/** One shot graded for the review and choice screens (index = the shot's own grain seed). */
+function gradedShotFor(
+  store: ShotPictures,
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  lookId: string | null,
+  shot: CapturedFrame,
+  index: number,
+): string | null {
+  const override = chosenLook(frameId, lookId);
+  return keptShotPicture(
+    store,
+    shot,
+    shotKey(frameId, override?.lookId ?? "own", seed, index),
+    () => {
+      // The session's look, else the frame's own tone (흑백 stays 흑백 with 「원본」); with
+      // neither there is nothing to draw and the screen shows the shot as taken.
+      const grade = previewGrader(looks, frameId, seed, lookId);
+      return grade ? gradedShotUrl(shot, grade, index) : null;
+    },
+  );
+}
+
+/** One chip of the colour row: the shot in one look. */
+function lookChipFor(
+  store: ShotPictures,
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  lookId: string,
+  shot: CapturedFrame,
+): string | null {
+  return keptShotPicture(store, shot, chipKey(frameId, lookId, seed), () => {
+    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
+    return grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+  });
+}
+
 /** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
 /**
  * The photo with no look ("원본"): as taken, in the frame's own tone (흑백, 세피아, ...), which is
@@ -259,6 +349,7 @@ function previewGrader(
 }
 
 function lookChipsFor(
+  store: ShotPictures,
   looks: BoothLooks,
   frameId: string,
   seed: number,
@@ -270,8 +361,7 @@ function lookChipsFor(
   if (!plain) return [];
   const chips: LookChip[] = [{ id: NO_LOOK, url: plain }];
   for (const lookId of LOOK_IDS) {
-    const grade = looks.graderFor(frameId, seed, chosenLook(frameId, lookId));
-    const url = grade ? gradedShotUrl(shot, grade, 0, LOOK_CHIP_EDGE) : null;
+    const url = lookChipFor(store, looks, frameId, seed, lookId, shot);
     if (!url) return [];
     chips.push({ id: lookId, url });
   }
@@ -374,7 +464,23 @@ export function KioskApp({
   const screenKey = `${state.phase}:${state.mobile.status}:${state.delivery.status}:${privateDelivery}`;
   // When the screen on show appeared, and what made the last press: finger taps in the first
   // moment of a new screen are strays (lib/kiosk/tap-guard.ts).
-  const tapRef = useRef({ screenShownAt: 0, pointerType: "", previousTouchAt: -Infinity });
+  const tapRef = useRef({
+    screenShownAt: 0,
+    pointerType: "",
+    previousTouchAt: -Infinity,
+    // Any press, accepted or not: background drawing (lib/kiosk/render-cache.ts) waits after it.
+    pointerDownAt: -Infinity,
+  });
+  // A screen that has just appeared or a finger that has just touched: no background drawing
+  // now, so the next tap is handled at once and the double-tap guard sees its true time.
+  const guestBusy = useCallback(() => {
+    const now = performance.now();
+    const { screenShownAt, pointerDownAt } = tapRef.current;
+    return (
+      now - screenShownAt < PREFETCH_QUIET_AFTER_TAP_MS ||
+      now - pointerDownAt < PREFETCH_QUIET_AFTER_TAP_MS
+    );
+  }, []);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     tapRef.current.screenShownAt = performance.now();
@@ -763,15 +869,28 @@ export function KioskApp({
   const choosing = state.phase === "review" || state.phase === "select";
   const lookFrameId = choosing ? state.frameId : null;
   const lookSeed = seedFromText(state.sessionId);
+  // Kept per shot (shotPictures), and drawn ahead in the background (below): a tap on another
+  // colour usually finds its six pictures ready.
+  const [shotPictures] = useState<ShotPictures>(() => new WeakMap());
   const gradedShots = useMemo(() => {
     const out: (string | null)[] = [];
     if (!looks || !lookFrameId) return out;
-    const grade = previewGrader(looks, lookFrameId, lookSeed, state.lookId);
-    if (!grade) return out;
     for (const [index, shot] of state.shots.entries())
-      out.push(shot ? gradedShotUrl(shot.frame, grade, index) : null);
+      out.push(
+        shot
+          ? gradedShotFor(
+              shotPictures,
+              looks,
+              lookFrameId,
+              lookSeed,
+              state.lookId,
+              shot.frame,
+              index,
+            )
+          : null,
+      );
     return out;
-  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId]);
+  }, [looks, lookFrameId, lookSeed, state.shots, state.lookId, shotPictures]);
   // The colour row of the choice screen: the guest's first shot in each of the eight looks.
   // All or nothing: a row with a look missing would offer a choice the booth cannot keep.
   const lookRowFrameId = state.phase === "select" ? state.frameId : null;
@@ -779,10 +898,35 @@ export function KioskApp({
   const lookChips = useMemo(
     () =>
       looks && lookRowFrameId && firstShot
-        ? lookChipsFor(looks, lookRowFrameId, lookSeed, firstShot.frame)
+        ? lookChipsFor(shotPictures, looks, lookRowFrameId, lookSeed, firstShot.frame)
         : [],
-    [looks, lookRowFrameId, lookSeed, firstShot],
+    [looks, lookRowFrameId, lookSeed, firstShot, shotPictures],
   );
+  // While the guest looks at the review screen, draw the colour row (needed next), then the six
+  // shots in every other look (needed on a tap), one picture per task.
+  const allShot = state.shots.every((s) => s !== null);
+  useEffect(() => {
+    if (!looks || !lookFrameId || !allShot) return;
+    const store = shotPictures;
+    const shots = state.shots.map((s) => s!.frame);
+    const jobs: PrefetchJob[] = [];
+    const first = shots[0]!;
+    for (const lookId of LOOK_IDS)
+      jobs.push({
+        done: () => hasShotPicture(store, first, chipKey(lookFrameId, lookId, lookSeed)),
+        run: () => lookChipFor(store, looks, lookFrameId, lookSeed, lookId, first),
+      });
+    for (const lookId of LOOK_IDS) {
+      const look = chosenLook(lookFrameId, lookId)?.lookId ?? "own";
+      for (const [index, shot] of shots.entries())
+        jobs.push({
+          done: () => hasShotPicture(store, shot, shotKey(lookFrameId, look, lookSeed, index)),
+          run: () => gradedShotFor(store, looks, lookFrameId, lookSeed, lookId, shot, index),
+        });
+    }
+    return prefetch(jobs, globalThis, PREFETCH_GAP_MS, PREFETCH_GAP_MS, guestBusy);
+  }, [looks, lookFrameId, lookSeed, state.shots, allShot, shotPictures, guestBusy]);
+
   // The live camera picture of a black-and-white frame is black and white too.
   const lookView: LookView = looks && state.frameId ? lookViewForFrame(state.frameId) : null;
 
@@ -799,37 +943,116 @@ export function KioskApp({
   }, []);
   const clock = useServerClock(serverNow);
   const previewing = state.phase === "pick" || state.phase === "options";
+  // The previews are the same for every guest (the sample photos, the day's date): drawn once
+  // and kept until the samples, the art or the looks change. Drawn ahead while nobody is at the
+  // picker, so "여기서 사진 찍기" does not wait for eight frames to be drawn.
+  const previews = useMemo(
+    () => ({
+      pictures: new RenderCache<string | null>(PREVIEW_CACHE_LIMIT),
+      graded: new RenderCache<CanvasImageSource>(PREVIEW_CACHE_LIMIT),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new set whenever these change
+    [samples, assets, looks, legacyIOS15, renderBudget.thumbScale],
+  );
+  const preview = useCallback(
+    (frame: FrameDefinition, scale: number, handFont?: string) => {
+      const now = clock.now();
+      // A look that failed (WebGL) is tried again for a later guest: its previews are not kept.
+      const lookState = looks ? (looks.problem() === null ? "graded" : "failed") : "none";
+      const key = [
+        frame.id,
+        scale,
+        handFont ?? "",
+        formatDateLabel(now),
+        formatStampLabel(now),
+        lookState,
+      ].join("|");
+      return {
+        key,
+        done: () => previews.pictures.has(key),
+        make: () => {
+          if (!samples || !assets) return null;
+          const url = renderPreview(frame, samples, assets, {
+            scale,
+            legacy: legacyIOS15,
+            handFont,
+            now,
+            grade: rememberingGrader(
+              looks?.graderFor(frame.id, 1),
+              previews.graded,
+              `${frame.id}|${scale}`,
+            ),
+          });
+          // A drawing that failed is tried again next time, as it always was. The look is asked
+          // again after drawing: WebGL can fail during it, and then the frame's own tone was drawn,
+          // which must not be kept as the graded picture for a later guest whose WebGL works.
+          const lookAfter = looks ? (looks.problem() === null ? "graded" : "failed") : "none";
+          if (url && lookState !== "failed" && lookAfter === lookState)
+            previews.pictures.set(key, url);
+          return url;
+        },
+      };
+    },
+    [clock, looks, previews, samples, assets, legacyIOS15],
+  );
+  const kept = (job: ReturnType<typeof preview>) =>
+    job.done() ? (previews.pictures.get(job.key) ?? null) : job.make();
+  const thumbScale = renderBudget.thumbScale;
   const pickThumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!samples || !assets || !previewing) return out;
     for (const card of FRAME_CARDS) {
-      const frame = card.frame(defaultOptions(card));
-      const url = renderPreview(frame, samples, assets, {
-        scale: renderBudget.thumbScale,
-        legacy: legacyIOS15,
-        now: clock.now(),
-        grade: looks?.graderFor(frame.id, 1),
-      });
+      const url = kept(preview(card.frame(defaultOptions(card)), thumbScale));
       if (url) out[card.id] = url;
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [samples, assets, previewing, legacyIOS15, renderBudget.thumbScale, looks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
+  }, [samples, assets, previewing, thumbScale, preview, previews]);
+  // Between guests: the picker cards, ahead of time, only on "화면을 눌러 시작" and only once it has
+  // been quiet for a moment. Never on the welcome screen: a drawing there holds up the guest's
+  // first deliberate tap, and a late tap slips past the double-tap guard (lib/kiosk/tap-guard.ts).
+  const betweenGuests = state.phase === "attract";
+  useEffect(() => {
+    if (!betweenGuests || !samples || !assets) return;
+    // While the LUTs are loading the previews would be drawn twice: wait for them.
+    if (!looks && looksActive(window.location.search, looksNow)) return;
+    return prefetch(
+      FRAME_CARDS.map((card) => {
+        const job = preview(card.frame(defaultOptions(card)), thumbScale);
+        return { done: job.done, run: job.make };
+      }),
+      globalThis,
+      PREFETCH_GAP_MS,
+      PREVIEW_PREFETCH_QUIET_MS,
+      guestBusy,
+    );
+  }, [betweenGuests, samples, assets, looks, looksNow, preview, thumbScale, guestBusy]);
 
   // The options screen: the result as chosen, the handwriting cycling through the ten fonts.
+  // Each font's picture is kept, and the next font is drawn ahead in the 1.2 s before it shows.
   const optionsFrame = state.phase === "options" ? getFrame(state.frameId) : null;
   const previewFont = useHandFontCycle(!!optionsFrame && usesHandwriting(optionsFrame));
+  const optionScale = thumbScale * 1.4;
   const optionPreview = useMemo(() => {
     if (!optionsFrame || !samples || !assets) return null;
-    return renderPreview(optionsFrame, samples, assets, {
-      scale: renderBudget.thumbScale * 1.4,
-      legacy: legacyIOS15,
-      handFont: previewFont,
-      now: clock.now(),
-      grade: looks?.graderFor(optionsFrame.id, 1),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the clock only labels the stamp
-  }, [optionsFrame, samples, assets, previewFont, legacyIOS15, renderBudget.thumbScale, looks]);
+    return kept(preview(optionsFrame, optionScale, previewFont));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
+  }, [optionsFrame, samples, assets, previewFont, optionScale, preview]);
+  const optionsFrameId = optionsFrame?.id ?? null;
+  const cyclingFonts = !!optionsFrame && usesHandwriting(optionsFrame);
+  useEffect(() => {
+    if (!optionsFrameId || !cyclingFonts) return;
+    const at = HAND_FONTS.findIndex((f) => f.id === previewFont);
+    const nextFont = HAND_FONTS[(at + 1) % HAND_FONTS.length]!.id;
+    const job = preview(getFrame(optionsFrameId), optionScale, nextFont);
+    return prefetch(
+      [{ done: job.done, run: job.make }],
+      globalThis,
+      PREFETCH_GAP_MS,
+      PREFETCH_GAP_MS,
+      guestBusy,
+    );
+  }, [optionsFrameId, cyclingFonts, previewFont, optionScale, preview, guestBusy]);
 
   // ── Between shooting and the frame: 촬영 완료 → [피부 보정] → [색감 필터] → 틀 합성 ─────────
   // The one hook for both (lib/kiosk/photo-stages.ts). The colour filter has no stage yet.
@@ -1419,6 +1642,7 @@ export function KioskApp({
           ref={scrollRef}
           onPointerDownCapture={(e) => {
             tapRef.current.pointerType = e.pointerType;
+            tapRef.current.pointerDownAt = performance.now();
           }}
           onClickCapture={(e) => {
             const now = performance.now();
