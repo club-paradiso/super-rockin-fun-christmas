@@ -2035,14 +2035,21 @@ function Screen(p: ScreenProps) {
     }
 
     case "options": {
-      // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷).
+      // Figma 898:1938 (필름 3컷), 898:2006 (필름 4컷), 898:2083 (체크 2컷), 1055:3631 (폴라로이드
+      // 1컷 문구: ten answers in two columns, no row label).
       const card = getCard(state.cardId);
+      // Many answers (the ten captions) sit in a two-column grid with no row label, which spaces
+      // the screen a little differently; four or five (밈 4컷) keep the row with its label.
+      const grid = card.options.some((o) => o.values.length >= OPTIONS_GRID_MIN);
+      const key = card.options.length === 1 ? card.options[0]!.key : null;
       const title =
-        card.options.length > 1
-          ? t.option.titleColorLogo
-          : card.options[0]?.key === "theme"
+        key === "caption"
+          ? t.option.titleCaption
+          : key === "theme"
             ? t.option.titleTheme
-            : t.option.titleColor;
+            : card.options.length > 1
+              ? t.option.titleColorLogo
+              : t.option.titleColor;
       return (
         <BoothScreen
           testId="screen-options"
@@ -2067,7 +2074,7 @@ function Screen(p: ScreenProps) {
             </p>
           </div>
           <div
-            className="options-preview"
+            className={grid ? "options-preview options-preview-grid" : "options-preview"}
             data-testid="frame-preview"
             data-frame={state.frameId}
             data-hand={usesHandwriting(getFrame(state.frameId)) ? "cycling" : undefined}
@@ -2081,18 +2088,28 @@ function Screen(p: ScreenProps) {
               )}
             </div>
           </div>
-          <div className="options-rows">
+          <div className={grid ? "options-rows options-rows-grid" : "options-rows"}>
             {card.options.map((option) => (
               <div
                 key={option.key}
-                className="options-row"
-                data-many={option.values.length > 3 ? "" : undefined}
+                className={
+                  option.values.length >= OPTIONS_GRID_MIN
+                    ? "options-row options-grid"
+                    : "options-row"
+                }
+                data-many={
+                  option.values.length > 3 && option.values.length < OPTIONS_GRID_MIN
+                    ? ""
+                    : undefined
+                }
                 role="radiogroup"
                 aria-label={t.label[option.key]}
               >
-                <span className="options-row-label" aria-hidden>
-                  {t.label[option.key]}
-                </span>
+                {option.values.length < OPTIONS_GRID_MIN && (
+                  <span className="options-row-label" aria-hidden>
+                    {t.label[option.key]}
+                  </span>
+                )}
                 {option.values.map((value) => {
                   const on = state.frameOptions[option.key] === value;
                   return (
@@ -2734,6 +2751,9 @@ function MobileScreen({
     </BoothScreen>
   );
 }
+
+/** From this many answers an option is a two-column grid without its row label (Figma 1055:3631). */
+const OPTIONS_GRID_MIN = 6;
 
 /** One card of the v2 picker: the frame with sample photos, its name, and its options hint. */
 function FrameCardButton({

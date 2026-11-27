@@ -1,9 +1,9 @@
 {
   "screen": "pick",
-  "browser": "chromium",
+  "browser": "kiosk-landscape",
   "worstOffsetPx": 1,
-  "overPct": 1.345,
-  "meanDeltaE": 0.239,
+  "overPct": 1.374,
+  "meanDeltaE": 0.244,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -211,6 +211,17 @@
       "size": [
         18,
         18
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-polaroid1\"] .pick-card-hint",
+      "delta": [
+        0.02,
+        0
+      ],
+      "size": [
+        14,
+        14
       ]
     },
     {

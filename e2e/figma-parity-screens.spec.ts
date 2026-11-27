@@ -2,11 +2,13 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { POLAROID1_CAPTIONS } from "../config/frames/v2";
 import { diff, toRaw, triptych, type Rect } from "../tests/parity/compare";
 import { enrollKiosk, openWelcome } from "./helpers";
 
 /**
- * 「Figma 일치」, the four v2 screens at 768 × 1024 (Figma 898:1677, 898:1938, 898:2006, 898:2083):
+ * 「Figma 일치」, the five v2 screens at 768 × 1024 (Figma 898:1677, 898:1938, 898:2006, 898:2083,
+ * and 1055:3631, the polaroid's ten captions, 2026-11-26):
  *  - every element where Figma puts it, within ±2 px, and the same type sizes;
  *  - the screenshot against the Figma export: share of pixels with ΔE00 > 5 at most 2 %, with the
  *    frame previews masked (example photos, cycling handwriting).
@@ -115,6 +117,21 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
       { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 616 }],
+  },
+  // 폴라로이드 1컷 문구 (Figma 1055:3631): a smaller preview, then ten captions in two columns.
+  polaroid1: {
+    wants: [
+      ...HEADER,
+      title,
+      { sel: '[data-testid="options-locked"]', text: { cx: 416, cy: 177, size: 18 } },
+      { sel: ".options-preview", box: [100, 200, 632, 360] },
+      ...POLAROID1_CAPTIONS.map((c, i) => ({
+        sel: `[data-testid="option-caption-${c}"]`,
+        box: [i % 2 ? 422 : 100, 572 + Math.floor(i / 2) * 66, 310, 56] as Box,
+      })),
+      { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
+    ],
+    masks: [{ x: 100, y: 200, w: 632, h: 360 }],
   },
 };
 

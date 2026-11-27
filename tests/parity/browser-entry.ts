@@ -22,7 +22,7 @@ let ready: Promise<Map<string, ComposeImage>> | null = null;
 async function compose(
   frameId: string,
   photoUrls: string[],
-  opts: { handFont: string; stamp: string; scale: number },
+  opts: { handFont: string; stamp: string; date: string; scale: number },
 ): Promise<string> {
   ready ??= Promise.all([loadFrameFonts(V2_FRAMES), loadFrameAssets(V2_FRAMES)]).then(
     ([, a]) => a.assets,
@@ -31,7 +31,7 @@ async function compose(
   const photos = await Promise.all(photoUrls.map(decode));
   const canvas = composeFrame(getFrame(frameId), photos, {
     createCanvas: createDomCanvas,
-    context: { dateLabel: "", stampLabel: opts.stamp, handFont: opts.handFont, assets },
+    context: { dateLabel: opts.date, stampLabel: opts.stamp, handFont: opts.handFont, assets },
     scale: opts.scale,
   }) as HTMLCanvasElement;
   return canvas.toDataURL("image/png");
