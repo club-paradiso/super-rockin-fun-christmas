@@ -376,12 +376,13 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
   await expect(page.getByTestId("confirm-selection")).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId("confirm-selection")).toBeEnabled();
   await expect(page.getByTestId("go-back")).toHaveCount(0);
-  // Changing it: one out (the button waits), the last one in.
+  // Changing it: one out (the button waits), the same one back in (it goes last). Four shots and
+  // at most four places: there is no spare photo to put in instead.
   await page.getByTestId("select-shot-0").click();
   await expect(page.getByTestId("confirm-selection")).toBeDisabled();
   await at("photo selection, one taken out");
-  await page.getByTestId("select-shot-3").click();
-  await expect(page.getByTestId("select-shot-3")).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("select-shot-0").click();
+  await expect(page.getByTestId("select-shot-0")).toHaveAttribute("aria-pressed", "true");
   await at("photo selection, chosen");
 
   await page.getByTestId("confirm-selection").click();

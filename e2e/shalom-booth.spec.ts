@@ -247,7 +247,7 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   // The recommended pose is shown in Chinese during the countdown.
   await expect(page.getByTestId("pose-guide")).toContainText("面对面");
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("请从 5 张中选 2 张", { exact: true })).toBeVisible();
+  await expect(page.getByText("请从 4 张中选 2 张", { exact: true })).toBeVisible();
   await expect(page.getByTestId("select-change-hint")).toHaveText(
     "已按顺序选好前几张。想换的话，先点要去掉的，再点要放进去的。",
   );
