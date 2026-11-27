@@ -493,7 +493,7 @@ test.describe("the booth with looks", () => {
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     // 원본: the shots as taken (no graded copy is made).
-    for (const index of [0, 5])
+    for (const index of [0, 3])
       await expect(page.getByTestId(`review-shot-${index}`).locator("img")).toHaveAttribute(
         "src",
         /^blob:/,

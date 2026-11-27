@@ -431,7 +431,7 @@ test.describe("the booth", () => {
     // Someone leans on the booth for the rest of the session.
     await standAt(page, -12, 15);
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    for (const shot of [0, 3, 5]) {
+    for (const shot of [0, 1, 3]) {
       const lean = Math.abs(await markerLean(page, shot));
       expect(lean).toBeGreaterThan(3.5);
       expect(lean).toBeLessThan(4.5);
