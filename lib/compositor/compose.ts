@@ -214,7 +214,7 @@ function drawPhoto(
   scale = 1,
   slotIndex = 0,
 ) {
-  const crop = coverCrop(image.width, image.height, slot.width / slot.height);
+  const crop = coverCrop(image.width, image.height, slot.width / slot.height, image.focus);
   const toned = tone ? tonedPhoto(image, crop, slot, tone, slotIndex) : null;
   ctx.save();
   rotate(ctx, slot.rotation, slot);
