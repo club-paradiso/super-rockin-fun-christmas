@@ -3,7 +3,7 @@ import {
   answerForQr,
   enrollKiosk,
   selectDefaultPhotos,
-  shootSixWithMock,
+  shootWithMock,
   startSession,
   toSelect,
   openWelcome,
@@ -81,15 +81,15 @@ test("이전 sits in the bottom bar beside 처음으로, never in the header", a
 });
 
 test("이전: photo choice → review keeps the choice; the phone QR → welcome", async ({ page }) => {
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   await toSelect(page);
-  await page.getByTestId("select-shot-4").click();
+  await page.getByTestId("select-shot-3").click();
   await page.getByTestId("select-shot-1").click();
   await page.getByTestId("go-back").click();
   await expect(page.getByTestId("screen-review")).toBeVisible();
   await expect(page.getByTestId("go-back")).toHaveCount(0);
   await toSelect(page);
-  await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("select-shot-3")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("select-shot-1")).toHaveAttribute("aria-pressed", "true");
 
   await page.goto("/kiosk?camera=mock");
@@ -100,19 +100,19 @@ test("이전: photo choice → review keeps the choice; the phone QR → welcome
   await expect(page.getByTestId("screen-welcome")).toBeVisible();
 });
 
-test("다시 찍기: asks first, shoots all six again in the same frame, once, and the QR works", async ({
+test("다시 찍기: asks first, shoots all four again in the same frame, once, and the QR works", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   const review = page.getByTestId("screen-review");
-  // Changing one's mind keeps the six.
+  // Changing one's mind keeps the four.
   await review.getByTestId("retake").click();
   const dialog = page.getByTestId("confirm-retake");
-  await expect(dialog).toContainText("사진 6장은 지워지고");
+  await expect(dialog).toContainText("사진 4장은 지워지고");
   await dialog.getByRole("button", { name: "이대로 둘게요" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(review.locator(".review-photo img")).toHaveCount(6);
+  await expect(review.locator(".review-photo img")).toHaveCount(4);
 
   await review.getByTestId("retake").click();
   await page.getByTestId("confirm-retake-yes").click();
@@ -152,7 +152,7 @@ test("English: the whole booth in English, the next guest back in Korean", async
   await expect(page.getByText("How did they turn out?")).toBeVisible();
   await page.getByRole("button", { name: "Looks good" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
-  await expect(page.getByText(/^Pick \d of your 6 photos$/)).toBeVisible();
+  await expect(page.getByText(/^Pick \d of your 4 photos$/)).toBeVisible();
   await selectDefaultPhotos(page);
   await expect(page.getByRole("heading", { name: /Can we show this photo/ })).toBeVisible();
   await expect(page.getByTestId("consent-yes")).toHaveText("Yes, show it");
@@ -211,7 +211,7 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
 });
 
 test("레이스 1컷: one oval photo, 2400 × 3000 at 2×, delivered by QR", async ({ page }) => {
-  await shootSixWithMock(page, "lace1");
+  await shootWithMock(page, "lace1");
   await toSelect(page);
   await expect(page.getByTestId("select-required")).toHaveAttribute("data-required", "1");
   await selectDefaultPhotos(page);
@@ -262,7 +262,7 @@ test("the letter sheet: every booth screen sits on paper, the seal only on the a
   await expect(page.getByTestId("screen-pick").getByTestId("letter-sheet")).toBeVisible();
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
 
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   await toSelect(page);
   await expect(page.getByTestId("wax-seal")).toHaveCount(0);
   await selectDefaultPhotos(page);
@@ -281,10 +281,10 @@ test("the review screen fits without scrolling, landscape and portrait", async (
     { width: 820, height: 1180 },
   ]) {
     await page.setViewportSize(size);
-    await shootSixWithMock(page);
+    await shootWithMock(page);
     const confirm = page.getByRole("button", { name: "이대로 좋아요" });
     await expect(confirm).toBeInViewport({ ratio: 1 });
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       await expect(page.getByTestId(`review-shot-${i}`)).toBeInViewport({ ratio: 1 });
     }
     // Neither the page nor the booth's own scroll area (.kiosk-scroll) has anything to scroll.

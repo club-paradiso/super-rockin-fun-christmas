@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   answerForQr,
   enrollKiosk,
-  shootSixWithMock,
+  shootWithMock,
   toConsent,
   openWelcome,
   confirmFrame,
@@ -54,7 +54,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   });
   expect(audioTracks).toBe(0);
 
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   await toConsent(page);
   const url = await answerForQr(page, "no");
 
@@ -144,7 +144,7 @@ test("no MediaRecorder: the same photo flow, no video notice, no video button, 4
   await expect(page.getByTestId("shoot-plan")).toBeVisible();
   await expect(page.getByTestId("video-notice")).toHaveCount(0);
 
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   await toConsent(page);
   const url = await answerForQr(page, "no");
 
@@ -172,7 +172,7 @@ test("a failing video upload never touches the photo, the wall answer or the QR"
     attempts++;
     return route.fulfill({ status: 500, body: "{}" });
   });
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   await toConsent(page);
   const url = await answerForQr(page, "yes");
   const phoneContext = await browser.newContext();

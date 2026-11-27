@@ -127,13 +127,13 @@ test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ brows
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   const sizes: Array<[number, number]> = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     const img = page.getByTestId(`review-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     sizes.push(await img.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight]));
   }
   for (const [w, h] of sizes) expect(w / h).toBeCloseTo(4 / 3, 2);
-  await expect(phone.getByTestId("shots")).toHaveText("촬영 6장");
+  await expect(phone.getByTestId("shots")).toHaveText("촬영 4장");
 
   // v2: no extra photo; straight on to the photo choice, consent, a real QR.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);

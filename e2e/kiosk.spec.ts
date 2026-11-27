@@ -7,7 +7,7 @@ import {
   openWelcome,
   photoForToken,
   selectDefaultPhotos,
-  shootFourWithMock,
+  shootWithMock,
   startSession,
   toConsent,
   tokenFromUrl,
@@ -29,13 +29,13 @@ test("guest kiosk never asks for a name on welcome or frame picker", async ({ pa
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
-test("happy path: frame → options → 6 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
+test("happy path: frame → options → 4 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
   page,
   context,
 }) => {
-  await shootFourWithMock(page, "film4", { color: "red" });
+  await shootWithMock(page, "film4", { color: "red" });
   await expect(page.getByTestId("step-progress")).toHaveText("3 / 6");
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     const img = page.getByTestId(`review-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     const [w, h] = await img.evaluate((el: HTMLImageElement) => [
@@ -119,7 +119,7 @@ test("happy path: frame → options → 6 shots → select → consent YES → u
 test("decline path: consent NO leaves the download working and nothing queued for the wall", async ({
   page,
 }) => {
-  await shootFourWithMock(page);
+  await shootWithMock(page);
   await toConsent(page);
   // Both answers carry the same weight: same size, same style.
   const [yes, no] = [page.getByTestId("consent-yes"), page.getByTestId("consent-no")];
@@ -138,9 +138,9 @@ test("decline path: consent NO leaves the download working and nothing queued fo
 });
 
 test("v2: no extra photo, no second frame choice, the steps are dots only", async ({ page }) => {
-  await shootFourWithMock(page);
+  await shootWithMock(page);
   const review = page.getByTestId("screen-review");
-  // 이대로 좋아요, 다시 찍기 (all six, 2026-11-25) and 처음으로 (plus the fullscreen switch in the
+  // 이대로 좋아요, 다시 찍기 (all four, 2026-11-25) and 처음으로 (plus the fullscreen switch in the
   // footer): never a seventh photo or a single-photo retake.
   const labels = await review
     .locator("button:not([data-testid='fullscreen-toggle'])")
@@ -150,13 +150,13 @@ test("v2: no extra photo, no second frame choice, the steps are dots only", asyn
   );
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
-  await expect(page.getByTestId("review-shot-6")).toHaveCount(0);
+  await expect(page.getByTestId("review-shot-4")).toHaveCount(0);
   // The count is for screen readers only; six dots are drawn.
   await expect(page.getByTestId("step-progress")).not.toBeInViewport();
   await expect(page.locator(".booth-steps-dot")).toHaveCount(6);
   await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible();
-  await expect(page.getByText("6장 중 3장을 골라주세요")).toBeVisible();
+  await expect(page.getByText("4장 중 3장을 골라주세요")).toBeVisible();
   // "이전" from the photo choice is the review (the shots), never a frame choice.
   await expect(page.getByTestId("go-back")).toHaveCount(1);
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
@@ -202,7 +202,7 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(page.locator('[data-testid="screen-ready"] .booth-btn-primary')).toHaveCount(1);
   for (const button of [free, guide])
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(64);
-  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 6컷을 찍어요");
+  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 4컷을 찍어요");
 
   await guide.click();
   const pose = page.getByTestId("pose-guide");

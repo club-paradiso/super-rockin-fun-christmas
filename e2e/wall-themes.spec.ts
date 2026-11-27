@@ -6,7 +6,7 @@ import { getFrame } from "../config/frames";
 import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "../config/wall-themes";
 import { planWallFit } from "../lib/wall/fit";
 import { ENROLL_SECRET, PORT, USE_SUPABASE } from "./env";
-import { answerForQr, enrollKiosk, shootSixWithMock, toConsent } from "./helpers";
+import { answerForQr, enrollKiosk, shootWithMock, toConsent } from "./helpers";
 
 /**
  * Media-wall themes (D85) and the wall address without enrollment (D86), end to end:
@@ -472,7 +472,7 @@ for (const size of [
 
     // Public wall on: the line is there, both answers stay on screen at equal size.
     await settings({ wallPublic: true });
-    await shootSixWithMock(page);
+    await shootWithMock(page);
     await toConsent(page);
     const note = page.getByTestId("consent-public-note");
     await expect(note).toHaveText("미디어월은 행사장 화면과 온라인 주소에서 함께 보여요.");
@@ -505,7 +505,7 @@ for (const size of [
 
     // Public wall off: no line, and the same YES is for the venue wall only.
     await settings({ wallPublic: false });
-    await shootSixWithMock(page);
+    await shootWithMock(page);
     await toConsent(page);
     await expect(page.getByTestId("consent-public-note")).toHaveCount(0);
     await answerForQr(page, "yes");

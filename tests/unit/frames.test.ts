@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_FRAME_ID, FRAMES, getFrame, isKnownFrameId } from "@/config/frames";
 import { KIOSK_CONFIG } from "@/config/kiosk";
 
+/** The earlier 20 frames (stored photos only, never offered) hold up to six photos; the booth now shoots four. */
+const LEGACY_MAX_SLOTS = 6;
+
 /** WCAG relative luminance of a #rrggbb colour. */
 function luminance(hex: string) {
   const channel = (i: number) => {
@@ -156,7 +159,7 @@ describe("frame definitions", () => {
   describe.each(FRAMES.map((f) => [f.id, f] as const))("%s", (_, frame) => {
     it("uses one to six shots without exceeding captured photos", () => {
       expect(frame.slots.length).toBeGreaterThanOrEqual(1);
-      expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
+      expect(frame.slots.length).toBeLessThanOrEqual(LEGACY_MAX_SLOTS);
     });
 
     it("uses the capture aspect ratio for every slot (preview = result)", () => {

@@ -710,10 +710,10 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(currentPose(toReady())).toBeNull(); // not before shooting starts
     for (let i = 0; i < 6; i++) {
       expect([s.phase, s.shotIndex]).toEqual(["countdown", i]);
-      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i]);
+      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i % POSE_SEQUENCE.length]);
       s = run(s, ...ticks(s.remaining));
       expect(s.phase).toBe("capturing");
-      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i]);
+      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i % POSE_SEQUENCE.length]);
       s = run(s, { type: "SHOT_CAPTURED", shot: `g-${i}` });
     }
     expect(s.phase).toBe("review");

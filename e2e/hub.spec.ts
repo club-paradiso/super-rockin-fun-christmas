@@ -243,7 +243,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
     /^data:image\/jpeg/,
   );
   expect(await isGrey(kiosk, "review-shot-0")).toBe(true);
-  expect(await isGrey(kiosk, "review-shot-5")).toBe(true);
+  expect(await isGrey(kiosk, "review-shot-3")).toBe(true);
 
   // Off: audited, and the next guest (a fresh page here) gets the booth as it was.
   await toggle.click();

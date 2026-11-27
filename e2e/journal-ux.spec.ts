@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, openWelcome, shootSixWithMock } from "./helpers";
+import { enrollKiosk, openWelcome, shootWithMock } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -25,7 +25,7 @@ test("the nine v2 cards show one persistent selection, 필름 3컷 first", async
 });
 
 test("the review: six photos, no seventh, one 다시 찍기 for all six", async ({ page }) => {
-  await shootSixWithMock(page);
+  await shootWithMock(page);
   const review = page.getByTestId("screen-review");
   await expect(review.locator(".review-photo")).toHaveCount(6);
   await expect(review.getByTestId("take-extra-shot")).toHaveCount(0);

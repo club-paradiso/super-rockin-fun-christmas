@@ -105,7 +105,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const [card, options, frameId, [w, h]] of VARIANTS) {
-  test(`${frameId}: card → options → six shots → review → choose → consent → QR`, async ({
+  test(`${frameId}: card → options → four shots → review → choose → consent → QR`, async ({
     page,
   }) => {
     await page.goto("/kiosk?camera=mock");

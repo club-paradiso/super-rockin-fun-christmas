@@ -5,9 +5,13 @@ function positiveInt(value: string | undefined, fallback: number): number {
 
 /** Kiosk behaviour knobs. Change here, not inside components. */
 export const KIOSK_CONFIG = {
-  shotsPerSession: 6,
   /**
-   * 「다시 찍기」 (a user decision, 2026-11-25): how many times one guest may throw the six shots
+   * 4 shots × 5 s, final (a user decision, 2026-11-27). Every frame holds at most four photos, so
+   * four shots are enough to choose from without a wasted one.
+   */
+  shotsPerSession: 4,
+  /**
+   * 「다시 찍기」 (a user decision, 2026-11-25): how many times one guest may throw the four shots
    * away on the review screen and shoot again. Each retake is another full round in front of the
    * camera, so the queue waits; 0 turns the button off.
    */
@@ -15,7 +19,7 @@ export const KIOSK_CONFIG = {
   /**
    * Seconds counted before every shot (D71). The single kiosk flow has no easy-mode override (D89).
    * NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS is a test-only override, set by the Playwright config so
-   * the E2E run does not wait 6 × 5 s per session. Do not set it on a real booth.
+   * the E2E run does not wait 4 × 5 s per session. Do not set it on a real booth.
    */
   countdownSeconds: positiveInt(process.env.NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS, 5),
   /**

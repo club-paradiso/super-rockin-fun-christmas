@@ -14,7 +14,7 @@ test.use({
   },
 });
 
-test("getUserMedia path reaches review with six captures", async ({ page }) => {
+test("getUserMedia path reaches review with four captures", async ({ page }) => {
   await enrollKiosk(page);
   await page.goto("/kiosk");
   await expect(page.getByTestId("mock-badge")).toHaveCount(0);
@@ -24,7 +24,7 @@ test("getUserMedia path reaches review with six captures", async ({ page }) => {
     .toBeGreaterThan(0);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: 45_000 });
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
   }
 });

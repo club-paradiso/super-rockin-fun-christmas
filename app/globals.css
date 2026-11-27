@@ -1296,7 +1296,7 @@ body {
     gap: clamp(6px, 1.2 * var(--bw), 12px);
     max-width: 100%;
   }
-  /* Six cells share a narrow panel rather than push the screen wider. */
+  /* Four cells share a narrow panel rather than push the screen wider. */
   .shot-strip-cell {
     display: flex;
     flex: 0 1 clamp(40px, min(6 * var(--bh), 7 * var(--bw)), 64px);
@@ -1339,14 +1339,14 @@ body {
     color: var(--color-ink);
   }
 
-  /* 3 · Review and 5 · Select: six 4:3 prints (seven after one extra) fit the stage. The grid works its
+  /* 3 · Review and 5 · Select: four 4:3 prints fit the stage. The grid works its
      own width out from the stage's height (rows, gaps and whatever sits under each print), so
      the prints are as large as they can be and the buttons stay on screen. */
   .fit-stage {
     min-height: var(--fit-min, 240px);
   }
   .fit-grid {
-    --cols: 3;
+    --cols: 2;
     --rows: 2;
     --gap: var(--gap-s);
     --extra: 0px;
@@ -1431,7 +1431,7 @@ body {
   }
   .select-grid {
     --cols: 2;
-    --rows: 3;
+    --rows: 2;
     --extra: 16px;
   }
   .select-grid.has-extra {
@@ -1441,7 +1441,7 @@ body {
      is. The break-even is a stage as wide as one print is (4:3). */
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
-      --cols: 3;
+      --cols: 2;
       --rows: 2;
     }
     .select-grid.has-extra {
@@ -2160,7 +2160,7 @@ body {
       flex-basis: auto;
     }
     .select-grid {
-      --cols: 3;
+      --cols: 2;
       --rows: 2;
     }
     .select-actions {
