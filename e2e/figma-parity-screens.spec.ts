@@ -8,7 +8,7 @@ import { enrollKiosk, openPicker } from "./helpers";
 
 /**
  * 「Figma 일치」, the five v2 screens at 768 × 1024 (Figma 1069:2245, 898:1938, 898:2006, 898:2083,
- * and 1055:3631, the polaroid's ten captions, 2026-11-26):
+ * and 1055:3631, the polaroid's captions, ten on 2026-11-26, five from 2026-11-27):
  *  - every element where Figma puts it, within ±2 px, and the same type sizes;
  *  - the screenshot against the Figma export: share of pixels with ΔE00 > 5 at most 2 %, with the
  *    frame previews masked (example photos, cycling handwriting).
@@ -150,20 +150,21 @@ const SCREENS: Record<string, { wants: Want[]; masks: Rect[] }> = {
     ],
     masks: [{ x: 100, y: 200, w: 632, h: 616 }],
   },
-  // 폴라로이드 1컷 문구 (Figma 1055:3631): a smaller preview, then ten captions in two columns.
+  // 폴라로이드 1컷 문구 (Figma 1055:3631): five captions in two columns and three rows (ten, in
+  // five rows, until 2026-11-27); the preview takes the freed 132 px (360 → 492).
   polaroid1: {
     wants: [
       ...HEADER,
       title,
       { sel: '[data-testid="options-locked"]', text: { cx: 416, cy: 177, size: 18 } },
-      { sel: ".options-preview", box: [100, 200, 632, 360] },
+      { sel: ".options-preview", box: [100, 200, 632, 492] },
       ...POLAROID1_CAPTIONS.map((c, i) => ({
         sel: `[data-testid="option-caption-${c}"]`,
-        box: [i % 2 ? 422 : 100, 572 + Math.floor(i / 2) * 66, 310, 56] as Box,
+        box: [i % 2 ? 422 : 100, 704 + Math.floor(i / 2) * 66, 310, 56] as Box,
       })),
       { sel: '[data-testid="confirm-options"]', box: [353, 924, 379, 76] },
     ],
-    masks: [{ x: 100, y: 200, w: 632, h: 360 }],
+    masks: [{ x: 100, y: 200, w: 632, h: 492 }],
   },
 };
 
