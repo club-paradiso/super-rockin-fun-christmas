@@ -126,6 +126,8 @@ import {
 import { prefetch, PREFETCH_GAP_MS, RenderCache, type PrefetchJob } from "@/lib/kiosk/render-cache";
 import { HAND_FONTS } from "@/config/hand-fonts";
 import { HelpPanel, type HelpQueueView } from "./help-panel";
+import { boothPerf, isPerfCode } from "@/lib/kiosk/perf";
+import { PerfCorner } from "./perf-table";
 import {
   BoothScreen,
   BrandLockup,
@@ -199,6 +201,9 @@ const PREVIEW_PREFETCH_QUIET_MS = 1500;
  * double-tap guard's window (TAP_GUARD_MS, 350), so a drawing never delays a tap it must judge.
  */
 const PREFETCH_QUIET_AFTER_TAP_MS = 600;
+
+/** 속도 기록: a screen that appears this soon after a tap is that tap's screen. */
+const SCREEN_TAP_WINDOW_MS = 1500;
 
 /** Longest edge of a graded shot on the review and choice screens: they are shown small. */
 const GRADED_SHOT_EDGE = 480;
@@ -387,6 +392,7 @@ export function KioskApp({
   serverNow,
   skinRetouch = "off",
   retouchHud = false,
+  perfHud = false,
 }: {
   cameraMode: CameraMode;
   frontend?: "modern" | "legacy";
@@ -406,6 +412,8 @@ export function KioskApp({
   skinRetouch?: RetouchLevelId;
   /** Show the retouch timings on screen (measuring a device; never for guests). */
   retouchHud?: boolean;
+  /** `?perf=1`: the speed log (속도 기록) can be opened on the first screen. Staff only. */
+  perfHud?: boolean;
 }) {
   const [state, dispatch] = useReducer(kioskReducer<Shot>, null, (): State =>
     createInitialState<Shot>({
@@ -415,6 +423,16 @@ export function KioskApp({
       retouch: skinRetouch,
       retakesPerSession: KIOSK_CONFIG.retakesPerSession,
     }),
+  );
+  // 속도 기록 (lib/kiosk/perf.ts): when the render that brought a new screen began. Taken here,
+  // before the screen's canvas work (thumbnails, graded shots), so that work is in the number.
+  const phaseBegan = useMemo(
+    () => ({
+      phase: state.phase,
+      // eslint-disable-next-line react-hooks/purity -- a timestamp for the speed log, never shown
+      at: typeof performance === "undefined" ? 0 : performance.now(),
+    }),
+    [state.phase],
   );
   // The previous session's handwriting font survives a reload, so the next one still differs.
   useEffect(() => {
@@ -470,6 +488,8 @@ export function KioskApp({
     previousTouchAt: -Infinity,
     // Any press, accepted or not: background drawing (lib/kiosk/render-cache.ts) waits after it.
     pointerDownAt: -Infinity,
+    // The last accepted click of any kind: where a screen's "tap → painted" time starts.
+    clickAt: -Infinity,
   });
   // A screen that has just appeared or a finger that has just touched: no background drawing
   // now, so the next tap is handled at once and the double-tap guard sees its true time.
@@ -486,6 +506,32 @@ export function KioskApp({
     tapRef.current.screenShownAt = performance.now();
   }, [screenKey]);
   const moreBelow = useMoreBelow(scrollRef, screenKey);
+  // 속도 기록: from the tap that asked for a screen (or, for an automatic step, from its render)
+  // until that screen has been painted. Numbers only.
+  const firstScreenRef = useRef(true);
+  useEffect(() => {
+    if (firstScreenRef.current) {
+      // The page's own first paint is loading, not a step of a session.
+      firstScreenRef.current = false;
+      return;
+    }
+    const code = `screen_${phaseBegan.phase}`;
+    if (!isPerfCode(code)) return;
+    const { clickAt } = tapRef.current;
+    const from =
+      phaseBegan.at - clickAt >= 0 && phaseBegan.at - clickAt < SCREEN_TAP_WINDOW_MS
+        ? clickAt
+        : phaseBegan.at;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // After the next frame has been drawn: a task queued from the frame callback runs past it.
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(() => boothPerf().record(code, performance.now() - from), 0);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [phaseBegan]);
 
   // Safari 15 on a tablet can expose a visual viewport shorter than 100vh while
   // its browser chrome is present. Keep the kiosk shell within the genuinely visible area.
@@ -652,10 +698,12 @@ export function KioskApp({
     if (state.phase !== "camera" || !cameraRef.current) return;
     let cancelled = false;
     const camera = cameraRef.current;
+    const cameraStarted = boothPerf().start("camera_start");
     camera
       .start(deviceId)
       .then(async () => {
         if (cancelled) return;
+        cameraStarted();
         setStream(camera.getStream());
         setDevices(await camera.listDevices());
         dispatch({ type: "CAMERA_READY" });
@@ -756,16 +804,20 @@ export function KioskApp({
         }
         // The release: the shutter and the film winder, as the frame is taken.
         sound?.play("shutter");
+        const grabbed = boothPerf().start("capture_grab");
+        const captured = boothPerf().start("capture_total");
         const frame = await camera.capture({
           aspect: KIOSK_CONFIG.captureAspect,
           mirror: KIOSK_CONFIG.mirror,
           maxWidth: renderBudget.captureMaxWidth,
         });
+        grabbed();
         // The blink comes after the grab, so it can never light (or spoil) the photo itself.
         if (!cancelled) setShutterBlink((n) => n + 1);
         const canvas = frame.canvas as HTMLCanvasElement;
         if (legacyIOS15) unclaimedCanvas = canvas;
         const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
+        captured();
         if (cancelled) return;
         if (unclaimedCanvas) {
           shotCanvasesRef.current.add(unclaimedCanvas);
@@ -817,10 +869,18 @@ export function KioskApp({
   const assetsRef = useRef<Promise<Map<string, ComposeImage>> | null>(null);
   const [assets, setAssets] = useState<Map<string, ComposeImage> | null>(null);
   useEffect(() => {
-    fontsRef.current ??= loadFrameFonts(V2_FRAMES);
-    assetsRef.current ??= loadFrameAssets(V2_FRAMES, undefined, {
-      lowRes: renderBudget.outputScale <= 1,
-    }).then((r) => r.assets);
+    if (!fontsRef.current) {
+      const done = boothPerf().start("boot_fonts");
+      fontsRef.current = loadFrameFonts(V2_FRAMES).finally(done);
+    }
+    if (!assetsRef.current) {
+      const done = boothPerf().start("boot_assets");
+      assetsRef.current = loadFrameAssets(V2_FRAMES, undefined, {
+        lowRes: renderBudget.outputScale <= 1,
+      })
+        .then((r) => r.assets)
+        .finally(done);
+    }
     void Promise.all([fontsRef.current, assetsRef.current]).then(([, loaded]) => setAssets(loaded));
   }, [renderBudget.outputScale]);
 
@@ -841,12 +901,14 @@ export function KioskApp({
     if (!looksActive(window.location.search, looksNow)) return;
     const created = createBoothLooks();
     looksRef.current = created;
+    const lutsLoaded = boothPerf().start("boot_luts");
     // Every look, whatever the frames start with: the guest chooses from all of them.
     looksLoadRef.current = Promise.all([
       created.preload(V2_FRAMES.map((frame) => frame.id)),
       created.preloadLooks(LOOK_IDS),
     ]).then(() => undefined);
     void looksLoadRef.current.then(() => {
+      lutsLoaded();
       if (looksRef.current === created) setLooks(created);
     });
     return () => {
@@ -875,6 +937,7 @@ export function KioskApp({
   const gradedShots = useMemo(() => {
     const out: (string | null)[] = [];
     if (!looks || !lookFrameId) return out;
+    const drawn = boothPerf().start("graded_shots");
     for (const [index, shot] of state.shots.entries())
       out.push(
         shot
@@ -889,6 +952,8 @@ export function KioskApp({
             )
           : null,
       );
+    // Only a round that put a look on a photo is a measurement (원본 draws nothing).
+    if (out.some((url) => url !== null)) drawn();
     return out;
   }, [looks, lookFrameId, lookSeed, state.shots, state.lookId, shotPictures]);
   // The colour row of the choice screen: the guest's first shot in each of the eight looks.
@@ -898,7 +963,9 @@ export function KioskApp({
   const lookChips = useMemo(
     () =>
       looks && lookRowFrameId && firstShot
-        ? lookChipsFor(shotPictures, looks, lookRowFrameId, lookSeed, firstShot.frame)
+        ? boothPerf().time("look_row", () =>
+            lookChipsFor(shotPictures, looks, lookRowFrameId, lookSeed, firstShot.frame),
+          )
         : [],
     [looks, lookRowFrameId, lookSeed, firstShot, shotPictures],
   );
@@ -934,7 +1001,9 @@ export function KioskApp({
   const [samples, setSamples] = useState<ComposeImage[] | null>(null);
   useEffect(() => {
     let cancelled = false;
+    const loaded = boothPerf().start("boot_samples");
     void loadSamplePhotos().then((photos) => {
+      loaded();
       if (!cancelled) setSamples(photos);
     });
     return () => {
@@ -1001,10 +1070,16 @@ export function KioskApp({
   const pickThumbs = useMemo(() => {
     const out: Record<string, string> = {};
     if (!samples || !assets || !previewing) return out;
+    // 속도 기록: only when a card had to be drawn now (nothing was drawn ahead for it).
+    const drawn = boothPerf().start("thumbs");
+    let misses = 0;
     for (const card of FRAME_CARDS) {
-      const url = kept(preview(card.frame(defaultOptions(card)), thumbScale));
+      const job = preview(card.frame(defaultOptions(card)), thumbScale);
+      if (!job.done()) misses++;
+      const url = kept(job);
       if (url) out[card.id] = url;
     }
+    if (misses > 0) drawn();
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
   }, [samples, assets, previewing, thumbScale, preview, previews]);
@@ -1035,7 +1110,8 @@ export function KioskApp({
   const optionScale = thumbScale * 1.4;
   const optionPreview = useMemo(() => {
     if (!optionsFrame || !samples || !assets) return null;
-    return kept(preview(optionsFrame, optionScale, previewFont));
+    const job = preview(optionsFrame, optionScale, previewFont);
+    return job.done() ? kept(job) : boothPerf().time("option_preview", () => kept(job));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `kept` only reads `previews`
   }, [optionsFrame, samples, assets, previewFont, optionScale, preview]);
   const optionsFrameId = optionsFrame?.id ?? null;
@@ -1089,10 +1165,13 @@ export function KioskApp({
         // Skin retouch runs here, before the frame; the colour look (`grade`, lib/looks) is
         // applied by composeFrame to each photo as it is drawn: 촬영 → 피부 보정 → 색감 → 틀.
         // A stage that fails hands the photos back as they were: the frame is always made.
+        const stagesDone = boothPerf().start("stages");
         const staged = await runPhotoStages(chosen, photoStages);
+        stagesDone();
         let canvas: HTMLCanvasElement;
         try {
           if (cancelled) return;
+          const composed = boothPerf().start("compose");
           canvas = composeFrame(frame, staged.images, {
             createCanvas: createDomCanvas,
             context: {
@@ -1108,15 +1187,18 @@ export function KioskApp({
               chosenLook(frame.id, lookForFinal),
             ),
           }) as HTMLCanvasElement;
+          composed();
         } finally {
           staged.release();
         }
         try {
+          const encoded = boothPerf().start("encode");
           const blob = await canvasToBlob(
             canvas,
             KIOSK_CONFIG.outputMime,
             KIOSK_CONFIG.outputQuality,
           );
+          encoded();
           if (cancelled) return;
           setFinalImage({
             frameId: frame.id,
@@ -1160,6 +1242,13 @@ export function KioskApp({
   ]);
 
   // The print has come up (the wall question shows it): a soft chime. The QR ticket: a stamp.
+  // 속도 기록: from the photos being chosen (this phase starting) to the QR being ready to show.
+  // The guest's own time at the wall question is not in it: the upload runs meanwhile.
+  const finishRef = useRef<{ sessionId: string; at: number } | null>(null);
+  const uploadTimersRef = useRef(new Map<string, () => void>());
+  useEffect(() => {
+    finishRef.current = finalPhase ? { sessionId: state.sessionId, at: performance.now() } : null;
+  }, [finalPhase, state.sessionId]);
   const printShown = finalPhase && finalImage?.frameId === state.frameId;
   useEffect(() => {
     if (printShown) sound?.play("develop");
@@ -1203,9 +1292,16 @@ export function KioskApp({
       dispatch({ type: "DELIVERY_QR_PENDING" });
       return;
     }
+    const qrDrawn = boothPerf().start("qr");
     const svg = await makeQrSvg(result.url);
+    qrDrawn();
     if (sessionId !== sessionRef.current) return;
     setQrSvg(svg);
+    const finish = finishRef.current;
+    if (finish?.sessionId === sessionId) {
+      boothPerf().record("finish", performance.now() - finish.at);
+      finishRef.current = null;
+    }
     dispatch({
       type: "DELIVERY_SUCCEEDED",
       token: result.token,
@@ -1227,6 +1323,8 @@ export function KioskApp({
         if (event.type === "status") {
           setQueueStatus({ depth: event.depth, authBlocked: event.authBlocked, durable });
         } else if (event.type === "uploaded") {
+          uploadTimersRef.current.get(event.sessionId)?.();
+          uploadTimersRef.current.delete(event.sessionId);
           void showQr(event.sessionId, event.result);
           sendVideo(event.sessionId);
           // A wall answer given while this photo was still queued can go now.
@@ -1297,6 +1395,10 @@ export function KioskApp({
     if (!finalImage || !queueRef.current) return;
     const sessionId = state.sessionId;
     dispatch({ type: "DELIVERY_STARTED" });
+    // Only the first attempt is timed: a retry after an outage measures the outage.
+    const timers = uploadTimersRef.current;
+    if (timers.size > 3) timers.clear();
+    if (!timers.has(sessionId)) timers.set(sessionId, boothPerf().start("upload"));
     try {
       const queue = await queueRef.current;
       await queue.enqueue({
@@ -1307,6 +1409,7 @@ export function KioskApp({
       });
       photoQueued(sessionId).resolve();
       const outcome = await queue.deliverNow(sessionId);
+      if (!outcome.ok) timers.delete(sessionId);
       if (outcome.ok || sessionRef.current !== sessionId) return; // "uploaded" shows the QR
       if (outcome.kind === "network" || outcome.kind === "server") {
         dispatch({ type: "DELIVERY_QUEUED", reason: "network" });
@@ -1571,6 +1674,11 @@ export function KioskApp({
     retouchFailuresRef.current = retouch.takeFailures;
   });
   const heartbeatRef = useRef({ queueDepth: 0, camera: "unknown" as "ok" | "error" | "unknown" });
+  // Which render budget the numbers were measured with (the iPad mini 4 path or the usual one).
+  const perfProfileRef = useRef<"legacy" | "modern">("modern");
+  useEffect(() => {
+    perfProfileRef.current = legacyIOS15 ? "legacy" : "modern";
+  }, [legacyIOS15]);
   useEffect(() => {
     heartbeatRef.current = {
       queueDepth: queueStatus.depth,
@@ -1583,6 +1691,7 @@ export function KioskApp({
     const beat = async () => {
       try {
         const sentAt = Date.now();
+        const perf = boothPerf().take();
         const res = await fetch("/api/kiosk/heartbeat", {
           method: "POST",
           credentials: "same-origin",
@@ -1593,6 +1702,8 @@ export function KioskApp({
             ...retouchFailuresRef.current(),
             // Why colour looks are off on this tablet, as a code (never anything about a photo).
             looksError: looksErrorCode(looksRef.current?.problem() ?? null) ?? undefined,
+            // 속도 기록: how long this booth's steps took since the last beat (codes and numbers).
+            ...(perf ? { perf, perfProfile: perfProfileRef.current } : {}),
           }),
         });
         if (!stopped && res.ok) {
@@ -1658,6 +1769,7 @@ export function KioskApp({
             tapRef.current.pointerType = "";
             if (!blocked && (pointerType === "touch" || pointerType === "pen"))
               tapRef.current.previousTouchAt = now;
+            if (!blocked) tapRef.current.clickAt = now;
             if (blocked) {
               e.preventDefault();
               e.stopPropagation();
@@ -1814,6 +1926,7 @@ export function KioskApp({
             looks={{ staffSwitch: photoLooks, session: looksNow, booth: looks }}
           />
         )}
+        {perfHud && state.phase === "attract" && <PerfCorner />}
         {retouchHud && skinRetouch !== "off" && (
           <RetouchHud
             metrics={retouch.metrics}

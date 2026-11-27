@@ -224,6 +224,59 @@ describe("wall heartbeat metrics", () => {
   });
 });
 
+describe("속도 기록 in the heartbeat", () => {
+  it("logs known codes and whole numbers; drops everything else; needs an enrolled booth", async () => {
+    const { POST } = await import("@/app/api/kiosk/heartbeat/route");
+    const log = vi.mocked(console.log);
+    const perfLines = () =>
+      log.mock.calls
+        .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+        .filter((entry) => entry.event === "kiosk_perf");
+    const before = perfLines().length;
+    const beat = (body: unknown, cookie = kiosk) =>
+      POST(post("/api/kiosk/heartbeat", body, cookie));
+
+    expect(
+      (
+        await beat({
+          queueDepth: 0,
+          perfProfile: "legacy",
+          perf: {
+            compose: { n: 2, last: 812.4, max: 900, med: 850 },
+            finish: { n: 1, last: 4100, max: 4100, med: 4100 },
+            // Not a code the booth has: dropped, whatever it carries.
+            selfie: { n: 1, last: 1, max: 1, med: 1, data: "data:image/jpeg;base64,AAAA" },
+            upload: { n: 1, last: "soon", max: 1, med: 1 },
+          },
+        })
+      ).status,
+    ).toBe(200);
+    const lines = perfLines().slice(before);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      profile: "legacy",
+      perf: "compose=2:812/850/900 finish=1:4100/4100/4100",
+    });
+    expect(JSON.stringify(lines[0])).not.toContain("data:");
+
+    // Nothing usable: no line at all. An unknown profile is logged as the usual one.
+    await beat({ queueDepth: 0, perf: { selfie: { n: 1, last: 1, max: 1, med: 1 } } });
+    await beat({ queueDepth: 0, perf: "fast" });
+    await beat({ queueDepth: 0 });
+    expect(perfLines().slice(before)).toHaveLength(1);
+    await beat({
+      queueDepth: 0,
+      perfProfile: "<script>",
+      perf: { qr: { n: 1, last: 3, max: 3, med: 3 } },
+    });
+    expect(perfLines().slice(before)[1]).toMatchObject({ profile: "modern", perf: "qr=1:3/3/3" });
+
+    // No kiosk session: refused before anything is read.
+    expect((await beat({ perf: { qr: { n: 1, last: 3, max: 3, med: 3 } } }, "")).status).toBe(401);
+    expect(perfLines().slice(before)).toHaveLength(2);
+  });
+});
+
 describe("exposure report endpoint", () => {
   it("needs an enrolled display, same origin, and photo ids", async () => {
     expect((await report([], [], "")).status).toBe(401);

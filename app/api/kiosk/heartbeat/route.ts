@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateKioskRequest, kioskCookieHeader } from "@/lib/kiosk-auth/server";
+import { cleanPerfReport, formatPerfReport } from "@/lib/kiosk/perf";
 import { getAiReview, sweepAiReviewSoon } from "@/lib/moderation/server";
 import { getServerConfig } from "@/lib/server/env";
 import { NO_STORE, jsonError, route } from "@/lib/server/http";
@@ -51,6 +52,8 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
     retouchFailures?: unknown;
     retouchError?: unknown;
     looksError?: unknown;
+    perf?: unknown;
+    perfProfile?: unknown;
   };
   // Skin retouch failed on that booth since its last beat: a code and a count for the log, so a
   // booth that is quietly sending unretouched photos is seen (nothing about a face is sent).
@@ -78,6 +81,16 @@ export const POST = route("kiosk_heartbeat", async (request: Request) => {
       { kioskId: auth.kioskId ?? "dev", code: body.looksError },
       "warn",
     );
+  // 속도 기록 (lib/kiosk/perf.ts): how long that booth's steps took since its last beat. Known
+  // codes and whole numbers only (`code=n:last/median/max` ms); anything else is dropped, and
+  // nothing about a photo or a session is in it. Logged, never stored.
+  const perf = cleanPerfReport(body.perf);
+  if (perf)
+    logEvent("kiosk_perf", {
+      kioskId: auth.kioskId ?? "dev",
+      profile: body.perfProfile === "legacy" ? "legacy" : "modern",
+      perf: formatPerfReport(perf),
+    });
   // Wall displays only (docs/ARCHITECTURE.md 1.8). Anything odd is dropped, not stored.
   const frameRate =
     typeof body.frameRate === "number" && body.frameRate >= 0 && body.frameRate <= 240

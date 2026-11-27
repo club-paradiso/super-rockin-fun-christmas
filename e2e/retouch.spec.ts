@@ -590,9 +590,12 @@ test.describe("the booth", () => {
     await expect(page.getByTestId("retouch-hud")).toContainText("init-failed");
     // And the server hears about it with the next heartbeat (a code and a count only).
     await expect.poll(() => reported.length, { timeout: 45_000 }).toBeGreaterThan(0);
-    expect(Object.keys(reported[0]!).sort()).toEqual(
-      ["camera", "queueDepth", "retouchError", "retouchFailures"].sort(),
-    );
+    // (The speed log may ride on the same beat: codes and numbers, e2e/kiosk-perf.spec.ts.)
+    expect(
+      Object.keys(reported[0]!)
+        .filter((key) => key !== "perf" && key !== "perfProfile")
+        .sort(),
+    ).toEqual(["camera", "queueDepth", "retouchError", "retouchFailures"].sort());
     expect(reported[0]!.retouchError).toMatch(/^[a-z-]+$/);
   });
 });
