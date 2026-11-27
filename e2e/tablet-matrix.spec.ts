@@ -161,9 +161,39 @@ function measureLayout(): LayoutReport {
     const r = el.getBoundingClientRect();
     return r.width / r.height;
   };
-  const preview = document.querySelector('[data-testid="camera-preview-box"]');
-  if (preview && Math.abs(ratio(preview) - 4 / 3) > 0.015)
-    out.distorted.push(`camera preview ${ratio(preview).toFixed(3)}`);
+  // The preview window has the chosen frame's slot shape (lib/kiosk/preview-shape.ts, its
+  // data-aspect); the shot inside it stays 4:3, cut by the window, never stretched.
+  const preview = document.querySelector<HTMLElement>('[data-testid="camera-preview-box"]');
+  const wanted = Number(preview?.dataset.aspect);
+  if (preview && !(Math.abs(ratio(preview) - wanted) / wanted < 0.012))
+    out.distorted.push(`camera preview ${ratio(preview).toFixed(3)} ≠ ${wanted}`);
+  const view = document.querySelector('[data-testid="camera-preview-view"]');
+  if (view && Math.abs(ratio(view) - 4 / 3) > 0.015)
+    out.distorted.push(`camera view ${ratio(view).toFixed(3)}`);
+  // Centred and covering the window: with both shapes right, the window then shows exactly the
+  // centred crop composeFrame makes of each shot (tests/unit/preview-shape.test.ts).
+  if (preview && view) {
+    // The window's inside (its 1 px border excluded): what the view fills.
+    const outer = preview.getBoundingClientRect();
+    const w = {
+      left: outer.left + preview.clientLeft,
+      top: outer.top + preview.clientTop,
+      width: preview.clientWidth,
+      height: preview.clientHeight,
+    };
+    const v = view.getBoundingClientRect();
+    const covers =
+      v.left <= w.left + 1 &&
+      v.top <= w.top + 1 &&
+      v.right >= w.left + w.width - 1 &&
+      v.bottom >= w.top + w.height - 1;
+    const centred =
+      Math.abs(v.left + v.width / 2 - (w.left + w.width / 2)) <= 1 &&
+      Math.abs(v.top + v.height / 2 - (w.top + w.height / 2)) <= 1;
+    const tight = Math.min(v.width - w.width, v.height - w.height) <= 2;
+    if (!covers || !centred || !tight)
+      out.distorted.push("camera view not the frame's centred crop");
+  }
   const video = document.querySelector<HTMLVideoElement>('[data-testid="camera-preview"]');
   if (video && getComputedStyle(video).objectFit !== "cover")
     out.distorted.push("preview not cover");
@@ -518,7 +548,9 @@ test("camera refused: a screen with a way to try again and a way home, at tablet
   await context.close();
 });
 
-test("turning the tablet: the preview stays 4:3 and on screen, both ways", async ({ page }) => {
+test("turning the tablet: the preview keeps its shape and stays on screen, both ways", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/kiosk?camera=mock");
   await page.getByTestId("attract-start").click();
@@ -536,7 +568,8 @@ test("turning the tablet: the preview stays 4:3 and on screen, both ways", async
   ]) {
     await page.setViewportSize(viewport);
     await expectSoundLayout(page, `ready after turning to ${viewport.width}×${viewport.height}`);
-    expect(await shape()).toBeCloseTo(4 / 3, 1);
+    // The window keeps the frame's slot shape (필름 3컷: about square) whichever way it turns.
+    expect(await shape()).toBeCloseTo(Number(await box.getAttribute("data-aspect")), 1);
     await expect(box).toBeInViewport({ ratio: 1 });
     await expect(page.getByTestId("shoot-free")).toBeInViewport({ ratio: 1 });
     // The stream is the one that was running: turning the screen does not restart the camera.

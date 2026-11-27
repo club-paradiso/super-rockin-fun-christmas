@@ -54,9 +54,16 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `fallbackPhotoBudgetMs`. A wrong fallback setting turns only the fallback off
   (`aiModerationFallbackProblem`), never a `ConfigError`.
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
-- **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
-  `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
-  slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
+- **Preview = result.** Every shot is taken at `KIOSK_CONFIG.captureAspect` (4:3) with
+  `KIOSK_CONFIG.mirror`, and the live view inside the preview is that 4:3 shot. Never stretch an
+  image; crop with `coverCrop`. The v2 frames (below) have slots of other shapes (square, oval,
+  Figma sizes): the 4:3 shot is cover-cropped into them, centred. Since 2026-11-27 (a user
+  request: "촬영시 카메라 화면이 너무 작아. 키오스크는 세로") the preview is a window of the chosen
+  frame's slot shape over that 4:3 view, centred the same way (`previewAspect` /
+  `previewViewSize`, `lib/kiosk/preview-shape.ts`), so it shows exactly the part of each shot the
+  print keeps, larger for square and tall slots; a frame whose slots differ in shape keeps the
+  whole 4:3 view. Only the view changes: never change the capture, the crop or the composite for
+  it (`tests/unit/preview-shape.test.ts`, the centred-crop check in `e2e/tablet-matrix.spec.ts`).
 - **Looks are on by default, behind a staff switch** (2026-11-23, `lib/looks`; on by default since
   2026-11-25, a user decision: the guest must be able to choose a colour,
   `docs/research/`): eight looks, each the house stock (`HOUSE` in `config/looks/index.ts`) plus
@@ -82,7 +89,10 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   touches nothing. No extra screen and no
   extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
   for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
-  is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
+  is not shown. A frame whose photos are black and white or sepia (`photoTone` mono / sepia: 필름
+  3컷, 35mm 필름's 흑백 and 세피아) offers no look at all (2026-11-27, a user decision: "애초부터
+  흑백 컨셉 이런 템플릿은 필터 고르지 못하게"): `frameToneIsFixed` in `lib/looks/config.ts` hides
+  the row, `SET_LOOK` refuses and `chosenLook` gives no look to the print. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
   gives wording). With looks on, the shots on the choice screen are shown in the
   session's look (`gradedShots`, the same grader as the print; `chosenLook`), or with no look in
   the frame's own tone (`frameToneGrader`, the same `applyTone` as the print), and the live camera
@@ -298,7 +308,10 @@ looks:measure`). `/looks` is the comparison
   `app/globals.css` (`--bw`/`--bh`, `--gap-*`, `--fs-*`, `--btn-*`, `--ctl-*`). Never size a booth
   element from raw `vh`/`vw` or a fixed pixel height, never add a device-name or user-agent
   branch, never a second scroll area inside a screen. Compositions switch by shape (wide / tall /
-  short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
+  short). Where container queries are missing (Safari 15, the iPad mini 4) the two stages
+  (`.shoot-stage`, `.fit-stage`) are measured by `Stage` (`components/kiosk/stage-size.tsx`) and
+  the fallback CSS sizes from `--stage-w` / `--stage-h`, never from a viewport guess alone. Any
+  booth change must keep `e2e/tablet-matrix.spec.ts` green.
 - **The progress dots count the steps this session really has** (a user decision, 2026-11-24):
   five with the wall question, four when it is skipped (PAUSE SUBMISSIONS): 틀 → 촬영 → 사진
   고르기 → 동의 → QR (six and five until 2026-11-27, when the review screen went; Figma's

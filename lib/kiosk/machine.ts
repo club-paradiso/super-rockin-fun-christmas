@@ -13,6 +13,7 @@ import {
 } from "@/config/frames/v2";
 import { getHandFont, pickHandFont } from "@/config/hand-fonts";
 import { LOOK_IDS, NO_LOOK } from "@/config/looks";
+import { frameToneIsFixed } from "@/lib/looks/config";
 import { parseRetouchLevel, type RetouchLevelId } from "@/config/retouch";
 import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskLang } from "@/lib/kiosk/copy";
@@ -497,7 +498,9 @@ export function kioskReducer<Shot>(
 
     case "SET_LOOK":
       // Fixed with the photos: once they are confirmed the picture is being made and uploaded.
+      // A black-and-white or sepia frame offers no colour choice (frameToneIsFixed).
       return state.phase === "select" &&
+        !frameToneIsFixed(state.frameId) &&
         (action.lookId === NO_LOOK || LOOK_IDS.includes(action.lookId))
         ? { ...state, lookId: action.lookId }
         : state;

@@ -1249,6 +1249,29 @@ body {
   .shoot-stage {
     min-height: clamp(160px, 22 * var(--bh), 420px);
   }
+  /* Tall screen (the booth stands upright; a user request, 2026-11-27: "촬영시 카메라 화면이
+     너무 작아"). There the 4:3 picture is limited by the width, and it cannot grow past it
+     without showing less than the photo takes (Preview = result). So the stage reaches past the
+     page's side margins to a small gutter: 670 → 744 px wide at 768 × 1024 (measured). The
+     binder rings lie under the picture while it is shown. */
+  @media not all and (min-aspect-ratio: 5/4) {
+    .shoot .shoot-stage {
+      align-self: stretch;
+      margin-inline: calc(var(--gap-s) - var(--booth-pad) - var(--sheet-pad-x, 24px));
+    }
+    /* Before the first shot the panel under the picture gives up height: the two-line lead runs
+       on as one line (it wraps again where a language's words do not fit) and the gaps close
+       up, so the picture is larger before shooting too. */
+    .shoot:not(.shoot-live) {
+      gap: var(--gap-s);
+    }
+    .shoot:not(.shoot-live) .shoot-panel {
+      gap: var(--gap-xs);
+    }
+    .shoot:not(.shoot-live) .shoot-panel > .booth-lead br {
+      display: none;
+    }
+  }
   .camera-preview {
     position: relative;
     overflow: hidden;
@@ -1256,6 +1279,15 @@ body {
     border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
     border-radius: 2px;
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  /* The whole 4:3 shot inside the window of the frame's slot shape (lib/kiosk/preview-shape.ts),
+     centred; the window clips it. Its size is set inline from the two shapes. */
+  .camera-preview-view {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
   }
   /* A black-and-white frame with 「사진 색 보정」 on: the guest sees themselves that way before
      the shot. An element filter (Safari 15 has it), on the view only: the shot is never taken
@@ -2573,6 +2605,25 @@ main input:focus-visible,
   .kiosk-root .select-grid.has-extra,
   .kiosk-root .review-grid.has-extra {
     max-width: min(100%, 60vh);
+  }
+  /* Once the stage is measured (components/kiosk/stage-size.tsx: --stage-w / --stage-h, the
+     numbers 100cqw / 100cqh give elsewhere), the same sizes as with container queries. The
+     viewport guesses above stay only for the moment before the first measurement. Without this
+     the photo grid on the iPad mini 4 (768 × 1024) was 514 px tall in a 206 px stage and covered
+     the colour row and its "다음" (2026-11-27, measured with the container rules taken out). */
+  .kiosk-root .shoot-stage[data-measured] .camera-preview {
+    width: min(var(--stage-w), calc(var(--stage-h) * var(--aspect, 1.3333)));
+    max-width: none;
+  }
+  .kiosk-root .fit-stage[data-measured] .fit-grid {
+    width: min(
+      var(--stage-w),
+      calc(
+        (((var(--stage-h) - (var(--rows) - 1) * var(--gap)) / var(--rows)) - var(--extra)) *
+          var(--ratio) * var(--cols) + (var(--cols) - 1) * var(--gap) - 1px
+      )
+    );
+    max-width: none;
   }
 }
 

@@ -2,9 +2,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { V2_FRAMES } from "@/config/frames/v2";
 import { LOOKS, LOOK_IDS, NO_LOOK, getLook, lookCubeUrl } from "@/config/looks";
+import { chosenLook } from "@/lib/looks/booth";
 import {
   FRAME_LOOKS,
   frameLookProblems,
+  frameToneIsFixed,
   lookForFrame,
   looksEnabled,
   type FrameLookMap,
@@ -119,5 +121,25 @@ describe("the feature flag", () => {
     expect(looksEnabled()).toBe(true);
     expect(looksEnabled("?camera=mock")).toBe(true);
     expect(looksEnabled("?looks=0")).toBe(false);
+  });
+});
+
+describe("frames whose tone is the concept (흑백, 세피아)", () => {
+  it("are every frame drawn in black and white or sepia, and only those", () => {
+    for (const frame of V2_FRAMES)
+      expect(frameToneIsFixed(frame.id), frame.id).toBe(
+        frame.photoTone === "mono" || frame.photoTone === "sepia",
+      );
+    expect(frameToneIsFixed("film3-mono-logo")).toBe(true);
+    expect(frameToneIsFixed("film35-sepia")).toBe(true);
+    expect(frameToneIsFixed("film35-natural")).toBe(false);
+    expect(frameToneIsFixed("no-such-frame")).toBe(false);
+    expect(frameToneIsFixed(null)).toBe(false);
+  });
+
+  it("never take a look into the print, whatever was asked", () => {
+    for (const lookId of [...LOOK_IDS, NO_LOOK])
+      expect(chosenLook("film3-mono-logo", lookId), lookId).toBeUndefined();
+    expect(chosenLook("film35-natural", "ink")).toEqual({ lookId: "ink" });
   });
 });
