@@ -32,9 +32,4 @@ const HANDSHAKE = {
   labelZh: "握手",
 } as const;
 
-export const POSE_SEQUENCE: readonly Pose[] = [
-  FACE,
-  SHOULDERS,
-  HANDSHAKE,
-  FACE,
-];
+export const POSE_SEQUENCE: readonly Pose[] = [FACE, SHOULDERS, HANDSHAKE, FACE];
