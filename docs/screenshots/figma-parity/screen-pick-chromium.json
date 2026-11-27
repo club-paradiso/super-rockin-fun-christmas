@@ -1,9 +1,9 @@
 {
   "screen": "pick",
   "browser": "chromium",
-  "worstOffsetPx": 1,
-  "overPct": 1.581,
-  "meanDeltaE": 0.3,
+  "worstOffsetPx": 0.5,
+  "overPct": 1.585,
+  "meanDeltaE": 0.499,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -71,15 +71,6 @@
       ]
     },
     {
-      "sel": ".booth-steps-dot:nth-of-type(7)",
-      "delta": [
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    {
       "sel": "[data-testid=\"go-home\"]",
       "delta": [
         0,
@@ -91,12 +82,23 @@
     {
       "sel": ".pick-head .booth-title",
       "delta": [
-        0,
-        -1
+        0.01,
+        0
       ],
       "size": [
-        32,
-        32
+        36,
+        36
+      ]
+    },
+    {
+      "sel": "[data-testid=\"pick-lead\"]",
+      "delta": [
+        0.01,
+        0
+      ],
+      "size": [
+        24,
+        24
       ]
     },
     {
@@ -109,45 +111,18 @@
       ]
     },
     {
-      "sel": "[data-testid=\"frame-option-film3\"]",
+      "sel": "[data-testid=\"frame-option-film\"]",
       "delta": [
-        0.05,
+        0.02,
         0,
-        0,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-film4\"]",
-      "delta": [
-        0.03,
-        0,
-        0,
+        -0.02,
         0
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-polaroid1\"]",
       "delta": [
-        0.01,
         0,
-        0,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-polaroid3\"]",
-      "delta": [
-        -0.01,
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-verse4\"]",
-      "delta": [
-        -0.03,
         0,
         0,
         0
@@ -156,16 +131,7 @@
     {
       "sel": "[data-testid=\"frame-option-check2\"]",
       "delta": [
-        0.04,
         0,
-        0,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-lace1\"]",
-      "delta": [
-        0.02,
         0,
         0,
         0
@@ -183,175 +149,110 @@
     {
       "sel": "[data-testid=\"frame-option-meme4\"]",
       "delta": [
-        -0.02,
+        0,
         0,
         0,
         0
       ]
     },
     {
-      "sel": "[data-testid=\"frame-option-film3\"] .pick-card-name",
+      "sel": "[data-testid=\"frame-option-film\"] .pick-card-name",
       "delta": [
-        0.04,
-        -1
+        0.01,
+        0
       ],
       "size": [
-        18,
-        18
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-film4\"] .pick-card-name",
-      "delta": [
-        0.02,
-        -1
-      ],
-      "size": [
-        18,
-        18
+        25,
+        25
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-polaroid1\"] .pick-card-name",
       "delta": [
-        0.01,
-        -1
-      ],
-      "size": [
-        18,
-        18
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-polaroid3\"] .pick-card-name",
-      "delta": [
         -0.01,
-        -1
+        0
       ],
       "size": [
-        18,
-        18
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-verse4\"] .pick-card-name",
-      "delta": [
-        -0.03,
-        -1
-      ],
-      "size": [
-        18,
-        18
+        25,
+        25
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-check2\"] .pick-card-name",
       "delta": [
-        0.03,
-        -1
+        -0.01,
+        0
       ],
       "size": [
-        18,
-        18
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-lace1\"] .pick-card-name",
-      "delta": [
-        0.01,
-        -1
-      ],
-      "size": [
-        18,
-        18
+        25,
+        25
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-film35\"] .pick-card-name",
       "delta": [
         0,
-        -1
+        0
       ],
       "size": [
-        18,
-        18
+        25,
+        25
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-meme4\"] .pick-card-name",
       "delta": [
-        -0.03,
-        -1
-      ],
-      "size": [
-        18,
-        18
-      ]
-    },
-    {
-      "sel": "[data-testid=\"frame-option-film3\"] .pick-card-hint",
-      "delta": [
-        0.04,
+        -0.01,
         0
       ],
       "size": [
-        14,
-        14
+        25,
+        25
       ]
     },
     {
-      "sel": "[data-testid=\"frame-option-film4\"] .pick-card-hint",
+      "sel": "[data-testid=\"frame-option-film\"] .pick-card-hint",
       "delta": [
-        0.03,
+        0.02,
+        0,
+        -0.02,
         0
-      ],
-      "size": [
-        14,
-        14
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-polaroid1\"] .pick-card-hint",
       "delta": [
-        0.01,
+        0,
+        0,
+        0,
         0
-      ],
-      "size": [
-        14,
-        14
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-check2\"] .pick-card-hint",
       "delta": [
-        0.04,
+        0,
+        0,
+        0,
         0
-      ],
-      "size": [
-        14,
-        14
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-film35\"] .pick-card-hint",
       "delta": [
         0,
+        0,
+        0,
         0
-      ],
-      "size": [
-        14,
-        14
       ]
     },
     {
       "sel": "[data-testid=\"frame-option-meme4\"] .pick-card-hint",
       "delta": [
-        -0.03,
+        0,
+        0,
+        0,
         0
-      ],
-      "size": [
-        14,
-        14
       ]
     }
   ]

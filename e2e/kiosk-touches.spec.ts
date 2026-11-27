@@ -60,8 +60,8 @@ test("the shortest way to the QR is six touches for a frame with options", async
 
   // 1 · the cover
   await page.getByTestId("attract-start").click();
-  // 2 · a card (필름 3컷 has colour and logo options)
-  await page.getByTestId("frame-option-film3").click();
+  // 2 · a card (필름 has four colours)
+  await page.getByTestId("frame-option-film").click();
   // 3 · "이대로 찍기"
   await page.getByTestId("confirm-options").click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
@@ -78,7 +78,7 @@ test("the shortest way to the QR is six touches for a frame with options", async
   const pressed = await clicks(page);
   expect(pressed).toEqual([
     "attract-start",
-    "frame-option-film3",
+    "frame-option-film",
     "confirm-options",
     "shoot-free",
     "confirm-selection",

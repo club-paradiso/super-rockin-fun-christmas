@@ -1,9 +1,9 @@
 {
-  "screen": "film3",
-  "browser": "webkit",
+  "screen": "film",
+  "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.679,
-  "meanDeltaE": 0.375,
+  "overPct": 1.432,
+  "meanDeltaE": 0.268,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -71,15 +71,6 @@
       ]
     },
     {
-      "sel": ".booth-steps-dot:nth-of-type(7)",
-      "delta": [
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    {
       "sel": "[data-testid=\"go-home\"]",
       "delta": [
         0,
@@ -120,45 +111,34 @@
       ]
     },
     {
-      "sel": ".options-row:nth-of-type(1) .options-row-label",
+      "sel": "[data-testid=\"option-color-cream\"]",
       "delta": [
         0.02,
+        0,
+        -0.02,
         0
-      ],
-      "size": [
-        20,
-        20
+      ]
+    },
+    {
+      "sel": "[data-testid=\"option-color-red\"]",
+      "delta": [
+        0,
+        0,
+        0,
+        0
       ]
     },
     {
       "sel": "[data-testid=\"option-color-mono\"]",
       "delta": [
-        0.02,
         0,
-        -0.02,
+        0,
+        0,
         0
       ]
     },
     {
       "sel": "[data-testid=\"option-color-sepia\"]",
-      "delta": [
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"option-logo-logoOn\"]",
-      "delta": [
-        0.02,
-        0,
-        -0.02,
-        0
-      ]
-    },
-    {
-      "sel": "[data-testid=\"option-logo-logoOff\"]",
       "delta": [
         0,
         0,

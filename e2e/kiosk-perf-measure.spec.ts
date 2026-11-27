@@ -45,7 +45,7 @@ test(`booth speed log, ${legacy ? "iPadOS 15 profile" : "usual renderer"}, ${rat
 
   // Two guests: the first pays for whatever is drawn once, the second shows the steady state.
   await session(page);
-  await session(page, "film4");
+  await session(page, "film");
 
   await page.getByTestId("perf-open").click();
   const rows = await page

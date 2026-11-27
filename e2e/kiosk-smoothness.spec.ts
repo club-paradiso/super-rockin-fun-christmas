@@ -63,7 +63,7 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
     results[`guest${guest}: options screen, 6 s`] = await longTasks(
       page,
       async () => {
-        await page.getByTestId("frame-option-film4").click();
+        await page.getByTestId("frame-option-film").click();
         await expect(page.getByTestId("screen-options")).toBeVisible();
       },
       6000,

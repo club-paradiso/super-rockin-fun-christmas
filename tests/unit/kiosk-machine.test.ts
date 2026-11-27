@@ -51,11 +51,12 @@ function run(state: S, ...actions: KioskAction<string>[]): S {
   return actions.reduce(kioskReducer<string>, state);
 }
 
-/** 필름 3컷 (the default card) → its options → the camera. */
+/** 필름 (the default card) in 흑백, the three-photo strip → the camera. */
 const toReady = (s = init()) =>
   run(
     s,
     { type: "CONFIRM_PICK", random: 0 },
+    { type: "SET_OPTION", key: "color", value: "mono" },
     { type: "CONFIRM_OPTIONS", random: 0 },
     { type: "CAMERA_READY" },
   );
@@ -212,7 +213,7 @@ describe("exactly four captures (2026-11-27, a user decision)", () => {
     expect(s.phase).toBe("select");
     expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3"]);
     expect(capturedCount(s)).toBe(SHOTS);
-    // 필름 3컷: the first three, in shooting order. One press finishes.
+    // 필름 · 흑백 (three photos): the first three, in shooting order. One press finishes.
     expect(s.selectedShotIndices).toEqual([0, 1, 2]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
@@ -221,11 +222,15 @@ describe("exactly four captures (2026-11-27, a user decision)", () => {
     for (const [card, slots] of [
       ["polaroid1", 1],
       ["check2", 2],
-      ["film3", 3],
-      ["film4", 4],
+      ["film:mono", 3],
+      ["film", 4],
       ["meme4", 4],
     ] as const) {
-      const s = toShotWith(card);
+      const [id, color] = card.split(":");
+      const s = toShotWith(
+        id!,
+        color ? [{ type: "SET_OPTION", key: "color", value: color as "mono" }] : [],
+      );
       expect(getFrame(s.frameId).slots.length, card).toBe(slots);
       expect(s.selectedShotIndices, card).toEqual(Array.from({ length: slots }, (_, i) => i));
       // No frame takes more than the session shoots: every shot has a place.
@@ -414,16 +419,16 @@ describe("failures", () => {
   });
 });
 
-describe("틀 선택 v2: nine cards, options before shooting", () => {
-  it("starts on 필름 3컷 with its defaults (흑백, 로고 넣기)", () => {
+describe("틀 선택 v2: the cards, options before shooting", () => {
+  it("starts on 필름 with its default (크림)", () => {
     const s = init();
-    expect([s.phase, s.cardId, s.frameId]).toEqual(["pick", "film3", "film3-mono-logo"]);
-    expect(s.frameOptions).toEqual({ color: "mono", logo: "logoOn" });
+    expect([s.phase, s.cardId, s.frameId]).toEqual(["pick", "film", "film4-cream"]);
+    expect(s.frameOptions).toEqual({ color: "cream" });
   });
 
   it("a card with options goes to the options screen (every card offered today has some)", () => {
     const pick = init();
-    for (const id of ["film3", "film4", "check2", "polaroid1", "film35", "meme4"])
+    for (const id of ["film", "check2", "polaroid1", "film35", "meme4"])
       expect(
         run(pick, { type: "SELECT_CARD", cardId: id }, { type: "CONFIRM_PICK", random: 0 }).phase,
       ).toBe("options");
@@ -438,14 +443,14 @@ describe("틀 선택 v2: nine cards, options before shooting", () => {
         { type: "PICK_CARD", cardId: id, random: 0 },
       ] as const) {
         const s = run(pick, action);
-        expect([s.cardId, s.frameId], id).toEqual(["film3", "film3-mono-logo"]);
+        expect([s.cardId, s.frameId], id).toEqual(["film", "film4-cream"]);
       }
     }
   });
 
   it("a tap on a card chooses it and goes on in one step (2026-11-27): the same place 고르기 + 다음 led to", () => {
     const pick = init();
-    for (const id of ["film3", "film4", "check2", "polaroid1", "film35", "meme4"]) {
+    for (const id of ["film", "check2", "polaroid1", "film35", "meme4"]) {
       const tapped = run(pick, { type: "PICK_CARD", cardId: id, random: 0 });
       expect([tapped.phase, tapped.cardId], id).toEqual(["options", id]);
       expect(tapped).toEqual(
@@ -455,14 +460,14 @@ describe("틀 선택 v2: nine cards, options before shooting", () => {
     // A card's options start at their defaults each time it is tapped, whatever was set before.
     const again = run(
       pick,
-      { type: "PICK_CARD", cardId: "film3", random: 0 },
+      { type: "PICK_CARD", cardId: "film", random: 0 },
       { type: "SET_OPTION", key: "color", value: "sepia" },
       { type: "BACK" },
-      { type: "PICK_CARD", cardId: "film3", random: 0 },
+      { type: "PICK_CARD", cardId: "film", random: 0 },
     );
-    expect(again.frameId).toBe("film3-mono-logo");
+    expect(again.frameId).toBe("film4-cream");
     // An unknown card is the default card, as with SELECT_CARD: never a broken session.
-    expect(run(pick, { type: "PICK_CARD", cardId: "nope", random: 0 }).cardId).toBe("film3");
+    expect(run(pick, { type: "PICK_CARD", cardId: "nope", random: 0 }).cardId).toBe("film");
   });
 
   it("a tap on a card works only on the picker", () => {
@@ -478,16 +483,16 @@ describe("틀 선택 v2: nine cards, options before shooting", () => {
         .frameId;
     const set = (key: "color" | "logo", value: string) =>
       ({ type: "SET_OPTION", key, value }) as KioskAction<string>;
-    expect(at("film3")).toBe("film3-mono-logo");
-    expect(at("film3", set("logo", "logoOff"))).toBe("film3-mono-plain");
-    expect(at("film3", set("color", "sepia"))).toBe("film3-sepia-logo");
-    expect(at("film3", set("color", "sepia"), set("logo", "logoOff"))).toBe("film3-sepia-plain");
-    expect(at("film4")).toBe("film4-cream");
-    expect(at("film4", set("color", "red"))).toBe("film4-red");
+    // 필름 (2026-11-27): 크림 · 빨강 four photos, 흑백 · 세피아 three with the logo; no 로고 빼기.
+    expect(at("film")).toBe("film4-cream");
+    expect(at("film", set("color", "red"))).toBe("film4-red");
+    expect(at("film", set("color", "mono"))).toBe("film3-mono-logo");
+    expect(at("film", set("color", "sepia"))).toBe("film3-sepia-logo");
+    expect(at("film", set("color", "sepia"), set("logo", "logoOff"))).toBe("film3-sepia-logo");
     expect(at("check2")).toBe("check2-red");
     expect(at("check2", set("color", "blue"))).toBe("check2-blue");
     // A value another card offers is refused.
-    expect(at("film4", set("color", "blue"))).toBe("film4-cream");
+    expect(at("film", set("color", "blue"))).toBe("film4-cream");
     expect(at("check2", set("logo", "logoOff"))).toBe("check2-red");
   });
 
@@ -528,9 +533,9 @@ describe("handwriting font (film 4컷, polaroid 1컷)", () => {
   };
 
   it("is drawn when shooting starts, only for frames that carry handwriting", () => {
-    expect(lockAt(init(), "film4", 0).handFont).toBe(HAND_FONTS[0]!.id);
+    expect(lockAt(init(), "film", 0).handFont).toBe(HAND_FONTS[0]!.id);
     expect(lockAt(init(), "polaroid1", 0.99).handFont).toBe(HAND_FONTS[9]!.id);
-    expect(lockAt(init(), "film3", 0).handFont).toBeNull();
+    expect(lockAt(init(), "check2", 0.5).handFont).toBeNull();
     expect(lockAt(init(), "check2", 0).handFont).toBeNull();
   });
 
@@ -541,7 +546,7 @@ describe("handwriting font (film 4컷, polaroid 1컷)", () => {
     const seen = new Set<string>();
     for (let i = 0; i < 20; i++) {
       // The worst case for a naive pick: always the same random number.
-      s = lockAt(s, i % 2 ? "film4" : "polaroid1", 0);
+      s = lockAt(s, i % 2 ? "film" : "polaroid1", 0);
       if (s.handFont === previous) repeats++;
       seen.add(s.handFont!);
       previous = s.handFont;
@@ -557,7 +562,7 @@ describe("handwriting font (film 4컷, polaroid 1컷)", () => {
       countdownSeconds: 3,
       lastHandFont: HAND_FONTS[0]!.id,
     });
-    expect(lockAt(s, "film4", 0).handFont).not.toBe(HAND_FONTS[0]!.id);
+    expect(lockAt(s, "film", 0).handFont).not.toBe(HAND_FONTS[0]!.id);
     const unknown = createInitialState<string>({
       shotCount: SHOTS,
       countdownSeconds: 3,
@@ -646,7 +651,7 @@ describe("progress", () => {
     };
     let s = init();
     note(s);
-    s = run(s, { type: "PICK_CARD", cardId: "film3", random: 0 });
+    s = run(s, { type: "PICK_CARD", cardId: "film", random: 0 });
     note(s);
     s = run(s, { type: "CONFIRM_OPTIONS", random: 0 }, { type: "CAMERA_READY" });
     note(s);
@@ -695,7 +700,7 @@ describe("progress", () => {
 describe("reset", () => {
   it("clears the previous session entirely", () => {
     const done = run(
-      selectAll(toShotWith("film4", [{ type: "SET_OPTION", key: "color", value: "red" }]), true),
+      selectAll(toShotWith("film", [{ type: "SET_OPTION", key: "color", value: "red" }]), true),
       { type: "DELIVERY_SUCCEEDED", token: "t", url: "u", expiresAt: "e" },
       { type: "SET_CONSENT", consent: "yes" },
     );
@@ -706,8 +711,8 @@ describe("reset", () => {
     expect(s.shots).toEqual(Array.from({ length: SHOTS }, () => null));
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
-    // Every guest starts on 필름 3컷 (v2); only the font is remembered, so the next one differs.
-    expect([s.cardId, s.frameId, s.handFont]).toEqual(["film3", "film3-mono-logo", null]);
+    // Every guest starts on 필름 (크림); only the font is remembered, so the next one differs.
+    expect([s.cardId, s.frameId, s.handFont]).toEqual(["film", "film4-cream", null]);
     expect(s.lastHandFont).toBe(done.handFont);
   });
 
@@ -723,7 +728,7 @@ describe("reset", () => {
 });
 
 describe("the colour look a guest chooses with the photos", () => {
-  const choosing = () => toShotWith("film4");
+  const choosing = () => toShotWith("film");
 
   it("starts as the frame's own (null) and takes any of the looks while choosing", () => {
     const s = choosing();
@@ -745,7 +750,7 @@ describe("the colour look a guest chooses with the photos", () => {
   });
 
   it("offers no look in a black-and-white or sepia frame: its tone is the concept", () => {
-    const mono = toShotWith("film3");
+    const mono = toShotWith("film", [{ type: "SET_OPTION", key: "color", value: "mono" }]);
     expect(mono.frameId).toBe("film3-mono-logo");
     expect(run(mono, { type: "SET_LOOK", lookId: "ink" })).toBe(mono);
     expect(run(mono, { type: "SET_LOOK", lookId: "none" })).toBe(mono);
@@ -786,8 +791,11 @@ describe("the colour look a guest chooses with the photos", () => {
 });
 
 describe("ordered selection", () => {
-  // 필름 4컷: all four. The screen opens with 0, 1, 2, 3 chosen.
-  const prepare = (cardId = "film4") => toShotWith(cardId);
+  // 필름 (크림): all four. The screen opens with 0, 1, 2, 3 chosen.
+  const prepare = (cardId = "film") => toShotWith(cardId);
+  // 필름 · 흑백: three photos.
+  const prepareThree = () =>
+    toShotWith("film", [{ type: "SET_OPTION", key: "color", value: "mono" }]);
 
   it("opens complete: one press finishes with the first photos, in shooting order", () => {
     const s = prepare();
@@ -823,7 +831,7 @@ describe("ordered selection", () => {
 
   it("a full frame of several photos takes no extra one: nothing is dropped for the guest", () => {
     // A frame of three, with four shots: the fourth photo does not push one of the three out.
-    const s = prepare("film3");
+    const s = prepareThree();
     expect(run(s, { type: "TOGGLE_SHOT_SELECTION", index: 3 })).toBe(s);
     let two = prepare("check2");
     expect(two.selectedShotIndices).toEqual([0, 1]);
@@ -834,7 +842,7 @@ describe("ordered selection", () => {
     );
     expect(two.selectedShotIndices).toEqual([2, 0]);
     expect(run(two, { type: "CONFIRM_SELECTION", askConsent: false }).phase).toBe("delivery");
-    let three = cleared(prepare("film3"));
+    let three = cleared(prepareThree());
     three = run(
       three,
       ...[3, 2, 1, 0].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
@@ -990,12 +998,7 @@ describe("language (D78): a view, per guest", () => {
   it("changes nothing else: the same shots, frames and steps in both languages", () => {
     const ko = toShot();
     const en = run(init(), { type: "SET_LANG", lang: "en" });
-    let s = run(
-      en,
-      { type: "CONFIRM_PICK", random: 0 },
-      { type: "CONFIRM_OPTIONS", random: 0 },
-      { type: "CAMERA_READY" },
-    );
+    let s = toReady(en);
     s = run(s, { type: "BEGIN_SHOOTING", guide: false });
     for (let i = 0; i < SHOTS; i++) s = shoot(s, `shot-${i}`);
     expect({ ...s, lang: "ko" }).toEqual(ko);
@@ -1094,7 +1097,7 @@ describe("attract screen (D80): 화면을 눌러 시작", () => {
     const s = fresh();
     expect([s.phase, s.sessionId]).toEqual(["attract", ""]);
     const open = run(s, { type: "OPEN", sessionId: SESSION });
-    expect([open.phase, open.sessionId, open.cardId]).toEqual(["pick", SESSION, "film3"]);
+    expect([open.phase, open.sessionId, open.cardId]).toEqual(["pick", SESSION, "film"]);
     // A second touch (a double tap) does not start again or move on.
     expect(run(open, { type: "OPEN", sessionId: "again" })).toBe(open);
     // The old two-step start is gone: its action changes nothing anywhere.
@@ -1121,7 +1124,7 @@ describe("attract screen (D80): 화면을 눌러 시작", () => {
     // Each line is one touch; the shots themselves need none.
     const touches: KioskAction<string>[] = [
       { type: "OPEN", sessionId: SESSION }, // 1 · 화면을 눌러 시작
-      { type: "PICK_CARD", cardId: "film3", random: 0 }, // 2 · a frame
+      { type: "PICK_CARD", cardId: "film", random: 0 }, // 2 · a frame
       { type: "CONFIRM_OPTIONS", random: 0 }, // 3 · 이대로 찍기
       { type: "BEGIN_SHOOTING", guide: false }, // 4 · 자유 포즈로 찍기
       { type: "CONFIRM_SELECTION", askConsent: true }, // 5 · 이 사진으로 완성하기

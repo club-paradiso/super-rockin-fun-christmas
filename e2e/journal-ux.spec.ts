@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("the six v2 cards show one marked card, 필름 3컷 first; a tap on a card goes on with it", async ({
+test("the five v2 cards show one marked card, 필름 first; a tap on a card goes on with it", async ({
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
@@ -13,12 +13,12 @@ test("the six v2 cards show one marked card, 필름 3컷 first; a tap on a card 
 
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
-  await expect(cards).toHaveCount(6);
-  // Taken down on 2026-11-27 (a user decision).
-  for (const id of ["lace1", "polaroid3", "verse4"])
+  await expect(cards).toHaveCount(5);
+  // Taken down on 2026-11-27 (a user decision); 필름 3컷 · 4컷 became the one card 필름.
+  for (const id of ["lace1", "polaroid3", "verse4", "film3", "film4"])
     await expect(page.getByTestId(`frame-option-${id}`)).toHaveCount(0);
   await expect(pick.locator('.pick-card[aria-pressed="true"]')).toHaveCount(1);
-  await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("frame-option-film")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("confirm-pick")).toHaveText("다음");
 
   // A tap on a card is the choice (2026-11-27): every card offered today has options, so a
@@ -36,7 +36,7 @@ test("the six v2 cards show one marked card, 필름 3컷 first; a tap on a card 
   await expect(page.getByTestId("screen-options")).toBeVisible();
   // A card with options: one tap is its options screen.
   await page.getByTestId("go-back").click();
-  await page.getByTestId("frame-option-film4").click();
+  await page.getByTestId("frame-option-film").click();
   await expect(page.getByTestId("screen-options")).toBeVisible();
 });
 

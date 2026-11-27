@@ -54,11 +54,13 @@ for (const viewport of [
     ])
       await expectTouchable(page.getByTestId(id));
     await page.getByTestId("attract-start").click();
-    await expectTouchable(page.getByTestId("frame-option-film3"));
+    await expectTouchable(page.getByTestId("frame-option-film"));
     await expectTouchable(page.getByTestId("confirm-pick"));
     await page.getByTestId("confirm-pick").click();
-    await expectTouchable(page.getByTestId("option-color-sepia"));
-    await expectTouchable(page.getByTestId("option-logo-logoOff"));
+    for (const color of ["cream", "red", "mono", "sepia"])
+      await expectTouchable(page.getByTestId(`option-color-${color}`));
+    // 세피아: the three-photo strip, so the choice below has a photo left over.
+    await page.getByTestId("option-color-sepia").click();
     await expectTouchable(page.getByTestId("confirm-options"));
     await page.getByTestId("confirm-options").click();
 

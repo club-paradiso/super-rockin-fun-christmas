@@ -64,8 +64,8 @@ describe("피부 보정 as the guest's choice (lib/kiosk/machine.ts)", () => {
 
   it("is final once the photos are chosen: the print is being made with it", () => {
     let s = run(toSelect(init("natural")), { type: "SET_RETOUCH", level: "glow" });
-    // The first three photos are chosen already (필름 3컷): one press finishes.
-    expect(s.selectedShotIndices).toEqual([0, 1, 2]);
+    // The photos are chosen already (필름 · 크림, all four): one press finishes.
+    expect(s.selectedShotIndices).toEqual([0, 1, 2, 3]);
     s = run(s, { type: "CONFIRM_SELECTION", askConsent: true });
     expect(s.phase).toBe("consent");
     expect(run(s, { type: "SET_RETOUCH", level: "off" })).toBe(s);

@@ -640,9 +640,10 @@ export const V2_FRAMES: readonly FrameDefinition[] = [
   ...Object.values(MEME4_VARIANTS),
 ];
 
-// ── The nine cards ──────────────────────────────────────────────────────────────────────────
+// ── The cards ──────────────────────────────────────────────────────────────────────────
 
 export type FrameCardId =
+  | "film"
   | "film3"
   | "film4"
   | "polaroid1"
@@ -689,6 +690,20 @@ function only(frame: FrameDefinition): FrameCard["frame"] {
 
 export const FRAME_CARDS: readonly FrameCard[] = [
   {
+    // 필름 (2026-11-27, a user decision): 필름 3컷 and 필름 4컷 as one card, the colour the only
+    // option. 크림 and 빨강 are the four-photo strip with the handwriting, 흑백 and 세피아 the
+    // three-photo strip with the logo; the strip without the logo is no longer offered. It comes
+    // first in this list so `cardOfFrame` gives this card for those six frames.
+    id: "film",
+    options: [{ key: "color", values: ["cream", "red", "mono", "sepia"] }],
+    frame: (o) =>
+      o.color === "mono" || o.color === "sepia"
+        ? FILM3_VARIANTS[`${o.color}-logo`]
+        : FILM4_VARIANTS[o.color === "red" ? "red" : "cream"],
+  },
+  {
+    // Retired (2026-11-27): folded into 필름 above. Kept so a photo stored in 필름 3컷 without
+    // the logo keeps its frame.
     id: "film3",
     options: [
       { key: "color", values: ["mono", "sepia"] },
@@ -700,6 +715,7 @@ export const FRAME_CARDS: readonly FrameCard[] = [
       ],
   },
   {
+    // Retired (2026-11-27): folded into 필름 above.
     id: "film4",
     options: [{ key: "color", values: ["cream", "red"] }],
     frame: (o) => FILM4_VARIANTS[o.color === "red" ? "red" : "cream"],
@@ -740,11 +756,14 @@ export const FRAME_CARDS: readonly FrameCard[] = [
 
 /**
  * Cards taken down (2026-11-27, a user decision: "레이스 빼고, 폴라로이드 3컷 빼고, 성경구절 4컷
- * 빼고"). Neither the booth nor the phone page offers them, and a new phone upload in one is
+ * 빼고"; the same day 필름 3컷 and 필름 4컷 became the one card 필름, and the 필름 3컷 strips
+ * without the logo were dropped: "로고 없는 흑백과 세피아 템플릿은 삭제"). Neither the booth nor the phone page offers them, and a new phone upload in one is
  * refused. Their frames stay in `FRAME_CARDS` / `V2_FRAMES` so a photo already stored in one keeps
  * hanging and being cut for review exactly as before. To bring one back, take it off this list.
  */
 export const RETIRED_CARD_IDS: ReadonlySet<FrameCardId> = new Set<FrameCardId>([
+  "film3",
+  "film4",
   "polaroid3",
   "verse4",
   "lace1",
@@ -765,8 +784,8 @@ export const OFFERED_V2_FRAMES: readonly FrameDefinition[] = V2_FRAMES.filter((f
   );
 });
 
-/** 필름 3컷 is preselected for every guest. */
-export const DEFAULT_CARD_ID: FrameCardId = "film3";
+/** 필름 is preselected for every guest. */
+export const DEFAULT_CARD_ID: FrameCardId = "film";
 
 /** An offered card; an unknown or retired id is the default card. */
 export function getCard(id: string | null | undefined): FrameCard {

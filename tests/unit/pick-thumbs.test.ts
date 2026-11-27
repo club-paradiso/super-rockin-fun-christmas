@@ -47,7 +47,7 @@ describe("the picker's ready-made previews (public/kiosk-thumbs)", () => {
 
   it("the booth asks for exactly these files", () => {
     expect(Object.keys(staticPickThumbs())).toEqual(OFFERED_CARDS.map((c) => c.id));
-    expect(pickThumbUrl("film3")).toBe("/kiosk-thumbs/film3.jpg");
+    expect(pickThumbUrl("film")).toBe("/kiosk-thumbs/film.jpg");
   });
 });
 

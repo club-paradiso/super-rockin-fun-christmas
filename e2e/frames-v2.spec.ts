@@ -30,12 +30,11 @@ const SAVE = process.env.SCREENSHOTS === "1";
 const sha = (b: Buffer | Uint8Array) => createHash("sha256").update(b).digest("hex");
 
 const VARIANTS: [card: string, options: CardOptions, frameId: string, size: [number, number]][] = [
-  ["film3", {}, "film3-mono-logo", [600, 1800]],
-  ["film3", { logo: "logoOff" }, "film3-mono-plain", [600, 1800]],
-  ["film3", { color: "sepia" }, "film3-sepia-logo", [600, 1800]],
-  ["film3", { color: "sepia", logo: "logoOff" }, "film3-sepia-plain", [600, 1800]],
-  ["film4", {}, "film4-cream", [600, 1800]],
-  ["film4", { color: "red" }, "film4-red", [600, 1800]],
+  // 필름 (2026-11-27): 필름 4컷 in 크림 · 빨강, 필름 3컷 with the logo in 흑백 · 세피아.
+  ["film", {}, "film4-cream", [600, 1800]],
+  ["film", { color: "red" }, "film4-red", [600, 1800]],
+  ["film", { color: "mono" }, "film3-mono-logo", [600, 1800]],
+  ["film", { color: "sepia" }, "film3-sepia-logo", [600, 1800]],
   ["polaroid1", {}, "polaroid1", [1200, 1459]],
   // 문구 (2026-11-26): the date in Figma's Caveat, and a caption drawn as Figma's art.
   ["polaroid1", { caption: "date" }, "polaroid1-date", [1200, 1459]],
@@ -117,7 +116,7 @@ for (const [card, options, frameId, [w, h]] of VARIANTS) {
     await expect(final).toHaveAttribute("data-height", String(h * 2));
     const hand = await final.getAttribute("data-hand-font");
     // Only the random handwriting is a session font; a chosen caption has Figma's own.
-    if (card === "film4" || frameId === "polaroid1") expect(hand).toBeTruthy();
+    if (frameId.startsWith("film4-") || frameId === "polaroid1") expect(hand).toBeTruthy();
     else expect(hand).toBeNull();
     // The stamp is the server's day (the tablet's clock is not used).
     await expect(final).toHaveAttribute("data-stamp", await serverStamp(page));
@@ -150,7 +149,7 @@ test("handwriting: 20 sessions in a row never repeat the previous font (a reload
     if (i === 10) await page.reload();
     await openPicker(page);
     // A tap on the card is its options screen.
-    await page.getByTestId(i % 2 ? "frame-option-polaroid1" : "frame-option-film4").click();
+    await page.getByTestId(i % 2 ? "frame-option-polaroid1" : "frame-option-film").click();
     await page.getByTestId("confirm-options").click();
     await expect(page.getByTestId("screen-ready")).toBeVisible();
     const font = await page.locator(".kiosk-root").getAttribute("data-hand-font");
@@ -168,7 +167,7 @@ test("handwriting: 20 sessions in a row never repeat the previous font (a reload
 test("the options preview cycles the ten handwriting fonts every 1.2 s", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
   await openPicker(page);
-  await page.getByTestId("frame-option-film4").click();
+  await page.getByTestId("frame-option-film").click();
   const img = page.getByTestId("frame-preview-image");
   await expect(img).toBeVisible();
   const first = await img.getAttribute("src");
@@ -233,8 +232,7 @@ for (const [width, height] of [
         quality: 85,
       });
     for (const [card, name] of [
-      ["film3", "2B-film3-options"],
-      ["film4", "2C-film4-options"],
+      ["film", "2B-film-options"],
       ["check2", "2E-check2-options"],
       ["film35", "2F-film35-options"],
       ["polaroid1", "2D-polaroid1-captions"],

@@ -43,6 +43,8 @@ const ko = {
   },
   frame: {
     pickTitle: "어떤 틀로 찍을까요?",
+    // Under the title (2026-11-27, a user request: a picker older guests can read).
+    pickLead: "마음에 드는 틀을 한 번 누르세요",
     next: "다음",
     shoot: "이 틀로 찍기",
     slots: (n: number) => `${n}컷 템플릿`,
@@ -57,6 +59,7 @@ const ko = {
     changeFrame: "프레임 바꾸기",
   },
   name: {
+    film: "필름",
     film3: "필름 3컷",
     film4: "필름 4컷",
     polaroid1: "폴라로이드 1컷",
@@ -66,16 +69,6 @@ const ko = {
     lace1: "레이스 1컷",
     film35: "35mm 필름 4컷",
     meme4: "밈 4컷",
-  },
-  hint: {
-    film3: "색·로고 선택",
-    // The line break is the card's: five to a row these sit at the edge of one line, and a font
-    // a hair narrower would keep them on one (Figma 1069:2245 breaks them here).
-    film4: "크림·빨강\n선택",
-    check2: "빨강·파랑\n선택",
-    film35: "컬러·흑백·세피아",
-    polaroid1: "문구 선택",
-    meme4: "밈 5종 고르기",
   },
   option: {
     titleColorLogo: "색과 로고를 골라주세요",
@@ -318,6 +311,7 @@ const en: KioskCopy = {
   },
   frame: {
     pickTitle: "Pick a frame",
+    pickLead: "Tap the one you like",
     next: "Next",
     shoot: "Use this frame",
     slots: (n) => `${n}-photo frame`,
@@ -332,6 +326,7 @@ const en: KioskCopy = {
     changeFrame: "Change frame",
   },
   name: {
+    film: "Film",
     film3: "Film · 3 shots",
     film4: "Film · 4 shots",
     polaroid1: "Polaroid · 1 shot",
@@ -341,14 +336,6 @@ const en: KioskCopy = {
     lace1: "Lace · 1 shot",
     film35: "35mm film · 4 shots",
     meme4: "Meme · 4 shots",
-  },
-  hint: {
-    film3: "Color & logo",
-    film4: "Cream or red",
-    check2: "Red or blue",
-    film35: "Color, B&W or sepia",
-    polaroid1: "Pick a caption",
-    meme4: "5 memes to pick",
   },
   option: {
     titleColorLogo: "Choose color and logo",
@@ -566,6 +553,7 @@ const zh: KioskCopy = {
   },
   frame: {
     pickTitle: "选择一个相框",
+    pickLead: "点一下喜欢的相框",
     next: "下一步",
     shoot: "用这个相框拍照",
     slots: (n) => `${n} 张相框`,
@@ -580,6 +568,7 @@ const zh: KioskCopy = {
     changeFrame: "更换相框",
   },
   name: {
+    film: "胶片",
     film3: "胶片 3格",
     film4: "胶片 4格",
     polaroid1: "拍立得 1格",
@@ -589,14 +578,6 @@ const zh: KioskCopy = {
     lace1: "蕾丝 1格",
     film35: "35mm胶片 4格",
     meme4: "梗图 4格",
-  },
-  hint: {
-    film3: "可选颜色·标志",
-    film4: "可选米色·红色",
-    check2: "可选红色·蓝色",
-    film35: "彩色·黑白·复古棕",
-    polaroid1: "可选文字",
-    meme4: "5种梗图可选",
   },
   option: {
     titleColorLogo: "请选择颜色和标志",

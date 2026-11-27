@@ -103,7 +103,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     await page.goto("/kiosk?camera=mock");
     await openPicker(page);
     // A tap on the card is its options screen.
-    await page.getByTestId("frame-option-film4").click();
+    await page.getByTestId("frame-option-film").click();
     await expect(page.getByTestId("screen-options")).toBeVisible();
     const preview = page.getByTestId("frame-preview-image");
     await expect(preview).toBeVisible();

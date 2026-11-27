@@ -112,15 +112,19 @@ looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
   or drawn, never a guest's photo. No face detection, no retouching: a look is colour only.
 - **The frame is chosen before shooting and fixed after it** (틀 선택 v2, 2026-11-22): the booth
-  offers the cards of `OFFERED_CARDS` in `config/frames/v2.ts`: six since 2026-11-27 (a user
-  decision: 레이스 1컷, 폴라로이드 3컷 and 성경 구절 4컷 taken down, `RETIRED_CARD_IDS`; their
-  frames stay in `FRAME_CARDS`/`V2_FRAMES` so stored photos keep hanging, but `getCard` never
-  returns one and the phone page refuses a new upload in one). The catalogue was the seven of Figma
+  offers the cards of `OFFERED_CARDS` in `config/frames/v2.ts`: five since 2026-11-27 (user
+  decisions: 레이스 1컷, 폴라로이드 3컷 and 성경 구절 4컷 taken down, `RETIRED_CARD_IDS`; then
+  필름 3컷 and 필름 4컷 folded into the one card **필름**, first and preselected, whose only option
+  is the colour 크림 · 빨강 · 흑백 · 세피아: 크림 and 빨강 are the 필름 4컷 strips (`film4-*`),
+  흑백 and 세피아 the 필름 3컷 strips with the logo (`film3-*-logo`); the 필름 3컷 strips without
+  the logo (`film3-*-plain`) are offered by nothing. Retired cards and frames stay in
+  `FRAME_CARDS`/`V2_FRAMES` so stored photos keep hanging, but `getCard` never returns a retired
+  card and the phone page refuses a new upload in a frame no offered card makes). The catalogue was the seven of Figma
   898:1677, then 필름 35mm 4컷, Figma 924:2026, added 2026-11-24, then 밈 4컷, added 2026-11-26: the
   five meme frames of Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD",
   the black one, is left out by a user decision; every card offered today has options; a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
-  to a line); the picker shows them five to a row, and a tap on a card goes on with it (below); the guest
+  to a line; 필름: four on one line); the picker shows them three to a row in large print, and a tap on a card goes on with it (below); the guest
   then shoots four, each one a 5 s countdown → the flash (when the guest switched it on) → a short rest (`KIOSK_CONFIG.restSeconds`, phase `rest`, 2026-11-27, a user decision; none after the last shot) → the next countdown, and chooses the photos
   (2026-11-27, a user decision, final: 4 shots × 5 s, no retake; `KIOSK_CONFIG.shotsPerSession`, six and five before;
   no frame holds more than four photos, so the choice is the order, not leaving one out).
@@ -139,7 +143,7 @@ looks:measure`). `/looks` is the comparison
 - **Frames are data** in `config/frames/`. Don't hard-code layout in the compositor. Every frame
   of `FRAMES` keeps the legible lockup rule in `tests/unit/frames.test.ts`; the v2 frames keep the
   Figma logo (two-line lockup at its Figma size, below every photo, ≥ 3:1 contrast; 필름 3컷 "로고
-  빼기" has none, the guest's choice; the 밈 4컷 frames carry the logo their Figma frame draws,
+  빼기" has none, kept only for photos stored before 2026-11-27; the 밈 4컷 frames carry the logo their Figma frame draws,
   inside their art, `isMemeFrame`) in `tests/unit/frames-v2.test.ts`; art over the photos is a
   vector overlay exported from Figma (`*-overlay.svg`): Figma's export writes a shadow "spread"
   (`feMorphology`) that Figma itself does not draw on text, so take it out of text layers' filters; mirror frame changes in
@@ -340,7 +344,7 @@ looks:measure`). `/looks` is the comparison
   `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
   once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
   missing file must never break a layout or a touch target. The shutter stays the screen's one
-  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 1082:1896; 1069:2245 with nine cards, 898:1677 before 밈 4컷), not
+  `.booth-btn-primary`. The v2 frame picker is the Figma card grid (`.pick-card`, 1085:1953 since 2026-11-27; 1082:1896, 1069:2245 and 898:1677 before), not
   postcards on the desk; nothing on the picker or the options screen sits on the binder rings
   (`--ring-safe` in `app/kiosk-figma.css`).
 - **One light, top left (135°)** (D101): every cast shadow falls to +x +y: the `--shadow-*`,
@@ -360,10 +364,13 @@ looks:measure`). `/looks` is the comparison
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. The picker's reference is Figma 1082:1896 (「2-A 틀 고르기 · 6개」, 2026-11-27: a copy of
-  1069:2245, the nine-card screen, with the three retired cards hidden and Figma's own wrap moving
-  the rest; five dots): six cards five to a row, the last one centred, names and hints broken between words as the booth's `keep-all` breaks them,
-  the pencil in the hint's first line; only the card previews are masked. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
+  to pass. The picker's reference is Figma 1085:1953 (「2-A 틀 고르기 · 5개 · 큰 글씨」, 2026-11-27, a
+  user request: older guests must be able to read it): a 36 px title with a 24 px line under it
+  saying what to do (「마음에 드는 틀을 한 번 누르세요」), five cards of 200 × 334 three to a row, the
+  second row centred, the picture and a name of 25 px on one line and nothing else (the small hints
+  under the names were removed the same day, a user decision: do not bring them back), a plain
+  edge round every card and the marked one in ink; only the card previews are masked. The 필름
+  options screen is Figma 1086:2006 (the 필름 4컷 screen with four colour answers of 131 on the row). The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.
@@ -588,7 +595,7 @@ measure/               Phase 4 measurements: seeded hub load + long wall run (pl
 - Kiosk copy: short Korean, large touch targets: `.booth-btn-primary`/`-secondary` are ≥ 80 px tall
   (64–80 px only when the booth is under 760 px tall), smaller controls ≥ 52 px (D88). Exception:
   the v2 picker and options screens follow Figma (bottom bar 76 px at 768 × 1024, option buttons
-  60 px, scaled with the screen, never under 48 px).
+  60 px, scaled with the screen, never under 48 px; picker names never under 18 px).
 - Storage rules live in `lib/storage/photo-service.ts` (+ `lib/ops`); backends stay dumb. New
   backend behaviour must pass `tests/helpers/photo-contract.ts` and `tests/helpers/ops-contract.ts`.
 - Staff features run on the hub (`FTL_ROLE=hub PHOTO_STORE=local`; /admin opens with

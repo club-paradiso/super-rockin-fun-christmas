@@ -352,31 +352,30 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
     await expect(cover).toBeVisible();
     await expect(page.getByTestId(`lang-${lang}`)).toHaveAttribute("aria-checked", "true");
     await page.getByTestId("attract-start").click();
-    await expect(page.getByTestId("frame-option-film3").locator("img")).toBeVisible();
+    await expect(page.getByTestId("frame-option-film").locator("img")).toBeVisible();
     await at("frame choice");
     // Every frame is on screen at once: none hidden in a scrolling list.
     for (const tile of await page.getByTestId("frame-options").getByRole("button").all())
       await expect(tile).toBeInViewport({ ratio: 1 });
-    // 필름 3컷 (options) is the card marked: the bottom bar's button → the options screen; each
-    // option row laid out soundly.
+    // 필름 (options) is the card marked: the bottom bar's button → the options screen; its four
+    // colours on one row, laid out soundly.
     await page.getByRole("button", { name: copy.frame.next }).click();
     await expect(page.getByTestId("screen-options")).toBeVisible();
     await expect(page.getByTestId("frame-preview-image")).toBeVisible();
-    await at("options: film 3");
+    // 크림 (four photos): the handwriting preview cycles while the screen is shown.
+    await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-hand", "cycling");
+    await at("options: film, cream");
     await page.getByTestId("option-color-sepia").click();
-    await page.getByTestId("option-logo-logoOff").click();
     await expect(page.getByTestId("frame-preview")).toHaveAttribute(
       "data-frame",
-      "film3-sepia-plain",
+      "film3-sepia-logo",
     );
-    await at("options: film 3, sepia, no logo");
+    await at("options: film, sepia");
     await page.getByTestId("go-back").click();
-    // 필름 4컷: a tap on the card is its options screen (no second press); the handwriting
-    // preview cycles while the screen is shown.
-    await page.getByTestId("frame-option-film4").click();
+    // A tap on a card is its options screen (no second press).
+    await page.getByTestId("frame-option-film").click();
     await expect(page.getByTestId("screen-options")).toBeVisible();
-    await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-hand", "cycling");
-    await at("options: film 4");
+    await expect(page.getByTestId("frame-preview")).toHaveAttribute("data-frame", "film4-cream");
     await page.getByRole("button", { name: copy.option.shoot }).click();
   }
 
@@ -655,20 +654,20 @@ test.describe("finger taps", () => {
     // tap must not have chosen a frame: the picker waits 800 ms for it (PICK_TAP_GUARD_MS).
     await start.tap();
     await expect(page.getByTestId("screen-pick")).toBeVisible();
-    const card = (await page.getByTestId("frame-option-film4").boundingBox())!;
+    const card = (await page.getByTestId("frame-option-check2").boundingBox())!;
     await page.touchscreen.tap(card.x + card.width / 2, card.y + card.height / 2);
     await page.waitForTimeout(200);
     await expect(page.getByTestId("screen-pick")).toBeVisible();
     await expect(page.locator("main")).toHaveAttribute("data-phase", "pick");
     // Not even marked: the stray tap did nothing at all.
-    await expect(page.getByTestId("frame-option-film3")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByTestId("frame-option-film4")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("frame-option-film")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("frame-option-check2")).toHaveAttribute("aria-pressed", "false");
 
     // A moment later the same tap is a deliberate one: that card, and on to its options.
     await page.waitForTimeout(800);
     await page.touchscreen.tap(card.x + card.width / 2, card.y + card.height / 2);
     await expect(page.getByTestId("screen-options")).toBeVisible();
-    await expect(page.getByTestId("confirm-options")).toHaveAttribute("data-frame", /^film4/);
+    await expect(page.getByTestId("confirm-options")).toHaveAttribute("data-frame", /^check2/);
   });
 });
 

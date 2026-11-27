@@ -272,12 +272,12 @@ describe("phone upload (D66)", () => {
 
     const letter = await qr();
     const res = await upload(tokenOf(letter.url), await plain(1200, 3600), {
-      "x-frame-id": "film3-sepia-plain",
+      "x-frame-id": "film3-sepia-logo",
     });
     expect(res.status).toBe(201);
     const row = (await getBackend().photos.findBySessionId(letter.sessionId))!;
     expect(row).toMatchObject({
-      frameId: "phone-film3-sepia-plain",
+      frameId: "phone-film3-sepia-logo",
       moderationStatus: "PENDING",
     });
     const meta = await sharp((await getBackend().objects.get(row.objectPath))!).metadata();
@@ -291,7 +291,7 @@ describe("phone upload (D66)", () => {
       return [r.status, ((await r.json()) as { error: string }).error];
     };
     // A photo that is not the frame's shape would hang in the wrong box.
-    expect(await refused("film3-sepia-plain", 1200, 900)).toEqual([400, "frame"]);
+    expect(await refused("film3-sepia-logo", 1200, 900)).toEqual([400, "frame"]);
     // Only the booth's own frames (D113): not one the booth dropped on 2026-11-22, not a retired
     // one, not the plain id, not a made-up one.
     expect(await refused("shalom-letter", 1200, 3600)).toEqual([400, "frame"]);
