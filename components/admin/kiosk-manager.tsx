@@ -2,12 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { engineStatusLine, engineStatusRows } from "@/lib/camera-engine/status";
 import type { StaffKioskView } from "@/lib/ops/admin";
 import { errorText, postJson } from "./api";
 import { ConfirmDialog } from "./confirm-dialog";
 import { HEALTH_LABEL, HEALTH_TONE, ago, formatTime } from "./labels";
 
-export function KioskManager({ kiosks }: { kiosks: StaffKioskView[] }) {
+export function KioskManager({
+  kiosks,
+  cameraEngineOn = false,
+}: {
+  kiosks: StaffKioskView[];
+  /** 「카메라 자동 보정」 is not off: each booth's own engine status is shown. */
+  cameraEngineOn?: boolean;
+}) {
   if (!kiosks.length)
     return (
       <p className="text-base text-ink/75">
@@ -17,13 +25,13 @@ export function KioskManager({ kiosks }: { kiosks: StaffKioskView[] }) {
   return (
     <ul className="grid gap-3 md:grid-cols-2">
       {kiosks.map((k) => (
-        <KioskItem key={k.id} kiosk={k} />
+        <KioskItem key={k.id} kiosk={k} cameraEngineOn={cameraEngineOn} />
       ))}
     </ul>
   );
 }
 
-function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
+function KioskItem({ kiosk, cameraEngineOn }: { kiosk: StaffKioskView; cameraEngineOn: boolean }) {
   const router = useRouter();
   const [label, setLabel] = useState(kiosk.label);
   const [busy, setBusy] = useState(false);
@@ -75,6 +83,32 @@ function KioskItem({ kiosk }: { kiosk: StaffKioskView }) {
               {kiosk.frameRate !== null && kiosk.frameRate < 20 && (
                 <span className="text-danger"> · 느려요 (저사양 모드 권장)</span>
               )}
+            </dd>
+          </>
+        )}
+        {cameraEngineOn && kiosk.cameraEngine && (
+          <>
+            <dt>자동 보정</dt>
+            <dd
+              className="text-ink"
+              data-testid="kiosk-camera-engine"
+              data-engine-state={kiosk.cameraEngine.state}
+            >
+              {engineStatusLine(kiosk.cameraEngine)}
+              {/* Sensor estimates from the booth's last heartbeat, not a measurement of a photo. */}
+              <details className="mt-1">
+                <summary className="cursor-pointer text-sm font-semibold text-ink/75">
+                  자세히
+                </summary>
+                <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm text-ink/75">
+                  {engineStatusRows(kiosk.cameraEngine).map((row) => (
+                    <div key={row.label} className="contents">
+                      <dt>{row.label}</dt>
+                      <dd className="text-ink">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
             </dd>
           </>
         )}

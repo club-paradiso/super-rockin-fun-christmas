@@ -6,6 +6,8 @@ import type { CameraDevice } from "@/lib/camera";
 import type { BoothLooks } from "@/lib/looks/booth";
 import { looksOverride } from "@/lib/looks/config";
 import { looksStatus } from "@/lib/looks/status";
+import { engineStatusLine, engineStatusRows } from "@/lib/camera-engine/status";
+import type { BoothCameraEngine } from "./camera-engine";
 import { HelpFullscreen } from "./fullscreen";
 import {
   HELP_CLOSED,
@@ -55,6 +57,8 @@ export function HelpPanel(p: {
   onToggleSound: (() => void) | null;
   /** 「사진 색 보정」: what staff set, what this guest's session runs with, and the loaded looks. */
   looks: HelpLooks;
+  /** 「카메라 자동 보정」 on this tablet (lib/camera-engine). */
+  cameraEngine: BoothCameraEngine;
 }) {
   const [state, dispatch] = useReducer(helpReducer, HELP_CLOSED);
   const cornerRef = useRef<HTMLDivElement>(null);
@@ -277,6 +281,8 @@ function HelpMenu(p: {
   onToggleSound: (() => void) | null;
   /** 「사진 색 보정」: what staff set, what this guest's session runs with, and the loaded looks. */
   looks: HelpLooks;
+  /** 「카메라 자동 보정」 on this tablet (lib/camera-engine). */
+  cameraEngine: BoothCameraEngine;
   onClose: () => void;
 }) {
   const [devices, setDevices] = useState<CameraDevice[] | null>(null);
@@ -348,6 +354,8 @@ function HelpMenu(p: {
         </p>
       </section>
 
+      <HelpCameraEngine cameraEngine={p.cameraEngine} />
+
       <section className="flex flex-col gap-2" data-testid="help-queue">
         <h3 className="text-2xl font-bold">보내지 못한 것</h3>
         {queue === null ? (
@@ -408,5 +416,56 @@ function HelpMenu(p: {
         처음으로: 지금 찍던 사진은 지워져요. 보내는 중이던 사진은 그대로 보내요.
       </p>
     </div>
+  );
+}
+
+/**
+ * 「카메라 자동 보정」 on this tablet, read again every second while the menu is open. The angles
+ * are what the tablet's sensors suggest, not a measurement of the photo; the labels say so.
+ */
+function HelpCameraEngine({ cameraEngine }: { cameraEngine: BoothCameraEngine }) {
+  const { status: read, requestPermission } = cameraEngine;
+  const [status, setStatus] = useState(read);
+  useEffect(() => {
+    const timer = setInterval(() => setStatus(read()), 1000);
+    return () => clearInterval(timer);
+  }, [read]);
+  return (
+    <section className="flex flex-col gap-2" data-testid="help-camera-engine">
+      <h3 className="text-2xl font-bold">카메라 자동 보정</h3>
+      {status === null ? (
+        <p className="text-xl" data-testid="help-camera-engine-status" data-state="off">
+          꺼짐 · 관리자 화면 설정에서 켤 수 있어요. 다음 손님부터 적용돼요.
+        </p>
+      ) : (
+        <>
+          <p className="text-xl" data-testid="help-camera-engine-status" data-state={status.state}>
+            {engineStatusLine(status)}
+          </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-lg">
+            {engineStatusRows(status).map((row) => (
+              <div key={row.label} className="contents">
+                <dt className="text-ink/75">{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {status.reason === "permission-pending" && (
+            // A touch: the one place iOS lets the page ask for the motion sensors.
+            <button
+              type="button"
+              className="btn-secondary"
+              data-testid="help-camera-engine-permission"
+              onClick={() => {
+                requestPermission();
+                setTimeout(() => setStatus(read()), 500);
+              }}
+            >
+              센서 권한 요청하기
+            </button>
+          )}
+        </>
+      )}
+    </section>
   );
 }

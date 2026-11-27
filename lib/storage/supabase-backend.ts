@@ -40,6 +40,8 @@ import type {
 import { AI_REVIEW_STATES, MODERATION_STATES } from "./types";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { normalizeLook } from "@/lib/wall/themes";
+import { normalizeCameraEngine } from "@/lib/camera-engine/settings";
+import { parseCameraEngineStatus } from "@/lib/camera-engine/status";
 import type { VideoMime } from "@/lib/video/format";
 
 /**
@@ -121,6 +123,8 @@ const toKiosk = (r: Row): KioskRow => ({
   enrolledVia: (r.enrolled_via as KioskRow["enrolledVia"]) ?? "secret",
   frameRate: r.frame_rate == null ? null : Number(r.frame_rate),
   memoryMb: (r.memory_mb as number | null) ?? null,
+  // Absent before the camera-engine migration, or a status this build cannot read: none.
+  cameraEngine: parseCameraEngineStatus(r.camera_engine),
 });
 
 const toCode = (r: Row): EnrollmentCodeRow => ({
@@ -149,6 +153,8 @@ const toSettings = (r: Row): EventSettings => ({
   moderationMode: r.moderation_mode === "auto" ? "auto" : "manual",
   // Absent before the looks migration: off.
   photoLooks: r.photo_looks === true,
+  // Absent before the camera-engine migration, or null: the defaults (mode off).
+  cameraEngine: normalizeCameraEngine(r.camera_engine),
   updatedAt: iso(r.updated_at)!,
   updatedBy: (r.updated_by as string | null) ?? null,
 });
@@ -180,7 +186,7 @@ const toAudit = (r: Row): AuditEvent => ({
  * Row mappers, exported for the SQL-level tests (tests/helpers/pg-backend.ts), so those read the
  * database through exactly the code the deployment uses.
  */
-export const fromDb = { photo: toPhoto, settings: toSettings, audit: toAudit };
+export const fromDb = { photo: toPhoto, settings: toSettings, audit: toAudit, kiosk: toKiosk };
 
 export class SupabaseError extends Error {
   constructor(
@@ -466,18 +472,26 @@ class SupabaseKioskRepository implements KioskRepository {
     if (error) throw new SupabaseError("touch kiosk", error);
   }
   async heartbeat(id: string, hb: KioskHeartbeat) {
-    const { error } = await this.db
-      .from("kiosks")
-      .update({
-        heartbeat_at: hb.atIso,
-        last_seen_at: hb.atIso,
-        queue_depth: hb.queueDepth,
-        camera_state: hb.cameraState,
-        app_build: hb.appBuild,
-        frame_rate: hb.frameRate ?? null,
-        memory_mb: hb.memoryMb ?? null,
-      })
-      .eq("id", id);
+    const beat = {
+      heartbeat_at: hb.atIso,
+      last_seen_at: hb.atIso,
+      queue_depth: hb.queueDepth,
+      camera_state: hb.cameraState,
+      app_build: hb.appBuild,
+      frame_rate: hb.frameRate ?? null,
+      memory_mb: hb.memoryMb ?? null,
+    };
+    if (hb.cameraEngine !== undefined) {
+      // The camera-engine column has its own migration. A database without it (or any other
+      // trouble with that one column) must never cost the booth its heartbeat: the same beat
+      // goes again without the status.
+      const { error } = await this.db
+        .from("kiosks")
+        .update({ ...beat, camera_engine: hb.cameraEngine })
+        .eq("id", id);
+      if (!error) return;
+    }
+    const { error } = await this.db.from("kiosks").update(beat).eq("id", id);
     if (error) throw new SupabaseError("kiosk heartbeat", error);
   }
   async update(
@@ -543,14 +557,22 @@ class SupabaseSettingsRepository implements SettingsRepository {
   async update(patch: SettingsPatch, staffUserId: string) {
     // Looks have their own audited function (its own migration), so the call below keeps the
     // signature that exists with or without that migration.
-    const { photoLooks, ...rest } = patch;
+    const { photoLooks, cameraEngine, ...rest } = patch;
+    let changed: Row[] | null = null;
     if (photoLooks !== undefined) {
-      const changed = await rpcRows(this.db, "ftl_settings_set_looks", {
+      changed = await rpcRows(this.db, "ftl_settings_set_looks", {
         p_enabled: photoLooks,
         p_actor_id: staffUserId,
       });
-      if (Object.keys(rest).length === 0) return toSettings(changed[0]!);
     }
+    // The camera engine too: its own column, its own audited function, its own migration.
+    if (cameraEngine !== undefined) {
+      changed = await rpcRows(this.db, "ftl_settings_set_camera_engine", {
+        p_value: cameraEngine,
+        p_actor_id: staffUserId,
+      });
+    }
+    if (changed && Object.keys(rest).length === 0) return toSettings(changed[0]!);
     const rows = await rpcRows(this.db, "ftl_settings_update", {
       p_pause_submissions: patch.pauseSubmissions ?? null,
       p_pause_wall: patch.pauseWall ?? null,

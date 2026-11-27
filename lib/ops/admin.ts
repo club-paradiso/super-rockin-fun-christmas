@@ -126,6 +126,8 @@ export interface StaffKioskView {
   /** Wall displays: frames per second and JS memory from the last heartbeat. */
   frameRate: number | null;
   memoryMb: number | null;
+  /** Booths with 「카메라 자동 보정」 on: the engine's status from the last heartbeat. */
+  cameraEngine: KioskRow["cameraEngine"];
 }
 
 export function toStaffKioskView(k: KioskRow, now = Date.now()): StaffKioskView {
@@ -143,6 +145,7 @@ export function toStaffKioskView(k: KioskRow, now = Date.now()): StaffKioskView 
     enrolledVia: k.enrolledVia,
     frameRate: k.frameRate,
     memoryMb: k.memoryMb,
+    cameraEngine: k.cameraEngine,
   };
 }
 
