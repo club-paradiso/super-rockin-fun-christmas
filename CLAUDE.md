@@ -340,6 +340,42 @@ looks:measure`). `/looks` is the comparison
   arrays (`cpu.ts`); a change to one is a change to both (`e2e/retouch.spec.ts` compares them).
   `/retouch-lab` (standalone, Safari 15) is the acceptance tool; iPad mini 4 timings are a
   person's measurement, never a desktop number.
+- **The camera engine is off by default, on the device, and may fail without the booth failing**
+  (「카메라 자동 보정」, D120, 2026-11-27, `docs/CAMERA_ENGINE.md`). It turns back the tablet's own
+  tilt: roll (Smart Level) and, partly, pitch (Smart Perspective), read from the motion sensors.
+  It is one optional argument of the one capture function: `grabFrame`'s `correct`
+  (`lib/camera/capture.ts`); without it, or when it returns null or throws, the frame is taken by
+  the code that was there before. Never a second capture path, never a `CameraProvider` of its
+  own, never applied twice, never to a phone upload, to the paired iPhone (`camera-remote`), to
+  frame art, logos or text. Staff setting `settings.cameraEngine` (`lib/camera-engine/settings.ts`,
+  mode `off` | `auto` | `manual`, default **off** until a person has worked through the device
+  checklist; audited through `ftl_settings_set_camera_engine`), or `?engine=` / `?tilt=` on one
+  tablet's address. The setting reaches a booth with its heartbeat and is taken up only on
+  "화면을 눌러 시작"; the tilt is fixed from a guest's first countdown to the end of the session
+  (`lock`, a retake included), so six photos never get two corrections. With it off the booth
+  listens to no sensor, asks no permission and makes no WebGL context. The sensor question
+  (iOS) is put once per page load, from inside the first touch, never per session. Every number
+  is in `config/camera-engine.ts`. One transformation, one resampling: roll, pitch, enlargement
+  and crop are a single homography `K_target · R · K_source⁻¹` (`plan.ts`), roll undone before
+  pitch, the middle of the picture kept where it was. Work on the "up" vector, never on angles
+  (`orientation.ts`): gamma is not a roll, and iOS reports gravity with the other sign.
+  **People come before geometry**: Portrait Guard holds the local stretch (the ratio of the
+  Jacobian's singular values) to `guard.portraitAnisotropy` in the middle and
+  `guard.frameAnisotropy` anywhere, and the pitch correction saturates; never raise those to
+  "fix" a picture, never add face detection, a mesh warp or anything that reshapes a person.
+  No empty corner ever (`tests/unit/camera-engine-plan.test.ts` walks the angle matrix); the
+  enlargement stops at `crop.hardZoom` and the correction is reduced instead. No camera
+  intrinsics are known: the field of view is a profile marked `assumed` (it gets a smaller
+  share) or a number staff measured; never write an unmeasured value as `measured`. WebGL 1
+  only (`warp-gl.ts`, no extensions); a 2D canvas draws roll only and never a faked perspective;
+  the camera frame goes to the GPU through a 2D canvas, not as a `<video>` texture. The preview
+  is the same homography as a CSS `matrix3d` on the `<video>` (`preview.ts`): no per-frame
+  script, and never a `perspective()`/`rotateX()` approximation. The session video (D72) is the
+  raw stream and is not corrected. Sensor readings stay in the page; the heartbeat carries codes
+  and rounded angles (`status.ts`, parsed strictly), and every angle shown to staff is labelled
+  an estimate from the sensors, never a measurement of the photo. `/camera-lab` (standalone,
+  Safari 15, `CAMERA_LAB=1`) is the acceptance tool; iPad mini 4 behaviour and timings are a
+  person's measurement, never a desktop number.
 - **The O of SHALOM holds the star** (D77) on screen (`components/brand.tsx`) and in every frame
   lockup SVG (`id="o-star"`, checked in `tests/unit/frames.test.ts`).
 - **Remote Camera is a camera provider, not a second booth** (D100, `docs/REMOTE_CAMERA.md`).
@@ -415,6 +451,13 @@ lib/compositor         FrameDefinition types, coverCrop, composeFrame
 lib/retouch            skin retouch: face finder (MediaPipe, lazy), face geometry + mask, each face's
                        skin colour model, per-face plan, WebGL 1 and CPU engines, pipeline (budgets,
                        failures), stats for the tests and the lab
+lib/camera-engine      camera engine (D120, off by default): sensors → up vector (orientation.ts),
+                       stabilizer, virtual camera + homography (model.ts), plan (roll, pitch,
+                       Portrait Guard, Smart Crop), WebGL 1 / 2D / reference warps, preview matrix,
+                       engine (session lock, fallbacks), staff setting + booth status contracts
+config/camera-engine.ts every camera-engine number: limits, dead zones, guard, crop, sensor filter,
+                       camera profiles
+camera-lab/            /camera-lab page (own Vite bundle for Safari 15) · app/camera-lab (route, gated)
 lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch; the colour look is composeFrame's grade)
 config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag
 retouch-lab/           /retouch-lab page (own Vite bundle for Safari 15) · app/retouch-lab (route, gated)

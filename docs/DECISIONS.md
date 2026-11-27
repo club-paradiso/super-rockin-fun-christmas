@@ -1971,3 +1971,33 @@ brass nail) and asked for it in code.
   sunset window 722 / 3426 (the wooden posts beside the bows), pastel coast 582 (the light face of
   the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
   the garland) / 3190 (the right post's wooden face).
+
+## D120 · The camera engine: the tablet's own tilt is turned back, people before geometry (2026-11-27)
+
+User: the 3D-printed housing holds the iPad mini 4 at an angle; photos lean and converge. The
+booth should read the tilt itself and correct it, with no measuring and no settings for staff,
+and "the engine may fail, the booth may not". Design and limits: `docs/CAMERA_ENGINE.md`.
+
+- **Where it sits.** One optional argument of `grabFrame` (`correct`). No second capture path and
+  no new camera provider; the state machine, compositor, consent and upload are untouched. Off
+  (the default) is the old code, call for call (`tests/unit/camera-engine-warp.test.ts`).
+- **What is corrected.** Roll in full (0.3–1° dead zone, up to 15°). Pitch only in part: the ask
+  is `7.5° · tanh(pitch / 7.5°)`, less for an assumed camera, then cut by Portrait Guard. A
+  rotation cannot move the camera, so a face seen from below stays one; a full rectification
+  would trade leaning walls for stretched heads. The user's order of priorities puts people
+  first.
+- **One homography.** `K_target · Rz(roll − Δroll) · S · Rx(Δpitch) · Rz(−roll) · K_source⁻¹`,
+  framed so the middle of the picture stays put, enlarged by the least that leaves no empty
+  corner. `S = diag(1, cos Δpitch, 1)` keeps the middle's proportions (part of K_target).
+- **The preview is CSS.** The same matrix as `matrix3d` on the `<video>`: the compositor does
+  the work. A WebGL preview would upload a video frame per frame on an A8.
+- **Orientation first, accelerometer second.** `deviceorientation` is already fused and has one
+  sign convention; `devicemotion`'s gravity has two. Both are turned into an "up" vector at once.
+- **Nothing is remembered.** A settled tilt is not stored between page loads: it settles again
+  in about a second, and yesterday's place can never be applied to today's.
+- **Off until checked.** Sensor signs, the camera's field of view, Safari 15's WebGL and
+  `matrix3d` on a camera `<video>`, and the timings are unverified on the iPad mini 4. The
+  setting ships `off`; `/camera-lab` and the checklist in the document are how a person checks.
+- **Not done, on purpose:** face detection and content-aware mesh warps (unmeasured on the
+  device, and geometry alone stays inside the limits); a perspective drawn with a 2D canvas
+  mesh; a corrected session video (the raw stream is recorded; the mini 4 records none).
