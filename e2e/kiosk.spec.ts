@@ -213,7 +213,7 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(page.locator('[data-testid="screen-ready"] .booth-btn-primary')).toHaveCount(1);
   for (const button of [free, guide])
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(64);
-  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 5컷을 찍어요");
+  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 4컷을 찍어요");
 
   await guide.click();
   const pose = page.getByTestId("pose-guide");
