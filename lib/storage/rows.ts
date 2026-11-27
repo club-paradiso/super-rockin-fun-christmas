@@ -20,5 +20,6 @@ export function newKioskRow(
     enrolledVia,
     frameRate: null,
     memoryMb: null,
+    cameraEngine: null,
   };
 }

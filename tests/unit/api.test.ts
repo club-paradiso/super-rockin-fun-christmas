@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { defaultCameraEngine } from "@/lib/camera-engine/settings";
 import { JPEG, JPEG_TRUNCATED, uuid } from "../helpers/images";
 
 /**
@@ -345,6 +346,8 @@ describe("Phase 3 kiosk APIs on the local backend", () => {
       wallPublic: false,
       aiReview: false,
       photoLooks: true,
+      // 「카메라 자동 보정」: off until staff turn it on.
+      cameraEngine: defaultCameraEngine(),
       // The booth dates photos by the server's clock, never the tablet's (v2 date stamp).
       serverNow: expect.any(String),
     });

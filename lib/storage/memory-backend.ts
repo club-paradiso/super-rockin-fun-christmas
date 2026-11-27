@@ -40,6 +40,7 @@ import type {
   WallEligibleRow,
 } from "./types";
 import { defaultWallLook } from "@/config/wall-themes";
+import { defaultCameraEngine } from "@/lib/camera-engine/settings";
 import { isPublicWallEligible, isWallEligible } from "@/lib/ops/moderation";
 import { AI_REVIEW_STATES, MODERATION_STATES } from "./types";
 
@@ -544,6 +545,10 @@ export class MemoryKioskRepository implements KioskRepository {
       appBuild: hb.appBuild,
       frameRate: hb.frameRate ?? null,
       memoryMb: hb.memoryMb ?? null,
+      // Undefined leaves the stored status alone; null clears it.
+      ...(hb.cameraEngine !== undefined && {
+        cameraEngine: hb.cameraEngine && { ...hb.cameraEngine },
+      }),
     });
   }
   async update(
@@ -626,6 +631,7 @@ export class MemoryEnrollmentCodeRepository implements EnrollmentCodeRepository 
       enrolledVia: "code",
       frameRate: null,
       memoryMb: null,
+      cameraEngine: null,
     };
     await this.kiosks.insert(kiosk);
     this.audit.append({
@@ -660,13 +666,15 @@ export class MemorySettingsRepository implements SettingsRepository {
     moderationMode: "auto",
     // On (2026-11-25, a user decision): the guest chooses a colour on the photo choice screen.
     photoLooks: true,
+    // Off until it has been checked on the real tablet (docs/CAMERA_ENGINE.md).
+    cameraEngine: defaultCameraEngine(),
     updatedAt: now(),
     updatedBy: null,
   };
   constructor(private readonly audit: MemoryAuditLog) {}
 
   async get() {
-    return { ...this.value };
+    return { ...this.value, cameraEngine: { ...this.value.cameraEngine } };
   }
   async update(patch: SettingsPatch, staffUserId: string) {
     const before = this.value;
@@ -681,6 +689,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         wall_look: s.wallLook,
         moderation_mode: s.moderationMode,
         photo_looks: s.photoLooks,
+        camera_engine: s.cameraEngine,
       });
     this.value = {
       pauseSubmissions: patch.pauseSubmissions ?? before.pauseSubmissions,
@@ -697,6 +706,7 @@ export class MemorySettingsRepository implements SettingsRepository {
         : before.wallLook,
       moderationMode: patch.moderationMode ?? before.moderationMode,
       photoLooks: patch.photoLooks ?? before.photoLooks,
+      cameraEngine: patch.cameraEngine ? { ...patch.cameraEngine } : before.cameraEngine,
       updatedAt: now(),
       updatedBy: staffUserId,
     };
@@ -709,7 +719,7 @@ export class MemorySettingsRepository implements SettingsRepository {
       fromState: pick(before),
       toState: pick(this.value),
     });
-    return { ...this.value };
+    return { ...this.value, cameraEngine: { ...this.value.cameraEngine } };
   }
 }
 
