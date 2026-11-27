@@ -389,7 +389,7 @@ test.describe("the booth", () => {
     expect(await previewTurn(page)).toBe(turn);
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     const leans: number[] = [];
-    for (let i = 0; i < 6; i++) leans.push(await markerLean(page, i));
+    for (let i = 0; i < 5; i++) leans.push(await markerLean(page, i));
     for (const lean of leans) {
       // The camera's picture turned back by the 4° of roll (mirrored, so the sign flips).
       expect(Math.abs(lean)).toBeGreaterThan(3.5);
@@ -407,7 +407,7 @@ test.describe("the booth", () => {
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-engine", "on");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    for (let i = 0; i < 6; i++)
+    for (let i = 0; i < 5; i++)
       await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
     await toConsent(page);
     const url = await answerForQr(page, "no");
@@ -431,16 +431,13 @@ test.describe("the booth", () => {
     // Someone leans on the booth for the rest of the session.
     await standAt(page, -12, 15);
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    for (const shot of [0, 3, 5]) {
+    for (const shot of [0, 3, 4]) {
       const lean = Math.abs(await markerLean(page, shot));
       expect(lean).toBeGreaterThan(3.5);
       expect(lean).toBeLessThan(4.5);
     }
-    // 「다시 찍기」 keeps the session's correction too.
-    await page.getByTestId("retake").click();
-    await page.getByTestId("confirm-retake-yes").click();
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
-    expect(await previewTurn(page)).toBe(turn);
+    // There is no 「다시 찍기」 (2026-11-27): the shots are final, and nothing offers another round.
+    await expect(page.getByTestId("retake")).toHaveCount(0);
     // The next guest is measured afresh: the booth now stands the other way.
     await page.getByTestId("go-home").click();
     await page.getByTestId("confirm-home-yes").click();
@@ -462,7 +459,7 @@ test.describe("the booth", () => {
     expect(Math.abs(await markerLean(page, 0))).toBeLessThan(0.3);
   });
 
-  test("WebGL taken away: the roll is still corrected and six photos are still taken", async ({
+  test("WebGL taken away: the roll is still corrected and five photos are still taken", async ({
     page,
   }) => {
     await page.addInitScript(noWebGl);
@@ -470,7 +467,7 @@ test.describe("the booth", () => {
     await startSession(page);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    for (let i = 0; i < 6; i++)
+    for (let i = 0; i < 5; i++)
       await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
     const lean = Math.abs(await markerLean(page, 2));
     expect(lean).toBeGreaterThan(3.5);

@@ -115,7 +115,7 @@ describe("pickVideoMime", () => {
 });
 
 describe("SessionRecorder", () => {
-  it("six shots become one file: start once, then pause/resume, then stop", async () => {
+  it("a session's shots become one file: start once, then pause/resume, then stop", async () => {
     const t = setup({ supported: ["video/mp4", "video/webm"] });
     for (let i = 0; i < 6; i++) shot(t);
     const video = await t.recorder.finish();

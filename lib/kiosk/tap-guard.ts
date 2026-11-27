@@ -1,7 +1,7 @@
 /**
  * Prevent a fast second finger tap from activating a different button after a screen switch.
  * A time window since render alone is insufficient: the review screen also appears AUTOMATICALLY
- * after six captures, and a legitimate first touch there must never silently disappear.
+ * after the last capture, and a legitimate first touch there must never silently disappear.
  */
 export const TAP_GUARD_MS = 350;
 

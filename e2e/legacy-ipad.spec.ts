@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   enrollKiosk,
   SHOOT_TIMEOUT,
-  shootSixWithMock,
+  shootAllWithMock,
   startSession,
   storedPhotos,
   toConsent,
@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", async ({ page }) => {
+test("iPadOS 15 profile: 필름 3컷 세피아, 5 shots, small composite + QR", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 768, height: 1024 });
   const errors: string[] = [];
@@ -68,17 +68,17 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 6 shots, small composite + QR", 
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-legacy-ios15", "true");
   const root = page.locator(".kiosk-root");
-  await expect(root).toHaveAttribute("data-test-flashes", "6");
+  await expect(root).toHaveAttribute("data-test-flashes", "5");
   const height = await root.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeGreaterThan(500);
   expect(height).toBeLessThanOrEqual(1025);
 
-  await expect(page.getByTestId("review-shot-5").locator("img")).toBeVisible();
-  // v2: six shots only, no extra.
+  await expect(page.getByTestId("review-shot-4").locator("img")).toBeVisible();
+  // v2: five shots only (2026-11-27), no extra.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
   // Colour looks are on by default (2026-11-25): the review shows each 960 × 720 shot as a
   // graded 320 × 240 copy (the iPad mini 4 budget's size) in the frame's look (sepia → walnut), drawn on this WebKit's WebGL.
-  const reviewShot = page.getByTestId("review-shot-5").locator("img");
+  const reviewShot = page.getByTestId("review-shot-4").locator("img");
   await expect(reviewShot).toHaveAttribute("src", /^data:image\/jpeg/);
   expect(
     await reviewShot.evaluate(async (img: HTMLImageElement) => {
@@ -127,7 +127,7 @@ test("idle recovery conceals a guest photo when durable storage is unavailable",
   });
   await page.clock.install();
   const before = new Set((await storedPhotos()).map((photo) => photo.sessionId));
-  await shootSixWithMock(page);
+  await shootAllWithMock(page);
   await page.route("**/api/photos", (route) => route.abort("internetdisconnected"));
   await toConsent(page);
   await expect(page.getByText("임시 저장소")).toBeVisible();

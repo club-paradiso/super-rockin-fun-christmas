@@ -61,7 +61,6 @@ import {
 } from "@/lib/looks/config";
 import {
   canGoBack,
-  canRetake,
   capturedCount,
   createInitialState,
   currentPose,
@@ -259,7 +258,7 @@ function gradedShotUrl(
 }
 
 /**
- * The graded pictures of one shot, kept while the shot lives (a retake makes new shots, so their
+ * The graded pictures of one shot, kept while the shot lives (the next guest's shots are new, so their
  * pictures go with the old ones). Keys: `shotKey` and `chipKey`. A failure is never kept.
  */
 type ShotPictures = WeakMap<CapturedFrame, Map<string, string>>;
@@ -462,7 +461,6 @@ export function KioskApp({
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
       lastHandFont: readStoredHandFont(),
       retouch: skinRetouch,
-      retakesPerSession: KIOSK_CONFIG.retakesPerSession,
     }),
   );
   // 속도 기록 (lib/kiosk/perf.ts): when the render that brought a new screen began. Taken here,
@@ -485,8 +483,6 @@ export function KioskApp({
   // "내 사진으로 참여하기": the QR drawn for the session id on screen (D66).
   const [mobileQr, setMobileQr] = useState<{ sessionId: string; svg: string } | null>(null);
   const [confirmHome, setConfirmHome] = useState(false);
-  /** 「다시 찍기」 asks first: the six shots are thrown away. */
-  const [confirmRetake, setConfirmRetake] = useState(false);
   const [privateDelivery, setPrivateDelivery] = useState(false);
 
   const cameraRef = useRef<CameraProvider | null>(null);
@@ -718,28 +714,11 @@ export function KioskApp({
     setTicket(null);
     setMobileQr(null);
     setConfirmHome(false);
-    setConfirmRetake(false);
     setPrivateDelivery(false);
     setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
   }, []);
-
-  /**
-   * 「다시 찍기」: the guest threw the six shots away. Nothing of them is kept: their pictures, and
-   * the session video (closed when the photos were first chosen, or still open), so the video
-   * that follows the photo is of the round that made it. Nothing was uploaded yet.
-   */
-  const retake = useCallback(() => {
-    setConfirmRetake(false);
-    recorderRef.current?.discard();
-    videosRef.current.delete(state.sessionId);
-    dispatch({ type: "RETAKE" });
-    releaseUrls(urlsRef.current);
-    urlsRef.current.clear();
-    releaseCanvases(shotCanvasesRef.current);
-    setFinalImage(null);
-  }, [state.sessionId]);
 
   // ── Camera lifecycle ─────────────────────────────────────────────────────────────────────
   const { cameraStarted, engine: engineNow } = cameraEngine;
@@ -1040,14 +1019,14 @@ export function KioskApp({
     if (state.phase === "attract") looksRef.current?.newSession();
   }, [state.phase]);
 
-  // The six shots on the review and choice screens, in the look of the frame they were taken
+  // The shots on the review and choice screens, in the look of the frame they were taken
   // for: what the guest chooses from is what the print will show. Small copies, made once per
   // session; a shot that could not be graded keeps its own picture.
   const choosing = state.phase === "review" || state.phase === "select";
   const lookFrameId = choosing ? state.frameId : null;
   const lookSeed = seedFromText(state.sessionId);
   // Kept per shot (shotPictures), and drawn ahead in the background (below): a tap on another
-  // colour usually finds its six pictures ready.
+  // colour usually finds its pictures ready.
   const [shotPictures] = useState<ShotPictures>(() => new WeakMap());
   const { gradedShotEdge, lookChipEdge } = renderBudget;
   const gradedShots = useMemo(() => {
@@ -2034,7 +2013,6 @@ export function KioskApp({
             qrSvg={qrSvg}
             onRetryDelivery={retryDelivery}
             onDiscard={requestHome}
-            onRetake={canRetake(state) ? () => setConfirmRetake(true) : null}
             durableQueue={queueStatus.durable}
             privateDelivery={privateDelivery}
             onConsent={chooseConsent}
@@ -2108,36 +2086,6 @@ export function KioskApp({
             }
           >
             <p className="booth-lead">{t.home.lead}</p>
-          </KioskDialog>
-        )}
-        {confirmRetake && canRetake(state) && (
-          <KioskDialog
-            title={t.review.retakeTitle}
-            onClose={() => setConfirmRetake(false)}
-            testId="confirm-retake"
-            actions={
-              <>
-                <button
-                  type="button"
-                  className="booth-btn-secondary"
-                  onClick={() => setConfirmRetake(false)}
-                >
-                  {t.review.retakeNo}
-                </button>
-                <button
-                  type="button"
-                  className="booth-btn-primary"
-                  data-testid="confirm-retake-yes"
-                  onClick={retake}
-                >
-                  {t.review.retakeYes}
-                </button>
-              </>
-            }
-          >
-            <p className="booth-lead">
-              <Lines text={t.review.retakeLead(state.shotCount, state.retakesLeft)} />
-            </p>
           </KioskDialog>
         )}
         {shutterBlink > 0 && (
@@ -2220,8 +2168,6 @@ interface ScreenProps {
   qrSvg: string | null;
   onRetryDelivery: () => void;
   onDiscard: () => void;
-  /** 「다시 찍기」 on the review screen (asks first); null where it is not offered. */
-  onRetake: (() => void) | null;
   durableQueue: boolean;
   privateDelivery: boolean;
   onConsent: (c: "yes" | "no") => void;
@@ -2699,14 +2645,18 @@ function Screen(p: ScreenProps) {
     }
 
     case "review":
-      // The six originals are immutable; 「다시 찍기」 replaces all six, after asking.
+      // The shots are final (2026-11-27: no retake): the guest goes on to choose from them.
       return (
         <BoothScreen testId="screen-review" progress={progress} className="review">
           <div className="review-head">
             <h1 className="booth-title">{t.review.title}</h1>
           </div>
           <div className="fit-stage">
-            <div className="fit-grid review-grid" data-testid="review-grid">
+            <div
+              className="fit-grid review-grid"
+              data-testid="review-grid"
+              data-count={state.shots.length}
+            >
               {state.shots.map((shot, i) => (
                 <div key={i} className="review-cell">
                   <div
@@ -2725,16 +2675,6 @@ function Screen(p: ScreenProps) {
             </div>
           </div>
           <div className="review-actions">
-            {p.onRetake && (
-              <button
-                type="button"
-                className="booth-btn-secondary"
-                data-testid="retake"
-                onClick={p.onRetake}
-              >
-                {t.review.retake}
-              </button>
-            )}
             <button
               type="button"
               className="booth-btn-primary"
@@ -2769,7 +2709,11 @@ function Screen(p: ScreenProps) {
             </p>
           </div>
           <div className="fit-stage">
-            <div className="fit-grid select-grid" data-testid="select-grid">
+            <div
+              className="fit-grid select-grid"
+              data-testid="select-grid"
+              data-count={state.shots.length}
+            >
               {state.shots.map((shot, index) => {
                 const order = selected.indexOf(index);
                 return (
@@ -3297,11 +3241,10 @@ function FinalPreview({
   );
 }
 
-/** The six shots of a session (v2: no extra one). */
 /**
  * The colour row of the photo choice screen (Figma 956:1589): eight looks, four at a time, each on
  * the guest's own first shot. It opens on the page of the look the frame comes with; "다음" shows
- * the rest. Choosing one redraws the six shots above in it; the print gets the same.
+ * the rest. Choosing one redraws the shots above in it; the print gets the same.
  */
 function LookRow({
   chips,

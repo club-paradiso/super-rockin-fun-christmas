@@ -111,6 +111,28 @@ describe("틀 선택 v2: the nine cards", () => {
     });
   });
 
+  it("no card, with any combination of its options, takes more photos than a session shoots (five, 2026-11-27)", () => {
+    expect(KIOSK_CONFIG.shotsPerSession).toBe(5);
+    let combinations = 0;
+    for (const card of FRAME_CARDS) {
+      const combos = card.options.reduce<Record<string, string>[]>(
+        (acc, o) => acc.flatMap((a) => o.values.map((v) => ({ ...a, [o.key]: v }))),
+        [{}],
+      );
+      for (const combo of combos) {
+        const frame = card.frame(cleanOptions(card, combo));
+        combinations++;
+        expect(frame.slots.length, frame.id).toBeGreaterThanOrEqual(1);
+        // The guest chooses from the session's shots: there must be enough of them, and with
+        // five shots and at most four slots there is always at least one to leave out.
+        expect(frame.slots.length, frame.id).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
+        expect(frame.slots.length, frame.id).toBeLessThanOrEqual(4);
+      }
+    }
+    // Every frame the booth can make, and no other, is in V2_FRAMES.
+    expect(combinations).toBe(V2_FRAMES.length);
+  });
+
   it("map every option combination to its own frame (polaroid1 10, meme4 5, film3 4, film35 3, film4 2, check2 2, others 1)", () => {
     const ids = FRAME_CARDS.flatMap((card) =>
       card.options
@@ -179,7 +201,7 @@ describe.each(V2_FRAMES.map((f) => [f.id, f] as const))("v2 frame %s", (_, frame
     expect([frame.outputWidth, frame.outputHeight]).toEqual(size ?? [600, 1800]);
   });
 
-  it("holds one to six photos, every one placed exactly once, inside the frame, apart", () => {
+  it("holds no more photos than a session shoots (five, 2026-11-27), every one placed exactly once, inside the frame, apart", () => {
     expect(frame.slots.length).toBeGreaterThanOrEqual(1);
     expect(frame.slots.length).toBeLessThanOrEqual(KIOSK_CONFIG.shotsPerSession);
     const placed = frame.decorations.flatMap((d) => (d.type === "photo" ? [d.slot] : []));

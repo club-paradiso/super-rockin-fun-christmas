@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { enrollKiosk, shootSixWithMock, SHOOT_TIMEOUT } from "./helpers";
+import { enrollKiosk, shootAllWithMock, SHOOT_TIMEOUT } from "./helpers";
 
 /**
  * Regression for controls sitting below the paper, behind the footer, or under invisible
@@ -61,8 +61,8 @@ for (const viewport of [
     await expectTouchable(page.getByRole("button", { name: "이대로 좋아요" }));
     await page.getByRole("button", { name: "이대로 좋아요" }).click();
 
-    await expectTouchable(page.getByTestId("select-shot-5"));
-    await page.getByTestId("select-shot-5").click();
+    await expectTouchable(page.getByTestId("select-shot-4"));
+    await page.getByTestId("select-shot-4").click();
     await expectTouchable(page.getByTestId("confirm-selection"));
     // Scrolling inside the booth must never make the document itself overflow sideways.
     const xOverflow = await page.evaluate(() => {
@@ -79,7 +79,7 @@ test.describe("first touch on auto-opened review", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    await shootSixWithMock(page);
+    await shootAllWithMock(page);
     await page.getByRole("button", { name: "이대로 좋아요" }).tap();
     await expect(page.getByTestId("screen-select")).toBeVisible();
   });

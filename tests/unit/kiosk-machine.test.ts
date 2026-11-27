@@ -3,11 +3,11 @@ import { POSE_SEQUENCE } from "@/config/poses";
 import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
 import { POLAROID1_CAPTIONS } from "@/config/frames/v2";
+import { KIOSK_CONFIG } from "@/config/kiosk";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
   canGoBack,
-  canRetake,
   capturedCount,
   createInitialState as attractState,
   currentPose,
@@ -25,9 +25,11 @@ function createInitialState<Shot>(init: Parameters<typeof attractState>[0]): Kio
   return kioskReducer(attractState<Shot>(init), { type: "OPEN" });
 }
 const SESSION = "11111111-2222-4333-8444-555555555555";
+/** Shots per session: five since 2026-11-27 (a user decision). */
+const SHOTS = KIOSK_CONFIG.shotsPerSession;
 
 function init(): S {
-  return createInitialState<string>({ shotCount: 6, countdownSeconds: 3 });
+  return createInitialState<string>({ shotCount: SHOTS, countdownSeconds: 3 });
 }
 
 function run(state: S, ...actions: KioskAction<string>[]): S {
@@ -49,19 +51,19 @@ const ticks = (n: number) => Array.from({ length: n }, () => ({ type: "TICK" }) 
 const shoot = (s: S, label: string) =>
   run(s, ...ticks(s.remaining), { type: "SHOT_CAPTURED", shot: label });
 
-function shootSix(ready: S): S {
+function shootAll(ready: S): S {
   let s = run(ready, { type: "BEGIN_SHOOTING", guide: false });
-  for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
+  for (let i = 0; i < SHOTS; i++) s = shoot(s, `shot-${i}`);
   return s;
 }
-const toReview = (): S => shootSix(toReady());
+const toReview = (): S => shootAll(toReady());
 
-/** A card (and its options) on the picker, then the camera and six shots. */
+/** A card (and its options) on the picker, then the camera and the five shots. */
 function toReviewWith(cardId: string, options: KioskAction<string>[] = []): S {
   let s = run(init(), { type: "START", sessionId: SESSION }, { type: "SELECT_CARD", cardId });
   s = run(s, { type: "CONFIRM_PICK", random: 0 });
   if (s.phase === "options") s = run(s, ...options, { type: "CONFIRM_OPTIONS", random: 0 });
-  return shootSix(run(s, { type: "CAMERA_READY" }));
+  return shootAll(run(s, { type: "CAMERA_READY" }));
 }
 
 /** Review → choose as many photos as the frame holds → the wall question (or the QR). */
@@ -100,15 +102,31 @@ describe("countdown", () => {
   });
 });
 
-describe("exactly six captures", () => {
-  it("goes to review after the sixth shot, in order", () => {
-    const s = toReview();
-    expect(s.phase).toBe("review");
-    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3", "shot-4", "shot-5"]);
-    expect(capturedCount(s)).toBe(6);
+describe("exactly five captures (2026-11-27, a user decision)", () => {
+  it("the booth shoots five", () => {
+    expect(SHOTS).toBe(5);
   });
 
-  it("rejects a stray seventh frame", () => {
+  it("goes to review after the fifth shot, in order", () => {
+    const s = toReview();
+    expect(s.phase).toBe("review");
+    expect(s.shots).toEqual(["shot-0", "shot-1", "shot-2", "shot-3", "shot-4"]);
+    expect(capturedCount(s)).toBe(SHOTS);
+  });
+
+  it("the fourth shot is not the last: the countdown runs exactly five times", () => {
+    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    const countdowns: number[] = [];
+    for (let i = 0; i < SHOTS; i++) {
+      expect(s.phase).toBe("countdown");
+      countdowns.push(s.shotIndex);
+      s = shoot(s, `shot-${i}`);
+    }
+    expect(countdowns).toEqual([0, 1, 2, 3, 4]);
+    expect(s.phase).toBe("review");
+  });
+
+  it("rejects a stray sixth frame", () => {
     const s = toReview();
     expect(run(s, { type: "SHOT_CAPTURED", shot: "extra" })).toBe(s);
   });
@@ -118,23 +136,22 @@ describe("exactly six captures", () => {
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
-  it("only confirms when all six exist, straight to choosing the photos", () => {
+  it("only confirms when all five exist, straight to choosing the photos", () => {
     const s = toReview();
     expect(run(s, { type: "CONFIRM_SHOTS" }).phase).toBe("select");
-    const five = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
-    let partial = five;
-    for (let i = 0; i < 5; i++) partial = shoot(partial, `p-${i}`);
+    let partial = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    for (let i = 0; i < SHOTS - 1; i++) partial = shoot(partial, `p-${i}`);
     expect(run(partial, { type: "CONFIRM_SHOTS" })).toBe(partial);
   });
 });
 
 describe("no extra photo, no second frame choice (v2)", () => {
-  it("has no seventh slot: the review holds exactly six and an unknown action changes nothing", () => {
-    const six = toReview();
-    expect(six.shots).toHaveLength(6);
-    expect("extraShotPending" in six).toBe(false);
+  it("has no sixth slot: the review holds exactly five and an unknown action changes nothing", () => {
+    const all = toReview();
+    expect(all.shots).toHaveLength(SHOTS);
+    expect("extraShotPending" in all).toBe(false);
     for (const type of ["TAKE_EXTRA_SHOT", "BACK_TO_FRAME", "CONFIRM_FRAME", "SELECT_FRAME"])
-      expect(run(six, { type } as never)).toBe(six);
+      expect(run(all, { type } as never)).toBe(all);
   });
 
   it("after shooting the card, colour and logo cannot change", () => {
@@ -213,67 +230,38 @@ describe("이전 where nothing is lost (2026-11-25)", () => {
   });
 });
 
-describe("다시 찍기 (2026-11-25)", () => {
-  const withRetakes = (n: number) =>
-    createInitialState<string>({ shotCount: 6, countdownSeconds: 3, retakesPerSession: n });
-  const review = (n = 1) => shootSix(toReady(withRetakes(n)));
-
-  it("is off unless the booth allows it", () => {
-    const s = toReview();
-    expect(s.retakesLeft).toBe(0);
-    expect(canRetake(s)).toBe(false);
-    expect(run(s, { type: "RETAKE" })).toBe(s);
+describe("no retake (2026-11-27, a user decision: 5 shots, no retake)", () => {
+  it("nothing shoots again: an old RETAKE action changes nothing on any screen", () => {
+    const review = toReview();
+    const select = run(review, { type: "CONFIRM_SHOTS" });
+    const consent = selectAll(review, true);
+    const shooting = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    for (const state of [review, select, consent, shooting])
+      expect(run(state, { type: "RETAKE" } as never)).toBe(state);
+    // And the shots are still the guest's.
+    expect(capturedCount(run(review, { type: "RETAKE" } as never))).toBe(SHOTS);
   });
 
-  it("throws the six shots away and opens the camera again, same frame and font", () => {
-    const s = review();
-    expect(canRetake(s)).toBe(true);
-    const r = run(s, { type: "RETAKE" });
-    expect(r.phase).toBe("camera");
-    expect(r.shots).toEqual([null, null, null, null, null, null]);
-    expect([r.frameId, r.handFont, r.sessionId]).toEqual([s.frameId, s.handFont, s.sessionId]);
-    expect([r.selectedShotIndices, r.lookId, r.poseGuide]).toEqual([[], null, false]);
-    expect(r.retakesLeft).toBe(0);
-    // Shoot again: six new shots, and no second retake.
-    const again = shootSix(run(r, { type: "CAMERA_READY" }));
-    expect(again.phase).toBe("review");
-    expect(capturedCount(again)).toBe(6);
-    expect(canRetake(again)).toBe(false);
-  });
-
-  it("only on the review screen: not from the photo choice, not once the photos are chosen", () => {
-    const select = run(review(), { type: "CONFIRM_SHOTS" });
-    expect(canRetake(select)).toBe(false);
-    expect(run(select, { type: "RETAKE" })).toBe(select);
-    // From the photo choice the way is "이전" first.
-    expect(run(select, { type: "BACK" }, { type: "RETAKE" }).phase).toBe("camera");
-    const consent = selectAll(review(), true);
-    expect(run(consent, { type: "RETAKE" })).toBe(consent);
-    const shooting = run(toReady(withRetakes(1)), { type: "BEGIN_SHOOTING", guide: false });
-    expect(run(shooting, { type: "RETAKE" })).toBe(shooting);
-  });
-
-  it("the retouch answer and look go back to the booth's defaults", () => {
+  it("the state carries no retake allowance, whatever the booth is started with", () => {
     const s = createInitialState<string>({
-      shotCount: 6,
+      shotCount: SHOTS,
       countdownSeconds: 3,
-      retakesPerSession: 2,
-      retouch: "natural",
-    });
-    const select = run(
-      shootSix(toReady(s)),
-      { type: "CONFIRM_SHOTS" },
-      { type: "SET_RETOUCH", level: "off" },
-      { type: "SET_LOOK", lookId: "ink" },
-    );
-    const r = run(select, { type: "BACK" }, { type: "RETAKE" });
-    expect([r.retouch, r.lookId, r.retakesLeft]).toEqual(["natural", null, 1]);
+      retakesPerSession: 3,
+    } as never);
+    expect("retakesLeft" in s).toBe(false);
+    expect("retakesPerSession" in s).toBe(false);
+    expect("retakesLeft" in toReview()).toBe(false);
   });
 
-  it("the next guest gets the booth's allowance again", () => {
-    const used = run(review(), { type: "RETAKE" });
-    expect(used.retakesLeft).toBe(0);
-    expect(run(used, { type: "RESET" }).retakesLeft).toBe(1);
+  it("after the last shot the only steps are forward (or home): no way back to the camera", () => {
+    const review = toReview();
+    expect(canGoBack(review)).toBe(false);
+    expect(run(review, { type: "BACK" })).toBe(review);
+    // From the photo choice "이전" goes to the review, never to shooting.
+    const select = run(review, { type: "CONFIRM_SHOTS" });
+    expect(run(select, { type: "BACK" }).phase).toBe("review");
+    for (const type of ["CAMERA_RESTART", "CAMERA_RETRY", "BEGIN_SHOOTING", "CAMERA_READY"])
+      expect(run(review, { type, guide: false } as never)).toBe(review);
   });
 });
 
@@ -414,13 +402,13 @@ describe("handwriting font (film 4컷, polaroid 1컷)", () => {
 
   it("is kept across a reload through the initial state", () => {
     const s = createInitialState<string>({
-      shotCount: 6,
+      shotCount: SHOTS,
       countdownSeconds: 3,
       lastHandFont: HAND_FONTS[0]!.id,
     });
     expect(lockAt(s, "film4", 0).handFont).not.toBe(HAND_FONTS[0]!.id);
     const unknown = createInitialState<string>({
-      shotCount: 6,
+      shotCount: SHOTS,
       countdownSeconds: 3,
       lastHandFont: "x",
     });
@@ -540,7 +528,7 @@ describe("reset", () => {
     const s = run(done, { type: "RESET" });
     expect(s.phase).toBe("attract");
     expect(s.sessionId).toBe("");
-    expect(s.shots).toEqual([null, null, null, null, null, null]);
+    expect(s.shots).toEqual(Array.from({ length: SHOTS }, () => null));
     expect(s.delivery).toEqual({ status: "idle" });
     expect(s.consent).toBeNull();
     // Every guest starts on 필름 3컷 (v2); only the font is remembered, so the next one differs.
@@ -607,15 +595,15 @@ describe("ordered selection", () => {
   it("cannot confirm early and preserves selection order", () => {
     let s = prepare();
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
-    s = run(s, ...[5, 1, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
-    expect(s.selectedShotIndices).toEqual([5, 1, 3]);
+    s = run(s, ...[4, 1, 3].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const));
+    expect(s.selectedShotIndices).toEqual([4, 1, 3]);
     expect(run(s, { type: "CONFIRM_SELECTION", askConsent: true })).toBe(s);
     s = run(
       s,
       { type: "TOGGLE_SHOT_SELECTION", index: 0 },
       { type: "CONFIRM_SELECTION", askConsent: true },
     );
-    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [5, 1, 3, 0]]);
+    expect([s.phase, s.selectedShotIndices]).toEqual(["consent", [4, 1, 3, 0]]);
   });
   it("accepts a 1-slot, a 2-slot or a 3-slot frame and prevents overflow", () => {
     let one = prepare("lace1");
@@ -632,9 +620,9 @@ describe("ordered selection", () => {
     let three = prepare("polaroid3");
     three = run(
       three,
-      ...[5, 4, 3, 2].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
+      ...[4, 3, 2, 1].map((index) => ({ type: "TOGGLE_SHOT_SELECTION", index }) as const),
     );
-    expect(three.selectedShotIndices).toEqual([5, 4, 3]);
+    expect(three.selectedShotIndices).toEqual([4, 3, 2]);
     expect(run(three, { type: "CONFIRM_SELECTION", askConsent: true }).phase).toBe("consent");
   });
   it("deselects; 이전 is the review, never a frame choice", () => {
@@ -698,17 +686,17 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
     expect(init().poseGuide).toBe(false);
     let s = begin(false);
     expect(s.poseGuide).toBe(false);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < SHOTS; i++) {
       expect(currentPose(s)).toBeNull();
       s = shoot(s, `f-${i}`);
     }
     expect(s.phase).toBe("review");
   });
 
-  it("guide mode shows the pose of the shot being counted down, six shots as always", () => {
+  it("guide mode shows the pose of the shot being counted down, five shots as always", () => {
     let s = begin(true);
     expect(currentPose(toReady())).toBeNull(); // not before shooting starts
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < SHOTS; i++) {
       expect([s.phase, s.shotIndex]).toEqual(["countdown", i]);
       expect(currentPose(s)).toEqual(POSE_SEQUENCE[i]);
       s = run(s, ...ticks(s.remaining));
@@ -717,7 +705,7 @@ describe("pose guide (D71): a choice on the ready screen, not a second flow", ()
       s = run(s, { type: "SHOT_CAPTURED", shot: `g-${i}` });
     }
     expect(s.phase).toBe("review");
-    expect(capturedCount(s)).toBe(6);
+    expect(capturedCount(s)).toBe(SHOTS);
     expect(currentPose(s)).toBeNull();
   });
 
@@ -765,7 +753,7 @@ describe("language (D78): a view, per guest", () => {
       { type: "CAMERA_READY" },
     );
     s = run(s, { type: "BEGIN_SHOOTING", guide: false });
-    for (let i = 0; i < 6; i++) s = shoot(s, `shot-${i}`);
+    for (let i = 0; i < SHOTS; i++) s = shoot(s, `shot-${i}`);
     expect({ ...s, lang: "ko" }).toEqual(ko);
   });
 
@@ -864,7 +852,7 @@ describe("back (D78): one step, never losing what the guest made", () => {
 });
 
 describe("attract screen (D80): 화면을 눌러 시작", () => {
-  const fresh = () => attractState<string>({ shotCount: 6, countdownSeconds: 3 });
+  const fresh = () => attractState<string>({ shotCount: SHOTS, countdownSeconds: 3 });
 
   it("the booth starts on the attract screen, and only a touch opens the welcome choices", () => {
     const s = fresh();

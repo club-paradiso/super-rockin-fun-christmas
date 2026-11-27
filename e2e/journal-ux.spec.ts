@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, openWelcome, shootSixWithMock } from "./helpers";
+import { enrollKiosk, openWelcome, shootAllWithMock } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -24,12 +24,15 @@ test("the nine v2 cards show one persistent selection, 필름 3컷 first", async
   await expect(page.getByTestId("confirm-pick")).toHaveText("이 틀로 찍기");
 });
 
-test("the review: six photos, no seventh, one 다시 찍기 for all six", async ({ page }) => {
-  await shootSixWithMock(page);
+test("the review: five photos, no sixth, and no 다시 찍기 (2026-11-27)", async ({ page }) => {
+  await shootAllWithMock(page);
   const review = page.getByTestId("screen-review");
-  await expect(review.locator(".review-photo")).toHaveCount(6);
+  await expect(review.locator(".review-photo")).toHaveCount(5);
+  await expect(review.locator(".review-photo img")).toHaveCount(5);
   await expect(review.getByTestId("take-extra-shot")).toHaveCount(0);
-  await expect(review.getByText("다시 찍기", { exact: true })).toHaveCount(1);
+  // Once the shots are taken there is no way back to the camera.
+  await expect(review.getByTestId("retake")).toHaveCount(0);
+  await expect(page.getByText("다시 찍기")).toHaveCount(0);
   await expect(review.locator(".journal-tab")).toHaveText("03");
 });
 

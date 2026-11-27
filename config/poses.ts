@@ -1,6 +1,7 @@
 /**
  * Recommended poses for the pose guide (D71), one per shot, in shooting order. Text only: there
- * are no pose illustrations. The sequence repeats so every pose gets two tries.
+ * are no pose illustrations. The sequence repeats, so with five shots (2026-11-27) the first two
+ * poses get two tries and the third one.
  * Its length must equal KIOSK_CONFIG.shotsPerSession (tests/unit/poses.test.ts).
  */
 export interface Pose {
@@ -32,11 +33,4 @@ const HANDSHAKE = {
   labelZh: "握手",
 } as const;
 
-export const POSE_SEQUENCE: readonly Pose[] = [
-  FACE,
-  SHOULDERS,
-  HANDSHAKE,
-  FACE,
-  SHOULDERS,
-  HANDSHAKE,
-];
+export const POSE_SEQUENCE: readonly Pose[] = [FACE, SHOULDERS, HANDSHAKE, FACE, SHOULDERS];

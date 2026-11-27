@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { KIOSK_CONFIG } from "../config/kiosk";
 import { ENROLL_SECRET, USE_SUPABASE } from "./env";
 
 export const SHOOT_TIMEOUT = 45_000;
@@ -66,7 +67,7 @@ export async function startSession(page: Page, card?: string, options: CardOptio
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 }
 
-export async function shootSixWithMock(page: Page, card?: string, options: CardOptions = {}) {
+export async function shootAllWithMock(page: Page, card?: string, options: CardOptions = {}) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await startSession(page, card, options);
@@ -75,8 +76,9 @@ export async function shootSixWithMock(page: Page, card?: string, options: CardO
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
-/** Legacy test name alias; captures are now six. */
-export const shootFourWithMock = shootSixWithMock;
+/** Earlier names of the same thing: a session shoots five now (2026-11-27). */
+export const shootFourWithMock = shootAllWithMock;
+export const shootSixWithMock = shootAllWithMock;
 
 /** Review → choosing the photos (v2: the frame was fixed before shooting). */
 export async function toSelect(page: Page) {
@@ -84,11 +86,11 @@ export async function toSelect(page: Page) {
   await expect(page.getByTestId("screen-select")).toBeVisible();
 }
 
-/** Pick the first N of six shots (N = the selected frame's number of slots). */
+/** Pick the first N of the five shots (N = the selected frame's number of slots). */
 export async function selectDefaultPhotos(page: Page) {
   await expect(page.getByTestId("screen-select")).toBeVisible();
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
-  if (!Number.isInteger(required) || required < 1 || required > 6)
+  if (!Number.isInteger(required) || required < 1 || required > KIOSK_CONFIG.shotsPerSession)
     throw new Error("Invalid photo count");
   for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
   await page.getByTestId("confirm-selection").click();

@@ -34,7 +34,8 @@ const ko = {
     title: "크리스마스의 추억을 함께 남겨요",
     lead: "사진을 찍어 휴대폰으로 받거나, 내 사진을 보내 큰 화면에 함께 걸어요.",
     camera: "여기서 사진 찍기",
-    cameraLead: "여섯 장 찍고 골라서 휴대폰으로 받아요",
+    // "여섯 장" until 2026-11-27 (a user decision: 5 shots); only the number changed.
+    cameraLead: "다섯 장 찍고 골라서 휴대폰으로 받아요",
     mobile: "내 사진으로 참여하기",
     mobileLead: "휴대폰에 있는 사진을 미디어월로 보내요",
     paused: "미디어월 게시 신청을 잠시 멈췄어요. 사진 찍기는 지금도 할 수 있어요",
@@ -165,16 +166,6 @@ const ko = {
   review: {
     title: "잘 나왔나요?",
     confirm: "이대로 좋아요",
-    // 「다시 찍기」 (2026-11-25): Claude's wording, not yet the user's (D76).
-    retake: "다시 찍기",
-    retakeTitle: "다시 찍을까요?",
-    retakeLead: (shots: number, left: number) =>
-      `지금 찍은 사진 ${shots}장은 지워지고, 같은 틀로 처음부터 다시 찍어요.` +
-      (left === 1
-        ? "\n다시 찍기는 한 번만 할 수 있어요."
-        : `\n다시 찍기는 ${left}번 할 수 있어요.`),
-    retakeYes: "다시 찍을게요",
-    retakeNo: "이대로 둘게요",
   },
   select: {
     title: (required: number, total: number) => `${total}장 중 ${required}장을 골라주세요`,
@@ -449,13 +440,6 @@ const en: KioskCopy = {
   review: {
     title: "How did they turn out?",
     confirm: "Looks good",
-    retake: "Retake",
-    retakeTitle: "Retake your photos?",
-    retakeLead: (shots, left) =>
-      `These ${shots} photos will be deleted and you’ll start again with the same frame.` +
-      (left === 1 ? "\nYou can only do this once." : `\nYou can do this ${left} times.`),
-    retakeYes: "Retake",
-    retakeNo: "Keep these",
   },
   select: {
     title: (required, total) => `Pick ${required} of your ${total} photos`,
@@ -583,7 +567,7 @@ const zh: KioskCopy = {
     title: "一起留下圣诞的回忆",
     lead: "拍照后用手机领取，或者把你的照片发上来，一起挂到大屏幕上。",
     camera: "在这里拍照",
-    cameraLead: "拍六张，挑选后用手机领取",
+    cameraLead: "拍五张，挑选后用手机领取",
     mobile: "用我的照片参与",
     mobileLead: "把手机里的照片发送到媒体墙",
     paused: "目前暂时停止接收照片",
@@ -710,13 +694,6 @@ const zh: KioskCopy = {
   review: {
     title: "拍得好看吗？",
     confirm: "就这样吧",
-    retake: "重拍",
-    retakeTitle: "要重拍吗？",
-    retakeLead: (shots, left) =>
-      `已拍的 ${shots} 张照片会被删除，用同一个相框从头重拍。` +
-      (left === 1 ? "\n只能重拍一次。" : `\n还可以重拍 ${left} 次。`),
-    retakeYes: "重拍",
-    retakeNo: "保留这些",
   },
   select: {
     title: (required, total) => `请从 ${total} 张中选 ${required} 张`,

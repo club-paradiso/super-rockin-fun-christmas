@@ -1339,7 +1339,7 @@ body {
     color: var(--color-ink);
   }
 
-  /* 3 · Review and 5 · Select: six 4:3 prints (seven after one extra) fit the stage. The grid works its
+  /* 3 · Review and 5 · Select: the session's 4:3 prints (five since 2026-11-27) fit the stage. The grid works its
      own width out from the stage's height (rows, gaps and whatever sits under each print), so
      the prints are as large as they can be and the buttons stay on screen. */
   .fit-stage {
@@ -1410,7 +1410,7 @@ body {
     height: 100%;
     object-fit: cover;
   }
-  /* No per-photo retake: 「다시 찍기」 (a secondary button) replaces all six, after asking. */
+  /* One button: the shots are final (no 「다시 찍기」 since 2026-11-27). */
   .review-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1437,12 +1437,39 @@ body {
   .select-grid.has-extra {
     --rows: 4;
   }
+  /* Five prints (2026-11-27): the row that is one short is centred, not left hanging to one
+     side. Each print spans two half-columns, so the short row can start half a print in. A print
+     is two tracks and the gap between them: exactly the width it has in the plain grid, so the
+     size the grid works out for --cols × --rows still holds. */
+  .fit-grid[data-count="5"] {
+    grid-template-columns: repeat(calc(var(--cols) * 2), minmax(0, 1fr));
+  }
+  .fit-grid[data-count="5"] > * {
+    grid-column: span 2;
+  }
+  /* Three across (the review, and the photo choice on a wide stage): the fourth print starts
+     the second row half a print in. Two across (the tall photo choice): the fifth sits alone in
+     the middle. `--short-4` / `--short-5` are where those two start. */
+  .fit-grid[data-count="5"] > :nth-child(4) {
+    grid-column: var(--short-4, 2) / span 2;
+  }
+  .fit-grid[data-count="5"] > :nth-child(5) {
+    grid-column: var(--short-5, auto) / span 2;
+  }
+  .select-grid[data-count="5"] {
+    --short-4: auto;
+    --short-5: 2;
+  }
   /* Two columns of three or three of two: whichever makes the prints larger in the room there
      is. The break-even is a stage as wide as one print is (4:3). */
   @container (min-aspect-ratio: 4/3) {
     .select-grid {
       --cols: 3;
       --rows: 2;
+    }
+    .select-grid[data-count="5"] {
+      --short-4: 2;
+      --short-5: auto;
     }
     .select-grid.has-extra {
       --rows: 3;
@@ -2151,7 +2178,7 @@ body {
     .look-row {
       grid-area: looks;
     }
-    /* Stacked beside the prints: the main button on top, 「다시 찍기」 under it. */
+    /* Beside the prints. */
     .review-actions {
       flex-direction: column-reverse;
       flex-wrap: nowrap;
@@ -2162,6 +2189,10 @@ body {
     .select-grid {
       --cols: 3;
       --rows: 2;
+    }
+    .select-grid[data-count="5"] {
+      --short-4: 2;
+      --short-5: auto;
     }
     .select-actions {
       flex-direction: column-reverse;

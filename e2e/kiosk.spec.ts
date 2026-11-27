@@ -29,13 +29,13 @@ test("guest kiosk never asks for a name on welcome or frame picker", async ({ pa
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
-test("happy path: frame → options → 6 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
+test("happy path: frame → options → 5 shots → select → consent YES → upload → QR → phone page → PENDING", async ({
   page,
   context,
 }) => {
   await shootFourWithMock(page, "film4", { color: "red" });
   await expect(page.getByTestId("step-progress")).toHaveText("3 / 6");
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     const img = page.getByTestId(`review-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     const [w, h] = await img.evaluate((el: HTMLImageElement) => [
@@ -140,13 +140,13 @@ test("decline path: consent NO leaves the download working and nothing queued fo
 test("v2: no extra photo, no second frame choice, the steps are dots only", async ({ page }) => {
   await shootFourWithMock(page);
   const review = page.getByTestId("screen-review");
-  // 이대로 좋아요, 다시 찍기 (all six, 2026-11-25) and 처음으로 (plus the fullscreen switch in the
-  // footer): never a seventh photo or a single-photo retake.
+  // 이대로 좋아요 and 처음으로 (plus the fullscreen switch in the footer): never a sixth photo,
+  // and no 다시 찍기 of any kind (2026-11-27).
   const labels = await review
     .locator("button:not([data-testid='fullscreen-toggle'])")
     .allInnerTexts();
   expect(labels.map((l) => l.replace(/\s+/g, " ").trim()).sort()).toEqual(
-    ["← 처음으로", "다시 찍기", "이대로 좋아요"].sort(),
+    ["← 처음으로", "이대로 좋아요"].sort(),
   );
   await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);

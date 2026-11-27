@@ -83,7 +83,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
   for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
   is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
-  gives wording). With looks on, the six shots on the review and choice screens are shown in the
+  gives wording). With looks on, the shots on the review and choice screens are shown in the
   session's look (`gradedShots`, the same grader as the print; `chosenLook`), or with no look in
   the frame's own tone (`frameToneGrader`, the same `applyTone` as the print), and the live camera
   picture of a black-and-white or sepia frame is shown that way with a CSS filter on the `<video>`
@@ -107,11 +107,12 @@ looks:measure`). `/looks` is the comparison
   Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD", the black one, is
   left out by a user decision); a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
-  to a line); the picker shows the nine five to a row; the guest then shoots six, reviews, chooses the photos. There is no
-  "one more shot" and no second frame choice after shooting (`lib/kiosk/machine.ts`). The one way
-  past the shots is 「다시 찍기」 on the review screen (a user decision, 2026-11-25): it asks first,
-  throws all six away (and the session video) and shoots six again in the same frame,
-  `KIOSK_CONFIG.retakesPerSession` times (1); never once the photos are chosen. Every option
+  to a line); the picker shows the nine five to a row; the guest then shoots five, reviews, chooses the photos
+  (2026-11-27, a user decision: 5 shots, no retake; `KIOSK_CONFIG.shotsPerSession`, six before).
+  There is no "one more shot", no second frame choice and no second round after shooting
+  (`lib/kiosk/machine.ts`): 「다시 찍기」 (2026-11-25) was removed with its button, dialog, action
+  and allowance, and must not come back as a setting. No v2 frame, with any combination of its
+  options, takes more photos than a session shoots (`tests/unit/frames-v2.test.ts`). Every option
   combination is its own frame id. 폴라로이드 1컷 has a 문구 option (2026-11-26, a user decision,
   Figma 877:1665 / options screen 1055:3631): ten captions; only the first (`polaroid1`, the id photos
   were stored under) draws the per-session random handwriting. Every other caption is Figma's own,
@@ -252,8 +253,8 @@ looks:measure`). `/looks` is the comparison
   a new per-guest option is a view in `lib/kiosk/machine.ts`, never a copy of the shooting,
   selection, consent or upload rules.
 - **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
-  decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, text only; no
-  invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26).
+  decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, five since
+  2026-11-27, text only; no invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26).
   `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` is for the E2E build only.
 - **The booth language is a view too** (D78, D89): `lang` in `lib/kiosk/machine.ts` (Korean,
   English or Simplified Chinese; every guest starts in Korean). Every guest string lives in
@@ -386,7 +387,8 @@ looks:measure`). `/looks` is the comparison
   checklist; audited through `ftl_settings_set_camera_engine`), or `?engine=` / `?tilt=` on one
   tablet's address. The setting reaches a booth with its heartbeat and is taken up only on
   "화면을 눌러 시작"; the tilt is fixed from a guest's first countdown to the end of the session
-  (`lock`, a retake included), so six photos never get two corrections. With it off the booth
+  (`lock`, a camera that drops out and comes back included), so the five photos never get two
+  corrections. With it off the booth
   listens to no sensor, asks no permission and makes no WebGL context. The sensor question
   (iOS) is put once per page load, from inside the first touch, never per session. Every number
   is in `config/camera-engine.ts`. One transformation, one resampling: roll, pitch, enlargement

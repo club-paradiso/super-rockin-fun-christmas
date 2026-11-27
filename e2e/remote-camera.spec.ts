@@ -127,7 +127,7 @@ test("pair from /admin, preview, shoot six, choose, consent, QR", async ({ brows
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   const sizes: Array<[number, number]> = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     const img = page.getByTestId(`review-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     sizes.push(await img.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight]));

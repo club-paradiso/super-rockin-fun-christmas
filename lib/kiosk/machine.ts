@@ -22,14 +22,18 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * effects in response to phases and dispatches the results back here. That keeps every rule
  * (exactly N shots, the frame fixed before shooting, reset) unit-testable.
  *
+ * 2026-11-27, a user decision: 5 shots, no retake. A session shoots five (KIOSK_CONFIG
+ * .shotsPerSession) and there is no way back past the shots: 「다시 찍기」 (2026-11-25) is gone,
+ * with its action, its allowance and its dialog.
+ *
  * 「틀 선택 v2」 (2026-11-22):
  * attract ("화면을 눌러 시작", D80) → welcome → pick (one of seven cards) → options (only for a
  *         card with options: colour, logo) → camera → ready → countdown ⇄ capturing → review →
  *         select (the photos for the frame) → consent → delivery (QR) → (reset) attract
  *
  * The frame, its colour and its logo are final once shooting starts (turnover): there is no
- * "one more shot" and no second frame choice after shooting; 「다시 찍기」 (below) shoots all six
- * again in the same frame. The handwriting font of the frames
+ * "one more shot", no second frame choice and no second round after shooting. The handwriting
+ * font of the frames
  * that carry one is drawn at that moment too, never the previous session's (`lastHandFont`).
  *
  * The upload starts as soon as the photos are chosen, so it runs while the guest answers the
@@ -49,9 +53,6 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  *  - Back: one step back where nothing is lost (canGoBack): frame pick → welcome, options →
  *    frame pick, the camera before the first shot → options (or the pick), photo choice →
  *    review (the choice is kept), the phone QR → welcome.
- *  - Retake (「다시 찍기」, a user decision, 2026-11-25): on the review screen the guest may throw
- *    the six shots away and shoot again with the same frame, `retakesPerSession` times (RETAKE).
- *    The only way back past the shots, and it always asks first. Nothing has been uploaded yet.
  *
  * D89: the easy screen mode (D67) is gone. There is one booth screen; the guest's only per-guest
  * choice besides the language is the pose guide.
@@ -143,10 +144,6 @@ export interface KioskState<Shot> {
    */
   retouchDefault: RetouchLevelId;
   retouch: RetouchLevelId;
-  /** Retakes this guest may still use (「다시 찍기」). Starts at `retakesPerSession`. */
-  retakesLeft: number;
-  /** The booth's allowance per guest (KIOSK_CONFIG.retakesPerSession), for RESET. */
-  retakesPerSession: number;
 }
 
 export type KioskAction<Shot> =
@@ -204,8 +201,6 @@ export type KioskAction<Shot> =
   | { type: "SET_RETOUCH"; level: RetouchLevelId }
   /** "이전": one step back, only where canGoBack allows it (D78). */
   | { type: "BACK" }
-  /** 「다시 찍기」: the shots are thrown away and the camera opens again (canRetake). */
-  | { type: "RETAKE" }
   | { type: "RESET" };
 
 export interface KioskInit {
@@ -215,8 +210,6 @@ export interface KioskInit {
   lastHandFont?: string | null;
   /** The booth's skin-retouch setting: "off" (default) offers the guest nothing. */
   retouch?: RetouchLevelId;
-  /** Retakes per guest (KIOSK_CONFIG.retakesPerSession). Default 0: none. */
-  retakesPerSession?: number;
 }
 
 /** After this many failed captures of the same shot, treat the camera as broken. */
@@ -251,8 +244,6 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     lang: "ko",
     retouchDefault: init.retouch ?? "off",
     retouch: init.retouch ?? "off",
-    retakesLeft: Math.max(0, Math.floor(init.retakesPerSession ?? 0)),
-    retakesPerSession: Math.max(0, Math.floor(init.retakesPerSession ?? 0)),
   };
 }
 
@@ -280,7 +271,6 @@ export function kioskReducer<Shot>(
         lastHandFont: state.handFont ?? state.lastHandFont,
         // Every guest starts at the booth's setting, never at the previous guest's answer.
         retouch: state.retouchDefault,
-        retakesPerSession: state.retakesPerSession,
       });
 
     case "OPEN":
@@ -323,24 +313,6 @@ export function kioskReducer<Shot>(
         default:
           return state;
       }
-
-    case "RETAKE":
-      if (!canRetake(state)) return state;
-      // Same frame and font; everything made from the shots goes with them.
-      return {
-        ...state,
-        phase: "camera",
-        shots: state.shots.map(() => null),
-        shotIndex: 0,
-        poseGuide: false,
-        remaining: state.countdownSeconds,
-        selectedShotIndices: [],
-        lookId: null,
-        retouch: state.retouchDefault,
-        captureFailures: 0,
-        cameraError: null,
-        retakesLeft: state.retakesLeft - 1,
-      };
 
     case "START":
       if (state.phase !== "welcome") return state;
@@ -584,8 +556,8 @@ export function kioskReducer<Shot>(
  * Where "이전" is offered (D78): only a step back that loses nothing the guest made. The camera
  * screen before the first shot goes back to the options (or the pick); after a shot it does not
  * (a reconnect keeps earlier shots, and going back would drop them). The photo choice goes back
- * to the review, where the shots are; the frame stays fixed (v2). Throwing the shots away is
- * not "이전" but 「다시 찍기」 (canRetake), which asks first.
+ * to the review, where the shots are; the frame stays fixed (v2). Nothing throws the shots away
+ * and shoots again (2026-11-27: no retake); "처음으로" ends the session instead, after asking.
  */
 export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
   switch (state.phase) {
@@ -601,17 +573,6 @@ export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
     default:
       return false;
   }
-}
-
-/**
- * 「다시 찍기」: only on the review screen, with every shot taken and a retake left. From the photo
- * choice the guest first goes back to the review ("이전"). Never once the photos are chosen: the
- * picture is then being made and uploaded.
- */
-export function canRetake<Shot>(state: KioskState<Shot>): boolean {
-  return (
-    state.phase === "review" && state.retakesLeft > 0 && capturedCount(state) === state.shotCount
-  );
 }
 
 /** The photo is final and on its way: the consent and delivery screens. */
@@ -664,7 +625,7 @@ export function progressStep(
 
 /**
  * The recommended pose for the shot being counted down or captured (D71). Null in free mode and
- * outside shooting. A retake of shot i shows pose i again.
+ * outside shooting. A shot taken again after a failed capture shows its pose again.
  */
 export function currentPose<Shot>(
   state: KioskState<Shot>,

@@ -9,7 +9,7 @@ import {
   enrollKiosk,
   openWelcome,
   selectDefaultPhotos,
-  shootSixWithMock,
+  shootAllWithMock,
   startSession,
   toSelect,
 } from "./helpers";
@@ -526,7 +526,7 @@ test.describe("the booth", () => {
   }) => {
     await enrollKiosk(page);
     const urls = watchRetouchRequests(page);
-    await shootSixWithMock(page);
+    await shootAllWithMock(page);
     await toSelect(page);
     // The guest is not asked about a feature that is off.
     await expect(page.getByTestId("retouch-row")).toHaveCount(0);
