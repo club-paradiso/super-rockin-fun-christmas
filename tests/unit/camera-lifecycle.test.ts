@@ -213,13 +213,11 @@ describe("camera recovery when the page is shown again", () => {
   it("every other screen is left alone, whatever the camera says", () => {
     const others: KioskPhase[] = [
       "attract",
-      "welcome",
       "mobile",
       "pick",
       "camera",
       "countdown",
       "capturing",
-      "review",
       "options",
       "select",
       "consent",

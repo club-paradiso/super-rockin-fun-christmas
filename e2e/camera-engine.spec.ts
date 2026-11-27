@@ -121,7 +121,7 @@ function darkestCorner(page: Page, testId: string): Promise<number> {
  */
 function markerLean(page: Page, shot: number): Promise<number> {
   return page
-    .getByTestId(`review-shot-${shot}`)
+    .getByTestId(`select-shot-${shot}`)
     .locator("img")
     .evaluate(async (img: HTMLImageElement) => {
       await img.decode();
@@ -369,7 +369,7 @@ test.describe("the booth", () => {
     expect(await previewTransform(page)).toBe("scaleX(-1)");
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-engine", "on");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     expect(Math.abs(await markerLean(page, 0))).toBeLessThan(0.3);
   });
 
@@ -387,7 +387,7 @@ test.describe("the booth", () => {
     await expect(page.getByTestId("countdown-number")).toBeVisible();
     // Fixed while shooting: the preview keeps the correction it had.
     expect(await previewTurn(page)).toBe(turn);
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     const leans: number[] = [];
     for (let i = 0; i < 5; i++) leans.push(await markerLean(page, i));
     for (const lean of leans) {
@@ -406,9 +406,9 @@ test.describe("the booth", () => {
     await startSession(page);
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-engine", "on");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     for (let i = 0; i < 5; i++)
-      await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
+      await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();
     await toConsent(page);
     const url = await answerForQr(page, "no");
     expect(url).toMatch(/\/p\//);
@@ -430,7 +430,7 @@ test.describe("the booth", () => {
     await expect(page.getByTestId("countdown-number")).toBeVisible();
     // Someone leans on the booth for the rest of the session.
     await standAt(page, -12, 15);
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     for (const shot of [0, 3, 4]) {
       const lean = Math.abs(await markerLean(page, shot));
       expect(lean).toBeGreaterThan(3.5);
@@ -455,7 +455,7 @@ test.describe("the booth", () => {
     await startSession(page);
     expect(await previewTransform(page)).toBe("scaleX(-1)");
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     expect(Math.abs(await markerLean(page, 0))).toBeLessThan(0.3);
   });
 
@@ -466,9 +466,9 @@ test.describe("the booth", () => {
     await page.goto("/kiosk?camera=mock&engine=manual&tilt=4,12&looks=0");
     await startSession(page);
     await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     for (let i = 0; i < 5; i++)
-      await expect(page.getByTestId(`review-shot-${i}`).locator("img")).toBeVisible();
+      await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();
     const lean = Math.abs(await markerLean(page, 2));
     expect(lean).toBeGreaterThan(3.5);
     expect(lean).toBeLessThan(4.5);

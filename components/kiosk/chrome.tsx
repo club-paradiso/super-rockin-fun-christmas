@@ -30,7 +30,7 @@ export const useKioskCopy = (): KioskCopy => useContext(KioskChromeContext)?.t ?
  * "이전" sits beside "처음으로" at the bottom, where the hand already is (a user decision,
  * 2026-11-25): never in the header. On the v2 frame screens (`action`) it is the fixed bottom bar
  * of Figma 898:1677: "처음으로", "이전" and the screen's main button, nothing else (the
- * fullscreen switch stays on the cover, the welcome screen and every other footer).
+ * fullscreen switch stays on the cover and every other footer).
  */
 export function BoothFooter({ action }: { action?: React.ReactNode } = {}) {
   const chrome = useKioskChrome();

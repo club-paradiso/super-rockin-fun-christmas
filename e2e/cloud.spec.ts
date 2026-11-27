@@ -1,4 +1,4 @@
-import { selectDefaultPhotos, openWelcome, confirmFrame } from "./helpers";
+import { selectDefaultPhotos, openPicker, confirmFrame } from "./helpers";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
@@ -99,12 +99,10 @@ test("setup: staff and an enrolled booth on the hub", async ({ browser }) => {
 /** Booth session up to the wall question's answer (the QR screen follows). */
 async function shootAndAnswer(answer: "yes" | "no") {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk);
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await kiosk.getByRole("button", { name: "이대로 좋아요" }).click();
+  await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId(`consent-${answer}`).click();
 }
@@ -121,7 +119,7 @@ test("online: the QR is the cloud's link, the phone downloads from the cloud, co
   expect((await phone.request.get(`${url}/image`)).status()).toBe(200);
   await phone.context().close();
 
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
+  await kiosk.getByRole("button", { name: "다음 분 차례예요" }).click();
   await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
 
   const hub = (await hubRow(session))!;
@@ -160,7 +158,7 @@ test("online: the session video follows the photo to the cloud; the scanned QR k
   expect(hub.cloud).toMatchObject({ state: "SYNCED", video: "SYNCED" });
   // Still the token of the QR on screen: the video call did not issue another one.
   expect((await cloudRow(hub.sessionId))!.tokenHash).toBe(sha256(tokenFromUrl(url)));
-  await kiosk.getByRole("button", { name: "다 받았어요" }).click();
+  await kiosk.getByRole("button", { name: "다음 분 차례예요" }).click();
 });
 
 test("cloud down: 'QR 준비 중', never a fake QR; the QR appears by itself when the cloud is back", async ({
@@ -225,7 +223,7 @@ test("내 사진으로 참여하기 with a hub: QR from the cloud, photo comes d
   browser,
 }) => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
+  await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
   await kiosk.getByTestId("start-mobile").click();
   const qr = kiosk.getByTestId("mobile-qr");
   await expect(qr.locator("svg")).toBeVisible();
@@ -281,7 +279,7 @@ test("내 사진으로 참여하기 offline: the booth says the internet is need
   await closeProxy();
   try {
     await kiosk.goto("/kiosk?camera=mock");
-    await openWelcome(kiosk);
+    await expect(kiosk.getByTestId("screen-attract")).toBeVisible();
     await kiosk.getByTestId("start-mobile").click();
     await expect(kiosk.getByTestId("mobile-failed")).toHaveAttribute("data-reason", "offline");
     await expect(kiosk.getByTestId("mobile-qr")).toHaveCount(0);

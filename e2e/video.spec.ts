@@ -4,7 +4,7 @@ import {
   enrollKiosk,
   shootAllWithMock,
   toConsent,
-  openWelcome,
+  openPicker,
   confirmFrame,
 } from "./helpers";
 
@@ -40,8 +40,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
     await route.continue();
   });
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(page);
   await confirmFrame(page);
   // The guest is told before shooting, in one line.
   await expect(page.getByTestId("video-notice")).toHaveText(
@@ -138,8 +137,7 @@ test("no MediaRecorder: the same photo flow, no video notice, no video button, 4
     if (r.url().includes("/api/photos/video")) videoUploads.push(r.url());
   });
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(page);
   await confirmFrame(page);
   await expect(page.getByTestId("shoot-plan")).toBeVisible();
   await expect(page.getByTestId("video-notice")).toHaveCount(0);
@@ -188,6 +186,6 @@ test("a failing video upload never touches the photo, the wall answer or the QR"
   await expect(page.getByTestId("delivery-ready")).toBeVisible();
   await expect(page.getByText(/영상/)).toHaveCount(0);
   expect(attempts).toBeLessThanOrEqual(3);
-  await page.getByRole("button", { name: "다 받았어요" }).click();
+  await page.getByRole("button", { name: "다음 분 차례예요" }).click();
   await expect(page.getByTestId("screen-attract")).toBeVisible();
 });

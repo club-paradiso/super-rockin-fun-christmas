@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { HUB_SETUP_CODE, USE_SUPABASE } from "./env";
-import { tokenFromUrl, openWelcome, confirmFrame } from "./helpers";
+import { tokenFromUrl, openPicker, confirmFrame } from "./helpers";
 import { createEnrollmentCode, enrollWithCode, kioskPhotoToQr, newPage } from "./staff-helpers";
 
 // The default (local) E2E run is the on-site hub: FTL_ROLE=hub, local files, PIN staff login.
@@ -150,8 +150,7 @@ async function holdCorner(page: Page, ms: number) {
 
 test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, start over", async () => {
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk);
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
 
@@ -215,8 +214,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
 
   // On (the default since 2026-11-25): the guest sees themselves in black and white before the shot.
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
   const view = kiosk.getByTestId("camera-preview");
@@ -233,17 +231,16 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
   await panel.getByTestId("help-reset").click();
 
   // And the five shots they choose from are already in the frame's tone (원본), with the colour row.
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
   await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(kiosk.getByTestId("screen-review")).toBeVisible({ timeout: 60_000 });
-  await expect(kiosk.getByTestId("review-shot-0").locator("img")).toHaveAttribute(
+  await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
+  await expect(kiosk.getByTestId("select-shot-0").locator("img")).toHaveAttribute(
     "src",
     /^data:image\/jpeg/,
   );
-  expect(await isGrey(kiosk, "review-shot-0")).toBe(true);
-  expect(await isGrey(kiosk, "review-shot-4")).toBe(true);
+  expect(await isGrey(kiosk, "select-shot-0")).toBe(true);
+  expect(await isGrey(kiosk, "select-shot-4")).toBe(true);
 
   // Off: audited, and the next guest (a fresh page here) gets the booth as it was.
   await toggle.click();
@@ -254,8 +251,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
     "update_settings",
   );
   await kiosk.goto("/kiosk?camera=mock");
-  await openWelcome(kiosk);
-  await kiosk.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
   await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
   await expect(kiosk.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");

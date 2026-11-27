@@ -65,7 +65,7 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 5 shots, small composite + QR", 
     }).observe(root, { childList: true });
   });
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-legacy-ios15", "true");
   const root = page.locator(".kiosk-root");
   await expect(root).toHaveAttribute("data-test-flashes", "5");
@@ -73,12 +73,12 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 5 shots, small composite + QR", 
   expect(height).toBeGreaterThan(500);
   expect(height).toBeLessThanOrEqual(1025);
 
-  await expect(page.getByTestId("review-shot-4").locator("img")).toBeVisible();
+  await expect(page.getByTestId("select-shot-4").locator("img")).toBeVisible();
   // v2: five shots only (2026-11-27), no extra.
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
-  // Colour looks are on by default (2026-11-25): the review shows each 960 × 720 shot as a
+  // Colour looks are on by default (2026-11-25): the photo choice shows each 960 × 720 shot as a
   // graded 320 × 240 copy (the iPad mini 4 budget's size) in the frame's look (sepia → walnut), drawn on this WebKit's WebGL.
-  const reviewShot = page.getByTestId("review-shot-4").locator("img");
+  const reviewShot = page.getByTestId("select-shot-4").locator("img");
   await expect(reviewShot).toHaveAttribute("src", /^data:image\/jpeg/);
   expect(
     await reviewShot.evaluate(async (img: HTMLImageElement) => {
@@ -112,7 +112,7 @@ test("iPadOS 15 profile: 필름 3컷 세피아, 5 shots, small composite + QR", 
   const download = await page.request.get(`${guestUrl}/image`);
   expect(download.status()).toBe(200);
   expect(download.headers()["content-type"]).toContain("image/jpeg");
-  await page.getByRole("button", { name: "다 받았어요" }).click();
+  await page.getByRole("button", { name: "다음 분 차례예요" }).click();
   await expect(page.getByTestId("screen-attract")).toBeVisible();
   await expect(page.getByTestId("qr-code")).toHaveCount(0);
   expect(errors).toEqual([]);

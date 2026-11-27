@@ -28,28 +28,30 @@ export async function enrollKiosk(page: Page, label = "E2E kiosk") {
 }
 
 /**
- * The attract screen ("화면을 눌러 시작", D80) → the welcome choices. Also fine when the welcome
- * screen is already open (after "이전").
+ * The cover ("화면을 눌러 시작", D80) → the frame picker. One touch starts a session since
+ * 2026-11-27: there is no welcome screen. Also fine when the picker is already open.
+ * (The language, the sound switch and "내 사진으로 참여하기" are on the cover: use them BEFORE this.)
  */
-export async function openWelcome(page: Page) {
-  const attract = page.getByTestId("screen-attract");
-  const welcome = page.getByTestId("screen-welcome");
-  await expect(attract.or(welcome)).toBeVisible();
-  if (await attract.isVisible()) await page.getByTestId("attract-start").click();
-  await expect(welcome).toBeVisible();
+export async function openPicker(page: Page) {
+  const cover = page.getByTestId("screen-attract");
+  const picker = page.getByTestId("screen-pick");
+  await expect(cover.or(picker)).toBeVisible();
+  if (await cover.isVisible()) await page.getByTestId("attract-start").click();
+  await expect(picker).toBeVisible();
 }
 
 /** A card's options on the v2 options screen, e.g. `{ color: "sepia", logo: "logoOff" }`. */
 export type CardOptions = Partial<Record<"color" | "logo" | "theme" | "caption", string>>;
 
 /**
- * 「틀 선택 v2」: on the picker choose a card (or keep 필름 3컷), press "다음" / "이 틀로 찍기",
- * and on the options screen (cards with options) set them and press "이대로 찍기".
+ * 「틀 선택 v2」: on the picker a tap on a card goes on with it (2026-11-27); without `card` the
+ * bottom bar's button goes on with the card that is marked (필름 3컷). On the options screen
+ * (cards with options) set them and press "이대로 찍기".
  */
 export async function confirmFrame(page: Page, card?: string, options: CardOptions = {}) {
   await expect(page.getByTestId("screen-pick")).toBeVisible();
   if (card) await page.getByTestId(`frame-option-${card}`).click();
-  await page.getByTestId("confirm-pick").click();
+  else await page.getByTestId("confirm-pick").click();
   const options$ = page.getByTestId("screen-options");
   const camera = page.getByTestId("screen-camera").or(page.getByTestId("screen-ready"));
   await expect(options$.or(camera)).toBeVisible();
@@ -61,44 +63,43 @@ export async function confirmFrame(page: Page, card?: string, options: CardOptio
 }
 
 export async function startSession(page: Page, card?: string, options: CardOptions = {}) {
-  await openWelcome(page);
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
+  await openPicker(page);
   await confirmFrame(page, card, options);
   await expect(page.getByTestId("screen-ready")).toBeVisible();
 }
 
+/** The five shots with the mock camera: ends on the photo choice (there is no review screen). */
 export async function shootAllWithMock(page: Page, card?: string, options: CardOptions = {}) {
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await startSession(page, card, options);
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toHaveText("3");
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
-/** Earlier names of the same thing: a session shoots five now (2026-11-27). */
-export const shootFourWithMock = shootAllWithMock;
-export const shootSixWithMock = shootAllWithMock;
-
-/** Review → choosing the photos (v2: the frame was fixed before shooting). */
-export async function toSelect(page: Page) {
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible();
-}
-
-/** Pick the first N of the five shots (N = the selected frame's number of slots). */
-export async function selectDefaultPhotos(page: Page) {
-  await expect(page.getByTestId("screen-select")).toBeVisible();
+/** How many photos the frame takes, as the photo choice screen says. */
+export async function requiredPhotos(page: Page): Promise<number> {
   const required = Number(await page.getByTestId("select-required").getAttribute("data-required"));
   if (!Number.isInteger(required) || required < 1 || required > KIOSK_CONFIG.shotsPerSession)
     throw new Error("Invalid photo count");
-  for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
+  return required;
+}
+
+/**
+ * The photo choice as it opens: the first N photos are already chosen (N = the frame's slots),
+ * so one press finishes. Never click a tile here to "choose" it: that takes it out.
+ */
+export async function selectDefaultPhotos(page: Page) {
+  await expect(page.getByTestId("screen-select")).toBeVisible();
+  const required = await requiredPhotos(page);
+  for (let i = 0; i < required; i++)
+    await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("confirm-selection").click();
 }
 
-/** Review → select photos → wall question. */
+/** The photo choice → the wall question, with the photos the screen opened with. */
 export async function toConsent(page: Page) {
-  await toSelect(page);
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
   await expect(page.getByTestId("final-image")).toBeVisible();
@@ -111,6 +112,12 @@ export async function answerForQr(page: Page, answer: "yes" | "no") {
   const qr = page.getByTestId("qr-code");
   await expect(qr.locator("svg")).toBeVisible();
   return (await qr.getAttribute("data-url"))!;
+}
+
+/** The QR screen's button that hands the booth to the next guest ("다음 분 차례예요"). */
+export async function nextGuest(page: Page) {
+  await page.getByRole("button", { name: "다음 분 차례예요" }).click();
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
 }
 
 export interface StoredPhoto {

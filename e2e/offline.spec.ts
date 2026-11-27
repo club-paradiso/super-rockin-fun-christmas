@@ -1,6 +1,6 @@
 import { selectDefaultPhotos } from "./helpers";
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, shootFourWithMock, storedPhotos, toSelect } from "./helpers";
+import { enrollKiosk, shootAllWithMock, storedPhotos } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -34,8 +34,7 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
   page,
   context,
 }) => {
-  await shootFourWithMock(page);
-  await toSelect(page);
+  await shootAllWithMock(page);
   const before = (await storedPhotos()).length;
 
   await context.setOffline(true);
@@ -69,8 +68,7 @@ test("network down: photo is queued in IndexedDB, no fake QR, then delivered onc
 test("reload while queued: the photo survives in IndexedDB and uploads after restart", async ({
   page,
 }) => {
-  await shootFourWithMock(page);
-  await toSelect(page);
+  await shootAllWithMock(page);
   const before = (await storedPhotos()).length;
 
   // Server unreachable for uploads only (page itself still loads).
@@ -111,8 +109,7 @@ test("offline: the guest still answers the wall question, and the answer lands w
   page,
   context,
 }) => {
-  await shootFourWithMock(page);
-  await toSelect(page);
+  await shootAllWithMock(page);
 
   // The upload starts with the wall question on screen; offline, it waits on the device.
   await context.setOffline(true);

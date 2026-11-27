@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, openWelcome } from "./helpers";
+import { enrollKiosk, openPicker } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -11,11 +11,12 @@ test("the Figma olive cover and edge-bound binder use different backgrounds", as
   const cover = page.getByTestId("screen-attract");
   await expect(cover).toBeVisible();
   await expect(cover).toHaveCSS("background-image", /kiosk-intro-olive\.png/);
-  await openWelcome(page);
-  const welcome = page.getByTestId("screen-welcome");
-  await expect(welcome).toHaveCSS("background-image", /kiosk-edge-spine\.png/);
-  await expect(welcome.getByTestId("journal-spine")).toBeHidden();
-  await expect(welcome.locator(".journal-tab")).toBeHidden();
+  // The first screen inside the journal is the frame picker now (no welcome screen).
+  await openPicker(page);
+  const inside = page.getByTestId("screen-pick");
+  await expect(inside).toHaveCSS("background-image", /kiosk-edge-spine\.png/);
+  await expect(inside.getByTestId("journal-spine")).toBeHidden();
+  await expect(inside.locator(".journal-tab")).toBeHidden();
 });
 
 test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine cards, five to a row)", async ({
@@ -23,8 +24,7 @@ test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine c
 }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
-  await page.getByTestId("start-camera").click();
+  await openPicker(page);
   const pick = page.getByTestId("screen-pick");
   const cards = pick.locator('[data-testid^="frame-option-"]');
   await expect(cards).toHaveCount(9);
@@ -63,8 +63,7 @@ test("the v2 picker keeps Figma 898:1677's edges and gaps at 768 × 1024 (nine c
 test("narrow phones keep all nine cards tappable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
-  await page.getByTestId("start-camera").click();
+  await openPicker(page);
   const cards = page.getByTestId("screen-pick").locator('[data-testid^="frame-option-"]');
   await expect(cards).toHaveCount(9);
   for (const card of await cards.all()) {

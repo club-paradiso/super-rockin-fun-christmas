@@ -15,12 +15,10 @@ export const PERF_CODES = [
   "boot_samples",
   "boot_luts",
   // A tap (or an automatic step) until the next screen has been painted.
-  "screen_welcome",
   "screen_pick",
   "screen_options",
   "screen_camera",
   "screen_ready",
-  "screen_review",
   "screen_select",
   "screen_consent",
   "screen_delivery",
@@ -33,7 +31,7 @@ export const PERF_CODES = [
   "camera_start", // getUserMedia until the stream is live
   "capture_grab", // one shot: the frame taken from the camera
   "capture_total", // one shot: grab + its JPEG for the screen
-  "graded_shots", // the shots redrawn in a colour look (review / choice screens)
+  "graded_shots", // the shots redrawn in a colour look (the photo choice screen)
   "look_row", // the colour row's page on show (four chips), when it had to be drawn with the screen
   "stages", // skin retouch (photo stages) before the frame
   "compose", // composeFrame: the final picture
@@ -57,12 +55,10 @@ export const PERF_LABELS: Record<PerfCode, string> = {
   boot_assets: "시작 · 틀 그림·글꼴 (전체)",
   boot_samples: "시작 · 예시 사진",
   boot_luts: "시작 · 색감 파일",
-  screen_welcome: "화면 · 시작 선택",
   screen_pick: "화면 · 틀 고르기",
   screen_options: "화면 · 틀 옵션",
   screen_camera: "화면 · 카메라 켜는 중",
   screen_ready: "화면 · 촬영 준비",
-  screen_review: "화면 · 사진 확인",
   screen_select: "화면 · 사진 고르기",
   screen_consent: "화면 · 미디어월 질문",
   screen_delivery: "화면 · QR",

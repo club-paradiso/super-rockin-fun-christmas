@@ -501,7 +501,7 @@ for (const size of [
     await expect
       .poll(async () => (await sessionOnScreen()).wallPublic, { timeout: 20_000 })
       .toBe(true);
-    await page.getByRole("button", { name: "다 받았어요" }).click();
+    await page.getByRole("button", { name: "다음 분 차례예요" }).click();
 
     // Public wall off: no line, and the same YES is for the venue wall only.
     await settings({ wallPublic: false });
@@ -513,7 +513,7 @@ for (const size of [
       .poll(async () => (await sessionOnScreen()).wallConsent, { timeout: 20_000 })
       .toBe(true);
     expect((await sessionOnScreen()).wallPublic).toBe(false);
-    await page.getByRole("button", { name: "다 받았어요" }).click();
+    await page.getByRole("button", { name: "다음 분 차례예요" }).click();
     await settings({ wallPublic: true });
     await context.close();
   });

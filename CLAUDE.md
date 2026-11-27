@@ -83,7 +83,7 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   extra step; `lookId` + `SET_LOOK` in `lib/kiosk/machine.ts`, only in phase `select`, null again
   for the next guest. The row is all or nothing: with looks off, a LUT missing or WebGL failed it
   is not shown. Its names are in `lib/kiosk/copy.ts` (`select.looks`, placeholders until the user
-  gives wording). With looks on, the shots on the review and choice screens are shown in the
+  gives wording). With looks on, the shots on the choice screen are shown in the
   session's look (`gradedShots`, the same grader as the print; `chosenLook`), or with no look in
   the frame's own tone (`frameToneGrader`, the same `applyTone` as the print), and the live camera
   picture of a black-and-white or sepia frame is shown that way with a CSS filter on the `<video>`
@@ -107,7 +107,8 @@ looks:measure`). `/looks` is the comparison
   Figma SS 02 "01 · 최종 후보", 14-C · 15 · 16 · 17 · 18-B; 18 "네온 스캔 HUD", the black one, is
   left out by a user decision); a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
-  to a line); the picker shows the nine five to a row; the guest then shoots five, reviews, chooses the photos
+  to a line); the picker shows the nine five to a row, and a tap on a card goes on with it (below); the guest
+  then shoots five and chooses the photos
   (2026-11-27, a user decision: 5 shots, no retake; `KIOSK_CONFIG.shotsPerSession`, six before).
   There is no "one more shot", no second frame choice and no second round after shooting
   (`lib/kiosk/machine.ts`): 「다시 찍기」 (2026-11-25) was removed with its button, dialog, action
@@ -261,9 +262,9 @@ looks:measure`). `/looks` is the comparison
   `lib/kiosk/copy.ts` in all three languages; never hard-code booth copy in a component. A frame
   or pose carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
   `:lang(zh-Hans)` (own font, no `word-break: keep-all`): keep `<html lang>` on `HTML_LANG`. Korean copy is the user's wording (D76). "이전" exists only
-  where `canGoBack` allows it, a step that loses nothing: frame pick → welcome, options → pick,
-  camera before the first shot → options, photo choice → review (the choice kept), phone QR →
-  welcome; never during shooting, on the review, or once the photos are chosen. It sits in the
+  where `canGoBack` allows it, a step that loses nothing: frame pick → cover, options → pick,
+  camera before the first shot → options, phone QR → cover; never during shooting or after it
+  (2026-11-27: the photo choice is the first screen after the shots and has no way back). It sits in the
   footer beside "처음으로" (a user decision, 2026-11-25; Figma `Kiosk/Footer` Type=HomeBack),
   never in the header.
 - **The booth is a ring-bound memory journal** (D104): the `LetterSheet` export and
@@ -283,12 +284,33 @@ looks:measure`). `/looks` is the comparison
   branch, never a second scroll area inside a screen. Compositions switch by shape (wide / tall /
   short). Any booth change must keep `e2e/tablet-matrix.spec.ts` green.
 - **The progress dots count the steps this session really has** (a user decision, 2026-11-24):
-  six with the wall question, five when it is skipped (PAUSE SUBMISSIONS). Until the photos are
+  five with the wall question, four when it is skipped (PAUSE SUBMISSIONS): 틀 → 촬영 → 사진
+  고르기 → 동의 → QR (six and five until 2026-11-27, when the review screen went; Figma's
+  picker and options screens were changed to five dots with it, a user decision). Until the photos are
   chosen that is the staff switch as the booth last heard it; from then on it is the fact
   (`consentAsked` in `lib/kiosk/machine.ts`, read with `sessionAsksConsent`), so the dots never
   change under a guest who is already past that step.
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
-  initial state and where every reset lands; only `OPEN` leaves it, to the welcome choices.
+  initial state and where every reset lands; `OPEN` (a session id with it) leaves it for the
+  frame picker, `START_MOBILE` for the phone QR.
+- **Fewer touches, the same rules** (2026-11-27, a user request; about 13 touches → 6, or 5 for a
+  frame without options: start · frame · (options) · shoot · finish · wall answer;
+  `tests/unit/kiosk-machine.test.ts` and `e2e/kiosk-touches.spec.ts` count them). One touch on
+  the cover starts a session at the picker: there is no welcome screen, and the language, the
+  sound switch and "내 사진으로 참여하기" are small controls on the cover (`.attract-options`; a
+  user decision: there, not on the picker, so the picker stays as Figma draws it). A language
+  left on the cover goes back to Korean after the idle time. A tap on a card chooses it and goes
+  on (`PICK_CARD`); the bottom bar's button, which Figma draws, goes on with the card that is
+  marked. Because that tap is immediate, the picker ignores a second finger for longer than any
+  other screen (`PICK_TAP_GUARD_MS`): a double tap on the cover must never pick a frame. There is
+  no review screen: after the last shot the guest is on the photo choice with the first photos
+  already chosen (as many as the frame takes, in shooting order) and one press finishes; a tap
+  takes a photo out, another puts one in, and in a frame of one photo a tap on another photo
+  swaps it in. The QR screen's button is "다음 분 차례예요" (the user's words) and goes straight to
+  the cover; untouched, the screen still resets by itself. None of this touches the wall
+  question (two answers of equal weight, "아니요" never costs the photo), the upload (it starts
+  when the photos are chosen and runs while the guest answers) or the QR (only with a real
+  token). Do not add a step back, and do not make a second, shorter "easy" flow beside this one.
 - **Studio props are optional pictures with a CSS stand-in** (D101): `config/studio.ts` lists
   `public/studio/` (desk, shutter knob, kraft envelope, stamp ring). A component uses a picture only
   once it has loaded (`useAssetReady`) and otherwise keeps its drawn look (`data-art="drawn"`); a
@@ -301,7 +323,7 @@ looks:measure`). `/looks` is the comparison
   `lib/wall/themes.ts` (= `--wall-photo-drop`). `tests/unit/studio.test.ts` reads the stylesheet
   and fails on any shadow that falls another way.
 - **Booth sound is synthesised and optional** (D101): `lib/kiosk/sound.ts` (Web Audio, no files),
-  unlocked by the first touch, muted per device (`ftl.boothMuted`; welcome screen and staff help).
+  unlocked by the first touch, muted per device (`ftl.boothMuted`; the cover and staff help).
   Nothing waits for a sound; it never touches the microphone (D72).
 - **"오늘 N번째 기록" is a count, nothing more** (D101): `PhotoService.dayOrdinal` counts the photo
   rows of that photo's Asia/Seoul day up to it (`countCreatedBetween`, head-only on Supabase). The
@@ -313,7 +335,8 @@ looks:measure`). `/looks` is the comparison
   (768 × 1024: elements within 2 px, same type sizes, at most 2 %) compare the booth with Figma
   exports in `tests/fixtures/figma-parity/`. A change to a v2 frame, its art, a tone, or the picker
   and options screens keeps both green in Chromium and WebKit; never loosen a limit or widen a mask
-  to pass. The picker's reference is Figma 1069:2245 (「2-A 틀 고르기 · 9개」, 2026-11-26): nine
+  to pass. The picker's reference is Figma 1069:2245 (「2-A 틀 고르기 · 9개」, 2026-11-26; its
+  header and the four options screens' show five dots since 2026-11-27, exported again): nine
   cards five to a row, names and hints broken between words as the booth's `keep-all` breaks them,
   the pencil in the hint's first line; only the card previews are masked. The shared header and "처음으로" are at the Figma sizes (75 tall, 26 px; wordmark 30 px;
   16 px dots) on every booth screen. The width of a space differs between browsers with the same

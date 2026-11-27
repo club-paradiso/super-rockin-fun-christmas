@@ -4,10 +4,11 @@ import {
   answerForQr,
   confirmFrame,
   enrollKiosk,
-  openWelcome,
+  nextGuest,
+  openPicker,
+  selectDefaultPhotos,
   SHOOT_TIMEOUT,
   startSession,
-  toSelect,
 } from "./helpers";
 
 /**
@@ -33,17 +34,10 @@ function watchPaths(page: Page): string[] {
 const frameArt = (paths: string[]) =>
   paths.filter((p) => p.startsWith("/frames/v2/") && !p.startsWith("/frames/v2/samples/"));
 
-/** To the frame picker, whatever the first screens are. */
-async function toPicker(page: Page) {
-  await openWelcome(page);
-  const camera = page.getByTestId("start-camera");
-  if (await camera.isVisible().catch(() => false)) await camera.click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
-}
-
-async function shootToReview(page: Page) {
+/** The five shots: ends on the photo choice, the first photos already chosen. */
+async function shootToChoice(page: Page) {
   await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
 test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
@@ -61,7 +55,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     const paths = watchPaths(page);
     await page.goto("/kiosk?camera=mock&perf=1");
     await expect(page.locator(".kiosk-root")).toHaveAttribute("data-kiosk-frontend", "legacy");
-    await toPicker(page);
+    await openPicker(page);
 
     // Nine cards, each a file from public/kiosk-thumbs, each really loaded.
     for (const card of FRAME_CARDS) {
@@ -83,20 +77,15 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     expect(frameArt(paths).some((p) => p.includes("overlay"))).toBe(true);
     for (const p of frameArt(paths)) expect(p, p).toMatch(/meme4-yaho|logo-/);
 
-    await shootToReview(page);
-    await toSelect(page);
-    const required = Number(
-      await page.getByTestId("select-required").getAttribute("data-required"),
-    );
-    for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
-    await page.getByTestId("confirm-selection").click();
+    await shootToChoice(page);
+    await selectDefaultPhotos(page);
     const print = page.getByTestId("final-image");
     await expect(print).toBeVisible({ timeout: 30_000 });
     // Composed with every picture the frame draws, at the 1× size of this budget.
     await expect(print).toHaveAttribute("data-art", "complete");
     await expect(print).toHaveAttribute("data-width", "600");
     await answerForQr(page, "no");
-    await page.getByRole("button", { name: /다 받았어요|다음 분 차례예요/ }).click();
+    await nextGuest(page);
 
     // The speed log agrees: no picker previews were drawn, and the frame's kit was loaded once.
     await page.getByTestId("perf-open").click();
@@ -112,10 +101,9 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
   }) => {
     const paths = watchPaths(page);
     await page.goto("/kiosk?camera=mock");
-    await toPicker(page);
+    await openPicker(page);
+    // A tap on the card is its options screen.
     await page.getByTestId("frame-option-film4").click();
-    const advance = page.getByTestId("confirm-pick");
-    if (await page.getByTestId("screen-pick").isVisible()) await advance.click();
     await expect(page.getByTestId("screen-options")).toBeVisible();
     const preview = page.getByTestId("frame-preview-image");
     await expect(preview).toBeVisible();
@@ -133,7 +121,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
   }) => {
     await page.route("**/kiosk-thumbs/**", (route) => route.abort());
     await page.goto("/kiosk?camera=mock");
-    await toPicker(page);
+    await openPicker(page);
     for (const card of FRAME_CARDS)
       await expect(page.getByTestId(`frame-option-${card.id}`).locator("img")).toHaveAttribute(
         "src",
@@ -157,7 +145,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
       "/studio/kiosk-intro-olive.jpg",
     );
     expect(await style(".kiosk-root", "background-image")).toContain("/studio/grain-ink.png");
-    await toPicker(page);
+    await openPicker(page);
     expect(await style('[data-testid="screen-pick"]', "background-image")).toContain(
       "/studio/kiosk-edge-spine.jpg",
     );
@@ -178,8 +166,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
     test.setTimeout(150_000);
     await page.goto("/kiosk?camera=mock&perf=1");
     await startSession(page, "lace1");
-    await shootToReview(page);
-    await toSelect(page);
+    await shootToChoice(page);
     const row = page.getByTestId("look-row");
     await expect(row).toBeVisible();
     const chipImages = row.locator(".look-chip img");
@@ -216,7 +203,7 @@ test.describe("every booth", () => {
   }) => {
     const paths = watchPaths(page);
     await page.goto("/kiosk?camera=mock");
-    await toPicker(page);
+    await openPicker(page);
     for (const card of FRAME_CARDS)
       await expect(page.getByTestId(`frame-option-${card.id}`).locator("img")).toHaveAttribute(
         "src",
@@ -234,9 +221,8 @@ test.describe("every booth", () => {
     await expect(page.getByTestId("screen-attract")).toBeVisible();
     await page.waitForLoadState("networkidle");
     expect(chineseFont()).toEqual([]);
-    const lang = page.getByTestId("lang-zh");
-    if (!(await lang.isVisible().catch(() => false))) await openWelcome(page);
-    await lang.click();
+    // The language is chosen on the cover.
+    await page.getByTestId("lang-zh").click();
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
     await expect.poll(() => chineseFont().length, { timeout: 15_000 }).toBeGreaterThan(0);
   });
@@ -258,13 +244,8 @@ test.describe("every booth", () => {
     });
     await page.goto("/kiosk?camera=mock");
     await startSession(page);
-    await shootToReview(page);
-    await toSelect(page);
-    const required = Number(
-      await page.getByTestId("select-required").getAttribute("data-required"),
-    );
-    for (let i = 0; i < required; i++) await page.getByTestId(`select-shot-${i}`).click();
-    await page.getByTestId("confirm-selection").click();
+    await shootToChoice(page);
+    await selectDefaultPhotos(page);
     await expect(page.getByTestId("screen-consent")).toBeVisible();
     // Nobody has answered: the photo is already on the server (a real token exists) ...
     await expect.poll(() => order.join(","), { timeout: 30_000 }).toContain("upload-201");

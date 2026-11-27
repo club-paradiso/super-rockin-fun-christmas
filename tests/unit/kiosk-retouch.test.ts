@@ -8,7 +8,7 @@ import {
 
 type Shot = string;
 const init = (retouch?: "off" | "natural" | "glow") =>
-  createInitialState<Shot>({ shotCount: 6, countdownSeconds: 3, retouch });
+  createInitialState<Shot>({ shotCount: 5, countdownSeconds: 3, retouch });
 const run = (state: KioskState<Shot>, ...actions: KioskAction<Shot>[]) =>
   actions.reduce(kioskReducer<Shot>, state);
 
@@ -16,18 +16,17 @@ const run = (state: KioskState<Shot>, ...actions: KioskAction<Shot>[]) =>
 function toSelect(state: KioskState<Shot>): KioskState<Shot> {
   let s = run(
     state,
-    { type: "OPEN" },
-    { type: "START", sessionId: "s1" },
+    { type: "OPEN", sessionId: "s1" },
     { type: "CONFIRM_PICK", random: 0 },
     { type: "CONFIRM_OPTIONS", random: 0 },
     { type: "CAMERA_READY" },
     { type: "BEGIN_SHOOTING", guide: false },
   );
-  for (let shot = 0; shot < 6; shot++) {
+  for (let shot = 0; shot < 5; shot++) {
     for (let tick = 0; tick < 3; tick++) s = run(s, { type: "TICK" });
     s = run(s, { type: "SHOT_CAPTURED", shot: `shot-${shot}` });
   }
-  s = run(s, { type: "CONFIRM_SHOTS" });
+  // The last shot opens the photo choice (no review screen since 2026-11-27).
   expect(s.phase).toBe("select");
   return s;
 }
@@ -46,8 +45,8 @@ describe("피부 보정 as the guest's choice (lib/kiosk/machine.ts)", () => {
     expect(start.retouch).toBe("natural");
     // Not before the photo-selection screen.
     expect(run(start, { type: "SET_RETOUCH", level: "glow" })).toBe(start);
-    const welcome = run(start, { type: "OPEN" });
-    expect(run(welcome, { type: "SET_RETOUCH", level: "glow" })).toBe(welcome);
+    const pick = run(start, { type: "OPEN", sessionId: "s0" });
+    expect(run(pick, { type: "SET_RETOUCH", level: "glow" })).toBe(pick);
 
     const select = toSelect(start);
     const glow = run(select, { type: "SET_RETOUCH", level: "glow" });
@@ -65,7 +64,8 @@ describe("피부 보정 as the guest's choice (lib/kiosk/machine.ts)", () => {
 
   it("is final once the photos are chosen: the print is being made with it", () => {
     let s = run(toSelect(init("natural")), { type: "SET_RETOUCH", level: "glow" });
-    for (const index of [0, 1, 2]) s = run(s, { type: "TOGGLE_SHOT_SELECTION", index });
+    // The first three photos are chosen already (필름 3컷): one press finishes.
+    expect(s.selectedShotIndices).toEqual([0, 1, 2]);
     s = run(s, { type: "CONFIRM_SELECTION", askConsent: true });
     expect(s.phase).toBe("consent");
     expect(run(s, { type: "SET_RETOUCH", level: "off" })).toBe(s);

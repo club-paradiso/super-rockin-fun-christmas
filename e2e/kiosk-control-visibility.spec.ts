@@ -42,9 +42,19 @@ for (const viewport of [
     test.setTimeout(120_000);
     await page.setViewportSize(viewport);
     await page.goto("/kiosk?camera=mock");
+    // The cover holds what the welcome screen held: every control on it can be reached.
+    await expect(page.getByTestId("screen-attract")).toBeVisible();
+    for (const id of [
+      "attract-start",
+      "lang-ko",
+      "lang-en",
+      "lang-zh",
+      "start-mobile",
+      "sound-toggle",
+    ])
+      await expectTouchable(page.getByTestId(id));
     await page.getByTestId("attract-start").click();
-    await expectTouchable(page.getByTestId("start-camera"));
-    await page.getByTestId("start-camera").click();
+    await expectTouchable(page.getByTestId("frame-option-film3"));
     await expectTouchable(page.getByTestId("confirm-pick"));
     await page.getByTestId("confirm-pick").click();
     await expectTouchable(page.getByTestId("option-color-sepia"));
@@ -57,13 +67,19 @@ for (const viewport of [
     await expectTouchable(page.getByTestId("shoot-guide"));
     await expectTouchable(page.getByTestId("flash-toggle"));
     await page.getByTestId("shoot-free").click();
-    await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-    await expectTouchable(page.getByRole("button", { name: "이대로 좋아요" }));
-    await page.getByRole("button", { name: "이대로 좋아요" }).click();
+    // Straight on the photo choice, with the first three chosen and the finish button live.
+    await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+    await expectTouchable(page.getByTestId("confirm-selection"));
+    await expect(page.getByTestId("confirm-selection")).toBeEnabled();
 
+    // Changing the choice: take the first one out, put the last one in.
+    await expectTouchable(page.getByTestId("select-shot-0"));
+    await page.getByTestId("select-shot-0").click();
     await expectTouchable(page.getByTestId("select-shot-4"));
     await page.getByTestId("select-shot-4").click();
+    await expect(page.getByTestId("select-shot-4")).toHaveAttribute("aria-pressed", "true");
     await expectTouchable(page.getByTestId("confirm-selection"));
+    await expect(page.getByTestId("confirm-selection")).toBeEnabled();
     // Scrolling inside the booth must never make the document itself overflow sideways.
     const xOverflow = await page.evaluate(() => {
       const d = document.documentElement;
@@ -73,14 +89,15 @@ for (const viewport of [
   });
 }
 
-test.describe("first touch on auto-opened review", () => {
+test.describe("first touch on the auto-opened photo choice", () => {
   test.use({ hasTouch: true });
   test("a genuine first finger press is accepted without an arbitrary 350 ms delay", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await shootAllWithMock(page);
-    await page.getByRole("button", { name: "이대로 좋아요" }).tap();
-    await expect(page.getByTestId("screen-select")).toBeVisible();
+    // The photo choice appears by itself after the last shot: the first finger on it counts.
+    await page.getByTestId("confirm-selection").tap();
+    await expect(page.getByTestId("screen-consent")).toBeVisible();
   });
 });

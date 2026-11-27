@@ -4,10 +4,11 @@ import {
   SHOOT_TIMEOUT,
   answerForQr,
   enrollKiosk,
-  openWelcome,
+  nextGuest,
+  openPicker,
   photoForToken,
   selectDefaultPhotos,
-  shootFourWithMock,
+  shootAllWithMock,
   startSession,
   toConsent,
   tokenFromUrl,
@@ -17,15 +18,17 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("guest kiosk never asks for a name on welcome or frame picker", async ({ page }) => {
+test("guest kiosk never asks for a name on the cover or the frame picker", async ({ page }) => {
   await page.goto("/kiosk?camera=mock");
-  await openWelcome(page);
+  await expect(page.getByTestId("screen-attract")).toBeVisible();
   // D89 regression: no separate easy/standard screen toggle is offered to guests.
   await expect(page.getByText(/간편 화면|쉬운 화면|Easy view|Standard view/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^(기본 화면|간편 화면)$/ })).toHaveCount(0);
   await expect(page.getByRole("textbox")).toHaveCount(0);
-  await page.getByRole("button", { name: "여기서 사진 찍기" }).click();
-  await expect(page.getByTestId("screen-pick")).toBeVisible();
+  // One touch on the cover is the frame picker (2026-11-27): no welcome screen in between.
+  await openPicker(page);
+  await expect(page.getByTestId("screen-welcome")).toHaveCount(0);
+  await expect(page.getByTestId("start-camera")).toHaveCount(0);
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
@@ -33,10 +36,11 @@ test("happy path: frame → options → 5 shots → select → consent YES → u
   page,
   context,
 }) => {
-  await shootFourWithMock(page, "film4", { color: "red" });
-  await expect(page.getByTestId("step-progress")).toHaveText("3 / 6");
+  await shootAllWithMock(page, "film4", { color: "red" });
+  // Straight on the photo choice after the fifth shot: step 3 of 5 (no review screen).
+  await expect(page.getByTestId("step-progress")).toHaveText("3 / 5");
   for (let i = 0; i < 5; i++) {
-    const img = page.getByTestId(`review-shot-${i}`).locator("img");
+    const img = page.getByTestId(`select-shot-${i}`).locator("img");
     await expect(img).toBeVisible();
     const [w, h] = await img.evaluate((el: HTMLImageElement) => [
       el.naturalWidth,
@@ -45,8 +49,6 @@ test("happy path: frame → options → 5 shots → select → consent YES → u
     expect(w / h).toBeCloseTo(4 / 3, 2);
   }
   // v2: straight to choosing the photos; no second frame choice, no "프레임 바꾸기".
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible();
   await expect(page.getByText("프레임 바꾸기")).toHaveCount(0);
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("screen-consent")).toBeVisible();
@@ -74,7 +76,7 @@ test("happy path: frame → options → 5 shots → select → consent YES → u
 
   const phoneUrl = await answerForQr(page, "yes");
   await expect(page.getByText("잠시 뒤 큰 화면에서 내 사진을 찾아보세요.")).toBeVisible();
-  await expect(page.getByTestId("step-progress")).toHaveText("6 / 6");
+  await expect(page.getByTestId("step-progress")).toHaveText("5 / 5");
   // Built by the server from PUBLIC_BASE_URL, not from the kiosk's location.
   expect(phoneUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/p\/[A-Za-z0-9_-]{32}$/);
 
@@ -112,14 +114,13 @@ test("happy path: frame → options → 5 shots → select → consent YES → u
   const row = await photoForToken(tokenFromUrl(phoneUrl));
   expect(row!.wallConsent).toBe(true);
 
-  await page.getByRole("button", { name: "다 받았어요" }).click();
-  await expect(page.getByTestId("screen-attract")).toBeVisible();
+  await nextGuest(page);
 });
 
 test("decline path: consent NO leaves the download working and nothing queued for the wall", async ({
   page,
 }) => {
-  await shootFourWithMock(page);
+  await shootAllWithMock(page);
   await toConsent(page);
   // Both answers carry the same weight: same size, same style.
   const [yes, no] = [page.getByTestId("consent-yes"), page.getByTestId("consent-no")];
@@ -137,29 +138,40 @@ test("decline path: consent NO leaves the download working and nothing queued fo
   expect((await photoForToken(tokenFromUrl(phoneUrl)))!.moderationStatus).toBe("NONE");
 });
 
-test("v2: no extra photo, no second frame choice, the steps are dots only", async ({ page }) => {
-  await shootFourWithMock(page);
-  const review = page.getByTestId("screen-review");
-  // 이대로 좋아요 and 처음으로 (plus the fullscreen switch in the footer): never a sixth photo,
-  // and no 다시 찍기 of any kind (2026-11-27).
-  const labels = await review
-    .locator("button:not([data-testid='fullscreen-toggle'])")
+test("v2: no extra photo, no second frame choice, no retake, the steps are dots only", async ({
+  page,
+}) => {
+  await shootAllWithMock(page);
+  // The photo choice is the first screen after the shots (2026-11-27): no review screen.
+  const select = page.getByTestId("screen-select");
+  await expect(page.locator("[data-testid='screen-review']")).toHaveCount(0);
+  await expect(page.getByText("5장 중 3장을 골라주세요")).toBeVisible();
+  // It opens with the first three chosen, in shooting order, and can finish at once.
+  for (const i of [0, 1, 2])
+    await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "true");
+  for (const i of [3, 4])
+    await expect(page.getByTestId(`select-shot-${i}`)).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("confirm-selection")).toBeEnabled();
+  await expect(page.getByTestId("select-change-hint")).toBeVisible();
+  // The five photos, the finish button and 처음으로 (plus the colour row and the fullscreen
+  // switch): never a sixth photo, and no 다시 찍기 of any kind (2026-11-27).
+  const labels = await select
+    .locator(
+      "button:not([data-testid='fullscreen-toggle']):not([data-testid^='select-shot-']):not(.look-row button)",
+    )
     .allInnerTexts();
   expect(labels.map((l) => l.replace(/\s+/g, " ").trim()).sort()).toEqual(
-    ["← 처음으로", "이대로 좋아요"].sort(),
+    ["← 처음으로", "이 사진으로 완성하기"].sort(),
   );
-  await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
+  await expect(page.locator("[data-testid^='select-shot-']")).toHaveCount(5);
+  await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기|다시 찍기/)).toHaveCount(0);
   await expect(page.getByTestId("take-extra-shot")).toHaveCount(0);
-  await expect(page.getByTestId("review-shot-6")).toHaveCount(0);
-  // The count is for screen readers only; six dots are drawn.
+  await expect(page.getByTestId("select-shot-5")).toHaveCount(0);
+  // Once the shots are taken there is no step back: neither to a review nor to a frame choice.
+  await expect(page.getByTestId("go-back")).toHaveCount(0);
+  // The count is for screen readers only; five dots are drawn.
   await expect(page.getByTestId("step-progress")).not.toBeInViewport();
-  await expect(page.locator(".booth-steps-dot")).toHaveCount(6);
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
-  await expect(page.getByTestId("screen-select")).toBeVisible();
-  await expect(page.getByText("6장 중 3장을 골라주세요")).toBeVisible();
-  // "이전" from the photo choice is the review (the shots), never a frame choice.
-  await expect(page.getByTestId("go-back")).toHaveCount(1);
-  await expect(page.getByText(/한 컷 더|추가 사진|프레임 바꾸기/)).toHaveCount(0);
+  await expect(page.locator(".booth-steps-dot")).toHaveCount(5);
 });
 
 test("screen flash can be toggled before shooting and lights the display only when enabled", async ({
@@ -174,9 +186,8 @@ test("screen flash can be toggled before shooting and lights the display only wh
   await expect(toggle).toHaveText("화면 플래시 끄기");
   await page.getByTestId("shoot-free").click();
   await expect(page.getByTestId("screen-flash")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.getByTestId("screen-flash")).toHaveCount(0);
-  await page.getByRole("button", { name: "이대로 좋아요" }).click();
   await page.getByTestId("go-home").click();
   await page.getByTestId("confirm-home-yes").click();
   await startSession(page);
@@ -202,7 +213,7 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(page.locator('[data-testid="screen-ready"] .booth-btn-primary')).toHaveCount(1);
   for (const button of [free, guide])
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(64);
-  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 6컷을 찍어요");
+  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 5컷을 찍어요");
 
   await guide.click();
   const pose = page.getByTestId("pose-guide");
@@ -210,7 +221,7 @@ test("pose guide (D71): one primary and one secondary start; poses only when ask
   await expect(pose).toContainText("서로 마주 보기");
   await expect(pose).toHaveAttribute("data-pose", "arms-on-shoulders", { timeout: 15_000 });
   await expect(pose).toContainText("어깨동무");
-  await expect(page.getByTestId("screen-review")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(pose).toHaveCount(0);
   // Free poses: nothing extra during the countdown.
   await page.getByTestId("go-home").click();
