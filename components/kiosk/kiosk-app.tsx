@@ -38,7 +38,8 @@ import { formatStampLabel, type PhotoGrader } from "@/lib/compositor/compose";
 import { loadFrameAssets } from "@/lib/compositor/assets";
 import type { FrameDefinition } from "@/lib/compositor/types";
 import { loadFrameFonts } from "@/lib/compositor/fonts";
-import { LOOK_IDS } from "@/config/looks";
+import { LOOK_IDS, NO_LOOK } from "@/config/looks";
+import { applyTone } from "@/lib/compositor/tone";
 import {
   chosenLook,
   createBoothLooks,
@@ -207,6 +208,11 @@ const GRADED_SHOT_EDGE = 480;
  * screen then shows the shot as taken). The grader's canvas is shared, so the picture is copied
  * out of it at once.
  */
+/** A shot as taken, small, for the "원본" chip of a frame without a tone. */
+function plainShotUrl(shot: CapturedFrame): string | null {
+  return gradedShotUrl(shot, (photo) => photo as unknown as CanvasImageSource, 0, LOOK_CHIP_EDGE);
+}
+
 function gradedShotUrl(
   shot: CapturedFrame,
   grade: PhotoGrader,
@@ -287,7 +293,9 @@ function gradedShotFor(
     shot,
     shotKey(frameId, override?.lookId ?? "own", seed, index),
     () => {
-      const grade = looks.graderFor(frameId, seed, override);
+      // The session's look, else the frame's own tone (흑백 stays 흑백 with 「원본」); with
+      // neither there is nothing to draw and the screen shows the shot as taken.
+      const grade = previewGrader(looks, frameId, seed, lookId);
       return grade ? gradedShotUrl(shot, grade, index) : null;
     },
   );
@@ -309,6 +317,37 @@ function lookChipFor(
 }
 
 /** Every look on one shot, for the colour row. Empty when any of them cannot be made. */
+/**
+ * The photo with no look ("원본"): as taken, in the frame's own tone (흑백, 세피아, ...), which is
+ * what the print does with no look. Undefined for a frame without a tone: nothing to do.
+ */
+function frameToneGrader(frameId: string): PhotoGrader | undefined {
+  const tone = getFrame(frameId).photoTone;
+  if (!tone) return undefined;
+  return (photo, width, height) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(photo as unknown as CanvasImageSource, 0, 0, width, height);
+    const pixels = ctx.getImageData(0, 0, width, height);
+    applyTone(pixels.data, tone);
+    ctx.putImageData(pixels, 0, 0);
+    return canvas;
+  };
+}
+
+/** The grader of the review and choice screens: the session's look, else the frame's tone. */
+function previewGrader(
+  looks: BoothLooks,
+  frameId: string,
+  seed: number,
+  lookId: string | null,
+): PhotoGrader | undefined {
+  return looks.graderFor(frameId, seed, chosenLook(frameId, lookId)) ?? frameToneGrader(frameId);
+}
+
 function lookChipsFor(
   store: ShotPictures,
   looks: BoothLooks,
@@ -316,7 +355,11 @@ function lookChipsFor(
   seed: number,
   shot: CapturedFrame,
 ): LookChip[] {
-  const chips: LookChip[] = [];
+  // "원본" first: the shot with no look, in the frame's own tone.
+  const tone = frameToneGrader(frameId);
+  const plain = tone ? gradedShotUrl(shot, tone, 0, LOOK_CHIP_EDGE) : plainShotUrl(shot);
+  if (!plain) return [];
+  const chips: LookChip[] = [{ id: NO_LOOK, url: plain }];
   for (const lookId of LOOK_IDS) {
     const url = lookChipFor(store, looks, frameId, seed, lookId, shot);
     if (!url) return [];
@@ -798,7 +841,11 @@ export function KioskApp({
     if (!looksActive(window.location.search, looksNow)) return;
     const created = createBoothLooks();
     looksRef.current = created;
-    looksLoadRef.current = created.preload(V2_FRAMES.map((frame) => frame.id));
+    // Every look, whatever the frames start with: the guest chooses from all of them.
+    looksLoadRef.current = Promise.all([
+      created.preload(V2_FRAMES.map((frame) => frame.id)),
+      created.preloadLooks(LOOK_IDS),
+    ]).then(() => undefined);
     void looksLoadRef.current.then(() => {
       if (looksRef.current === created) setLooks(created);
     });
@@ -2909,9 +2956,9 @@ function LookRow({
             type="button"
             className="booth-btn-m look-turn"
             data-testid="look-turn"
-            onClick={() => setPage(last ? page - 1 : page + 1)}
+            onClick={() => setPage(last ? 0 : page + 1)}
           >
-            {last ? `‹ ${t.select.lookPrev}` : `${t.select.lookNext} ›`}
+            {last ? `‹ ${t.select.lookFirst}` : `${t.select.lookNext} ›`}
           </button>
         )}
       </div>

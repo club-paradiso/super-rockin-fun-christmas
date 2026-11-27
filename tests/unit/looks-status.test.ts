@@ -4,6 +4,7 @@ import {
   looksActive,
   looksEnabled,
   looksOverride,
+  LOOK_CHOICES,
   lookPageOf,
   lookPages,
   lookViewForFrame,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/looks/config";
 import { chosenLook } from "@/lib/looks/booth";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
-import { LOOK_IDS } from "@/config/looks";
+import { LOOK_IDS, NO_LOOK } from "@/config/looks";
 import { looksStatus, type LooksStatusInput } from "@/lib/looks/status";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -139,33 +140,48 @@ describe("the staff line in the booth's help menu", () => {
 });
 
 describe("the colour row of the photo choice screen", () => {
-  it("shows the eight looks four at a time, in the order of config/looks", () => {
-    expect(lookPages()).toEqual([LOOK_IDS.slice(0, 4), LOOK_IDS.slice(4, 8)]);
-    expect(lookPages().flat()).toHaveLength(8);
+  it("shows 원본 and the eight looks four at a time, in the order of config/looks", () => {
+    expect(LOOK_CHOICES).toEqual([NO_LOOK, ...LOOK_IDS]);
+    expect(lookPages()).toEqual([
+      [NO_LOOK, ...LOOK_IDS.slice(0, 3)],
+      LOOK_IDS.slice(3, 7),
+      LOOK_IDS.slice(7, 8),
+    ]);
+    expect(lookPages().flat()).toHaveLength(9);
   });
 
-  it("opens on the page of the frame's own look", () => {
-    expect(lookPageOf(sessionLookId("film4-cream", null))).toBe(0); // linen
-    expect(lookPageOf(sessionLookId("film35-mono", null))).toBe(1); // ink
+  it("opens on the first page, where 원본 is: no frame comes with a look", () => {
+    for (const id of ["film4-cream", "film35-mono", "meme4-yaho"])
+      expect(lookPageOf(sessionLookId(id, null)), id).toBe(0);
+    expect(lookPageOf("walnut")).toBe(2);
     expect(lookPageOf(null)).toBe(0);
     expect(lookPageOf("no-such-look")).toBe(0);
   });
 
-  it("the session's look is the guest's choice, else the frame's; never an unknown one", () => {
-    expect(sessionLookId("film4-cream", null)).toBe("linen");
+  it("the session's look is the guest's choice, else 원본; never an unknown one", () => {
+    expect(sessionLookId("film4-cream", null)).toBe(NO_LOOK);
     expect(sessionLookId("film4-cream", "pine")).toBe("pine");
-    expect(sessionLookId("film4-cream", "sparkle")).toBe("linen");
+    expect(sessionLookId("film4-cream", NO_LOOK)).toBe(NO_LOOK);
+    expect(sessionLookId("film4-cream", "sparkle")).toBe(NO_LOOK);
   });
 
-  it("choosing the frame's own look keeps the frame's mapped strength (no override)", () => {
+  it("원본 is no override; any look the guest picks is one", () => {
     expect(chosenLook("film4-red", null)).toBeUndefined();
-    expect(chosenLook("film4-red", "lamp")).toBeUndefined();
-    expect(chosenLook("film4-red", "ink")).toEqual({ lookId: "ink" });
+    expect(chosenLook("film4-red", NO_LOOK)).toBeUndefined();
+    expect(chosenLook("film4-red", "lamp")).toEqual({ lookId: "lamp" });
+    expect(chosenLook("film3-mono-logo", "ink")).toEqual({ lookId: "ink" });
+  });
+
+  it("with no look, the camera view of a black-and-white or sepia frame keeps the frame's tone", () => {
+    expect(lookViewForFrame("film3-mono-logo")).toBe("mono");
+    expect(lookViewForFrame("film35-sepia")).toBe("sepia");
+    expect(lookViewForFrame("film4-cream")).toBeNull();
+    expect(lookViewForFrame("meme4-yaho")).toBeNull();
   });
 
   it("every look has a name in every booth language", () => {
     for (const lang of ["ko", "en", "zh"] as const)
-      for (const id of LOOK_IDS)
+      for (const id of LOOK_CHOICES)
         expect(KIOSK_COPY[lang].select.looks[id], `${lang} ${id}`).toBeTruthy();
   });
 });

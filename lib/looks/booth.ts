@@ -1,7 +1,7 @@
-import { lookCubeUrl } from "@/config/looks";
+import { lookCubeUrl, NO_LOOK } from "@/config/looks";
 import type { CanvasLike } from "@/lib/canvas";
 import type { PhotoGrader } from "@/lib/compositor/compose";
-import { lookForFrame } from "./config";
+import { FRAME_LOOKS, lookForFrame } from "./config";
 import { parseCube, type Lut3D } from "./cube";
 import { LookRenderer, type GlCanvas } from "./renderer";
 import { renderParams } from "./types";
@@ -53,9 +53,10 @@ export interface LookOverride {
 /**
  * What to hand `graderFor` for the look a guest chose on the photo choice screen. Nothing when it
  * is the frame's own look (or none was chosen): the frame's mapped strength then applies as ever.
+ * "원본" (`NO_LOOK`) over a frame that has a look is `{ lookId: NO_LOOK }`, which grades nothing.
  */
 export function chosenLook(frameId: string, lookId: string | null): LookOverride | undefined {
-  return lookId && lookForFrame(frameId)?.look.id !== lookId ? { lookId } : undefined;
+  return lookId && (lookForFrame(frameId)?.look.id ?? NO_LOOK) !== lookId ? { lookId } : undefined;
 }
 
 export interface BoothLooksDeps {
@@ -109,7 +110,8 @@ export function createBoothLooks({
       for (const frameId of frameIds) {
         const entry = lookForFrame(frameId);
         if (entry) ids.add(entry.look.id);
-        else log(`Frame "${frameId}" names a look that does not exist`);
+        else if ((FRAME_LOOKS.frames[frameId] ?? FRAME_LOOKS.default).look !== NO_LOOK)
+          log(`Frame "${frameId}" names a look that does not exist`);
       }
       await Promise.all([...ids].map(loadLook));
     },
