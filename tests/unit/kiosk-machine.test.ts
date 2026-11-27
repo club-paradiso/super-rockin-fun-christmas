@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { POSE_SEQUENCE } from "@/config/poses";
 import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
+import { POLAROID1_CAPTIONS } from "@/config/frames/v2";
 import { KIOSK_COPY } from "@/lib/kiosk/copy";
 import {
   MAX_CAPTURE_FAILURES,
@@ -312,11 +313,11 @@ describe("틀 선택 v2: seven cards, options before shooting", () => {
 
   it("a card with options goes to the options screen; one without goes straight to the camera", () => {
     const pick = run(init(), { type: "START", sessionId: SESSION });
-    for (const id of ["film3", "film4", "check2"])
+    for (const id of ["film3", "film4", "check2", "polaroid1", "film35"])
       expect(
         run(pick, { type: "SELECT_CARD", cardId: id }, { type: "CONFIRM_PICK", random: 0 }).phase,
       ).toBe("options");
-    for (const id of ["polaroid1", "polaroid3", "verse4", "lace1"])
+    for (const id of ["polaroid3", "verse4", "lace1"])
       expect(
         run(pick, { type: "SELECT_CARD", cardId: id }, { type: "CONFIRM_PICK", random: 0 }).phase,
       ).toBe("camera");
@@ -788,14 +789,19 @@ describe("language (D78): a view, per guest", () => {
           : o && typeof o === "object"
             ? Object.entries(o).flatMap(([k, v]) => strings(v, `${path}.${k}`))
             : [];
+    // A polaroid caption is shown as it is written on the photo, in every language (「메리
+    // 크리스마스」 stays Korean on an English screen); only the two that describe it are translated.
+    const captions = POLAROID1_CAPTIONS.filter((c) => c !== "date" && c !== "circle").map(
+      (c) => `.value.${c}`,
+    );
     // Korean only where it names something Korean on purpose: the language picker's own label.
-    const allowed = new Set([".langGroup"]);
+    const allowed = new Set([".langGroup", ...captions]);
     for (const [path, text] of strings(KIOSK_COPY.en))
       if (!allowed.has(path)) expect(hangul.test(text), `${path}: ${text}`).toBe(false);
     // The Chinese screens are Chinese, not English: every string has Han characters, except
     // where it names something on purpose (the event name, the language picker's label).
     const han = /\p{Script=Han}/u;
-    const notChinese = new Set([".attract.event", ".langGroup"]);
+    const notChinese = new Set([".attract.event", ".langGroup", ...captions]);
     for (const [path, text] of strings(KIOSK_COPY.zh))
       if (!notChinese.has(path)) {
         expect(han.test(text), `${path}: ${text}`).toBe(true);

@@ -71,9 +71,17 @@ export type FrameDecoration =
        * "Christmas Village '26" in one of the ten handwriting fonts (config/hand-fonts.ts). The
        * font is chosen per session (ComposeContext.handFont); the heart and the underline follow
        * the measured width of the text (Figma 895:1405, 880:1717, 877:1664).
+       *
+       * With `font`, the text is drawn in that one font, never the session's: a caption drawn as
+       * Figma has it (폴라로이드 1컷 「오늘 날짜」, Figma 877:1674). `text` may then carry
+       * `{handDate}`, the shooting day as `12. 24. 2026` (from ComposeContext.dateLabel).
        */
       type: "hand";
       text: string;
+      /** A fixed font (Figma's), sizes in frame units. Without it: the session's font. */
+      font?: { family: string; weight: 400 | 700; size: number };
+      /** The Figma text layer's width: where the heart goes when the text cannot be measured. */
+      width?: number;
       /** Top-left of the Figma text layer, and its rotation about that corner. */
       x: number;
       y: number;

@@ -2,8 +2,8 @@
   "screen": "pick",
   "browser": "chromium",
   "worstOffsetPx": 1,
-  "overPct": 1.55,
-  "meanDeltaE": 0.295,
+  "overPct": 1.581,
+  "meanDeltaE": 0.3,
   "elements": [
     {
       "sel": "[data-testid=\"go-back\"]",
@@ -303,6 +303,17 @@
       "sel": "[data-testid=\"frame-option-film4\"] .pick-card-hint",
       "delta": [
         0.03,
+        0
+      ],
+      "size": [
+        14,
+        14
+      ]
+    },
+    {
+      "sel": "[data-testid=\"frame-option-polaroid1\"] .pick-card-hint",
+      "delta": [
+        0.01,
         0
       ],
       "size": [

@@ -79,11 +79,13 @@ const ko = {
     film4: "크림·빨강\n선택",
     check2: "빨강·파랑\n선택",
     film35: "컬러·흑백·세피아",
+    polaroid1: "문구 선택",
     meme4: "밈 5종 고르기",
   },
   option: {
     titleColorLogo: "색과 로고를 골라주세요",
     titleColor: "색을 골라주세요",
+    titleCaption: "문구를 골라주세요",
     titleTheme: "어떤 밈으로 찍을까요?",
     locked: (frame: string) => `${frame} · 찍은 뒤에는 바꿀 수 없어요`,
     shoot: "이대로 찍기",
@@ -91,6 +93,7 @@ const ko = {
   label: {
     color: "색",
     logo: "로고",
+    caption: "문구",
     theme: "밈",
   },
   value: {
@@ -102,6 +105,19 @@ const ko = {
     red: "빨강",
     blue: "파랑",
     natural: "컬러",
+    // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
+    village: "Christmas Village '26",
+    date: "오늘 날짜",
+    verse: "blessed are the peacemakers",
+    merry: "merry christmas!",
+    us: "us, at Christmas Village",
+    merryKo: "메리 크리스마스",
+    hooray: "크리스마스 야호-",
+    checklist: "with my people",
+    peace: "peace!",
+    circle: "'26에 동그라미",
     yaho: "크리스마스 야호",
     quit: "촬영 포기하겠습니다",
     emoji: "이거 제 이모찌야",
@@ -348,11 +364,13 @@ const en: KioskCopy = {
     film4: "Cream or red",
     check2: "Red or blue",
     film35: "Color, B&W or sepia",
+    polaroid1: "Pick a caption",
     meme4: "5 memes to pick",
   },
   option: {
     titleColorLogo: "Choose color and logo",
     titleColor: "Choose a color",
+    titleCaption: "Choose a caption",
     titleTheme: "Which meme will it be?",
     locked: (frame) => `${frame} · Can't be changed after shooting`,
     shoot: "Start shooting",
@@ -360,6 +378,7 @@ const en: KioskCopy = {
   label: {
     color: "Color",
     logo: "Logo",
+    caption: "Caption",
     theme: "Meme",
   },
   value: {
@@ -371,6 +390,19 @@ const en: KioskCopy = {
     red: "Red",
     blue: "Blue",
     natural: "Color",
+    // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
+    village: "Christmas Village '26",
+    date: "Today's date",
+    verse: "blessed are the peacemakers",
+    merry: "merry christmas!",
+    us: "us, at Christmas Village",
+    merryKo: "메리 크리스마스",
+    hooray: "크리스마스 야호-",
+    checklist: "with my people",
+    peace: "peace!",
+    circle: "Circled '26",
     yaho: "Christmas Yaho",
     quit: "I give up",
     emoji: "My emoji",
@@ -593,11 +625,13 @@ const zh: KioskCopy = {
     film4: "可选米色·红色",
     check2: "可选红色·蓝色",
     film35: "彩色·黑白·复古棕",
+    polaroid1: "可选文字",
     meme4: "5种梗图可选",
   },
   option: {
     titleColorLogo: "请选择颜色和标志",
     titleColor: "请选择颜色",
+    titleCaption: "请选择文字",
     titleTheme: "用哪个梗图来拍？",
     locked: (frame) => `${frame} · 拍摄后无法更改`,
     shoot: "就这样拍",
@@ -605,6 +639,7 @@ const zh: KioskCopy = {
   label: {
     color: "颜色",
     logo: "标志",
+    caption: "文字",
     theme: "梗图",
   },
   value: {
@@ -616,6 +651,19 @@ const zh: KioskCopy = {
     red: "红色",
     blue: "蓝色",
     natural: "彩色",
+    // 폴라로이드 1컷 문구 (2026-11-26, Figma 1055:3631). A caption is shown as it is written on
+    // the photo; 「오늘 날짜」 and 「'26에 동그라미」 describe it instead (wording left to Claude by
+    // the user, 2026-11-26).
+    village: "Christmas Village '26",
+    date: "今天日期",
+    verse: "blessed are the peacemakers",
+    merry: "merry christmas!",
+    us: "us, at Christmas Village",
+    merryKo: "메리 크리스마스",
+    hooray: "크리스마스 야호-",
+    checklist: "with my people",
+    peace: "peace!",
+    circle: "圈出 '26",
     yaho: "圣诞呀吼",
     quit: "我放弃拍摄",
     emoji: "我的表情包",

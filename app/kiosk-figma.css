@@ -495,6 +495,41 @@
   outline: 3px solid var(--color-button);
   outline-offset: 2px;
 }
+/* An option with many answers (폴라로이드 1컷 문구, ten captions, Figma 1055:3631): two equal
+   columns of 56-tall answers in 18 px, 12 apart and rows 10 apart, no row label (the title names
+   it). */
+.kiosk-root .booth-screen-v2 .options-row.options-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  column-gap: calc(12 * var(--fx));
+  row-gap: calc(10 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-grid .options-choice {
+  min-height: max(48px, calc(56 * var(--fx)));
+  padding: 2px calc(12 * var(--fx));
+  font-size: max(15px, calc(18 * var(--fx)));
+  line-height: 1.2;
+  word-spacing: calc(var(--space-fix, 0) * 1em);
+}
+/* Figma's ✓ is a glyph of the 18 px label here, not of the 22 px one: the drawn mark scales with
+   it (16.6 × 18.9 at 22 px, × 18/22). The gap was measured on 1055:3631 instead of scaled: with
+   2.9 the mark and the text start on Figma's pixels (2.4 and 3.45 both put them a pixel off). */
+.kiosk-root .booth-screen-v2 .options-grid .v2-mark-check {
+  width: calc(13.58 * var(--fx));
+  height: calc(15.46 * var(--fx));
+  top: calc(1.06 * var(--fx));
+}
+.kiosk-root .booth-screen-v2 .options-grid .options-choice {
+  gap: calc(2.9 * var(--fx));
+}
+/* The grid has no 2 px inset as the two-answer row (64 tall, 60 tall answers) has, so nothing
+   makes up for it: the preview ends 12 above the first answer and the grid 4 above the bar. */
+.kiosk-root .booth-screen-v2 .options-preview.options-preview-grid {
+  margin-bottom: 0;
+}
+.kiosk-root .booth-screen-v2 .options-rows.options-rows-grid {
+  margin-bottom: calc(4 * var(--fx));
+}
 
 /* The bottom bar: "처음으로" at the left, then "이전" where there is a way back, the main button
    to the right edge of the content (Figma: 30 → 204, 224 → 333, 353 → 732; without "이전" the

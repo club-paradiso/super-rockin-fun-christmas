@@ -437,8 +437,8 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
   // A new screen starts at its top, whatever the last one was scrolled to.
   await page.getByTestId("start-camera").click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
-  // 폴라로이드 1컷 has no options: "이 틀로 찍기" goes straight to the camera.
-  await page.getByTestId("frame-option-polaroid1").click();
+  // 폴라로이드 3컷 has no options: "이 틀로 찍기" goes straight to the camera.
+  await page.getByTestId("frame-option-polaroid3").click();
   await page.getByRole("button", { name: KIOSK_COPY.zh.frame.shoot }).click();
   await expect(page.getByTestId("screen-ready")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
