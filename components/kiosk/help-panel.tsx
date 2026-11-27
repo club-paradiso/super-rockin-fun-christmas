@@ -450,7 +450,7 @@ function HelpCameraEngine({ cameraEngine }: { cameraEngine: BoothCameraEngine })
               </div>
             ))}
           </dl>
-          {status.permission === "prompt" && (
+          {status.reason === "permission-pending" && (
             // A touch: the one place iOS lets the page ask for the motion sensors.
             <button
               type="button"

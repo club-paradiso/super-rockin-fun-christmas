@@ -1464,7 +1464,6 @@ export function KioskApp({
               dispatch({ type: "OPEN" });
             }}
             engine={engineNow}
-            engineTick={cameraEngine.tick}
             onStart={() => dispatch({ type: "START", sessionId: newSessionId() })}
             onStartMobile={() => dispatch({ type: "START_MOBILE" })}
             mobileQrSvg={
@@ -1622,7 +1621,6 @@ interface ScreenProps {
   lookView: LookView;
   /** 「카메라 자동 보정」: the preview gets the photo's correction. Null: off. */
   engine: CameraEngine | null;
-  engineTick: number;
   /** The colour row of the choice screen: every look on the first shot. Empty: no row. */
   lookChips: readonly LookChip[];
   /** The options screen's preview (the chosen colour / logo, the cycling handwriting). */
@@ -2017,7 +2015,6 @@ function Screen(p: ScreenProps) {
               mirror={KIOSK_CONFIG.mirror}
               lookView={p.lookView}
               engine={p.engine}
-              engineTick={p.engineTick}
             >
               <div className="absolute inset-0 flex items-center justify-center">
                 {state.phase === "countdown" ? (

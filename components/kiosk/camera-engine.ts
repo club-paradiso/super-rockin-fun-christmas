@@ -18,10 +18,11 @@ import type { KioskPhase } from "@/lib/kiosk/machine";
  * booth runs exactly as it did before the engine existed.
  */
 export interface BoothCameraEngine {
-  /** The engine while staff have it on, else null. */
+  /**
+   * The engine while staff have it on, else null. The preview subscribes to it itself, so a
+   * booth that is moved redraws one <video>'s style and not the whole booth.
+   */
   engine: CameraEngine | null;
-  /** Changes whenever the correction may have changed: the preview follows it. */
-  tick: number;
   /** A heartbeat brought the staff setting. */
   heard: (settings: CameraEngineSettings) => void;
   /** Inside the "화면을 눌러 시작" touch: iOS only answers the sensor question there. */
@@ -29,8 +30,10 @@ export interface BoothCameraEngine {
   /** The camera is running: which one it is. */
   cameraStarted: (camera: CameraProvider, deviceId: string | undefined) => void;
   /**
-   * For the heartbeat: the status while on, `null` once after it was turned off (so the
-   * server forgets the old one), otherwise `undefined` (nothing is sent).
+   * For the heartbeat: the status while on; `null` when this tablet has it off although staff
+   * have it on, and once after it was turned off (so the server forgets an old status);
+   * otherwise `undefined` (nothing is sent: a deployment that never used the engine never
+   * hears of it).
    */
   heartbeatStatus: () => CameraEngineStatus | null | undefined;
   /** For the staff help menu; null while off. */
@@ -52,7 +55,6 @@ export function useCameraEngine(
 
   const engineRef = useRef<CameraEngine | null>(null);
   const [engine, setEngine] = useState<CameraEngine | null>(null);
-  const [tick, setTick] = useState(0);
   const reportedRef = useRef(false);
 
   // One engine for the page: the answer to the sensor question lives in it, so a change of
@@ -60,9 +62,7 @@ export function useCameraEngine(
   useEffect(() => {
     const created = new CameraEngine();
     engineRef.current = created;
-    const off = created.subscribe(() => setTick((n) => n + 1));
     return () => {
-      off();
       created.dispose();
       engineRef.current = null;
     };
@@ -119,16 +119,20 @@ export function useCameraEngine(
     const current = engineRef.current;
     return current?.active() ? current.status() : null;
   }, []);
+  const staffOnRef = useRef(initial.mode !== "off");
+  useEffect(() => {
+    staffOnRef.current = heardSettings.mode !== "off";
+  }, [heardSettings]);
   const heartbeatStatus = useCallback(() => {
     const now = status();
     if (now) {
       reportedRef.current = true;
       return now;
     }
-    if (!reportedRef.current) return undefined;
+    if (!reportedRef.current && !staffOnRef.current) return undefined;
     reportedRef.current = false;
     return null;
   }, [status]);
 
-  return { engine, tick, heard, requestPermission, cameraStarted, heartbeatStatus, status };
+  return { engine, heard, requestPermission, cameraStarted, heartbeatStatus, status };
 }

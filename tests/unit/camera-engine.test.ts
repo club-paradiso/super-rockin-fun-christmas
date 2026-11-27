@@ -443,6 +443,17 @@ describe("when drawing fails", () => {
     expect(engine.planFor(1280, 720, 4 / 3).identity).toBe(false);
   });
 
+  it("a stream that has not said its size is no error and changes no status", () => {
+    const { engine, stand, canvases } = setup();
+    stand(5, 9);
+    const before = engine.status();
+    expect(engine.preview(0, 0, 400, 300, 4 / 3, true)).toBeNull();
+    expect(engine.preview(1280, 720, 0, 0, 4 / 3, true)).toBeNull();
+    expect(engine.correct(shot(canvases.factory, { srcWidth: 0, srcHeight: 0 }))).toBeNull();
+    expect(engine.status()).toEqual(before);
+    expect(engine.status().error).toBeNull();
+  });
+
   it("never throws into the capture, whatever it is handed", () => {
     const { engine, stand, canvases } = setup();
     stand(5, 9);

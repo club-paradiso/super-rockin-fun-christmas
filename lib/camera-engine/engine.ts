@@ -187,7 +187,9 @@ export class CameraEngine {
   planFor(srcWidth: number, srcHeight: number, aspect: number): Plan {
     const key = `${srcWidth}x${srcHeight}:${aspect}:${this.version}`;
     if (this.cache?.key === key) return this.cache.plan;
-    this.geometry = { srcWidth, srcHeight, aspect };
+    // A stream that has not said its size yet is not a stream to describe to staff.
+    if (srcWidth > 0 && srcHeight > 0 && aspect > 0)
+      this.geometry = { srcWidth, srcHeight, aspect };
     const plan = this.compute(srcWidth, srcHeight, aspect);
     this.cache = { key, plan };
     return plan;
@@ -196,6 +198,9 @@ export class CameraEngine {
   /** The correction for one photo. Bound, so it can be handed to the camera as it is. */
   readonly correct: FrameCorrector = (input) => {
     if (!this.active()) return null;
+    // Nothing to correct in a frame without a size; the usual path reports that its own way.
+    if (!(input.srcWidth > 0 && input.srcHeight > 0 && input.width > 0 && input.height > 0))
+      return null;
     try {
       let plan = this.planFor(input.srcWidth, input.srcHeight, input.aspect);
       if (plan.identity) return null;
@@ -242,6 +247,8 @@ export class CameraEngine {
     mirror: boolean,
   ): PreviewLayout | null {
     if (!this.active()) return null;
+    // Before the <video> knows its size (or is laid out) there is nothing to place.
+    if (!(srcWidth > 0 && srcHeight > 0 && boxWidth > 0 && boxHeight > 0)) return null;
     try {
       const plan = this.planFor(srcWidth, srcHeight, aspect);
       if (plan.identity) return null;

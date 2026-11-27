@@ -262,7 +262,6 @@ export function CameraPreview({
   mirror,
   lookView = null,
   engine = null,
-  engineTick = 0,
   children,
 }: {
   stream: MediaStream | null;
@@ -272,8 +271,6 @@ export function CameraPreview({
   lookView?: "mono" | "sepia" | null;
   /** The camera engine while staff have it on. */
   engine?: CameraEngine | null;
-  /** Changes when the engine's correction may have changed. */
-  engineTick?: number;
   children?: React.ReactNode;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -335,19 +332,23 @@ export function CameraPreview({
       video.dataset.engine = "on";
     };
     place();
+    // The engine says when its correction may have changed (the booth was moved, a session
+    // began or ended): only this element is touched, React renders nothing.
+    const unsubscribe = engine.subscribe(place);
     video.addEventListener("loadedmetadata", place);
     video.addEventListener("resize", place);
     window.addEventListener("resize", place);
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
     observer?.observe(box);
     return () => {
+      unsubscribe();
       video.removeEventListener("loadedmetadata", place);
       video.removeEventListener("resize", place);
       window.removeEventListener("resize", place);
       observer?.disconnect();
       plain();
     };
-  }, [engine, engineTick, stream, aspect, mirror]);
+  }, [engine, stream, aspect, mirror]);
 
   return (
     <div

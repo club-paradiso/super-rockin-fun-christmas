@@ -45,6 +45,7 @@ export class TiltSensors {
   private listening = false;
   private lastOrientation: { up: Vec3; at: number } | null = null;
   private lastAccepted = -Infinity;
+  private lastCrossCheck = -Infinity;
   private lastSource: SensorSource | null = null;
   /** Running angle between the two sources when both report, degrees. */
   private disagree = 0;
@@ -153,7 +154,9 @@ export class TiltSensors {
   private readonly onMotion = (event: Event) => {
     const at = this.now();
     const fresh = this.lastOrientation && at - this.lastOrientation.at < this.cfg.staleMs / 3;
-    if (!fresh && at - this.lastAccepted < this.cfg.sampleIntervalMs) return;
+    // Either way a dozen a second is plenty.
+    const last = fresh ? this.lastCrossCheck : this.lastAccepted;
+    if (at - last < this.cfg.sampleIntervalMs) return;
     const a = (event as Partial<DeviceMotionEvent>).accelerationIncludingGravity;
     const reading = a ? gravityAxis(a.x, a.y, a.z) : null;
     if (!reading) return;
@@ -165,6 +168,7 @@ export class TiltSensors {
       return;
     if (fresh && this.lastOrientation) {
       // Orientation leads; the accelerometer only says whether the two agree.
+      this.lastCrossCheck = at;
       const up = resolveUp(reading.axis, this.lastOrientation.up, 0);
       this.disagree += 0.05 * (angleBetween(up, this.lastOrientation.up) - this.disagree);
       return;
