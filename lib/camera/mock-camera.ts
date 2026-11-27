@@ -67,6 +67,9 @@ export class MockCamera implements CameraProvider {
     this.timer = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
+    // Every start makes a new picture: give this one's pixels back now rather than whenever the
+    // browser collects it (captured frames are their own canvases and are not touched).
+    if (this.source) this.source.width = this.source.height = 0;
     this.source = null;
   }
 

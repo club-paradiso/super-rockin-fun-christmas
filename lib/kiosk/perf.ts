@@ -11,8 +11,7 @@
 /** Every span the booth records. The server accepts these codes and no others. */
 export const PERF_CODES = [
   // Loading, once per page load.
-  "boot_fonts",
-  "boot_assets",
+  "boot_assets", // every frame's art and fonts (not on the iPad mini 4 budget: see frame_kit)
   "boot_samples",
   "boot_luts",
   // A tap (or an automatic step) until the next screen has been painted.
@@ -28,13 +27,14 @@ export const PERF_CODES = [
   "screen_mobile",
   "screen_attract",
   // Canvas work.
+  "frame_kit", // the chosen frame's art and fonts, loaded when it is chosen (iPad mini 4 budget)
   "thumbs", // the frame picker's previews, when any had to be drawn on entry
   "option_preview", // one options-screen preview drawn on the spot
   "camera_start", // getUserMedia until the stream is live
   "capture_grab", // one shot: the frame taken from the camera
   "capture_total", // one shot: grab + its JPEG for the screen
   "graded_shots", // the shots redrawn in a colour look (review / choice screens)
-  "look_row", // the colour row's chips
+  "look_row", // the colour row's page on show (four chips), when it had to be drawn with the screen
   "stages", // skin retouch (photo stages) before the frame
   "compose", // composeFrame: the final picture
   "encode", // the final picture as JPEG
@@ -54,8 +54,7 @@ export function isPerfCode(value: unknown): value is PerfCode {
 
 /** What staff read on the booth (Korean, like the rest of the help menu). */
 export const PERF_LABELS: Record<PerfCode, string> = {
-  boot_fonts: "시작 · 글꼴",
-  boot_assets: "시작 · 틀 그림",
+  boot_assets: "시작 · 틀 그림·글꼴 (전체)",
   boot_samples: "시작 · 예시 사진",
   boot_luts: "시작 · 색감 파일",
   screen_welcome: "화면 · 시작 선택",
@@ -69,6 +68,7 @@ export const PERF_LABELS: Record<PerfCode, string> = {
   screen_delivery: "화면 · QR",
   screen_mobile: "화면 · 휴대폰 참여",
   screen_attract: "화면 · 처음",
+  frame_kit: "고른 틀 준비 (그림·글꼴)",
   thumbs: "틀 미리보기 그리기",
   option_preview: "옵션 미리보기 그리기",
   camera_start: "카메라 준비",

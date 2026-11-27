@@ -357,6 +357,23 @@ looks:measure`). `/looks` is the comparison
   milliseconds; anything else is dropped; logged, never stored). Never put a photo, a face, a
   token, a session id or free text in it, and never let a measurement delay a guest. A number
   measured on a desktop (even with the CPU slowed) is never written down as an iPad number.
+- **The iPad mini 4 budget draws less, and only that budget** (속도, 2026-11-27, a user request).
+  `LEGACY_IOS15_RENDER_BUDGET` (`lib/kiosk/legacy-ios.ts`) is the one place that says what the
+  slow tablet skips; never a new device or user-agent branch. On it: the frame picker shows the
+  ready-made pictures of `public/kiosk-thumbs` (`npm run thumbs:build` saves the booth's own
+  previews; never hand-make one; `tests/unit/pick-thumbs.test.ts` fails while a frame, its art or a
+  sample differs from what they were built from) and composes nothing for the picker; a frame's
+  art and fonts are loaded when that frame is chosen (`FrameKit`, `lib/kiosk/frame-kit.ts`), and
+  asked for once more before the final picture, so a file lost to a network moment gets a second
+  try (a print that still lacks art says so: `[frame-kit]` on the console, `data-art="partial"`);
+  graded copies are smaller and drawn on the tap, not ahead; the page pictures are JPEG, the paper
+  grain is a ready tile and `filter: drop-shadow()` is off (`npm run kiosk:lite`,
+  `app/kiosk-figma.css`). If a ready-made picture does not load, that booth draws its cards itself
+  and loads everything, as every other booth does. The saved photo is the same compositor with
+  the same data on every budget. On every booth the colour row draws the page on show (four
+  chips) with the screen and the other pages in the background or on the turn (`showLookPage`);
+  it is still all or nothing. Whether any of this is faster on the real tablet is a number read
+  from that tablet's speed log, never claimed from a desktop run.
 - **The camera engine is off by default, on the device, and may fail without the booth failing**
   (「카메라 자동 보정」, D120, 2026-11-27, `docs/CAMERA_ENGINE.md`). It turns back the tablet's own
   tilt: roll (Smart Level) and, partly, pitch (Smart Perspective), read from the motion sensors.
@@ -477,6 +494,9 @@ config/camera-engine.ts every camera-engine number: limits, dead zones, guard, c
 camera-lab/            /camera-lab page (own Vite bundle for Safari 15) · app/camera-lab (route, gated)
 lib/kiosk/render-cache.ts  screen pictures (frame previews, graded shots, colour chips) drawn once,
                        kept, and drawn ahead one per task; a miss is drawn on the spot as before
+lib/kiosk/frame-kit.ts a frame's art + fonts, loaded once and retried (all at start, or per chosen frame)
+lib/kiosk/pick-thumbs.ts  the picker's ready-made previews (public/kiosk-thumbs) and what they were built from
+scripts/kiosk-lite-assets.mjs  JPEG page pictures + grain tile for the iPad mini 4 budget (npm run kiosk:lite)
 lib/kiosk/perf.ts      속도 기록: the booth's own step timings (codes + ms), table for staff, heartbeat report
 lib/kiosk/photo-stages.ts  the one hook between shooting and the frame (skin retouch; the colour look is composeFrame's grade)
 config/retouch.ts      every skin-retouch number: levels, thresholds, budgets, the flag

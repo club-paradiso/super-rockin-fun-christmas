@@ -101,8 +101,8 @@ describe("booth speed log (속도 기록)", () => {
     const log = new PerfLog(() => 0);
     log.record("finish", 1);
     log.record("screen_pick", 1);
-    log.record("boot_fonts", 1);
-    expect(log.rows().map((r) => r.code)).toEqual(["boot_fonts", "screen_pick", "finish"]);
+    log.record("boot_assets", 1);
+    expect(log.rows().map((r) => r.code)).toEqual(["boot_assets", "screen_pick", "finish"]);
   });
 
   it("mirrors each span (start and duration) and survives a mirror that throws", () => {

@@ -66,6 +66,25 @@ describe("iPad mini 4 / Safari 15 detection", () => {
     expect(LEGACY_IOS15_RENDER_BUDGET.cameraHeight).toBeLessThan(1080);
     expect(LEGACY_IOS15_RENDER_BUDGET.captureMaxWidth).toBeLessThan(1600);
     expect(LEGACY_IOS15_RENDER_BUDGET.outputScale).toBe(1);
+    // 속도 (2026-11-27): the mini 4 budget draws less. The usual budget is the booth as it was.
+    expect(STANDARD_RENDER_BUDGET).toMatchObject({
+      staticPickThumbs: false,
+      lazyFrameKit: false,
+      prefetchLookShots: true,
+      gradedShotEdge: 480,
+      lookChipEdge: 280,
+    });
+    expect(LEGACY_IOS15_RENDER_BUDGET).toMatchObject({
+      staticPickThumbs: true,
+      lazyFrameKit: true,
+      prefetchLookShots: false,
+    });
+    expect(LEGACY_IOS15_RENDER_BUDGET.gradedShotEdge).toBeLessThan(
+      STANDARD_RENDER_BUDGET.gradedShotEdge,
+    );
+    expect(LEGACY_IOS15_RENDER_BUDGET.lookChipEdge).toBeLessThan(
+      STANDARD_RENDER_BUDGET.lookChipEdge,
+    );
     expect(LEGACY_IOS15_RENDER_BUDGET.recordVideo).toBe(false);
   });
 
