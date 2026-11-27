@@ -17,7 +17,7 @@
 | 틀 내림: `RETIRED_CARD_IDS`(lace1 · polaroid3 · verse4). 부스·휴대폰 선택지에서 빠짐, 휴대폰의 새 업로드는 거절(400 frame). 이미 저장된 사진은 그 틀 그대로 미디어월·검토에 쓰임 | 구현됨. 단위 + E2E                                                |
 | 이제 모든 틀에 옵션 화면이 있어 가장 짧은 경로는 6번 터치(5번 경로는 없어짐)                                                                                                     | 단위 + E2E                                                        |
 | iPad mini 4용 미리 만든 썸네일: 내린 3장 파일과 manifest 항목 삭제                                                                                                               | 단위 테스트                                                       |
-| Figma: 9장 화면(1069:2245)을 복제해 3장을 숨긴 6장 화면 **1082:1896** 추가(원본은 그대로). 기준 그림 `screen-pick.webp` 다시 내보냄                                              | Figma 일치 화면 테스트(Chromium): E2E_RESULT_PICK                 |
+| Figma: 9장 화면(1069:2245)을 복제해 3장을 숨긴 6장 화면 **1082:1896** 추가(원본은 그대로). 기준 그림 `screen-pick.webp` 다시 내보냄                                              | Figma 일치 화면 테스트(Chromium) 통과: 1 px · 1.136 %(한도 2 px · 2 %)                 |
 | Supabase 마이그레이션 실제 적용(`npm run test:supabase`)                                                                                                                         | **미검증**: 이 컨테이너에 로컬 Supabase 없음                      |
 | WebKit에서 Figma 일치                                                                                                                                                            | **미측정**                                                        |
 
