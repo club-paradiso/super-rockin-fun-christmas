@@ -1,7 +1,7 @@
 import { lookCubeUrl, NO_LOOK } from "@/config/looks";
 import type { CanvasLike } from "@/lib/canvas";
 import type { PhotoGrader } from "@/lib/compositor/compose";
-import { FRAME_LOOKS, lookForFrame } from "./config";
+import { FRAME_LOOKS, frameToneIsFixed, lookForFrame } from "./config";
 import { parseCube, type Lut3D } from "./cube";
 import { LookRenderer, type GlCanvas } from "./renderer";
 import { renderParams } from "./types";
@@ -56,6 +56,8 @@ export interface LookOverride {
  * "원본" (`NO_LOOK`) over a frame that has a look is `{ lookId: NO_LOOK }`, which grades nothing.
  */
 export function chosenLook(frameId: string, lookId: string | null): LookOverride | undefined {
+  // A black-and-white or sepia frame keeps its own tone, whatever was asked (frameToneIsFixed).
+  if (frameToneIsFixed(frameId)) return undefined;
   return lookId && (lookForFrame(frameId)?.look.id ?? NO_LOOK) !== lookId ? { lookId } : undefined;
 }
 

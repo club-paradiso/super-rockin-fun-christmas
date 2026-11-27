@@ -34,6 +34,18 @@ export function lookForFrame(
   return look ? { look, strength: entry.strength } : null;
 }
 
+/**
+ * A frame whose concept is its tone (흑백, 세피아: 필름 3컷, 35mm 필름's 흑백 and 세피아) offers no
+ * colour choice (a user decision, 2026-11-27: "애초부터 흑백 컨셉 이런 템플릿은 필터 고르지
+ * 못하게"). Its photos keep the frame's own `photoTone`: no colour row, `SET_LOOK` refused, and
+ * no look in the print even if one were asked for.
+ */
+export function frameToneIsFixed(frameId: string | null | undefined): boolean {
+  if (!frameId || !isKnownFrameId(frameId)) return false;
+  const tone = getFrame(frameId).photoTone;
+  return tone === "mono" || tone === "sepia";
+}
+
 /** Everything wrong with a mapping, in words. Empty when it is sound. */
 export function frameLookProblems(
   map: FrameLookMap,

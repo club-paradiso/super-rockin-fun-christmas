@@ -169,7 +169,9 @@ describe("the colour row of the photo choice screen", () => {
     expect(chosenLook("film4-red", null)).toBeUndefined();
     expect(chosenLook("film4-red", NO_LOOK)).toBeUndefined();
     expect(chosenLook("film4-red", "lamp")).toEqual({ lookId: "lamp" });
-    expect(chosenLook("film3-mono-logo", "ink")).toEqual({ lookId: "ink" });
+    expect(chosenLook("film35-natural", "ink")).toEqual({ lookId: "ink" });
+    // A black-and-white or sepia frame takes no look (2026-11-27, a user decision).
+    expect(chosenLook("film3-mono-logo", "ink")).toBeUndefined();
   });
 
   it("with no look, the camera view of a black-and-white or sepia frame keeps the frame's tone", () => {
