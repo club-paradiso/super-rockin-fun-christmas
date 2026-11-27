@@ -14,8 +14,13 @@ export function frameFontRequests(frames: readonly FrameDefinition[]) {
   for (const frame of frames)
     for (const d of frame.decorations ?? []) {
       if (d.type === "hand") {
-        // The font is chosen per session: every one of the ten must be ready.
-        for (const f of HAND_FONTS) add(`${f.weight} ${f.size * d.scale}px "${f.family}"`, d.text);
+        // The date is filled in at compose time ({handDate}).
+        const text = d.text.replaceAll("{handDate}", "0123456789. ");
+        // A caption with Figma's own font needs only that one.
+        if (d.font) add(`${d.font.weight} ${d.font.size}px "${d.font.family}"`, text);
+        // Otherwise the font is chosen per session: every one of the ten must be ready.
+        else
+          for (const f of HAND_FONTS) add(`${f.weight} ${f.size * d.scale}px "${f.family}"`, text);
         continue;
       }
       if (d.type !== "text") continue;

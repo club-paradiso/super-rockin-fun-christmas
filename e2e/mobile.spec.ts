@@ -118,8 +118,13 @@ test("내 사진으로 참여하기: QR → phone → booth sees it → staff ap
     "data-frame",
     "polaroid1",
   );
-  // A card without options shows none.
-  await expect(guest.getByTestId("mobile-frame-options")).toHaveCount(0);
+  // 폴라로이드 1컷 offers the booth's ten captions (2026-11-26), the first already chosen.
+  const captions = guest.getByTestId("mobile-frame-options").getByRole("radio");
+  await expect(captions).toHaveCount(10);
+  await expect(guest.getByTestId("mobile-option-caption-village")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
   await guest.getByTestId("mobile-frame-confirm").click();
   // Then exactly as many photos as the frame holds: one here, so it is chosen for the guest.
   await guest.getByTestId("mobile-file").setInputFiles(await photoFile(1600, 1200));
