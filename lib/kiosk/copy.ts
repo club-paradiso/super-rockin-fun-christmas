@@ -188,7 +188,8 @@ const ko = {
     lookTitle: "색감",
     lookNext: "다음",
     // Not "이전": that is the step back in the bottom bar of the same screen (2026-11-25).
-    lookPrev: "앞장",
+    // The last page goes back to the first (three pages since 「원본」, 2026-11-26), so it says so.
+    lookFirst: "첫 장",
     lookChoose: (name: string) => `${name} 색감으로 바꾸기`,
     looks: {
       none: "원본",
@@ -465,7 +466,7 @@ const en: KioskCopy = {
     confirm: "Finish with these",
     lookTitle: "Colour",
     lookNext: "Next",
-    lookPrev: "Previous",
+    lookFirst: "First page",
     lookChoose: (name) => `Change the colour to ${name}`,
     looks: {
       none: "Original",
@@ -725,7 +726,7 @@ const zh: KioskCopy = {
     confirm: "用这些照片完成",
     lookTitle: "色调",
     lookNext: "下一页",
-    lookPrev: "上一页",
+    lookFirst: "第一页",
     lookChoose: (name) => `换成“${name}”色调`,
     looks: {
       none: "原图",

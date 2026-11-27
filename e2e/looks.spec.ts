@@ -594,7 +594,11 @@ test.describe("the booth with looks", () => {
       await page.getByTestId("look-turn").click();
       await expect(page.getByTestId("look-page")).toHaveText("3 / 3");
       await expect(page.getByTestId("look-walnut")).toBeVisible();
-      await expect(page.getByTestId("look-turn")).toHaveText("‹ 앞장");
+      await expect(page.getByTestId("look-turn")).toHaveText("‹ 첫 장");
+      // The last page goes back to the first, so 「원본」 is always in reach (never 2 ↔ 3).
+      await page.getByTestId("look-turn").click();
+      await expect(page.getByTestId("look-page")).toHaveText("1 / 3");
+      await expect(page.getByTestId("look-none")).toBeVisible();
       await page.getByTestId("look-turn").click();
       await expect(page.getByTestId("look-page")).toHaveText("2 / 3");
 

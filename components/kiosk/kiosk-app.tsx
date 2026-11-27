@@ -2732,9 +2732,9 @@ function LookRow({
             type="button"
             className="booth-btn-m look-turn"
             data-testid="look-turn"
-            onClick={() => setPage(last ? page - 1 : page + 1)}
+            onClick={() => setPage(last ? 0 : page + 1)}
           >
-            {last ? `‹ ${t.select.lookPrev}` : `${t.select.lookNext} ›`}
+            {last ? `‹ ${t.select.lookFirst}` : `${t.select.lookNext} ›`}
           </button>
         )}
       </div>
