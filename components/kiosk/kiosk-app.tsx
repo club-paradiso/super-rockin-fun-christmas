@@ -454,6 +454,7 @@ export function KioskApp({
     createInitialState<Shot>({
       shotCount: KIOSK_CONFIG.shotsPerSession,
       countdownSeconds: KIOSK_CONFIG.countdownSeconds,
+      restSeconds: KIOSK_CONFIG.restSeconds,
       lastHandFont: readStoredHandFont(),
       retouch: skinRetouch,
     }),
@@ -797,6 +798,12 @@ export function KioskApp({
     const timer = setTimeout(() => dispatch({ type: "TICK" }), 1000);
     return () => clearTimeout(timer);
   }, [state.phase, state.remaining, state.shotIndex]);
+  // The breather between two shots: after restSeconds the next countdown starts by itself.
+  useEffect(() => {
+    if (state.phase !== "rest") return;
+    const timer = setTimeout(() => dispatch({ type: "REST_DONE" }), state.restSeconds * 1000);
+    return () => clearTimeout(timer);
+  }, [state.phase, state.restSeconds, state.shotIndex]);
   // A clock tick each second, a brighter one for the last three. Sound only follows the count.
   useEffect(() => {
     if (state.phase !== "countdown") return;
@@ -2522,7 +2529,8 @@ function Screen(p: ScreenProps) {
 
     case "ready":
     case "countdown":
-    case "capturing": {
+    case "capturing":
+    case "rest": {
       const shooting = state.phase !== "ready";
       const pose = currentPose(state);
       return (
@@ -2547,6 +2555,11 @@ function Screen(p: ScreenProps) {
                     className="countdown-number countdown-pop"
                   >
                     {state.remaining}
+                  </span>
+                ) : null}
+                {state.phase === "rest" ? (
+                  <span data-testid="rest-note" className="booth-title rest-note">
+                    {t.shoot.rest}
                   </span>
                 ) : null}
               </div>

@@ -28,7 +28,7 @@ describe("mock camera flow", () => {
 
     dispatch({ type: "OPEN", sessionId: crypto.randomUUID() });
     // 필름 4컷 · 빨강: a card with an option and the handwriting. One tap chooses it and goes on.
-    dispatch({ type: "PICK_CARD", cardId: "film4", random: 0.5 });
+    dispatch({ type: "PICK_CARD", cardId: "film", random: 0.5 });
     dispatch({ type: "SET_OPTION", key: "color", value: "red" });
     dispatch({ type: "CONFIRM_OPTIONS", random: 0.5 });
     expect(state.frameId).toBe("film4-red");
