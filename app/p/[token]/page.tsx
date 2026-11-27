@@ -5,6 +5,7 @@ import { getPhotoService } from "@/lib/storage/server";
 import { BrandLockup } from "@/components/brand";
 import { StampTicket } from "@/components/studio/stamp-ticket";
 import { SavePhoto } from "./save-photo";
+import { SaveStory } from "./save-story";
 import { SaveVideo } from "./save-video";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
         {/* eslint-disable-next-line @next/next/no-img-element -- private, uncached image */}
         <img src={src} alt="내 네컷 사진" className="max-h-[70dvh] w-auto rounded-lg" />
         <SavePhoto imageUrl={src} mime={photo.mime} />
+        <SaveStory imageUrl={src} createdAt={photo.createdAt} />
         {/* A video may arrive shortly after the photo/QR: the client checks without a reload. */}
         <SaveVideo
           videoUrl={`/p/${encodeURIComponent(token)}/video`}
