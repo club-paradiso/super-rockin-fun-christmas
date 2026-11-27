@@ -575,6 +575,7 @@ describe.skipIf(!enabled)("staff + kiosk APIs on local Supabase", () => {
         wallPublic: false,
         aiReview: false,
         photoLooks: true,
+        mobileUpload: false,
         cameraEngine: defaultCameraEngine(),
         // The booth dates photos by the server's clock (틀 선택 v2 date stamp).
         serverNow: expect.any(String),
