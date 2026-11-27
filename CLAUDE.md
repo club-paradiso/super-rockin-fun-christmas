@@ -54,9 +54,16 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   `fallbackPhotoBudgetMs`. A wrong fallback setting turns only the fallback off
   (`aiModerationFallbackProblem`), never a `ConfigError`.
 - **Vendor-neutral.** Do not invent MY4CUT (or any vendor) APIs. Hardware is a shell.
-- **Preview = result.** Preview and capture share `KIOSK_CONFIG.captureAspect` and
-  `KIOSK_CONFIG.mirror`. Never stretch an image; crop with `coverCrop`. The v2 frames (below) have
-  slots of other shapes (square, oval, Figma sizes): the 4:3 shot is cover-cropped into them.
+- **Preview = result.** Every shot is taken at `KIOSK_CONFIG.captureAspect` (4:3) with
+  `KIOSK_CONFIG.mirror`, and the live view inside the preview is that 4:3 shot. Never stretch an
+  image; crop with `coverCrop`. The v2 frames (below) have slots of other shapes (square, oval,
+  Figma sizes): the 4:3 shot is cover-cropped into them, centred. Since 2026-11-27 (a user
+  request: "촬영시 카메라 화면이 너무 작아. 키오스크는 세로") the preview is a window of the chosen
+  frame's slot shape over that 4:3 view, centred the same way (`previewAspect` /
+  `previewViewSize`, `lib/kiosk/preview-shape.ts`), so it shows exactly the part of each shot the
+  print keeps, larger for square and tall slots; a frame whose slots differ in shape keeps the
+  whole 4:3 view. Only the view changes: never change the capture, the crop or the composite for
+  it (`tests/unit/preview-shape.test.ts`, the centred-crop check in `e2e/tablet-matrix.spec.ts`).
 - **Looks are on by default, behind a staff switch** (2026-11-23, `lib/looks`; on by default since
   2026-11-25, a user decision: the guest must be able to choose a colour,
   `docs/research/`): eight looks, each the house stock (`HOUSE` in `config/looks/index.ts`) plus

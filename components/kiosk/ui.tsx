@@ -5,6 +5,7 @@ import { BrandLockup, BrandWordmark } from "@/components/brand";
 import { useAssetReady } from "@/components/studio/stamp-ticket";
 import { STUDIO_ASSETS } from "@/config/studio";
 import type { CameraEngine } from "@/lib/camera-engine/engine";
+import { previewViewSize } from "@/lib/kiosk/preview-shape";
 import { boothSound } from "@/lib/kiosk/sound";
 import { BoothFooter, useKioskChrome, useKioskCopy } from "./chrome";
 import { KioskFullscreenControl } from "./fullscreen";
@@ -258,10 +259,17 @@ export function CameraPreview({
   mirror,
   lookView = null,
   engine = null,
+  windowAspect = aspect,
   children,
 }: {
   stream: MediaStream | null;
+  /** The shape of every shot (`KIOSK_CONFIG.captureAspect`): the view inside is always this. */
   aspect: number;
+  /**
+   * The shape of the window on screen: the chosen frame's slot (lib/kiosk/preview-shape.ts), so
+   * the guest sees the part of the shot the frame keeps. Defaults to the whole shot.
+   */
+  windowAspect?: number;
   mirror: boolean;
   /** A black-and-white frame with looks on shows the live picture that way (lib/looks/config.ts). */
   lookView?: "mono" | "sepia" | null;
@@ -346,25 +354,40 @@ export function CameraPreview({
     };
   }, [engine, stream, aspect, mirror]);
 
+  const view = previewViewSize(windowAspect, aspect);
   return (
     <div
-      ref={boxRef}
       className="camera-preview"
       data-testid="camera-preview-box"
-      style={{ aspectRatio: String(aspect), "--aspect": String(aspect) } as React.CSSProperties}
+      data-aspect={windowAspect.toFixed(4)}
+      style={
+        {
+          aspectRatio: String(windowAspect),
+          "--aspect": String(windowAspect),
+        } as React.CSSProperties
+      }
     >
-      {/* muted + playsInline: iOS Safari plays a camera stream inline only with both. */}
-      <video
-        ref={videoRef}
-        data-testid="camera-preview"
-        data-look-view={lookView ?? undefined}
-        muted
-        playsInline
-        autoPlay
-        disablePictureInPicture
-        className="h-full w-full object-cover"
-        style={{ transform: mirror ? "scaleX(-1)" : undefined }}
-      />
+      {/* The whole shot (4:3), centred and as large as the window needs: the window shows the
+          part of it the frame keeps, exactly as composeFrame cuts it (preview-shape.ts). */}
+      <div
+        ref={boxRef}
+        className="camera-preview-view"
+        data-testid="camera-preview-view"
+        style={{ width: `${view.width * 100}%`, height: `${view.height * 100}%` }}
+      >
+        {/* muted + playsInline: iOS Safari plays a camera stream inline only with both. */}
+        <video
+          ref={videoRef}
+          data-testid="camera-preview"
+          data-look-view={lookView ?? undefined}
+          muted
+          playsInline
+          autoPlay
+          disablePictureInPicture
+          className="h-full w-full object-cover"
+          style={{ transform: mirror ? "scaleX(-1)" : undefined }}
+        />
+      </div>
       {!stream && <div className="camera-preview-wait">{t.camera.preview}</div>}
       <PhotoCorners />
       {children}

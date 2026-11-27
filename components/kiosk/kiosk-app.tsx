@@ -12,6 +12,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getFrame } from "@/config/frames";
+import { previewAspect } from "@/lib/kiosk/preview-shape";
 import {
   OFFERED_CARDS,
   OFFERED_V2_FRAMES,
@@ -2551,6 +2552,7 @@ function Screen(p: ScreenProps) {
             <CameraPreview
               stream={p.stream}
               aspect={aspect}
+              windowAspect={previewAspect(getFrame(state.frameId), aspect)}
               mirror={KIOSK_CONFIG.mirror}
               lookView={p.lookView}
               engine={p.engine}

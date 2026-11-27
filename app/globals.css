@@ -1280,6 +1280,15 @@ body {
     border-radius: 2px;
     background: color-mix(in srgb, var(--color-ink) 10%, transparent);
   }
+  /* The whole 4:3 shot inside the window of the frame's slot shape (lib/kiosk/preview-shape.ts),
+     centred; the window clips it. Its size is set inline from the two shapes. */
+  .camera-preview-view {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+  }
   /* A black-and-white frame with 「사진 색 보정」 on: the guest sees themselves that way before
      the shot. An element filter (Safari 15 has it), on the view only: the shot is never taken
      from this element, and the print's tone is the look's own arithmetic (lib/looks). */
