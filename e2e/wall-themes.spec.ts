@@ -255,9 +255,14 @@ test("staff change the background in 설정; an open wall follows without a relo
       quality: 80,
     });
   }
-  // Every card shows its bundled preview.
-  for (const img of await form.locator("img").all())
-    expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(640);
+  // Every card shows its bundled preview. The pictures load lazily: a card below the fold
+  // (the settings page grew a switch on 2026-11-27) loads once it is scrolled to.
+  for (const img of await form.locator("img").all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth))
+      .toBe(640);
+  }
 
   await form.locator('[data-theme="bethlehem"]').getByRole("radio").click();
   await form.getByTestId("wall-look-save").click();
