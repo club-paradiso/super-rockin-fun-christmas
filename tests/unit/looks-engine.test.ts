@@ -103,6 +103,21 @@ describe.each(LOOKS.map((look) => [look.id, look] as const))("%s tones", (_id, l
     expect(level(0)).toBeLessThan(12);
   });
 
+  it("the light reaches the face first: no skin tone, light or deep, comes out darker", () => {
+    // Levels of 255. Three is under what the eye sees on a face; Lamp took 16 off a deep skin
+    // tone and Flash 21 before this bar (2026-11-28).
+    const luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    for (const [r, g, b] of SKIN_TONES) {
+      const out = grade(r / 255, g / 255, b / 255);
+      expect(luma(out[0], out[1], out[2]) * 255).toBeGreaterThan(luma(r, g, b) - 3);
+    }
+  });
+
+  it("grain is the tooth of the paper, not noise on a face", () => {
+    expect(look.grain.amount).toBeLessThanOrEqual(0.024);
+    expect(look.grain.size).toBeGreaterThanOrEqual(600);
+  });
+
   it("every corner of the colour cube comes out a real colour", () => {
     for (const r of [0, 0.5, 1])
       for (const g of [0, 0.5, 1])

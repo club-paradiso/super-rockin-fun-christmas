@@ -11,8 +11,13 @@ import type { FaceJob, RetouchEngine } from "./types";
  *  2. à trous:  four edge-stopped 5 × 5 B3-spline passes with growing steps → c1…c4
  *               (Dammertz et al. 2010, "Edge-Avoiding À-Trous Wavelet Transform")
  *  3. activity: how strong the skin's own mid-size detail is around each pixel
- *  4. combine:  the correction (what to take out of each band) and the final mask
- *  5. final:    at full size, photo − mask × correction
+ *     around:   what the skin around each pixel looks like: the same kernel twice with no edge
+ *               stop, counting skin only (hair, brows, lips and background do not enter it).
+ *               트러블 is measured against it
+ *  4. combine:  the correction (what to take out of each band, and the contour light as a gain
+ *               on the smoothed colour) and the final mask
+ *  5. final:    at full size, photo − mask × correction; where the outline is drawn in
+ *               (윤곽 다듬기) the pixel is read from where the warp field says, bicubic
  */
 
 /** The correction is stored as value × ENCODE + BIAS (so ±0.25 fits a byte, 1/510 steps). */
@@ -22,6 +27,8 @@ export const BIAS = 128 / 255;
 export const ACTIVITY_GAIN = 8;
 /** Redness above the face's median that is looked at, at most. */
 export const REDNESS_CAP = 0.08;
+/** A move smaller than this many pixels is no move: the pixel is read where it is. */
+export const WARP_MIN_PX = 0.01;
 /** The mask view's colour and weight (lab page). */
 export const MASK_TINT = [0.1, 0.85, 0.55] as const;
 export const MASK_TINT_WEIGHT = 0.7;
@@ -115,6 +122,79 @@ export function atrous(
   return out;
 }
 
+/** A spot counts as trouble only where at least this share of what is around it is skin … */
+export const AROUND_MIN = 0.35;
+/** … and fully from this share. */
+export const AROUND_FULL = 0.7;
+
+/**
+ * The work image with, in alpha, how much each pixel counts as this face's skin (the geometry
+ * mask × its colour against the face's own model): the weights of `skinAverage`.
+ */
+export function skinWeighted(c0: Uint8Array, job: FaceJob): Uint8Array {
+  const { lowWidth: lw, lowHeight: lh, skin, mask } = job;
+  const [invCb, invCr] = job.invChroma;
+  const [dark0, dark1] = job.darkGate;
+  const out = new Uint8Array(c0.length);
+  for (let i = 0; i < lw * lh; i++) {
+    const p = i * 4;
+    const r = c0[p]! / 255;
+    const b = c0[p + 2]! / 255;
+    const y = c0[p + 3]! / 255;
+    const dCb = ((b - y) * CB_SCALE + 0.5 - skin.cb) * invCb;
+    const dCr = ((r - y) * CR_SCALE + 0.5 - skin.cr) * invCr;
+    const conf = Math.exp(-0.5 * (dCb * dCb + dCr * dCr)) * smoothstep(dark0, dark1, y);
+    out[p] = c0[p]!;
+    out[p + 1] = c0[p + 1]!;
+    out[p + 2] = c0[p + 2]!;
+    out[p + 3] = round8((mask[p]! / 255) * conf);
+  }
+  return out;
+}
+
+/**
+ * The 5 × 5 kernel with no edge stop, each sample counted by its alpha: the mean colour of the
+ * skin around a pixel. Alpha out = how much of the neighbourhood was skin.
+ */
+export function skinAverage(src: Uint8Array, lw: number, lh: number, step: number): Uint8Array {
+  const out = new Uint8Array(src.length);
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let sum = 0;
+      for (let j = -2; j <= 2; j++) {
+        const row = Math.max(0, Math.min(lh - 1, y + j * step)) * lw;
+        const ky = KERNEL[j + 2]!;
+        for (let i = -2; i <= 2; i++) {
+          const p = (row + Math.max(0, Math.min(lw - 1, x + i * step))) * 4;
+          const wgt = (ky * KERNEL[i + 2]! * src[p + 3]!) / 255;
+          r += wgt * src[p]!;
+          g += wgt * src[p + 1]!;
+          b += wgt * src[p + 2]!;
+          sum += wgt;
+        }
+      }
+      const o = (y * lw + x) * 4;
+      if (sum < 0.01) {
+        // No skin around at all: the pixel itself, counted as nothing.
+        out[o] = src[o]!;
+        out[o + 1] = src[o + 1]!;
+        out[o + 2] = src[o + 2]!;
+        out[o + 3] = 0;
+        continue;
+      }
+      const norm = 1 / (sum * 255);
+      out[o] = round8(r * norm);
+      out[o + 1] = round8(g * norm);
+      out[o + 2] = round8(b * norm);
+      out[o + 3] = round8(sum / 256);
+    }
+  }
+  return out;
+}
+
 /** Mean |luma(c0) − luma(c2)| over a 5 × 5 neighbourhood, × ACTIVITY_GAIN, one byte per pixel. */
 export function activity(
   c0: Uint8Array,
@@ -147,6 +227,7 @@ export function activity(
 export function combine(
   c: readonly [Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array],
   act: Uint8Array,
+  around: Uint8Array,
   job: FaceJob,
 ): Uint8Array {
   const { lowWidth: lw, lowHeight: lh, level, skin, mask } = job;
@@ -154,6 +235,9 @@ export function combine(
   const [invCb, invCr] = job.invChroma;
   const [dark0, dark1] = job.darkGate;
   const margin = job.rednessMargin;
+  const [roll0, roll1] = job.contourRollOff;
+  const [spot0, spot1] = job.troubleExcess;
+  const [even0, even1] = job.troubleRed;
   const d = [0, 0, 0];
 
   for (let i = 0; i < lw * lh; i++) {
@@ -181,6 +265,42 @@ export function combine(
     cr *= guard;
     cg *= guard;
     cb *= guard;
+
+    // 트러블: a spot redder than the skin around it (Cr against the mean of the skin around: the
+    // edge stop above keeps a spot whole, which is what keeps a mole, so it cannot be measured
+    // there). Such a spot is replaced by its surroundings by the level's share. A mole or a
+    // freckle is darker, not redder: its Cr is no higher than the skin's, and this never
+    // touches it. Where too little of the neighbourhood is skin (the hairline, beside a brow),
+    // there is nothing sound to measure against and nothing is done.
+    let trouble = 0;
+    if (level.trouble > 0) {
+      const ar = around[p]! / 255;
+      const ag = around[p + 1]! / 255;
+      const ab = around[p + 2]! / 255;
+      const ay = LUMA[0] * ar + LUMA[1] * ag + LUMA[2] * ab;
+      // Its own brightness from its three colour bytes, not from the stored one: one rounding
+      // less in a number that a threshold is about to look at.
+      const r1 = c[1][p]! / 255;
+      const y1 = LUMA[0] * r1 + (LUMA[1] * c[1][p + 1]!) / 255 + (LUMA[2] * c[1][p + 2]!) / 255;
+      const excess = (r1 - y1 - (ar - ay)) * CR_SCALE;
+      // Its red about the skin's own, or it is a crease, a shadow, a mole or a rim: not trouble.
+      const uneven = Math.abs(r1 - ar) / Math.max(ar, 1 / 255);
+      trouble =
+        level.trouble *
+        // A straight ramp, not a smoothstep: half again less steep at its steepest, so one
+        // level of rounding in the bytes above moves the result by less.
+        Math.max(0, Math.min(1, (excess - spot0) / (spot1 - spot0))) *
+        (1 - smoothstep(even0, even1, uneven)) *
+        smoothstep(AROUND_MIN, AROUND_FULL, around[p + 3]! / 255) *
+        // The texture guard holds this back too: on skin that is all lines, or in a noisy
+        // photo, a redder patch is the skin's own pattern and not a spot on it.
+        guard;
+      if (trouble > 0) {
+        cr += trouble * (c[0][p]! / 255 - ar - cr);
+        cg += trouble * (c[0][p + 1]! / 255 - ag - cg);
+        cb += trouble * (c[0][p + 2]! / 255 - ab - cb);
+      }
+    }
 
     // Under the eyes: lift what is darker than its surroundings (the two coarsest bands).
     const under = mask[p + 1]! / 255;
@@ -210,13 +330,28 @@ export function combine(
       }
     }
 
+    // Contour light (윤곽 조명): shade and highlight as a gain on the smoothed colour, so the
+    // skin keeps its hue and its texture is not amplified. The correction is subtracted later.
+    const shade = (mask[p + 2]! / 255) * level.contourShade;
+    const brightest = Math.max(c[2][p]!, c[2][p + 1]!, c[2][p + 2]!) / 255;
+    const light =
+      (mask[p + 3]! / 255) * level.contourLight * (1 - smoothstep(roll0, roll1, brightest));
+    const gain = light - shade;
+    if (gain !== 0) {
+      cr -= (c[2][p]! / 255) * gain;
+      cg -= (c[2][p + 1]! / 255) * gain;
+      cb -= (c[2][p + 2]! / 255) * gain;
+    }
+
     // Is this pixel skin of this face? Colour against the face's model, and not too dark.
     const r1 = c[1][p]! / 255;
     const b1 = c[1][p + 2]! / 255;
     const y1 = c[1][p + 3]! / 255;
     const dCb = ((b1 - y1) * CB_SCALE + 0.5 - skin.cb) * invCb;
     const dCr = ((r1 - y1) * CR_SCALE + 0.5 - skin.cr) * invCr;
-    const conf = Math.exp(-0.5 * (dCb * dCb + dCr * dCr)) * smoothstep(dark0, dark1, y1);
+    let conf = Math.exp(-0.5 * (dCb * dCb + dCr * dCr)) * smoothstep(dark0, dark1, y1);
+    // The spot's own colour is not the skin's; it sits on skin, and that is what counts.
+    if (trouble > 0) conf += (trouble / level.trouble) * (1 - conf);
     const m = (mask[p]! / 255) * conf * job.strength;
 
     out[p] = round8(cr * ENCODE + BIAS);
@@ -227,37 +362,105 @@ export function combine(
   return out;
 }
 
-/** Full size: photo − mask × (correction + fine share), then the lift. In place. */
+/** Whether this job draws the outline in: its level moves something and it is not the mask view. */
+export function outlineMoves(job: FaceJob): boolean {
+  return (
+    job.warp !== null &&
+    job.view !== "mask" &&
+    (job.level.slim > 0 || job.level.size > 0) &&
+    job.strength > 0 &&
+    job.faceWidth > 0
+  );
+}
+
+/** Catmull-Rom: the weight of a sample `x` pixels from where the value is wanted. */
+export function cubicWeight(x: number): number {
+  const a = x < 0 ? -x : x;
+  if (a < 1) return (1.5 * a - 2.5) * a * a + 1;
+  if (a < 2) return ((-0.5 * a + 2.5) * a - 4) * a + 2;
+  return 0;
+}
+
+/**
+ * Full size: photo − mask × (correction + fine share), then the lift. In place.
+ *
+ * With a warp field, a pixel of the result is the retouched photo at another place: the photo is
+ * read there with a bicubic (sixteen whole pixels, so the skin's grain survives the move better
+ * than with a bilinear read), the low-resolution images bilinearly as always.
+ */
 export function finalPass(
   pixels: Uint8ClampedArray,
   comb: Uint8Array,
   c0: Uint8Array,
   job: FaceJob,
 ): void {
-  const { width: w, height: h, k, lowWidth: lw, lowHeight: lh, level } = job;
+  const { width: w, height: h, k, lowWidth: lw, lowHeight: lh, level, warp } = job;
   const [roll0, roll1] = job.liftRollOff;
   const maskView = job.view === "mask";
+  // The level's shares as pixels of this cut-out (a small face gets less, like everything else).
+  const slimPx = level.slim * job.strength * job.faceWidth;
+  const sizePx = level.size * job.strength * job.faceWidth;
+  const moves = warp !== null && outlineMoves(job);
+  // The photo as it came in: a moved pixel is read from it, not from what is being written.
+  const from = moves ? pixels.slice() : pixels;
   const s = new Float32Array(8);
-  for (let y = 0; y < h; y++) {
-    const fy = (y + 0.5) / k - 0.5;
+  const src = [0, 0, 0];
+  const wx = [0, 0, 0, 0];
+
+  /** Bilinear weights and corners of the work images at a place in the photo (pixel centres). */
+  let p00 = 0;
+  let p10 = 0;
+  let p01 = 0;
+  let p11 = 0;
+  let w00 = 0;
+  let w10 = 0;
+  let w01 = 0;
+  let w11 = 0;
+  const lowAt = (cx: number, cy: number) => {
+    const fx = cx / k - 0.5;
+    const fy = cy / k - 0.5;
+    const xf = Math.floor(fx);
     const yf = Math.floor(fy);
+    const tx = fx - xf;
     const ty = fy - yf;
+    const xa = Math.max(0, Math.min(lw - 1, xf));
+    const xb = Math.max(0, Math.min(lw - 1, xf + 1));
     const ya = Math.max(0, Math.min(lh - 1, yf)) * lw;
     const yb = Math.max(0, Math.min(lh - 1, yf + 1)) * lw;
+    p00 = (ya + xa) * 4;
+    p10 = (ya + xb) * 4;
+    p01 = (yb + xa) * 4;
+    p11 = (yb + xb) * 4;
+    w00 = (1 - tx) * (1 - ty);
+    w10 = tx * (1 - ty);
+    w01 = (1 - tx) * ty;
+    w11 = tx * ty;
+  };
+
+  for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const fx = (x + 0.5) / k - 0.5;
-      const xf = Math.floor(fx);
-      const tx = fx - xf;
-      const xa = Math.max(0, Math.min(lw - 1, xf));
-      const xb = Math.max(0, Math.min(lw - 1, xf + 1));
-      const p00 = (ya + xa) * 4;
-      const p10 = (ya + xb) * 4;
-      const p01 = (yb + xa) * 4;
-      const p11 = (yb + xb) * 4;
-      const w00 = (1 - tx) * (1 - ty);
-      const w10 = tx * (1 - ty);
-      const w01 = (1 - tx) * ty;
-      const w11 = tx * ty;
+      // Where this pixel is read from, in pixel centres.
+      let cx = x + 0.5;
+      let cy = y + 0.5;
+      lowAt(cx, cy);
+      let moved = false;
+      if (moves) {
+        const f = (ch: number) =>
+          (warp[p00 + ch]! * w00 +
+            warp[p10 + ch]! * w10 +
+            warp[p01 + ch]! * w01 +
+            warp[p11 + ch]! * w11 -
+            128) /
+          127;
+        const dx = slimPx * f(0) + sizePx * f(2);
+        const dy = slimPx * f(1) + sizePx * f(3);
+        if (dx * dx + dy * dy >= WARP_MIN_PX * WARP_MIN_PX) {
+          moved = true;
+          cx += dx;
+          cy += dy;
+          lowAt(cx, cy);
+        }
+      }
       for (let ch = 0; ch < 4; ch++) {
         s[ch] =
           (comb[p00 + ch]! * w00 +
@@ -270,11 +473,37 @@ export function finalPass(
           255;
       }
       const m = s[3]!;
-      if (m <= 0) continue;
+      if (m <= 0 && !moved) continue;
       const p = (y * w + x) * 4;
-      const ir = pixels[p]! / 255;
-      const ig = pixels[p + 1]! / 255;
-      const ib = pixels[p + 2]! / 255;
+      if (moved) {
+        const tx = cx - 0.5;
+        const ty = cy - 0.5;
+        const bx = Math.floor(tx);
+        const by = Math.floor(ty);
+        for (let i = 0; i < 4; i++) wx[i] = cubicWeight(i - 1 - (tx - bx));
+        src[0] = src[1] = src[2] = 0;
+        for (let j = 0; j < 4; j++) {
+          const wy = cubicWeight(j - 1 - (ty - by));
+          const row = Math.max(0, Math.min(h - 1, by + j - 1)) * w;
+          for (let i = 0; i < 4; i++) {
+            const q = (row + Math.max(0, Math.min(w - 1, bx + i - 1))) * 4;
+            const wgt = wx[i]! * wy;
+            src[0]! += wgt * from[q]!;
+            src[1]! += wgt * from[q + 1]!;
+            src[2]! += wgt * from[q + 2]!;
+          }
+        }
+        src[0] = src[0]! / 255;
+        src[1] = src[1]! / 255;
+        src[2] = src[2]! / 255;
+      } else {
+        src[0] = from[p]! / 255;
+        src[1] = from[p + 1]! / 255;
+        src[2] = from[p + 2]! / 255;
+      }
+      const ir = src[0]!;
+      const ig = src[1]!;
+      const ib = src[2]!;
       let r: number;
       let g: number;
       let b: number;
@@ -313,10 +542,17 @@ export class CpuEngine implements RetouchEngine {
     const c3 = atrous(c2, lw, lh, steps[2], job.edgeInvSigma2);
     const c4 = atrous(c3, lw, lh, steps[3], job.edgeInvSigma2);
     const act = activity(c0, c2, lw, lh, steps[1]);
-    const comb = combine([c0, c1, c2, c3, c4], act, job);
+    const around = skinAverage(
+      skinAverage(skinWeighted(c0, job), lw, lh, steps[1]),
+      lw,
+      lh,
+      steps[2],
+    );
+    const comb = combine([c0, c1, c2, c3, c4], act, around, job);
     finalPass(pixels, comb, c0, job);
-    // Seven work images; the cut-out itself belongs to the caller.
-    this.peak = Math.max(this.peak, lw * lh * 4 * 7);
+    // Ten work images at most; the cut-out itself belongs to the caller. Where the outline
+    // moves, the final pass also holds the cut-out as it came in, at full size.
+    this.peak = Math.max(this.peak, lw * lh * 4 * 10 + (outlineMoves(job) ? w * h * 4 : 0));
   }
 
   peakBytes(): number {

@@ -14,11 +14,21 @@ import type { LookGrade } from "./types";
  * The skin band in OKLCh hue. Measured, not guessed: twelve reference skin colours from very
  * light to very deep lie between 40° and 70°, with chroma 0.037–0.085
  * (tests/unit/looks-engine.test.ts keeps the list). Full weight within `SKIN_CORE` of the middle,
- * fading to nothing at `SKIN_HALF_WIDTH`.
+ * fading to nothing at `SKIN_HALF_WIDTH` above it (toward yellow) and at `SKIN_HALF_WIDTH_RED`
+ * below it (toward red).
+ *
+ * The fade was 20° wide on both sides (core 16, half width 36) until 2026-11-28. A look that
+ * gives skin its own light, or holds a tint off it, changes fast across that fade, and at 20° a
+ * 33-point LUT could not follow it: measured on Lamp, the baked LUT was 0.22 of a level from the
+ * grade on average; with the wider fade every look came closer to its grade
+ * (tests/unit/looks-cube.test.ts holds the bar at 0.2). The red side stays tighter because
+ * decoration red sits 30° below the middle and must not be taken for skin; nothing that has to
+ * be kept apart sits that close on the yellow side.
  */
 export const SKIN_HUE = 55;
-export const SKIN_CORE = 16;
-export const SKIN_HALF_WIDTH = 36;
+export const SKIN_CORE = 12;
+export const SKIN_HALF_WIDTH = 48;
+export const SKIN_HALF_WIDTH_RED = 40;
 
 /** 1 at the centre of a band, 0 at its edge and beyond (raised cosine). */
 function bandWeight(hue: number, centre: number, halfWidth: number): number {
@@ -31,13 +41,15 @@ function bandWeight(hue: number, centre: number, halfWidth: number): number {
  * orange lamp. Lightness is left out on purpose, so dark and light skin are treated alike.
  */
 export function skinWeight(chroma: number, hue: number): number {
-  const off = Math.abs(hueDelta(hue, SKIN_HUE));
+  const delta = hueDelta(hue, SKIN_HUE);
+  const off = Math.abs(delta);
+  const half = delta < 0 ? SKIN_HALF_WIDTH_RED : SKIN_HALF_WIDTH;
   const inBand =
     off <= SKIN_CORE
       ? 1
-      : off >= SKIN_HALF_WIDTH
+      : off >= half
         ? 0
-        : 0.5 + 0.5 * Math.cos((Math.PI * (off - SKIN_CORE)) / (SKIN_HALF_WIDTH - SKIN_CORE));
+        : 0.5 + 0.5 * Math.cos((Math.PI * (off - SKIN_CORE)) / (half - SKIN_CORE));
   return inBand * smoothstep(0.008, 0.03, chroma) * (1 - smoothstep(0.16, 0.23, chroma));
 }
 

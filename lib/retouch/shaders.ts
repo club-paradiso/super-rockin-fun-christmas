@@ -1,5 +1,15 @@
 import { RETOUCH_CONFIG } from "@/config/retouch";
-import { ACTIVITY_GAIN, BIAS, ENCODE, MASK_TINT, MASK_TINT_WEIGHT, REDNESS_CAP } from "./cpu";
+import {
+  ACTIVITY_GAIN,
+  AROUND_FULL,
+  AROUND_MIN,
+  BIAS,
+  ENCODE,
+  MASK_TINT,
+  MASK_TINT_WEIGHT,
+  REDNESS_CAP,
+  WARP_MIN_PX,
+} from "./cpu";
 import { CB_SCALE, CR_SCALE, LUMA } from "./skin";
 
 /**
@@ -87,6 +97,44 @@ void main() {
 }
 `;
 
+/** The work image with, in alpha, how much each pixel counts as this face's skin. */
+export const WEIGH = `${HEAD}
+uniform sampler2D uC0;
+uniform sampler2D uMask;
+uniform vec3 uSkin;
+uniform vec2 uInvChroma;
+uniform vec2 uDark;
+void main() {
+  vec4 c = texture2D(uC0, vUv);
+  vec2 dc = (vec2((c.b - c.a) * ${f(CB_SCALE)} + 0.5, (c.r - c.a) * ${f(CR_SCALE)} + 0.5) - uSkin.yz) * uInvChroma;
+  float conf = exp(-0.5 * dot(dc, dc)) * smoothstep(uDark.x, uDark.y, c.a);
+  gl_FragColor = vec4(c.rgb, texture2D(uMask, vUv).r * conf);
+}
+`;
+
+/** The kernel with no edge stop, each sample counted by its alpha: the mean of the skin around. */
+export const AROUND = `${HEAD}
+uniform sampler2D uTex;
+uniform vec2 uTexel;
+uniform float uStep;
+${KERNEL}
+void main() {
+  vec3 sum = vec3(0.0);
+  float total = 0.0;
+  for (int j = -2; j <= 2; j++) {
+    for (int i = -2; i <= 2; i++) {
+      vec2 o = vec2(float(i), float(j));
+      vec4 t = texture2D(uTex, vUv + o * uStep * uTexel);
+      float w = kern(o.x) * kern(o.y) * t.a;
+      sum += w * t.rgb;
+      total += w;
+    }
+  }
+  if (total < 0.01) gl_FragColor = vec4(texture2D(uTex, vUv).rgb, 0.0);
+  else gl_FragColor = vec4(sum / total, total / 256.0);
+}
+`;
+
 export const ACTIVITY = `${HEAD}
 uniform sampler2D uC0;
 uniform sampler2D uC2;
@@ -112,6 +160,7 @@ uniform sampler2D uC3;
 uniform sampler2D uC4;
 uniform sampler2D uAct;
 uniform sampler2D uMask;
+uniform sampler2D uAround;
 uniform vec4 uBands;
 uniform vec4 uKeep;
 uniform float uGuard;
@@ -122,6 +171,11 @@ uniform vec3 uSkin;      // y, cb, cr of this face
 uniform vec2 uInvChroma; // 1 / (tolerance × sigma) for cb, cr
 uniform vec2 uDark;      // dark gate, in luma
 uniform float uStrength;
+uniform vec2 uContour;   // contour light: shade, highlight
+uniform vec2 uRoll;      // the highlight fades out between these values of the brightest channel
+uniform float uTrouble;
+uniform vec2 uSpot;      // Cr excess of a spot over its surroundings: starts, full
+uniform vec2 uEven;      // relative difference in red: full up to, none from
 
 vec3 take(vec3 d, float share, float keep) {
   float q = max(abs(d.r), max(abs(d.g), abs(d.b))) / keep;
@@ -136,13 +190,25 @@ void main() {
   vec4 c4 = texture2D(uC4, vUv);
   vec4 mask = texture2D(uMask, vUv);
 
+  vec4 around = texture2D(uAround, vUv);
+
   vec3 c = take(c0.rgb - c1.rgb, uBands.x, uKeep.x)
          + take(c1.rgb - c2.rgb, uBands.y, uKeep.y)
          + take(c2.rgb - c3.rgb, uBands.z, uKeep.z)
          + take(c3.rgb - c4.rgb, uBands.w, uKeep.w);
 
   float a = texture2D(uAct, vUv).r / ${f(ACTIVITY_GAIN)} / uGuard;
-  c *= 1.0 / (1.0 + a * a);
+  float guard = 1.0 / (1.0 + a * a);
+  c *= guard;
+
+  // 트러블: a spot redder than the mean of the skin around it is replaced by that mean.
+  float trouble = 0.0;
+  if (uTrouble > 0.0) {
+    float excess = ((c1.r - dot(c1.rgb, LUMA)) - (around.r - dot(around.rgb, LUMA))) * ${f(CR_SCALE)};
+    float uneven = abs(c1.r - around.r) / max(around.r, 1.0 / 255.0);
+    trouble = uTrouble * clamp((excess - uSpot.x) / (uSpot.y - uSpot.x), 0.0, 1.0) * (1.0 - smoothstep(uEven.x, uEven.y, uneven)) * smoothstep(${f(AROUND_MIN)}, ${f(AROUND_FULL)}, around.a) * guard;
+    c += trouble * (c0.rgb - around.rgb - c);
+  }
 
   if (mask.g > 0.0 && uUnderEye > 0.0) {
     vec3 e = c2.rgb - c4.rgb;
@@ -162,8 +228,13 @@ void main() {
     }
   }
 
+  float brightest = max(c2.r, max(c2.g, c2.b));
+  float gain = mask.a * uContour.y * (1.0 - smoothstep(uRoll.x, uRoll.y, brightest)) - mask.b * uContour.x;
+  c -= c2.rgb * gain;
+
   vec2 dc = (vec2((c1.b - c1.a) * ${f(CB_SCALE)} + 0.5, (c1.r - c1.a) * ${f(CR_SCALE)} + 0.5) - uSkin.yz) * uInvChroma;
   float conf = exp(-0.5 * dot(dc, dc)) * smoothstep(uDark.x, uDark.y, c1.a);
+  if (trouble > 0.0) conf += (trouble / uTrouble) * (1.0 - conf);
   gl_FragColor = vec4(c * ${f(ENCODE)} + ${BIAS}, mask.r * conf * uStrength);
 }
 `;
@@ -177,9 +248,45 @@ uniform float uFine;
 uniform float uLift;
 uniform vec2 uRoll;
 uniform float uMaskView;
+uniform sampler2D uWarp;
+uniform vec2 uMove;     // 윤곽 다듬기: slim, size, in pixels of the cut-out (0, 0 = nothing moves)
+uniform vec2 uSrcSize;
+
+float cubic(float x) {
+  float a = abs(x);
+  if (a < 1.0) return (1.5 * a - 2.5) * a * a + 1.0;
+  if (a < 2.0) return ((-0.5 * a + 2.5) * a - 4.0) * a + 2.0;
+  return 0.0;
+}
+
+// The photo at a place between pixels: Catmull-Rom over sixteen whole pixels.
+vec3 photoAt(vec2 centre) {
+  vec2 t = centre - 0.5;
+  vec2 base = floor(t);
+  vec2 fr = t - base;
+  vec3 sum = vec3(0.0);
+  for (int j = 0; j < 4; j++) {
+    float wy = cubic(float(j) - 1.0 - fr.y);
+    for (int i = 0; i < 4; i++) {
+      vec2 p = clamp(base + vec2(float(i) - 1.0, float(j) - 1.0), vec2(0.0), uSrcSize - 1.0) + 0.5;
+      sum += cubic(float(i) - 1.0 - fr.x) * wy * texture2D(uSrc, p / uSrcSize).rgb;
+    }
+  }
+  return sum;
+}
+
 void main() {
   vec3 src = texture2D(uSrc, vUv).rgb;
   vec2 low = vUv * uLowScale;
+  if (uMove.x + uMove.y > 0.0) {
+    vec4 field = (texture2D(uWarp, low) * 255.0 - 128.0) / 127.0;
+    vec2 d = uMove.x * field.xy + uMove.y * field.zw;
+    if (dot(d, d) >= ${f(WARP_MIN_PX * WARP_MIN_PX)}) {
+      vec2 centre = vUv * uSrcSize + d;
+      src = photoAt(centre);
+      low = centre / uSrcSize * uLowScale;
+    }
+  }
   vec4 comb = texture2D(uComb, low);
   vec4 c0 = texture2D(uC0, low);
   float m = comb.a;
