@@ -15,8 +15,14 @@ export function shouldReload(o: {
   lastReloadAt: number | null;
   stallMs: number;
   minReloadGapMs: number;
+  /**
+   * False inside another program's web view (`?embed=1`, lib/wall/embed.ts): the host decides
+   * when the page draws, so a quiet animation-frame clock is not a stall there, and reloading
+   * for it would restart the wall every minute. Errors still reload.
+   */
+  watchFrames?: boolean;
 }): boolean {
-  const stalled = o.visible && o.now - o.lastFrameAt >= o.stallMs;
+  const stalled = o.watchFrames !== false && o.visible && o.now - o.lastFrameAt >= o.stallMs;
   if (!stalled && !o.errored) return false;
   return o.lastReloadAt === null || o.now - o.lastReloadAt >= o.minReloadGapMs;
 }

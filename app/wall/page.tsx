@@ -6,6 +6,7 @@ import { ConfigError, getServerConfig } from "@/lib/server/env";
 import { currentWallTheme } from "@/lib/wall/server";
 import { logEvent } from "@/lib/server/log";
 import { parseCanvas } from "@/lib/wall/layout";
+import { parseWallView } from "@/lib/wall/embed";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export const metadata: Metadata = {
  *
  * Scene size: WALL_CANVAS=3840x1080 on the hub (the LED's input resolution), or ?canvas=WxH to try
  * a size at the LED; without either the scene fills the screen. Low-spec mode: WALL_LITE=1 or
- * ?lite=1.
+ * ?lite=1. Inside another program's web view (Millumin's browser media): ?embed=1, and ?check=1
+ * for the staff check; ?photos=N hangs at least N photos on this screen (lib/wall/embed.ts,
+ * docs/MILLUMIN.md).
  */
 export default async function WallPage({
   searchParams,
@@ -56,5 +59,19 @@ export default async function WallPage({
   } catch (err) {
     logEvent("wall_theme_read_failed", { message: (err as Error).message }, "warn");
   }
-  return <WallApp canvas={canvas} lite={lite} initialTheme={theme} />;
+  const view = parseWallView({
+    embed: one(q.embed),
+    check: one(q.check),
+    photos: one(q.photos),
+  });
+  return (
+    <WallApp
+      canvas={canvas}
+      lite={lite}
+      initialTheme={theme}
+      embed={view.embed}
+      check={view.check}
+      minPhotos={view.minPhotos}
+    />
+  );
 }

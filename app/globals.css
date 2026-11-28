@@ -246,6 +246,48 @@ body {
   background: var(--wall-floor);
   color: var(--wall-cream);
 }
+/* An engine without dvh (WebKit before 15.4, some embedded web views) would leave the wall with
+   no height at all, and everything on it is absolutely placed: a black screen. */
+@supports not (height: 100dvh) {
+  .wall-stage {
+    height: 100vh;
+  }
+}
+/* 점검 (/wall?check=1, components/wall/wall-check.tsx): staff numbers over the wall. Sized from
+   the page so it reads on a 720-line render and on a 3840-wide LED alike. */
+.wall-check {
+  position: absolute;
+  top: 3vh;
+  left: 3vh;
+  z-index: 60;
+  max-width: min(92vw, 1100px);
+  padding: 16px 22px;
+  border: 1px solid color-mix(in srgb, var(--wall-cream) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wall-night) 90%, transparent);
+  color: var(--wall-cream);
+  font-size: clamp(14px, 2.2vh, 30px);
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.wall-check-title {
+  margin-bottom: 0.5em;
+  font-weight: 700;
+  color: var(--wall-amber);
+}
+.wall-check dl > div {
+  display: flex;
+  gap: 1em;
+}
+.wall-check dt {
+  flex: none;
+  width: 6.5em;
+  color: var(--wall-mist);
+}
+.wall-check [data-warn] dd {
+  font-weight: 700;
+  color: var(--wall-amber);
+}
 /* 전체화면 button: only while the wall does not cover the screen and the pointer moved lately
    (components/wall/fullscreen-button.tsx). Never on a wall that already fills the screen. */
 .wall-fullscreen-btn {
