@@ -3,6 +3,7 @@ import {
   RETOUCH_CONFIG,
   RETOUCH_LEVELS,
   RETOUCH_LEVEL_IDS,
+  WARP_LIMITS,
   parseRetouchLevel,
   resolveRetouchLevel,
   retouchLevelProblems,
@@ -39,6 +40,37 @@ describe("skin retouch settings (config/retouch.ts)", () => {
       for (const share of level.bands) expect(share).toBeLessThan(1);
     expect(natural.redness).toBeLessThan(glow.redness);
     expect(natural.underEye).toBeLessThan(glow.underEye);
+    // 윤곽 조명: both levels have it, 뽀샤시 more; and never more light than shade (no whitening).
+    expect(natural.contourShade).toBeGreaterThan(0);
+    expect(natural.contourShade).toBeLessThan(glow.contourShade);
+    expect(natural.contourLight).toBeLessThan(glow.contourLight);
+    for (const level of [natural, glow])
+      expect(level.contourLight).toBeLessThanOrEqual(level.contourShade);
+    // 트러블 and 윤곽 다듬기: both levels, 뽀샤시 a little more, both inside the limits.
+    expect(natural.trouble).toBeGreaterThan(0.5);
+    expect(natural.trouble).toBeLessThanOrEqual(glow.trouble);
+    expect(natural.slim).toBeLessThan(glow.slim);
+    expect(natural.size).toBeLessThan(glow.size);
+    expect(glow.slim).toBeLessThanOrEqual(WARP_LIMITS.slim);
+    expect(glow.size).toBeLessThanOrEqual(WARP_LIMITS.size);
+  });
+
+  it("과하지 않게: the levels stay under the ceilings of a restrained retouch", () => {
+    // The user's measure (2026-11-28): blemishes, trouble and tone, never a Photoshop look.
+    for (const level of [RETOUCH_LEVELS.natural, RETOUCH_LEVELS.glow]) {
+      // The skin's own grain is hardly touched, and the widest band (the shading that gives a
+      // face its shape and its smile lines) least of all.
+      expect(level.fine).toBeLessThanOrEqual(0.05);
+      expect(level.bands[3]).toBeLessThanOrEqual(0.2);
+      expect(level.bands[2]).toBeLessThanOrEqual(0.6);
+      // A brightening of a few per cent at most, a contour of under a tenth.
+      expect(level.lift).toBeLessThanOrEqual(0.04);
+      expect(level.contourShade).toBeLessThanOrEqual(0.1);
+      // The outline: under 2 % of the face width a side, and under 1 % all round.
+      expect(level.slim).toBeLessThanOrEqual(0.02);
+      expect(level.size).toBeLessThanOrEqual(0.01);
+    }
+    expect(WARP_LIMITS).toEqual({ slim: 0.025, size: 0.015 });
   });
 
   it("refuses numbers that are out of range", () => {
@@ -51,6 +83,19 @@ describe("skin retouch settings (config/retouch.ts)", () => {
       "keepAbove[0] must be 0–0.5",
     );
     expect(retouchLevelProblems({ ...base, lift: 0.4 })).toContain("lift must be 0–0.15");
+    expect(retouchLevelProblems({ ...base, contourShade: 0.3 })).toContain(
+      "contourShade must be 0–0.2",
+    );
+    expect(retouchLevelProblems({ ...base, contourLight: -0.1 })).toContain(
+      "contourLight must be 0–0.2",
+    );
+    expect(retouchLevelProblems({ ...base, slim: 0.05 })).toContain("slim must be 0–0.025");
+    expect(retouchLevelProblems({ ...base, size: 0.03 })).toContain("size must be 0–0.015");
+    expect(retouchLevelProblems({ ...base, trouble: 1.5 })).toContain("trouble must be 0–1");
+    // More light than shade would be a brightening of the face on balance.
+    expect(retouchLevelProblems({ ...base, contourShade: 0.05, contourLight: 0.08 })).toContain(
+      "contourLight must not be above contourShade",
+    );
     expect(retouchLevelProblems({ ...base, strength: Number.NaN })).toContain(
       "strength must be 0–2",
     );
@@ -68,9 +113,17 @@ describe("skin retouch settings (config/retouch.ts)", () => {
     expect([zero.fine, ...zero.bands, zero.underEye, zero.redness, zero.lift]).toEqual([
       0, 0, 0, 0, 0, 0, 0, 0,
     ]);
+    expect([zero.contourShade, zero.contourLight]).toEqual([0, 0]);
+    expect(half.contourShade).toBeCloseTo(RETOUCH_LEVELS.glow.contourShade * 0.5);
+    expect(half.contourLight).toBeCloseTo(RETOUCH_LEVELS.glow.contourLight * 0.5);
     const double = scaledLevel(RETOUCH_LEVELS.glow, 2);
     for (const share of double.bands) expect(share).toBeLessThanOrEqual(1);
     expect(double.lift).toBeLessThanOrEqual(0.15);
+    expect(double.contourShade).toBeLessThanOrEqual(0.2);
+    // The lab's slider at 200 % cannot push the outline past the limits.
+    expect(double.slim).toBeLessThanOrEqual(WARP_LIMITS.slim);
+    expect(double.size).toBeLessThanOrEqual(WARP_LIMITS.size);
+    expect([zero.slim, zero.size, zero.trouble]).toEqual([0, 0, 0]);
     // A slider value that is not a number leaves the level as written.
     expect(scaledLevel(RETOUCH_LEVELS.natural, Number.NaN).bands).toEqual(
       RETOUCH_LEVELS.natural.bands,

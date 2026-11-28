@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AiReviewPanel } from "@/components/admin/ai-review-panel";
 import { PhotoCard } from "@/components/admin/photo-card";
+import { WallBulk } from "@/components/admin/wall-bulk";
 import type { PhotoSource } from "@/config/mobile";
 import { sweepAiReviewSoon } from "@/lib/moderation/server";
 import {
@@ -8,7 +9,9 @@ import {
   getAiOverview,
   moderationSection,
   pendingQueue,
+  wallSection,
   type ModerationView,
+  type StaffPhotoView,
 } from "@/lib/ops/admin";
 import { requireStaff } from "@/lib/staff-auth/page";
 import { getBackend } from "@/lib/storage/server";
@@ -26,10 +29,15 @@ const VIEWS: Record<ModerationView, { label: string; tab?: string; lead: string;
   {
     queue: {
       label: "검수 대기",
-      // Five tabs share a phone's width: the short word keeps each on one line.
+      // Six tabs, three to a row on a phone: the short word keeps each on one line.
       tab: "대기",
       lead: "미디어월 동의 + 검수 대기 · AI 주의 먼저, 그다음 오래된 순",
       empty: "검수할 사진이 없어요.",
+    },
+    wall: {
+      label: "게시 중",
+      lead: "지금 미디어월에 나갈 수 있는 사진 전부 · 사람·AI 승인 모두 · 골라서 한 번에 내리기",
+      empty: "미디어월에 올라간 사진이 없어요.",
     },
     flagged: {
       label: "AI 주의",
@@ -65,7 +73,7 @@ export default async function ModerationPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireStaff();
-  const { source, view: rawView } = await searchParams;
+  const { source, view: rawView, before: rawBefore } = await searchParams;
   const view: ModerationView = (MODERATION_VIEWS as readonly string[]).includes(String(rawView))
     ? (rawView as ModerationView)
     : "queue";
@@ -73,23 +81,31 @@ export default async function ModerationPage({
     source === "mobile" ? "mobile" : source === "booth" ? "booth" : undefined;
   // A staff member looking at the queue is a good moment to push it along.
   sweepAiReviewSoon();
-  const [photos, ai, settings] = await Promise.all([
-    view === "queue" ? pendingQueue(60, filter) : moderationSection(view),
+  const before = typeof rawBefore === "string" ? rawBefore : undefined;
+  const [section, ai, settings] = await Promise.all([
+    loadView(view, filter, before),
     getAiOverview(),
     getBackend().settings.get(),
   ]);
+  const { photos, total, nextBefore } = section;
   const meta = VIEWS[view];
+  const sourceQuery = filter ? `&source=${filter}` : "";
+  const viewBase = view === "queue" ? "/admin/moderation?" : `/admin/moderation?view=${view}&`;
+  const firstPage =
+    view === "queue"
+      ? `/admin/moderation${filter ? `?source=${filter}` : ""}`
+      : `/admin/moderation?view=${view}${sourceQuery}`;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="admin-h1">
-          {meta.label} {photos.length}건
+        <h1 className="admin-h1" data-testid="view-count">
+          {meta.label} {total ?? photos.length}건
         </h1>
         <p className="text-base text-ink/75">{meta.lead}</p>
       </div>
       <AiReviewPanel ai={ai} settings={settings} />
       <nav
-        className="admin-seg md:w-fit md:grid-flow-col md:auto-cols-[7.5rem]"
+        className="admin-seg grid-flow-row grid-cols-3 md:w-fit md:grid-flow-col md:grid-cols-none md:auto-cols-[7.5rem]"
         aria-label="검수 구역"
       >
         {MODERATION_VIEWS.map((v) => (
@@ -104,7 +120,7 @@ export default async function ModerationPage({
           </Link>
         ))}
       </nav>
-      {view === "queue" && (
+      {(view === "queue" || view === "wall") && (
         <nav
           className="admin-seg md:w-fit md:grid-flow-col md:auto-cols-[8rem]"
           aria-label="사진 출처"
@@ -114,7 +130,7 @@ export default async function ModerationPage({
             return (
               <Link
                 key={f.key}
-                href={f.key === "all" ? "/admin/moderation" : `/admin/moderation?source=${f.key}`}
+                href={f.key === "all" ? viewBase.slice(0, -1) : `${viewBase}source=${f.key}`}
                 aria-current={active ? "page" : undefined}
                 data-testid={`queue-filter-${f.key}`}
                 className="admin-seg-btn"
@@ -125,7 +141,17 @@ export default async function ModerationPage({
           })}
         </nav>
       )}
-      {photos.length === 0 ? (
+      {total !== undefined && (
+        <p className="text-base text-ink/75" data-testid="view-page-count">
+          이 페이지 {photos.length}장
+          {filter ? ` (${filter === "mobile" ? "휴대폰 사진" : "현장 촬영"}만)` : ""}
+          {nextBefore ? " · 아래 「더 오래된 사진 보기」로 나머지" : ""}
+        </p>
+      )}
+      {view === "wall" ? (
+        // Stays mounted when the page empties, so the undo for the batch just taken down remains.
+        <WallBulk photos={photos} empty={meta.empty} />
+      ) : photos.length === 0 ? (
         <p className="admin-card p-8 text-center text-base text-ink/75" data-testid="queue-empty">
           {meta.empty}
         </p>
@@ -136,6 +162,43 @@ export default async function ModerationPage({
           ))}
         </div>
       )}
+      {(before || nextBefore) && (
+        <nav className="flex flex-wrap justify-between gap-2" aria-label="페이지">
+          {before ? (
+            <Link href={firstPage} className="admin-btn admin-btn-quiet">
+              처음으로
+            </Link>
+          ) : (
+            <span />
+          )}
+          {nextBefore && (
+            <Link
+              href={`${viewBase}before=${encodeURIComponent(nextBefore)}${sourceQuery}`}
+              className="admin-btn admin-btn-quiet"
+              data-testid="wall-older"
+            >
+              더 오래된 사진 보기
+            </Link>
+          )}
+        </nav>
+      )}
     </div>
   );
+}
+
+interface Section {
+  photos: StaffPhotoView[];
+  /** The whole count when the view is paged (「게시 중」); otherwise the list is the whole view. */
+  total?: number;
+  nextBefore: string | null;
+}
+
+async function loadView(
+  view: ModerationView,
+  source: PhotoSource | undefined,
+  before: string | undefined,
+): Promise<Section> {
+  if (view === "queue") return { photos: await pendingQueue(60, source), nextBefore: null };
+  if (view === "wall") return wallSection({ before, source });
+  return { photos: await moderationSection(view), nextBefore: null };
 }

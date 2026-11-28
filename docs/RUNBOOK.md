@@ -248,6 +248,9 @@ LED에 나온다. 승인된 사진만 가능하다.
 
 **전용 공유기:** 부스 노트북에 **고정 주소**(DHCP 예약)를 준다. 그래야 허브 주소가 매일 같다.
 
+**Millumin 4로 LED에 내보낼 때:** `docs/MILLUMIN.md` (주소 끝에 `?embed=1`, 렌더 크기 = LED 해상도,
+점검은 `&check=1`).
+
 **미디어월 PC:** Chrome(또는 Edge)만 있으면 된다. `ops/start-wall.bat`, `ops/start-wall.ps1`,
 `ops/wall-hub.txt` (macOS는 `start-wall.command`, `wall-hub.txt`)를 한 폴더에 복사하고, `wall-hub.txt`
 첫 줄을 허브 주소(예: `http://192.168.0.10:3000`)로 고친다. `start-wall` 바로가기 이름은

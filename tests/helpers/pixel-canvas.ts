@@ -198,5 +198,8 @@ export function meshFace(face: SyntheticFace): DetectedFace {
   points[MESH.noseBase] = { x: cx, y: cy + iod * 0.75 };
   points[MESH.rightNoseWing] = { x: cx - iod * 0.25, y: cy + iod * 0.72 };
   points[MESH.leftNoseWing] = { x: cx + iod * 0.25, y: cy + iod * 0.72 };
+  // The contour light reads these (the forehead top, lower lip and chin tip are on the loops).
+  points[MESH.betweenEyes] = { x: cx, y: cy };
+  points[MESH.noseTip] = { x: cx, y: cy + iod * 0.6 };
   return { landmarks: points };
 }

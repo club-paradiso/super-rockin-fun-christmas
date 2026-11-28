@@ -246,6 +246,48 @@ body {
   background: var(--wall-floor);
   color: var(--wall-cream);
 }
+/* An engine without dvh (WebKit before 15.4, some embedded web views) would leave the wall with
+   no height at all, and everything on it is absolutely placed: a black screen. */
+@supports not (height: 100dvh) {
+  .wall-stage {
+    height: 100vh;
+  }
+}
+/* 점검 (/wall?check=1, components/wall/wall-check.tsx): staff numbers over the wall. Sized from
+   the page so it reads on a 720-line render and on a 3840-wide LED alike. */
+.wall-check {
+  position: absolute;
+  top: 3vh;
+  left: 3vh;
+  z-index: 60;
+  max-width: min(92vw, 1100px);
+  padding: 16px 22px;
+  border: 1px solid color-mix(in srgb, var(--wall-cream) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wall-night) 90%, transparent);
+  color: var(--wall-cream);
+  font-size: clamp(14px, 2.2vh, 30px);
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.wall-check-title {
+  margin-bottom: 0.5em;
+  font-weight: 700;
+  color: var(--wall-amber);
+}
+.wall-check dl > div {
+  display: flex;
+  gap: 1em;
+}
+.wall-check dt {
+  flex: none;
+  width: 6.5em;
+  color: var(--wall-mist);
+}
+.wall-check [data-warn] dd {
+  font-weight: 700;
+  color: var(--wall-amber);
+}
 /* 전체화면 button: only while the wall does not cover the screen and the pointer moved lately
    (components/wall/fullscreen-button.tsx). Never on a wall that already fills the screen. */
 .wall-fullscreen-btn {
@@ -1529,7 +1571,10 @@ body {
   .select-grid {
     --cols: 2;
     --rows: 2;
-    --extra: 16px;
+    /* Nothing sits under a print (the number is on it): the only extra height is the tile's own
+       edge, 2 × (4 px padding + 4 px border) = 16 px, less the 12 px those same 16 px of width
+       already give the 4:3 picture. 16 here left 12 px of every row empty (2026-11-28). */
+    --extra: 4px;
   }
   .select-grid.has-extra {
     --rows: 4;
@@ -1693,6 +1738,24 @@ body {
      was 5 px too tall again at 768 × 1024 and 23 px at 820 × 1060 (measured). */
   .select.has-looks .fit-stage {
     --fit-min: clamp(160px, 20.5 * var(--bh), 320px);
+  }
+  /* 2026-11-28 (a user request: "사진 셀렉할때 화면이 지나치게 작아서 안보여"): at 768 × 1024 each
+     photo was 122 × 95 px, smaller than the colour chips under it (155 px wide), because the
+     colour row and the gaps took the room the prints needed (measured). The prints are what the
+     guest chooses, so they come first: the screen's parts sit closer together and each chip shows
+     its look on a smaller picture of the same shot, still 4:3 (never another crop), centred above
+     its name; the chip itself keeps its width and stays a touch target. The wide composition sets
+     its own gap; its chips, under the prints there too, take the same smaller picture. */
+  .select {
+    --select-gap: var(--gap-s);
+  }
+  .select .look-chip img,
+  .select .look-chip-wait {
+    align-self: center;
+    width: auto;
+    max-width: 100%;
+    height: clamp(44px, 6.5 * var(--bh), 96px);
+    aspect-ratio: 4 / 3;
   }
   .select.has-looks.select-has-retouch .fit-stage {
     --fit-min: clamp(140px, 15 * var(--bh), 300px);

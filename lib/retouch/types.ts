@@ -24,6 +24,26 @@ export interface DetectedFace {
   score?: number;
 }
 
+/** The face's own axes in the photo: where its middle is and which way is across and down. */
+export interface FaceFrame {
+  /** Midway between the eyes. */
+  centre: Point;
+  /** Unit vector from the right eye to the left eye (as the mesh names them). */
+  across: Point;
+  /** Unit vector from the eyes toward the chin. */
+  down: Point;
+}
+
+/** One soft highlight of the contour light: an ellipse, `axis` the unit vector of `rx`. */
+export interface LightSpot {
+  centre: Point;
+  rx: number;
+  ry: number;
+  axis: Point;
+  /** 0–1: its share of the level's `contourLight`. */
+  weight: number;
+}
+
 /** A face as polygons in photo pixels: where skin may be, and what must stay untouched. */
 export interface FaceGeometry {
   /** The face outline (forehead to chin). */
@@ -32,6 +52,9 @@ export interface FaceGeometry {
   features: Point[][];
   /** Under each eye: where darker-than-around shading is lifted a little. */
   underEyes: Point[][];
+  /** 윤곽 조명: the face's own axes, and where its highlights sit. */
+  frame: FaceFrame;
+  highlights: LightSpot[];
   /** Cheek to cheek, in photo pixels. */
   width: number;
   /** Bounding box of the outline. */
@@ -77,7 +100,7 @@ export interface FaceJob {
   steps: [number, number, number, number];
   /**
    * `lowWidth × lowHeight × 4` bytes: R = geometry mask (outline minus features), G = under-eye
-   * zone, B and A unused (255).
+   * zone, B = contour shade, A = contour highlight (윤곽 조명; both 0 where there is none).
    */
   mask: Uint8Array;
   skin: SkinModel;
@@ -97,6 +120,20 @@ export interface FaceJob {
   rednessMargin: number;
   /** The lift fades out between these luma values. */
   liftRollOff: [number, number];
+  /** The contour highlight fades out between these values of the brightest channel. */
+  contourRollOff: [number, number];
+  /** 트러블: the Cr excess of a spot over its surroundings at which it starts, and is full. */
+  troubleExcess: [number, number];
+  /** 트러블: the relative difference in red up to which it is full, and from which none. */
+  troubleRed: [number, number];
+  /**
+   * 윤곽 다듬기: `lowWidth × lowHeight × 4` bytes, each (value − 128) ÷ 127 = −1…1. R, G = where
+   * a pixel of the result is read from for a `slim` of 1 (x, y, in face widths); B, A = the same
+   * for `size`. Null when the level moves nothing.
+   */
+  warp: Uint8Array | null;
+  /** Cheek to cheek, in pixels of the cut-out. */
+  faceWidth: number;
   /** "mask": paint the mask over the photo instead of retouching (lab page). */
   view: "result" | "mask";
 }

@@ -1994,7 +1994,7 @@ for every older new photo.
 - **Measured (virtual clock, `tests/unit/rotation.test.ts`):** a new photo with none waiting ahead
   is up within 6 s of approval (13 s before); bound `P + 2 + 5 + 2 + 1 = 15 s` (F2). On a real
   wall the image download adds to that. In Chromium against a local hub, a full four-slot wall
-  showed the new photo 5.9 s after approval (`e2e/wall-scene.spec.ts`); the venue PC and LED: not
+  showed the new photo 5.9 s and 8.9 s after approval (two runs) (`e2e/wall-scene.spec.ts`); the venue PC and LED: not
   measured.
 - **Unchanged:** the booth's wall status line (올라갔어요 on the server's APPROVED), consent,
   moderation, F1 and F3–F6.

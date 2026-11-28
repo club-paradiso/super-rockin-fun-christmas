@@ -240,19 +240,41 @@ function score(plan: WallFitPlan): number {
 export function planWallFit(
   theme: WallTheme,
   screen: FitScreen,
-  { lite = false, prefer = null }: { lite?: boolean; prefer?: string | null } = {},
+  {
+    lite = false,
+    prefer = null,
+    minSlots = 0,
+  }: {
+    lite?: boolean;
+    prefer?: string | null;
+    /**
+     * Hang at least this many photos (`/wall?photos=N`, a person's choice for one screen): the
+     * planner then picks among the plans with that many or more, so more of the picture shows and
+     * the photos hang smaller, with bands where they need the room. Never more than the cut has.
+     */
+    minSlots?: number;
+  } = {},
 ): WallFitPlan | null {
   const W = screen.width;
   const H = screen.height;
   if (!(W > 0) || !(H > 0)) return null;
   const s: FitScreen = { width: W, height: H };
 
+  const slotsOf = (look: WallTheme) =>
+    lite
+      ? look.liteSlots.filter((i) => i < look.scene.slots.length).length
+      : look.scene.slots.length;
+  const asked = Math.max(0, Math.floor(minSlots) || 0);
+  const most = Math.max(...themeCuts(theme).map((c) => slotsOf(c.theme)));
+
   let best: { plan: WallFitPlan; value: number; tie: number[] } | null = null;
   for (const { cut, theme: look } of themeCuts(theme)) {
     const all = look.scene.slots.map((_, i) => i);
     const allowed = lite ? look.liteSlots.filter((i) => i < all.length) : all;
     if (!allowed.length) continue;
-    const fewest = Math.min(WALL_FIT.minSlots, allowed.length);
+    // A cut with fewer slots than were asked for is out, unless no cut has that many.
+    if (allowed.length < Math.min(asked, most)) continue;
+    const fewest = Math.min(Math.max(WALL_FIT.minSlots, asked), allowed.length);
     for (let size = allowed.length; size >= fewest; size--) {
       for (const run of runs(allowed, size)) {
         const plan = planFor(look, cut, run, s, lite);

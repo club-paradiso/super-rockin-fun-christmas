@@ -13,8 +13,9 @@ import {
  * Whether the 「전체화면」 button should be on screen: the browser can go fullscreen, the wall
  * does not cover the screen yet, and someone moved the pointer (or the page just opened) within
  * FULLSCREEN_BUTTON_IDLE_MS. Once the wall covers the screen, nothing shows until Escape.
+ * Never inside another program's web view (`enabled` false, lib/wall/embed.ts).
  */
-export function useFullscreenButton(): boolean {
+export function useFullscreenButton(enabled = true): boolean {
   // Starts false so the server render and the first client render agree.
   const [canEnter, setCanEnter] = useState(false);
   const [active, setActive] = useState(true);
@@ -49,7 +50,7 @@ export function useFullscreenButton(): boolean {
     };
   }, []);
 
-  return canEnter && active;
+  return enabled && canEnter && active;
 }
 
 export function WallFullscreenButton() {
