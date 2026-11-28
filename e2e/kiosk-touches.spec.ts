@@ -53,7 +53,7 @@ test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
 });
 
-test("the shortest way to the QR is six touches for a frame with options", async ({ page }) => {
+test("the shortest way to the QR is five touches for a frame with options", async ({ page }) => {
   await countClicks(page);
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
@@ -62,16 +62,14 @@ test("the shortest way to the QR is six touches for a frame with options", async
   await page.getByTestId("attract-start").click();
   // 2 · a card (필름 has four colours)
   await page.getByTestId("frame-option-film").click();
-  // 3 · "이대로 찍기"
+  // 3 · "이대로 찍기": shooting starts by itself, four shots with no touch at all (2026-11-28)
   await page.getByTestId("confirm-options").click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
-  // 4 · "자유 포즈로 찍기", then four shots with no touch at all
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  // 5 · the photos are already chosen: one press finishes
+  // 4 · the photos are already chosen: one press finishes
   await page.getByTestId("confirm-selection").click();
   await expect(page.getByTestId("screen-consent")).toBeVisible();
-  // 6 · the wall answer
+  // 5 · the wall answer
   await page.getByTestId("consent-no").click();
 
   await expectRealQr(page);
@@ -80,11 +78,10 @@ test("the shortest way to the QR is six touches for a frame with options", async
     "attract-start",
     "frame-option-film",
     "confirm-options",
-    "shoot-free",
     "confirm-selection",
     "consent-no",
   ]);
-  expect(pressed.length).toBe(6);
+  expect(pressed.length).toBe(5);
   // The user's limit for this path, whatever the exact number becomes.
   expect(pressed.length).toBeLessThanOrEqual(7);
 });

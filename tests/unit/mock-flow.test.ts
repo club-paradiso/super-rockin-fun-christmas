@@ -35,7 +35,6 @@ describe("mock camera flow", () => {
     expect(state.handFont).not.toBeNull();
     await camera.start();
     dispatch({ type: "CAMERA_READY" });
-    dispatch({ type: "BEGIN_SHOOTING", guide: false });
 
     let guard = 0;
     while (state.phase === "countdown" || state.phase === "capturing") {

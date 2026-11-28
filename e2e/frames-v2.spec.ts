@@ -104,7 +104,6 @@ for (const [card, options, frameId, [w, h]] of VARIANTS) {
     await page.goto("/kiosk?camera=mock");
     await startSession(page, card, options);
     await expectNoRemovedControls(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expectNoRemovedControls(page);
     await selectDefaultPhotos(page);
@@ -139,24 +138,30 @@ for (const [card, options, frameId, [w, h]] of VARIANTS) {
   });
 }
 
-test("handwriting: 20 sessions in a row never repeat the previous font (a reload in between)", async ({
+test("handwriting: sessions in a row never repeat the previous font (in the page and across a reload)", async ({
   page,
 }) => {
   test.setTimeout(240_000);
   await page.goto("/kiosk?camera=mock");
   const fonts: string[] = [];
-  for (let i = 0; i < 20; i++) {
-    if (i === 10) await page.reload();
+  // Shooting starts by itself and cannot be left until the photo choice (2026-11-28), so a
+  // session in the page is a whole one; every other one is ended by a reload instead.
+  for (let i = 0; i < 8; i++) {
     await openPicker(page);
     // A tap on the card is its options screen.
     await page.getByTestId(i % 2 ? "frame-option-polaroid1" : "frame-option-film").click();
     await page.getByTestId("confirm-options").click();
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
     const font = await page.locator(".kiosk-root").getAttribute("data-hand-font");
     expect(font).toBeTruthy();
     fonts.push(font!);
-    await page.getByTestId("go-home").click();
-    await page.getByTestId("confirm-home-yes").click();
+    if (i % 2) {
+      await page.reload();
+    } else {
+      await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
+      await page.getByTestId("go-home").click();
+      await page.getByTestId("confirm-home-yes").click();
+    }
     await expect(page.getByTestId("screen-attract")).toBeVisible();
   }
   const repeats = fonts.filter((f, i) => i > 0 && f === fonts[i - 1]).length;
@@ -184,7 +189,6 @@ test("date stamp: a tablet clock years off still stamps the server's day", async
   await page.goto("/kiosk?camera=mock");
   expect(await page.evaluate(() => new Date().getUTCFullYear())).toBe(2020);
   await startSession(page, "polaroid1", { caption: "date" });
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(page);
   const stamp = await page.getByTestId("final-image").getAttribute("data-stamp");

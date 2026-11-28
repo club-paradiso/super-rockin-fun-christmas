@@ -379,14 +379,13 @@ async function walkSession(page: Page, { lang = "ko" }: { lang?: "ko" | "zh" } =
     await page.getByRole("button", { name: copy.option.shoot }).click();
   }
 
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
   await expect
     .poll(() => page.getByTestId("camera-preview").evaluate((v: HTMLVideoElement) => v.videoWidth))
     .toBeGreaterThan(0);
   await at("camera ready");
   await expect(page.getByTestId("camera-preview-box")).toBeInViewport({ ratio: 1 });
 
-  await page.getByTestId("shoot-free").click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
   await at("countdown");
   await expect(page.getByTestId("camera-preview-box")).toBeInViewport({ ratio: 1 });
@@ -555,7 +554,7 @@ test("turning the tablet: the preview keeps its shape and stays on screen, both 
   await page.goto("/kiosk?camera=mock");
   await page.getByTestId("attract-start").click();
   await confirmFrame(page);
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
   const box = page.getByTestId("camera-preview-box");
   const shape = async () => {
     const r = (await box.boundingBox())!;
@@ -567,13 +566,13 @@ test("turning the tablet: the preview keeps its shape and stays on screen, both 
     { width: 1180, height: 700 },
   ]) {
     await page.setViewportSize(viewport);
-    await expectSoundLayout(page, `ready after turning to ${viewport.width}×${viewport.height}`);
+    await expectSoundLayout(page, `shooting after turning to ${viewport.width}×${viewport.height}`);
     // The window keeps the frame's slot shape (필름 3컷: about square) whichever way it turns.
     expect(await shape()).toBeCloseTo(Number(await box.getAttribute("data-aspect")), 1);
     await expect(box).toBeInViewport({ ratio: 1 });
-    await expect(page.getByTestId("shoot-free")).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId("shot-label")).toBeInViewport({ ratio: 1 });
     // The stream is the one that was running: turning the screen does not restart the camera.
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
   }
 });
 
@@ -629,7 +628,7 @@ test("a screen too short to fit scrolls inside the booth: nothing is cut off or 
   await page.getByTestId("frame-option-polaroid1").click();
   await expect(page.getByTestId("screen-options")).toBeVisible();
   await page.getByTestId("confirm-options").click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
   expect(await page.evaluate(() => document.querySelector("[data-booth-scroll]")!.scrollTop)).toBe(
     0,
   );

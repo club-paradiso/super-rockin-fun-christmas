@@ -122,7 +122,6 @@ async function boothPhoto(frame: "film" | "polaroid1" | "check2") {
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk, frame);
-  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(kiosk);
   await kiosk.getByTestId("consent-yes").click();

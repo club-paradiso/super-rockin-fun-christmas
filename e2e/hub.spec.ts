@@ -208,7 +208,7 @@ test("staff help mode on the booth: 3-second corner hold, name + PIN, menu, star
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk);
-  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-shooting")).toBeVisible();
 
   // A guest's quick touch never opens it.
   await holdCorner(kiosk, 800);
@@ -272,7 +272,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
-  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-shooting")).toBeVisible();
   const view = kiosk.getByTestId("camera-preview");
   await expect(view).toHaveAttribute("data-look-view", "mono");
   expect(await view.evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale(1)");
@@ -289,7 +289,6 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
   // And the four shots they choose from are already in the frame's tone (원본), with the colour row.
   await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
-  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
   await expect(kiosk.getByTestId("select-shot-0").locator("img")).toHaveAttribute(
     "src",
@@ -309,7 +308,7 @@ test("사진 색 보정: on by default, a black-and-white frame is black and whi
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk, "film35", { color: "mono" });
-  await expect(kiosk.getByTestId("screen-ready")).toBeVisible();
+  await expect(kiosk.getByTestId("screen-shooting")).toBeVisible();
   await expect(kiosk.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
 
   // Back on, as the event runs.

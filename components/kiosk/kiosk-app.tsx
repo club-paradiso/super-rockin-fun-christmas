@@ -64,7 +64,6 @@ import {
   canGoBack,
   capturedCount,
   createInitialState,
-  currentPose,
   isShooting,
   kioskReducer,
   needsCamera,
@@ -87,14 +86,7 @@ import {
 } from "@/lib/camera-engine/settings";
 import { shouldBlockKioskTap } from "@/lib/kiosk/tap-guard";
 import { CAMERA_RESUME_GRACE_MS, cameraRecovery } from "@/lib/kiosk/camera-recovery";
-import {
-  HTML_LANG,
-  KIOSK_COPY,
-  KIOSK_LANGS,
-  lines,
-  localizedLabel,
-  type KioskCopy,
-} from "@/lib/kiosk/copy";
+import { HTML_LANG, KIOSK_COPY, KIOSK_LANGS, lines, type KioskCopy } from "@/lib/kiosk/copy";
 import {
   deliverVideo,
   fetchReviewStatus,
@@ -498,7 +490,6 @@ export function KioskApp({
   const urlsRef = useRef(new Set<string>());
   const shotCanvasesRef = useRef(new Set<HTMLCanvasElement>());
   // Tablet screen light, not a hardware LED torch (iOS Safari cannot reliably control it).
-  const [flashEnabled, setFlashEnabled] = useState(false);
   const [screenFlashActive, setScreenFlashActive] = useState(false);
   const [composeAttempt, setComposeAttempt] = useState(0);
   const [finalImage, setFinalImage] = useState<FinalImage | null>(null);
@@ -714,7 +705,6 @@ export function KioskApp({
     setMobileQr(null);
     setConfirmHome(false);
     setPrivateDelivery(false);
-    setFlashEnabled(false);
     setScreenFlashActive(false);
     dispatch({ type: "RESET" });
   }, []);
@@ -829,14 +819,13 @@ export function KioskApp({
           setStream(camera.getStream());
         }
         if (cancelled) return;
-        if (flashEnabled) {
-          // Paint white *before* grabbing the frame, so this is light rather than a
-          // decorative post-capture blink. Bound exposure time on slow remote links.
-          setScreenFlashActive(true);
-          flashTimeout = setTimeout(() => setScreenFlashActive(false), 2_000);
-          await new Promise<void>((resolve) => setTimeout(resolve, 250));
-          if (cancelled) return;
-        }
+        // The screen flash goes off for every shot (2026-11-28, a user decision: no switch).
+        // Paint white *before* grabbing the frame, so this is light rather than a decorative
+        // post-capture blink. Bound exposure time on slow remote links.
+        setScreenFlashActive(true);
+        flashTimeout = setTimeout(() => setScreenFlashActive(false), 2_000);
+        await new Promise<void>((resolve) => setTimeout(resolve, 250));
+        if (cancelled) return;
         // The release: the shutter and the film winder, as the frame is taken.
         sound?.play("shutter");
         const grabbed = boothPerf().start("capture_grab");
@@ -881,7 +870,6 @@ export function KioskApp({
     state.phase,
     state.shotIndex,
     deviceId,
-    flashEnabled,
     legacyIOS15,
     renderBudget.captureMaxWidth,
     sound,
@@ -1752,7 +1740,7 @@ export function KioskApp({
     setDeviceId(id || undefined);
     cameraRef.current?.stop();
     setStream(null);
-    // Ready: restart the preview with the new camera. Camera error: try the new one at once.
+    // Shooting: take the new camera (the countdown starts again). Camera error: try it at once.
     dispatch({ type: state.phase === "camera-error" ? "CAMERA_RETRY" : "CAMERA_RESTART" });
   };
 
@@ -2008,8 +1996,6 @@ export function KioskApp({
             deviceId={deviceId}
             onSelectDevice={selectDevice}
             guestCameraChoice={!staffHelp}
-            flashEnabled={flashEnabled}
-            onToggleFlash={() => setFlashEnabled((enabled) => !enabled)}
             thumbs={pickThumbs}
             onThumbError={staticThumbs ? () => setStaticThumbsBroken(true) : undefined}
             onLookPage={showLookPage}
@@ -2149,10 +2135,8 @@ interface ScreenProps {
   devices: CameraDevice[];
   deviceId: string | undefined;
   onSelectDevice: (id: string) => void;
-  /** Without staff help mode (cloud kiosks) the camera choice stays on the ready screen. */
+  /** Without staff help mode (cloud kiosks) the camera choice is on the camera error screen. */
   guestCameraChoice: boolean;
-  flashEnabled: boolean;
-  onToggleFlash: () => void;
   /** Picker previews by card id (sample photos). */
   thumbs: Record<string, string>;
   /** A ready-made preview did not load: the booth then draws the cards itself. */
@@ -2192,7 +2176,7 @@ interface ScreenProps {
   wallPublic: boolean;
   /** This guest said yes while the automatic check was on (D95): the line the QR screen shows. */
   reviewLine: ReviewLine | null;
-  /** This booth's browser can record the session video (D72): tell the guest before shooting. */
+  /** This booth's browser can record the session video (D72): tell the guest while shooting. */
   videoNotice: boolean;
   /** Booth sounds are off (lib/kiosk/sound.ts). */
   soundMuted: boolean;
@@ -2530,23 +2514,29 @@ function Screen(p: ScreenProps) {
                 {t.camera.home}
               </button>
             </div>
+            {p.guestCameraChoice && p.devices.length > 1 && (
+              <label className="booth-field">
+                {t.camera.choose}
+                <select value={p.deviceId ?? ""} onChange={(e) => p.onSelectDevice(e.target.value)}>
+                  <option value="">{t.camera.defaultDevice}</option>
+                  {p.devices.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         </BoothScreen>
       );
     }
 
-    case "ready":
     case "countdown":
     case "capturing":
     case "rest": {
-      const shooting = state.phase !== "ready";
-      const pose = currentPose(state);
       return (
-        <BoothScreen
-          testId={shooting ? "screen-shooting" : "screen-ready"}
-          progress={progress}
-          className={shooting ? "shoot shoot-live" : "shoot"}
-        >
+        <BoothScreen testId="screen-shooting" progress={progress} className="shoot shoot-live">
           <Stage className="shoot-stage">
             <CameraPreview
               stream={p.stream}
@@ -2572,10 +2562,12 @@ function Screen(p: ScreenProps) {
                   </span>
                 ) : null}
               </div>
-              {pose && (
-                <div className="pose-guide" data-testid="pose-guide" data-pose={pose.id}>
-                  <span className="booth-caption text-ink">{t.shoot.pose}</span>
-                  <span className="booth-title">{localizedLabel(pose, state.lang)}</span>
+              {/* The session video (D72) is told while the first shot counts down: there is no
+                  screen before shooting any more (2026-11-28). Over the picture, so the preview
+                  keeps its size. */}
+              {p.videoNotice && state.shotIndex === 0 && state.phase === "countdown" && (
+                <div className="shoot-video-note" data-testid="video-notice">
+                  <span className="booth-caption text-ink">{t.shoot.video}</span>
                 </div>
               )}
             </CameraPreview>
@@ -2587,69 +2579,11 @@ function Screen(p: ScreenProps) {
               <p className="booth-title" data-testid="shot-label">
                 {t.shoot.shot(state.shotIndex + 1)}
               </p>
-              <ShotStrip state={state} current={shooting ? state.shotIndex : -1} />
+              <ShotStrip state={state} current={state.shotIndex} />
             </div>
             <p className="booth-lead">
               <Lines text={t.shoot.lead} />
             </p>
-            {!shooting && (
-              <>
-                {/* One filled button only: free poses is the default, the guide is the option. */}
-                <div className="shoot-actions">
-                  <ShutterButton
-                    testId="shoot-free"
-                    label={t.shoot.free}
-                    onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: false })}
-                  />
-                  <button
-                    type="button"
-                    className="booth-btn-secondary"
-                    data-testid="shoot-guide"
-                    onClick={() => dispatch({ type: "BEGIN_SHOOTING", guide: true })}
-                  >
-                    {t.shoot.guide}
-                  </button>
-                </div>
-                {/* Tall screen: the flash switch beside the two small notes, one line. */}
-                <div className="shoot-foot">
-                  <button
-                    type="button"
-                    data-testid="flash-toggle"
-                    aria-pressed={p.flashEnabled}
-                    className="booth-btn-m"
-                    onClick={p.onToggleFlash}
-                  >
-                    {p.flashEnabled ? t.shoot.flashOff : t.shoot.flashOn}
-                  </button>
-                  <div className="shoot-notes">
-                    <p className="booth-caption" data-testid="shoot-plan">
-                      {t.shoot.plan(state.countdownSeconds, total)}
-                    </p>
-                    {p.videoNotice && (
-                      <p className="booth-caption" data-testid="video-notice">
-                        {t.shoot.video}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {p.guestCameraChoice && p.devices.length > 1 && (
-                  <label className="booth-field">
-                    {t.camera.choose}
-                    <select
-                      value={p.deviceId ?? ""}
-                      onChange={(e) => p.onSelectDevice(e.target.value)}
-                    >
-                      <option value="">{t.camera.defaultDevice}</option>
-                      {p.devices.map((d) => (
-                        <option key={d.deviceId} value={d.deviceId}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </>
-            )}
           </div>
         </BoothScreen>
       );

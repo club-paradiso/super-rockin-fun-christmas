@@ -80,7 +80,6 @@ test(`${GUESTS} guests in a row leave nothing behind (iPadOS 15 profile)`, async
   const after: Held[] = [];
   for (let guest = 0; guest < GUESTS; guest++) {
     await startSession(page, CARDS[guest % CARDS.length]);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     // The first photos are already chosen: nothing to tap but the colour and the finish.
     await expect(page.getByTestId("confirm-selection")).toBeEnabled();

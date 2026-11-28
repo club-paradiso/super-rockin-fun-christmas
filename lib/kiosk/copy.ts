@@ -139,17 +139,11 @@ const ko = {
   },
   shoot: {
     shot: (n: number) => `${n}번째 사진`,
-    flashOn: "화면 플래시 켜기",
-    flashOff: "화면 플래시 끄기",
     // The breather between two shots (2026-11-27). Claude's wording, not yet the user's (D76).
     rest: "잠깐 쉬어요",
     lead: "카메라를 보고 웃어주세요.\n숫자가 0이 되면 찍혀요.",
-    free: "자유 포즈로 찍기",
-    guide: "포즈 추천받고 찍기",
-    plan: (seconds: number, total: number) => `${seconds}초마다 한 컷씩, 모두 ${total}컷을 찍어요`,
     // Figma KIOSK 3b (395:1204), chosen by the user on 2026-11-23 (D113).
     video: "촬영 과정은 소리 없이 짧은 영상으로도 저장돼요.",
-    pose: "추천 포즈",
     progress: (done: number, total: number) => `${total}장 중 ${done}장 촬영`,
   },
   select: {
@@ -405,15 +399,9 @@ const en: KioskCopy = {
   },
   shoot: {
     shot: (n) => `Photo ${n}`,
-    flashOn: "Turn screen flash on",
-    flashOff: "Turn screen flash off",
     rest: "Take a breath",
     lead: "Look at the camera and smile.\nThe photo is taken when the count reaches 0.",
-    free: "Pose freely",
-    guide: "Get pose ideas",
-    plan: (seconds, total) => `One photo every ${seconds} seconds, ${total} in all`,
     video: "A short silent clip of the session is saved too.",
-    pose: "Try this pose",
     progress: (done, total) => `${done} of ${total} photos taken`,
   },
   select: {
@@ -647,15 +635,9 @@ const zh: KioskCopy = {
   },
   shoot: {
     shot: (n) => `第 ${n} 张照片`,
-    flashOn: "开启屏幕补光",
-    flashOff: "关闭屏幕补光",
     rest: "稍作休息",
     lead: "请看着镜头微笑。\n数字变成 0 就会拍下来。",
-    free: "自由摆姿势",
-    guide: "给我姿势建议",
-    plan: (seconds, total) => `每隔 ${seconds} 秒拍一张，一共 ${total} 张`,
     video: "拍摄过程也会保存成一段无声短视频。",
-    pose: "推荐姿势",
     progress: (done, total) => `已拍 ${done} 张，共 ${total} 张`,
   },
   select: {

@@ -53,7 +53,7 @@ export async function confirmFrame(page: Page, card?: string, options: CardOptio
   if (card) await page.getByTestId(`frame-option-${card}`).click();
   else await page.getByTestId("confirm-pick").click();
   const options$ = page.getByTestId("screen-options");
-  const camera = page.getByTestId("screen-camera").or(page.getByTestId("screen-ready"));
+  const camera = page.getByTestId("screen-camera").or(page.getByTestId("screen-shooting"));
   await expect(options$.or(camera)).toBeVisible();
   if (await options$.isVisible()) {
     for (const [key, value] of Object.entries(options))
@@ -65,7 +65,8 @@ export async function confirmFrame(page: Page, card?: string, options: CardOptio
 export async function startSession(page: Page, card?: string, options: CardOptions = {}) {
   await openPicker(page);
   await confirmFrame(page, card, options);
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  // No start button (2026-11-28): the first countdown runs as soon as the camera is on.
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
 }
 
 /** The four shots with the mock camera: ends on the photo choice (there is no review screen). */
@@ -73,8 +74,7 @@ export async function shootAllWithMock(page: Page, card?: string, options: CardO
   await page.goto("/kiosk?camera=mock");
   await expect(page.getByTestId("mock-badge")).toBeVisible();
   await startSession(page, card, options);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
-  await expect(page.getByTestId("countdown-number")).toHaveText("3");
+  await expect(page.getByTestId("countdown-number")).toBeVisible();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 

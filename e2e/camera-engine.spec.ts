@@ -368,7 +368,6 @@ test.describe("the booth", () => {
     await startSession(page);
     expect(await previewTransform(page)).toBe("scaleX(-1)");
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-engine", "on");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     expect(Math.abs(await markerLean(page, 0))).toBeLessThan(0.3);
   });
@@ -383,7 +382,6 @@ test.describe("the booth", () => {
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-engine", "on");
     expect(await previewTransform(page)).toMatch(/^matrix3d\(/);
     const turn = await previewTurn(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("countdown-number")).toBeVisible();
     // Fixed while shooting: the preview keeps the correction it had.
     expect(await previewTurn(page)).toBe(turn);
@@ -405,7 +403,6 @@ test.describe("the booth", () => {
     await page.goto("/kiosk?camera=mock&engine=manual&tilt=10,8");
     await startSession(page);
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-engine", "on");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     for (let i = 0; i < 4; i++)
       await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();
@@ -426,7 +423,6 @@ test.describe("the booth", () => {
     await startSession(page);
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-engine", "on");
     const turn = await previewTurn(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("countdown-number")).toBeVisible();
     // Someone leans on the booth for the rest of the session.
     await standAt(page, -12, 15);
@@ -454,7 +450,6 @@ test.describe("the booth", () => {
     await page.goto("/kiosk?camera=mock&engine=auto&looks=0");
     await startSession(page);
     expect(await previewTransform(page)).toBe("scaleX(-1)");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     expect(Math.abs(await markerLean(page, 0))).toBeLessThan(0.3);
   });
@@ -465,7 +460,6 @@ test.describe("the booth", () => {
     await page.addInitScript(noWebGl);
     await page.goto("/kiosk?camera=mock&engine=manual&tilt=4,12&looks=0");
     await startSession(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     for (let i = 0; i < 4; i++)
       await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();

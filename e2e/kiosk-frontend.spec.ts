@@ -165,7 +165,7 @@ test("legacy camera denial can be retried without clearing enrollment", async ({
     await confirmFrame(page);
     await expect(page.getByText("카메라 사용이 허용되지 않았어요")).toBeVisible();
     await page.getByRole("button", { name: "다시 시도" }).click();
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
     await expect
       .poll(() =>
         page.getByTestId("camera-preview").evaluate((video: HTMLVideoElement) => video.videoWidth),
