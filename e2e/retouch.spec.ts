@@ -177,19 +177,19 @@ test.describe("the quality rules on every sample (CPU engine: the same numbers o
         if (r.metrics.facesRetouched === 0) continue;
 
         // "매끈하지만 사람 피부": the skin's fine texture stays. Raised 2026-11-28 with the
-        // user's measure (과한 포토샵 느낌은 지양): 0.9 and 0.78 before, measured 0.95 and 0.93
+        // user's measure (과한 포토샵 느낌은 지양): 0.9 and 0.78 before, measured 0.94 and 0.93
         // at the least.
         expect(s.fineRetention, "fine texture kept").toBeGreaterThan(
           level === "natural" ? 0.93 : 0.9,
         );
         expect(s.fineRetention).toBeLessThan(1.06);
         // It does something, and it never repaints: small changes only. Tightened the same day
-        // (3 / 6 and 40 / 60 before; measured 3.0 / 4.0 and 23 / 30 at the most).
+        // (3 / 6 and 40 / 60 before; measured 3.0 / 4.1 and 26 / 32 at the most).
         expect(s.meanAbsDiff).toBeLessThan(level === "natural" ? 3.5 : 5);
         expect(s.maxAbsDiff).toBeLessThan(level === "natural" ? 30 : 40);
         // No whitening, no greying (dark skin), no blown highlights (light skin). The other
         // side has room for the contour light's shade: on a face that is already bright the
-        // highlight is rolled off and only the shade is left (measured −1.8 at most).
+        // highlight is rolled off and only the shade is left (measured −1.7 at most).
         expect(s.lumaShift, "no whitening").toBeLessThan(level === "natural" ? 1.5 : 4);
         expect(s.lumaShift, "the contour's shade, and no more than that").toBeGreaterThan(-2.5);
         expect(s.saturationRatio, "colour kept").toBeGreaterThan(0.94);
