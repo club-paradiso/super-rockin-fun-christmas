@@ -83,6 +83,13 @@ export default async function OverviewPage() {
       <AiReviewPanel ai={o.ai} settings={o.settings} />
       <section className="admin-card divide-y divide-ink/10" aria-label="현황">
         <Row
+          label="미디어월 승인 사진"
+          value={`${o.byStatus.APPROVED}장`}
+          sub="전부 보고 골라서 한 번에 내리기"
+          href="/admin/moderation?view=on-wall"
+          testId="tile-on-wall"
+        />
+        <Row
           label="키오스크"
           value={`${o.kiosks.online} 온라인`}
           sub={`지연 ${o.kiosks.stale} · 오프라인 ${o.kiosks.offline}`}

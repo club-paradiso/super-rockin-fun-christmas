@@ -29,11 +29,14 @@ export function PhotoCard({
   photo,
   showRecovery = false,
   primaryOnly = false,
+  select,
 }: {
   photo: StaffPhotoView;
   showRecovery?: boolean;
   /** Moderation queue: just approve / reject, as big as possible. */
   primaryOnly?: boolean;
+  /** "On the wall" list: a big tick box for the bulk hide. */
+  select?: { checked: boolean; onChange: (checked: boolean) => void };
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ModerationAction | null>(null);
@@ -83,12 +86,27 @@ export function PhotoCard({
 
   return (
     <article
-      className="admin-card flex flex-col overflow-hidden"
+      className={`admin-card flex flex-col overflow-hidden ${
+        select?.checked ? "ring-4 ring-danger" : ""
+      }`}
       data-testid="photo-card"
+      data-selected={select ? String(select.checked) : undefined}
       data-photo-id={photo.id}
       data-status={photo.status}
       data-source={photo.source}
     >
+      {select && (
+        <label className="flex min-h-14 cursor-pointer items-center gap-3 border-b border-ink/15 px-4 text-base font-semibold">
+          <input
+            type="checkbox"
+            className="size-7 accent-danger"
+            checked={select.checked}
+            onChange={(e) => select.onChange(e.target.checked)}
+            data-testid="photo-select"
+          />
+          {select.checked ? "선택됨 · 내릴 사진" : "선택"}
+        </label>
+      )}
       <div className="flex h-72 items-center justify-center bg-backdrop">
         {photo.deleted ? (
           <p className="text-base text-ink/75">이미지 삭제됨</p>

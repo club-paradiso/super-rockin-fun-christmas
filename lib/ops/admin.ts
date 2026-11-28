@@ -166,6 +166,8 @@ export interface PhotoQuery {
   source?: PhotoSource;
   /** Only these AI review states (D95). */
   aiStatuses?: AiReviewStatus[];
+  /** Captured strictly before this instant (the next page of a newest-first list). */
+  before?: string;
   limit?: number;
 }
 
@@ -181,6 +183,7 @@ export async function listStaffPhotos(q: PhotoQuery): Promise<StaffPhotoView[]> 
       sessionShort:
         q.sessionShort && /^[0-9a-f]{4,8}$/i.test(q.sessionShort) ? q.sessionShort : undefined,
       aiStatuses: q.aiStatuses,
+      before: q.before,
       limit: Math.min(Math.max(q.limit ?? 60, 1), 200),
     }),
     kioskLabelMap(),
@@ -206,15 +209,27 @@ export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<St
   return [...flagged, ...rest].slice(0, limit);
 }
 
-export const MODERATION_VIEWS = ["queue", "flagged", "ai-approved", "rejected", "hidden"] as const;
+export const MODERATION_VIEWS = [
+  "queue",
+  "on-wall",
+  "flagged",
+  "ai-approved",
+  "rejected",
+  "hidden",
+] as const;
 export type ModerationView = (typeof MODERATION_VIEWS)[number];
 
 /** The sections of the review page other than the queue (D95). Newest first, bounded. */
 export async function moderationSection(
   view: Exclude<ModerationView, "queue">,
   limit = 60,
+  before?: string,
 ): Promise<StaffPhotoView[]> {
   switch (view) {
+    // Everything the wall may show right now (the `isWallEligible` rule), whoever approved it,
+    // with no time window: staff page back through all of it with `before`.
+    case "on-wall":
+      return listStaffPhotos({ statuses: ["APPROVED"], wallConsent: true, limit, before });
     case "flagged":
       return listStaffPhotos({
         statuses: ["PENDING"],
@@ -229,6 +244,11 @@ export async function moderationSection(
     case "hidden":
       return listStaffPhotos({ statuses: ["HIDDEN"], limit });
   }
+}
+
+/** How many photos the wall may show right now (APPROVED + consent + not deleted). Ids only. */
+export async function onWallCount(): Promise<number> {
+  return (await getPhotoService().wallPhotos(20_000)).length;
 }
 
 export interface AiOverview extends AiStatus {

@@ -20,6 +20,9 @@ export const MODERATION_ACTIONS = [
 ] as const;
 export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
 
+/** Most photos one bulk hide may name: one page of the "on the wall" list (60) with room. */
+export const BULK_HIDE_MAX = 120;
+
 interface Rule {
   from: ModerationStatus[];
   to: ModerationStatus;
