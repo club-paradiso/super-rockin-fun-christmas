@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ANDROID_SAVED_HINT, prefersShareToSave } from "@/lib/guest/save-env";
+import { useSaveEnv } from "./use-save-env";
 
 const noSubscribe = () => () => {};
 const VIDEO_CHECK_INTERVAL_MS = 3_000;
@@ -23,11 +25,16 @@ export function SaveVideo({
   videoUrl: string;
   initialMime: string | null;
 }) {
-  const shareApi = useSyncExternalStore(
+  const env = useSaveEnv();
+  const shareSupported = useSyncExternalStore(
     noSubscribe,
     () => typeof navigator.canShare === "function" && typeof navigator.share === "function",
     () => false,
   );
+  // Android's share sheet has no "save" entry: a plain download goes to the gallery there.
+  const shareApi = shareSupported && prefersShareToSave(env);
+  const android = env.os === "android";
+  const [downloaded, setDownloaded] = useState(false);
   const [mime, setMime] = useState<string | null>(initialMime);
   const [checking, setChecking] = useState(!initialMime);
   const [retry, setRetry] = useState(0);
@@ -92,7 +99,10 @@ export function SaveVideo({
   const downloadHref = videoUrl + "?download=1";
 
   async function save(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (!file) return; // Native download is always the fallback.
+    if (!file) {
+      setDownloaded(true); // Native download is always the fallback.
+      return;
+    }
     event.preventDefault();
     try {
       await navigator.share({ files: [file] });
@@ -132,9 +142,16 @@ export function SaveVideo({
               아이폰은 공유 메뉴에서 ‘비디오 저장’을 선택하세요.
             </p>
           )}
-          <a href={downloadHref} download className="btn-quiet" data-testid="video-file-download">
-            파일로 받기
-          </a>
+          {android && downloaded && (
+            <p className="text-center text-sm text-ink [word-break:keep-all]" role="status">
+              {ANDROID_SAVED_HINT}
+            </p>
+          )}
+          {!android && (
+            <a href={downloadHref} download className="btn-quiet" data-testid="video-file-download">
+              파일로 받기
+            </a>
+          )}
           <p className="text-center text-sm text-ink/75">
             촬영하는 모습을 담은 짧은 영상이에요. 소리는 없어요.
           </p>

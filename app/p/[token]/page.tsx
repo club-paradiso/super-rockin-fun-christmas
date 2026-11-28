@@ -4,6 +4,7 @@ import { findGuestPhoto } from "@/lib/storage/guest";
 import { getPhotoService } from "@/lib/storage/server";
 import { BrandLockup } from "@/components/brand";
 import { StampTicket } from "@/components/studio/stamp-ticket";
+import { OpenInBrowser } from "./open-in-browser";
 import { SavePhoto } from "./save-photo";
 import { SaveStory } from "./save-story";
 import { SaveVideo } from "./save-video";
@@ -38,6 +39,7 @@ export default async function PhotoPage({ params }: { params: Promise<{ token: s
           <BrandLockup className="text-[52px]" />
           <h1 className="mt-5 text-2xl font-bold text-ink">오늘의 네컷이 도착했어요</h1>
         </header>
+        <OpenInBrowser />
         {/* eslint-disable-next-line @next/next/no-img-element -- private, uncached image */}
         <img src={src} alt="내 네컷 사진" className="max-h-[70dvh] w-auto rounded-lg" />
         <SavePhoto imageUrl={src} mime={photo.mime} />
