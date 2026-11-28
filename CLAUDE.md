@@ -106,7 +106,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   context is released), and `newSession()` on "화면을 눌러 시작" tries WebGL again for the next
   guest, so one lost context (iPad sleep, memory pressure) cannot hide the colour row all day.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
-  greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
+  greens never more vivid, white short of clipping, black 2–12 levels, and since 2026-11-28, a
+  user request to finish the looks: **the light reaches the face first**, no skin tone, light or
+  deep, comes out more than 3 levels darker than it went in; a look that wants a deep room or a
+  hard black takes it from the tones under the skin and gives the skin its light back with
+  `skinLight`; grain at most 0.024 and never coarser than 600 across) and stays plain to tell
   from the others (`tests/unit/looks-distinct.test.ts`: every pair at least 4.5 ΔE00 apart on the samples; `npm run
 looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
@@ -167,6 +171,12 @@ looks:measure`). `/looks` is the comparison
 - **Private photos.** Bucket stays private; guests only ever see `/p/[token]`,
   `/p/[token]/image` and `/p/[token]/video`. Never return `objectPath`, `tokenHash` or signed
   storage URLs to clients.
+- **The guest page saves the way each phone can** (2026-11-28, a user request: Galaxy guests got
+  lost). `lib/guest/save-env.ts` reads the user agent on `/p/[token]` only (never on the booth):
+  iPhone saves through the share sheet («이미지 저장»); Android never uses the share sheet to save
+  (it has no gallery entry) and downloads straight away, then says where the file is; inside an
+  app's own browser (KakaoTalk, NAVER, Instagram …) the page offers to reopen in the real browser.
+  `e2e/guest-save.spec.ts`.
 - **Raw tokens are never stored or logged.** Only `sha256(token)`. Unknown/expired/deleted all
   return the same 404.
 - **No fake QR.** A QR is shown only after the server returned a real token.
@@ -390,8 +400,10 @@ looks:measure`). `/looks` is the comparison
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.
-- **Skin retouch is off by default, on the device, and never reshapes a face** (「피부 보정」,
-  2026-11-24, `docs/research/skin-retouch-audit.md`). It is one photo stage,
+- **Skin retouch is off by default, on the device, and the person in the print is the person
+  who stood in the booth** (「피부 보정」, 2026-11-24, `docs/research/skin-retouch-audit.md`; the
+  measure is the user's, 2026-11-28: "본인 그대로의 고유의 매력을 살리고 과도한 보정은 지양", after
+  the portrait studio 시현하다; "과하게 하면 절대 안돼 … 과한 포토샵 느낌은 지양"). It is one photo stage,
   `runPhotoStages` in `lib/kiosk/photo-stages.ts`, called once right before `composeFrame`:
   촬영 완료 → [피부 보정] → [색감] → 틀 합성. The colour look is not a photo stage: it is
   `composeFrame`'s `grade` (lib/looks, above), applied to each photo as it is drawn, so it always
@@ -404,10 +416,37 @@ looks:measure`). `/looks` is the comparison
   once the photos are chosen and never carries over to the next guest. No new step: the
   progress dots do not change. The chosen answer is filled like the frame options' (a state, not
   a second action). If the model has not loaded, the choice is not offered. Every
-  number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. Never add a
-  mesh warp (eyes, jaw, nose). Never smooth the finest band at 자연스럽게 (`fine: 0`), never
-  whiten (the only brightening is 뽀샤시's `lift`, a gain with a highlight roll-off), and never
-  judge skin by a fixed colour range: the colour model is each face's own (`lib/retouch/skin.ts`).
+  number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. A level does
+  three things, and each has its own tests in `tests/unit/retouch-pipeline.test.ts`:
+  **(1) the skin work**: blemishes, skin trouble and uneven tone go; moles, freckles, lines and
+  the skin's own grain stay. Uneven tone is the middle detail bands, reduced and never erased;
+  strong detail is kept (`keepAbove`). 트러블 (`trouble`, 2026-11-28) is a small spot redder than
+  the mean of the skin around it (`skinAverage`: skin only, so hair, brows and lips do not enter
+  it) with about the skin's own red (`trouble.redGate`): it is replaced by that mean. Never widen
+  it to what has lost its red too: that is a mole, a crease or a rim, and without that gate
+  it half filled an old man's frown line. Never smooth the finest band at 자연스럽게
+  (`fine: 0`), never whiten: the only brightening is 뽀샤시's `lift` (a gain with a highlight
+  roll-off) and the contour's highlight. Never judge skin by a fixed colour range: the colour
+  model is each face's own (`lib/retouch/skin.ts`).
+  **(2) the contour light** (윤곽 조명): a shade along the cheek and jaw edges and the temples
+  (`contourShade`) and a highlight on the forehead, nose bridge, cheekbone tops and chin
+  (`contourLight`), as gains on the skin's own smoothed colour, from a map drawn on the face's
+  own points (`contourFields`, mask channels B and A). The highlight is never more than its
+  shade (`contourLight` ≤ `contourShade`, and under the mask the light never sums to more than
+  the shade), so no face is brighter on balance for it, and skin that is already lit gets no
+  more light (`contour.lightRollOff`, on the brightest channel).
+  **(3) the outline** (윤곽 다듬기, 2026-11-28, a user decision that lifted "never reshape a face":
+  "얼굴 갸름하게, 크기 조정 이런 부분도 규칙을 풀어서 추가해줘 … 너무 과하면 안돼"): the cheek and jaw
+  line is drawn in by a small share of the face's own width, sideways (`slim`) and toward the
+  middle of the face (`size`), through a field of where each pixel is read from (`warpField`,
+  bicubic in both engines). What keeps it the same person, and must stay true: **only a band
+  along the outline moves**, so eyes, brows, nose, lips and the middle of the face keep every
+  pixel (never add eye enlarging, a nose or lip change, or any move of a feature); **every face
+  gets the same share**, so nothing is pulled toward an ideal shape (never fit a target face,
+  never slim one face more because it is wider); the forehead and hairline do not move; and the
+  shares are capped by `WARP_LIMITS` (2.5 % and 1.5 % of the face width), which a level or the
+  lab's slider cannot pass. `tests/unit/retouch-config.test.ts` 「과하지 않게」 holds the ceilings
+  of all three; raising one is the user's decision, not a tuning step.
   The live preview is never retouched. Face points, masks and regions stay in the page: never
   send, store or log them (failures reach the server as a code and a count through the
   heartbeat). A photo that fails or runs over its time goes on unretouched, whole, and says so on
