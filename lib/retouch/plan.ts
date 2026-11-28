@@ -25,7 +25,7 @@ export function planFaces(
 ): { plans: FacePlan[]; skipped: SkipReason[] } {
   const skipped: SkipReason[] = [];
   const geometries = faces
-    .map((face) => faceGeometry(face))
+    .map((face) => faceGeometry(face, config))
     .filter((g): g is NonNullable<typeof g> => g !== null)
     .sort((a, b) => b.width - a.width);
 

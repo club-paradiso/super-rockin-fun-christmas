@@ -24,7 +24,10 @@ export default async function EnrollPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { error, next } = await searchParams;
+  const { error, next, code } = await searchParams;
+  // A one-time code in the address is put in the box, so a screen with no keyboard (a show
+  // program's browser, docs/MILLUMIN.md) needs one press. It is still sent only by that press.
+  const prefill = typeof code === "string" && /^[A-Za-z0-9-]{4,16}$/.test(code) ? code : undefined;
   const toWall = next === "wall";
   const config = getServerConfig();
   const sharedPasswordEnabled =
@@ -141,6 +144,7 @@ export default async function EnrollPage({
                   <input
                     name="code"
                     required
+                    defaultValue={prefill}
                     autoComplete="off"
                     autoCapitalize="characters"
                     placeholder="예: K7QM-3XRP"
