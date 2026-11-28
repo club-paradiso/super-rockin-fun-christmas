@@ -4,7 +4,7 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from "@
 import sharp from "sharp";
 import { getFrame } from "../config/frames";
 import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "../config/wall-themes";
-import { planWallFit } from "../lib/wall/fit";
+import { WALL_FIT, planWallFit, themeCuts } from "../lib/wall/fit";
 import { ENROLL_SECRET, PORT, USE_SUPABASE } from "./env";
 import { answerForQr, enrollKiosk, shootAllWithMock, toConsent } from "./helpers";
 
@@ -385,8 +385,10 @@ for (const theme of WALL_THEMES) {
   });
 }
 
-// D91 + D110: on a 2.4:1 board (성안교회 3096 × 1290) every theme covers the board: a theme with a
+// D91 + D110: on a 2.4:1 board (성안교회 3096 × 1290) a theme covers the board: a theme with a
 // board cut may use it, a 32:9 theme is cropped to its photos. Photos stay on screen either way.
+// D123 (2026-11-28, "가급적 많은 사진을 한번에"): a picture with more places than its board cut
+// (peace-wall: five, its cut four) hangs all five, with blurred bands above and below.
 for (const id of ["peace-wall", "bethlehem", "sunset-window"] as const) {
   test(`board 3096x1290: ${id} covers the board, photos on screen`, async ({ browser }) => {
     test.setTimeout(120_000);
@@ -411,11 +413,26 @@ for (const id of ["peace-wall", "bethlehem", "sunset-window"] as const) {
       .toBe(shown.scene.width);
     const bg = (await background.boundingBox())!;
     expect(bg.width / bg.height).toBeCloseTo(shown.scene.width / shown.scene.height, 2);
-    expect(plan.coverage).toBeCloseTo(1, 6);
-    expect(bg.x).toBeLessThanOrEqual(1);
-    expect(bg.y).toBeLessThanOrEqual(1);
-    expect(bg.x + bg.width).toBeGreaterThanOrEqual(size.width - 1);
-    expect(bg.y + bg.height).toBeGreaterThanOrEqual(size.height - 1);
+    const cutPlaces = Math.max(
+      ...themeCuts(getWallTheme(id)).map((c) => c.theme.scene.slots.length),
+    );
+    if (plan.coverage < 1 - 1e-6) {
+      // More photos than the board cut: the picture is smaller than the board on one axis only,
+      // centred there, and still covers enough of it.
+      expect(plan.slotIndexes.length).toBe(cutPlaces);
+      expect(plan.coverage).toBeGreaterThanOrEqual(WALL_FIT.morePhotosMinCoverage);
+      const coversX = bg.x <= 1 && bg.x + bg.width >= size.width - 1;
+      const coversY = bg.y <= 1 && bg.y + bg.height >= size.height - 1;
+      expect(coversX || coversY).toBe(true);
+      if (!coversX) expect(Math.abs(bg.x - (size.width - bg.x - bg.width))).toBeLessThanOrEqual(2);
+      if (!coversY)
+        expect(Math.abs(bg.y - (size.height - bg.y - bg.height))).toBeLessThanOrEqual(2);
+    } else {
+      expect(bg.x).toBeLessThanOrEqual(1);
+      expect(bg.y).toBeLessThanOrEqual(1);
+      expect(bg.x + bg.width).toBeGreaterThanOrEqual(size.width - 1);
+      expect(bg.y + bg.height).toBeGreaterThanOrEqual(size.height - 1);
+    }
 
     const visible = page.locator('[data-testid="wall-photo"][data-phase="VISIBLE"]');
     await expect

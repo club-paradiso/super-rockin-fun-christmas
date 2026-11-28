@@ -3,10 +3,18 @@ export const WALL_CONFIG = {
   /** Opening hours (set in /admin → 설정) are wall-clock times in this zone. */
   timeZone: "Asia/Seoul",
   /**
-   * How often the wall asks the server which photos it may show. Also the upper bound for a
-   * hidden or deleted photo to leave the screen (plan target: 5 s).
+   * How often an enrolled venue display asks the hub which photos it may show. Also the upper
+   * bound for a hidden or deleted photo to leave the screen (plan target: 5 s). 2 s since
+   * 2026-11-28 (a user request: "체감속도 개선"): a just-approved photo is seen sooner.
    */
-  pollMs: 5_000,
+  pollMs: 2_000,
+  /**
+   * The public audience (anyone who opened the wall address, D86) keeps the old pace: it may be
+   * many phones, and nothing it shows is urgent.
+   */
+  publicPollMs: 5_000,
+  /** One feed request gives up after this long (the next poll asks again). */
+  pollTimeoutMs: 4_000,
   /** Liveness report so /admin → 키오스크 shows the wall display online/stale/offline. */
   heartbeatMs: 45_000,
   /** Scheduler resolution. At most one photo enters per tick, so entrances are staggered. */
@@ -29,7 +37,7 @@ export const WALL_CONFIG = {
    * A debut never pushes out a photo that has been fully visible for less than this, so nothing
    * flashes past. 바로 띄우기 (show-now) does not wait for it.
    */
-  debutYieldAfterMs: 5_000,
+  debutYieldAfterMs: 3_000,
   /** Cloud fallback only (no exposure history): newest eligible photos the wall rotates through. */
   feedLimit: 60,
   /**

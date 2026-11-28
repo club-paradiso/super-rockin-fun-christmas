@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_WALL_THEME, WALL_THEMES, getWallTheme } from "@/config/wall-themes";
-import { WALL_FIT, planWallFit, slotEnvelope, themeCuts, wordmarkBox } from "@/lib/wall/fit";
+import {
+  WALL_FIT,
+  fitChoices,
+  planWallFit,
+  slotEnvelope,
+  themeCuts,
+  wordmarkBox,
+} from "@/lib/wall/fit";
 
 /**
  * D110: the wall fits the photos and the wordmark into the screen, never stretches, never zooms
@@ -94,15 +101,22 @@ describe("planWallFit (D110)", () => {
       });
     }
 
-    // A cut drawn for a shape is never beaten by something worse at that shape: no band, at least
-    // as many photos, at least as large. (Snowy chapel's 32:9 picture beats its own board cut on the
-    // board: all five photos, larger, no band.)
+    // A cut drawn for a shape is never beaten by something worse at that shape: at least as many
+    // photos; with the same number, no band and at least as large. More photos (2026-11-28,
+    // "가급적 많은 사진을 한번에": the 32:9 picture's five on the board instead of its cut's four)
+    // only within the limits of `morePhotosMinScale` and `morePhotosMinCoverage`.
     it(`${theme.id}: on a screen the shape of any of its cuts, at least as good as that cut`, () => {
       for (const { theme: look } of themeCuts(theme)) {
         const plan = planWallFit(theme, { width: look.scene.width, height: look.scene.height })!;
-        expect(plan.coverage).toBeCloseTo(1, 9);
-        expect(plan.scale).toBeGreaterThanOrEqual(1 - 1e-9);
-        expect(plan.slotIndexes.length).toBeGreaterThanOrEqual(look.scene.slots.length);
+        const own = look.scene.slots.length;
+        expect(plan.slotIndexes.length).toBeGreaterThanOrEqual(own);
+        if (plan.slotIndexes.length === own) {
+          expect(plan.coverage).toBeCloseTo(1, 9);
+          expect(plan.scale).toBeGreaterThanOrEqual(1 - 1e-9);
+        } else {
+          expect(plan.coverage).toBeGreaterThanOrEqual(WALL_FIT.morePhotosMinCoverage);
+          expect(plan.scale).toBeGreaterThanOrEqual(WALL_FIT.morePhotosMinScale - 1e-9);
+        }
       }
     });
 
@@ -115,12 +129,43 @@ describe("planWallFit (D110)", () => {
     });
   }
 
-  it("a 16:9 screen gets no bands with the default theme's cut, and photos at least 75% size", () => {
-    const plan = planWallFit(getWallTheme(DEFAULT_WALL_THEME), { width: 1920, height: 1080 })!;
-    expect(plan.coverage).toBeGreaterThan(0.9);
-    expect(plan.scale).toBeGreaterThan(0.75);
+  it("a 16:9 screen hangs every place of the default picture, larger than the old whole fit", () => {
+    const theme = getWallTheme(DEFAULT_WALL_THEME);
+    const plan = planWallFit(theme, { width: 1920, height: 1080 })!;
+    expect(plan.slotIndexes).toHaveLength(theme.scene.slots.length);
+    expect(plan.coverage).toBeGreaterThanOrEqual(WALL_FIT.morePhotosMinCoverage);
     // The old fit (whole 3840 × 1080 picture in the screen) hung them at half size.
     expect(plan.scale).toBeGreaterThan(1920 / 3840);
+  });
+
+  // 2026-11-28 ("가급적 많은 사진을 한번에"): the most photos, within the two limits.
+  it("hangs the most photos whose size and cover stay within the limits", () => {
+    for (const theme of WALL_THEMES) {
+      for (const [width, height] of SCREENS) {
+        const screen = { width, height };
+        const plan = planWallFit(theme, screen)!;
+        const { free, bySize } = fitChoices(theme, screen)!;
+        const within = (p: { scale: number; coverage: number }) =>
+          p.scale >= WALL_FIT.morePhotosMinScale * free.scale - 1e-9 &&
+          p.coverage >= Math.min(WALL_FIT.morePhotosMinCoverage, free.coverage) - 1e-9;
+        // The photos shrink at most to the limit, and the picture still covers enough.
+        expect(within(plan), `${theme.id} ${width}x${height}`).toBe(true);
+        expect(plan.slotIndexes.length).toBeGreaterThanOrEqual(free.slotIndexes.length);
+        // No larger count was within the limits.
+        for (const [n, p] of bySize)
+          if (n > plan.slotIndexes.length)
+            expect(within(p), `${theme.id} ${width}x${height}: ${n} photos`).toBe(false);
+      }
+    }
+  });
+
+  it("a portrait screen keeps its few large photos rather than a screen of bands", () => {
+    for (const theme of WALL_THEMES) {
+      const plan = planWallFit(theme, { width: 1080, height: 1920 })!;
+      const { free } = fitChoices(theme, { width: 1080, height: 1920 })!;
+      expect(plan.coverage).toBeGreaterThanOrEqual(free.coverage * 0.6);
+      expect(plan.slotIndexes.length).toBeLessThanOrEqual(3);
+    }
   });
 
   it("is the same plan at any pixel count for the same shape (only the scale differs)", () => {

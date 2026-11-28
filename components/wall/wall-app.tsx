@@ -316,16 +316,20 @@ export function WallApp({
   useEffect(() => {
     let stopped = false;
     let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A display asks every `pollMs`, the public audience every `publicPollMs` (it is told which
+    // it is by the answer; until then, the display pace).
+    let pace: number = WALL_CONFIG.pollMs;
+    const next = () => {
+      if (!stopped) timer = setTimeout(() => void poll().finally(next), pace);
+    };
     async function poll() {
       // Only one request may be active. A slow earlier poll must never overwrite
       // a newer PAUSE WALL or SHOW HOLDING SCREEN response.
       if (stopped || inFlight) return;
       inFlight = true;
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        Math.min(8_000, WALL_CONFIG.pollMs - 1_000),
-      );
+      const timeout = setTimeout(() => controller.abort(), WALL_CONFIG.pollTimeoutMs);
       try {
         const q = new URLSearchParams();
         if (onWallRef.current.length) q.set("on", onWallRef.current.join(","));
@@ -338,6 +342,7 @@ export function WallApp({
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as WallFeed;
         if (stopped) return;
+        pace = body.audience === "public" ? WALL_CONFIG.publicPollMs : WALL_CONFIG.pollMs;
         setFeed(body);
         setOnline(true);
         setLastOkAt(Date.now());
@@ -365,11 +370,10 @@ export function WallApp({
         // Retried after the next successful poll.
       }
     }
-    void poll();
-    const id = setInterval(poll, WALL_CONFIG.pollMs);
+    void poll().finally(next);
     return () => {
       stopped = true;
-      clearInterval(id);
+      clearTimeout(timer);
     };
   }, []);
 

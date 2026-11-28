@@ -1974,6 +1974,30 @@ brass nail) and asked for it in code.
   the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
   the garland) / 3190 (the right post's wooden face).
 
+## D123 · Faster to the wall, and as many photos at once as the picture allows (2026-11-28)
+
+User: "체감속도 개선해주고, 가급적 많은 사진을 한번에 보일 수 있게 조정 부탁". After D121 the
+remaining wait after approval was the wall's own: a 5 s feed poll and a 5 s wait before a debut
+may push a photo out. The AI review already sends every shot at once and starts at the consent.
+
+- **Speed.** An enrolled display polls every 2 s (`WALL_CONFIG.pollMs`); the public audience
+  stays at 5 s (`publicPollMs`, told by the answer's `audience`). A feed request gives up after
+  4 s (`pollTimeoutMs`); polls are chained, never stacked. A debut may push out a photo fully
+  visible 3 s (`debutYieldAfterMs`, was 5 s). The booth's status line asks every 1.5 s
+  (`kioskStatusPollMs`, was 2.5 s), so "올라갔어요" comes sooner. Display feed limit 30 → 90 a
+  minute. Virtual clock, busy evening: approval → photo starting to go up, median 3 → 1 s,
+  95 % 6 → 3 s, worst with none ahead 6 → 4 s; 바로 띄우기 6 → 3 s; a hidden photo leaves within
+  1 s (was 4 s). The 1.5 s entrance comes on top.
+- **More photos.** `planWallFit` no longer stops at the best-scored plan: it hangs the most
+  photos whose size stays at least 70 % of that plan's (`morePhotosMinScale`) and whose picture
+  still covers half the screen, or as much as that plan does (`morePhotosMinCoverage`). The
+  2.4:1 board: 4 → 5 for the two five-place pictures (photos 3 % larger), 3 → 4 for festive
+  lights; 16:9 TVs: +1–2 photos at 74–82 % size, with blurred bands where the photos need the
+  room; the 32:9 LED: no change (every place already); portrait screens keep two large photos.
+  `/wall?photos=N` still asks for at least N. More places than a picture has would need new
+  places drawn into the pictures: not done.
+- **Unchanged:** the order (F1–F6 hold), the debut rules, consent, moderation, every theme rule.
+
 ## D121 · A just-approved photo goes up at once: the debut (2026-11-28)
 
 User: "사람들이 미디어월로 송출하기를 선택하면, 사진이 문제 없이 승인될 경우에는 즉시 사진이

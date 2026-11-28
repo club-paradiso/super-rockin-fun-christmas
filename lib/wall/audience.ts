@@ -28,11 +28,12 @@ export async function wallAudience(request: Request): Promise<{
 }
 
 /**
- * Per display / per address. The wall polls every 5 s (12 a minute) and loads each image once;
- * the public limits leave room for several screens behind one venue address.
+ * Per display / per address. A display polls every 2 s (30 a minute, `WALL_CONFIG.pollMs`) and a
+ * public viewer every 5 s; each loads an image once. The public limits leave room for several
+ * screens behind one venue address.
  */
 const LIMITS = {
-  feed: { display: new RateLimiter(30, 60_000), public: new RateLimiter(90, 60_000) },
+  feed: { display: new RateLimiter(90, 60_000), public: new RateLimiter(90, 60_000) },
   image: { display: new RateLimiter(240, 60_000), public: new RateLimiter(360, 60_000) },
 };
 

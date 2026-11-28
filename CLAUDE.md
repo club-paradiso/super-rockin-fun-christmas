@@ -257,8 +257,11 @@ looks:measure`). `/looks` is the comparison
   `/wall?photos=N` (a user request the same day, at the venue: "배경이 많이 잘려 … 더 많은 사진")
   asks one screen for at least N photos at once: `minSlots` in `planWallFit` then keeps only the
   plans with that many, so more of the picture shows and each photo hangs smaller, with bands
-  where they need the room. Never more than the picture has places for; without it the fit is
-  exactly what it was (`tests/unit/wall-fit.test.ts`).
+  where they need the room. Never more than the picture has places for. Without it the fit hangs
+  as many photos as it can on its own (D123, 2026-11-28, a user request: "가급적 많은 사진을
+  한번에"): the most photos whose size stays at least `WALL_FIT.morePhotosMinScale` (70 %) of the
+  best-scored plan's and whose picture still covers `morePhotosMinCoverage` (50 %, or what that
+  plan covers) of the screen (`fitChoices`, `tests/unit/wall-fit.test.ts`).
   Whether any of this works in Millumin is a person's check on that Mac, never claimed from a
   Chromium run.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
@@ -548,7 +551,9 @@ looks:measure`). `/looks` is the comparison
   wall only picks the first usable id. A photo just approved and never shown is a debut (D121,
   2026-11-28, a user request: the guest sees it go up at once): taken within
   `WALL_CONFIG.debutWindowMs`, after show-now in the order, listed in the feed's `debut`, and the
-  wall makes room for it (`debutYieldAfterMs`, never pushing out show-now or another debut). Changing rotation means keeping F1–F6
+  wall makes room for it (`debutYieldAfterMs`, never pushing out show-now or another debut). An
+  enrolled display asks every `WALL_CONFIG.pollMs` (2 s since D123), the public audience every
+  `publicPollMs` (5 s). Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
 
 ## The user's words

@@ -50,6 +50,19 @@ export const WALL_FIT = {
    * gives way (the photos still fit inside the screen): a hairline band is worse than a tighter edge.
    */
   snap: 1.06,
+  /**
+   * As many photos as the picture has places for (2026-11-28, a user request: "가급적 많은 사진을
+   * 한번에"): of the plans the score finds best for each number of photos, the one with the most
+   * photos wins as long as each of its photos is at least this share of the size the overall best
+   * plan would hang them at. So a 16:9 TV hangs every place of most pictures, and a portrait
+   * screen, where every photo would shrink to under half, keeps its few large ones.
+   */
+  morePhotosMinScale: 0.7,
+  /**
+   * …and as long as the picture still covers at least this share of the screen (or as much as
+   * the best plan does, when that is less): more photos never turn the wall into mostly bands.
+   */
+  morePhotosMinCoverage: 0.5,
 } as const;
 
 export interface FitScreen {
@@ -237,24 +250,47 @@ function score(plan: WallFitPlan): number {
  * wins near-ties (`WALL_FIT.stickiness`). Ties then go to more photos, then to the theme's own cut,
  * then to the run closest to the middle of the picture. Null for a screen with no size.
  */
+export interface WallFitOptions {
+  lite?: boolean;
+  prefer?: string | null;
+  /**
+   * Hang at least this many photos (`/wall?photos=N`, a person's choice for one screen): the
+   * planner then picks among the plans with that many or more, so more of the picture shows and
+   * the photos hang smaller, with bands where they need the room. Never more than the cut has.
+   */
+  minSlots?: number;
+}
+
 export function planWallFit(
   theme: WallTheme,
   screen: FitScreen,
-  {
-    lite = false,
-    prefer = null,
-    minSlots = 0,
-  }: {
-    lite?: boolean;
-    prefer?: string | null;
-    /**
-     * Hang at least this many photos (`/wall?photos=N`, a person's choice for one screen): the
-     * planner then picks among the plans with that many or more, so more of the picture shows and
-     * the photos hang smaller, with bands where they need the room. Never more than the cut has.
-     */
-    minSlots?: number;
-  } = {},
+  options: WallFitOptions = {},
 ): WallFitPlan | null {
+  const found = fitChoices(theme, screen, options);
+  if (!found) return null;
+  const { best, free, bySize } = found;
+  // The most photos whose size stays within reach of the best plan's (the plan on screen gets
+  // the same leeway as in the score, so a resize does not flip between two counts).
+  const covers = Math.min(WALL_FIT.morePhotosMinCoverage, free.coverage);
+  for (const size of [...bySize.keys()].sort((a, b) => b - a)) {
+    const plan = bySize.get(size)!;
+    const leeway = options.prefer && plan.key === options.prefer ? WALL_FIT.stickiness : 1;
+    if (plan.scale * leeway >= WALL_FIT.morePhotosMinScale * free.scale && plan.coverage >= covers)
+      return plan;
+  }
+  return best;
+}
+
+/**
+ * What the planner chooses from: the best-scored plan of all (`free`, whatever was asked for: the
+ * size photos are measured against), the best-scored plan that hangs what was asked (`best`), and
+ * the best-scored plan for each number of photos that was asked (`bySize`). Exported for tests.
+ */
+export function fitChoices(
+  theme: WallTheme,
+  screen: FitScreen,
+  { lite = false, prefer = null, minSlots = 0 }: WallFitOptions = {},
+): { best: WallFitPlan; free: WallFitPlan; bySize: Map<number, WallFitPlan> } | null {
   const W = screen.width;
   const H = screen.height;
   if (!(W > 0) || !(H > 0)) return null;
@@ -268,14 +304,19 @@ export function planWallFit(
   const most = Math.max(...themeCuts(theme).map((c) => slotsOf(c.theme)));
 
   let best: { plan: WallFitPlan; value: number; tie: number[] } | null = null;
+  /** The best plan of all, whatever was asked for: the size the photos are measured against. */
+  let free: { plan: WallFitPlan; value: number; tie: number[] } | null = null;
+  /** The best plan for each number of photos. */
+  const bySize = new Map<number, { plan: WallFitPlan; value: number; tie: number[] }>();
   for (const { cut, theme: look } of themeCuts(theme)) {
     const all = look.scene.slots.map((_, i) => i);
     const allowed = lite ? look.liteSlots.filter((i) => i < all.length) : all;
     if (!allowed.length) continue;
     // A cut with fewer slots than were asked for is out, unless no cut has that many.
-    if (allowed.length < Math.min(asked, most)) continue;
+    const cutAsked = allowed.length >= Math.min(asked, most);
     const fewest = Math.min(Math.max(WALL_FIT.minSlots, asked), allowed.length);
-    for (let size = allowed.length; size >= fewest; size--) {
+    for (let size = allowed.length; size >= Math.min(WALL_FIT.minSlots, allowed.length); size--) {
+      const isAsked = cutAsked && size >= fewest;
       for (const run of runs(allowed, size)) {
         const plan = planFor(look, cut, run, s, lite);
         let value = score(plan);
@@ -283,15 +324,23 @@ export function planWallFit(
         const mid = (plan.safe.x + plan.safe.width / 2) / look.scene.width;
         // Higher is better, compared in order after `value`.
         const tie = [size, cut === -1 ? 1 : 0, -Math.abs(mid - 0.5)];
-        const better =
-          !best ||
-          value > best.value * (1 + 1e-9) ||
-          (Math.abs(value - best.value) <= best.value * 1e-9 && compare(tie, best.tie) > 0);
-        if (better) best = { plan, value, tie };
+        const beats = (other: { value: number; tie: number[] } | null | undefined) =>
+          !other ||
+          value > other.value * (1 + 1e-9) ||
+          (Math.abs(value - other.value) <= other.value * 1e-9 && compare(tie, other.tie) > 0);
+        if (beats(free)) free = { plan, value, tie };
+        if (!isAsked) continue;
+        if (beats(best)) best = { plan, value, tie };
+        if (beats(bySize.get(size))) bySize.set(size, { plan, value, tie });
       }
     }
   }
-  return best?.plan ?? null;
+  if (!best || !free) return null;
+  return {
+    best: best.plan,
+    free: free.plan,
+    bySize: new Map([...bySize].map(([n, c]) => [n, c.plan])),
+  };
 }
 
 const compare = (a: number[], b: number[]) => {
