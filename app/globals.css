@@ -1271,6 +1271,11 @@ body {
     .shoot:not(.shoot-live) .shoot-panel > .booth-lead br {
       display: none;
     }
+    /* While shooting the picture runs edge to edge (a user decision, 2026-11-28: "거의 전체
+       화면 느낌으로"): a 1 px gutter (a fraction of a pixel more would be off the screen), the paper's side margins are given up too. */
+    .shoot-live .shoot-stage {
+      margin-inline: calc(1px - var(--booth-pad) - var(--sheet-pad-x, 24px));
+    }
   }
   .camera-preview {
     position: relative;
