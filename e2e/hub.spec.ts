@@ -140,6 +140,62 @@ test("on the hub alone: kiosk photo → consent YES → approve → wall → hid
   await wall.context().close();
 });
 
+test("「게시 중」: every wall photo in one place, several taken down at once, and back", async () => {
+  const shots = [await kioskPhotoToQr(kiosk, "yes"), await kioskPhotoToQr(kiosk, "yes")];
+  for (const { session } of shots) {
+    const card = staff.getByTestId("photo-card").filter({ hasText: session });
+    await expect(async () => {
+      await staff.goto("/admin/moderation");
+      await expect(card.getByTestId("photo-status")).toHaveText("검수 대기", { timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+    await card.getByTestId("action-approve").click();
+    await expect(card).toHaveCount(0);
+  }
+  const ids = await Promise.all(shots.map(({ url }) => photoIdForToken(tokenFromUrl(url))));
+
+  await staff.goto("/admin/moderation");
+  await staff.getByTestId("view-wall").click();
+  await expect(staff).toHaveURL(/view=wall/);
+  const cards = shots.map(({ session }) =>
+    staff.getByTestId("photo-card").filter({ hasText: session }),
+  );
+  for (const card of cards) {
+    await expect(card.getByTestId("photo-status")).toHaveText("승인됨");
+    await card.getByTestId("photo-select").click();
+    await expect(card).toHaveAttribute("data-selected", "true");
+  }
+  await expect(staff.getByTestId("wall-selected-count")).toHaveText("2장 선택");
+  await staff.getByTestId("wall-hide-selected").click();
+  await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
+  await expect(staff.getByTestId("wall-bulk-result")).toContainText("2장을 미디어월에서 내렸어요");
+  for (const card of cards) await expect(card).toHaveCount(0);
+  const status = async (id: string) => {
+    const db = JSON.parse(await readFile(".data-e2e/db.json", "utf8")) as {
+      photos: { id: string; moderationStatus: string }[];
+    };
+    return db.photos.find((p) => p.id === id)?.moderationStatus;
+  };
+  for (const id of ids) await expect.poll(() => status(id)).toBe("HIDDEN");
+
+  await staff.getByTestId("wall-undo").click();
+  await expect(staff.getByTestId("wall-bulk-result")).toContainText(
+    "2장을 다시 미디어월에 올렸어요",
+  );
+  for (const id of ids) await expect.poll(() => status(id)).toBe("APPROVED");
+  for (const card of cards) await expect(card).toBeVisible();
+
+  // Taking down everything on the page empties it, and the undo must still be there.
+  await staff.getByTestId("wall-select-all").click();
+  await staff.getByTestId("wall-hide-selected").click();
+  await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
+  await expect(staff.getByTestId("queue-empty")).toBeVisible();
+  await expect(staff.getByTestId("wall-undo")).toBeVisible();
+  for (const id of ids) await expect.poll(() => status(id)).toBe("HIDDEN");
+  await staff.getByTestId("wall-undo").click();
+  for (const id of ids) await expect.poll(() => status(id)).toBe("APPROVED");
+  for (const card of cards) await expect(card).toBeVisible();
+});
+
 async function holdCorner(page: Page, ms: number) {
   const box = (await page.getByTestId("help-corner").boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

@@ -206,12 +206,19 @@ export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<St
   return [...flagged, ...rest].slice(0, limit);
 }
 
-export const MODERATION_VIEWS = ["queue", "flagged", "ai-approved", "rejected", "hidden"] as const;
+export const MODERATION_VIEWS = [
+  "queue",
+  "wall",
+  "flagged",
+  "ai-approved",
+  "rejected",
+  "hidden",
+] as const;
 export type ModerationView = (typeof MODERATION_VIEWS)[number];
 
 /** The sections of the review page other than the queue (D95). Newest first, bounded. */
 export async function moderationSection(
-  view: Exclude<ModerationView, "queue">,
+  view: Exclude<ModerationView, "queue" | "wall">,
   limit = 60,
 ): Promise<StaffPhotoView[]> {
   switch (view) {
@@ -228,6 +235,80 @@ export async function moderationSection(
       return listStaffPhotos({ statuses: ["REJECTED"], limit });
     case "hidden":
       return listStaffPhotos({ statuses: ["HIDDEN"], limit });
+  }
+}
+
+/** One page of 「게시 중」 at a time: enough to look through, bounded for the iPad and the server. */
+export const WALL_PAGE_SIZE = 120;
+
+export interface WallPage {
+  photos: StaffPhotoView[];
+  /** Every photo the wall may show right now (approved by a person or by the AI, with consent). */
+  total: number;
+  /** Pass as `before` for the next (older) page; null on the last page. */
+  nextBefore: string | null;
+}
+
+/**
+ * 「게시 중」: every photo the venue wall may show right now, newest first, a page at a time.
+ * Only wall-eligible photos (`isWallEligible`); the one thing staff do here is take them down
+ * (hide), so a page offers nothing else in bulk.
+ *
+ * The cursor is `<ms>~<id>,<id>…`: the boundary photo's time in whole milliseconds plus the ids on
+ * this page taken in that same millisecond. The next page asks for everything up to and including
+ * that millisecond and leaves those ids out, so photos sharing a timestamp are never skipped
+ * (backends only know "strictly before", and Supabase keeps microseconds).
+ */
+export async function wallSection(
+  opts: { before?: string; source?: PhotoSource; limit?: number } = {},
+): Promise<WallPage> {
+  const limit = Math.min(Math.max(opts.limit ?? WALL_PAGE_SIZE, 1), 200);
+  const cursor = parseWallCursor(opts.before);
+  const [rows, labels, total] = await Promise.all([
+    // One extra row says whether an older page exists; the seen ids may come back and are dropped.
+    getPhotoService().list({
+      statuses: ["APPROVED"],
+      wallConsent: true,
+      before: cursor ? new Date(cursor.ms + 1).toISOString() : undefined,
+      limit: limit + 1 + (cursor?.seen.size ?? 0),
+    }),
+    kioskLabelMap(),
+    countWallEligible(),
+  ]);
+  const fresh = cursor ? rows.filter((r) => !cursor.seen.has(r.id)) : rows;
+  const more = fresh.length > limit;
+  const page = fresh.slice(0, limit);
+  const views = page
+    .filter((r) => isWallEligible(r))
+    .map((r) => toStaffPhotoView(r, labels))
+    .filter((v) => !opts.source || v.source === opts.source);
+  return { photos: views, total, nextBefore: more ? wallCursor(page, cursor) : null };
+}
+
+function wallCursor(
+  page: { id: string; createdAt: string }[],
+  previous: { ms: number; seen: Set<string> } | null,
+): string {
+  const ms = Date.parse(page[page.length - 1]!.createdAt);
+  const tied = page.filter((r) => Date.parse(r.createdAt) === ms).map((r) => r.id);
+  // A millisecond that spans pages keeps the ids already left out before.
+  if (previous && previous.ms === ms) tied.push(...previous.seen);
+  return `${ms}~${[...new Set(tied)].join(",")}`;
+}
+
+function parseWallCursor(raw: string | undefined): { ms: number; seen: Set<string> } | null {
+  const m = raw ? /^(\d{1,15})~([0-9a-f,-]{0,8000})$/i.exec(raw) : null;
+  if (!m) return null;
+  const seen = new Set(m[2]!.split(",").filter((id) => /^[0-9a-f-]{36}$/i.test(id)));
+  return { ms: Number(m[1]), seen };
+}
+
+/** Approved photos still on the wall; never throws (a count is not worth a broken page). */
+async function countWallEligible(): Promise<number> {
+  try {
+    return (await getPhotoService().stats()).byStatus.APPROVED;
+  } catch {
+    return 0;
   }
 }
 
