@@ -1271,6 +1271,11 @@ body {
     .shoot:not(.shoot-live) .shoot-panel > .booth-lead br {
       display: none;
     }
+    /* While shooting the picture runs edge to edge (a user decision, 2026-11-28: "거의 전체
+       화면 느낌으로"): a 1 px gutter (a fraction of a pixel more would be off the screen), the paper's side margins are given up too. */
+    .shoot-live .shoot-stage {
+      margin-inline: calc(1px - var(--booth-pad) - var(--sheet-pad-x, 24px));
+    }
   }
   .camera-preview {
     position: relative;
@@ -1524,7 +1529,10 @@ body {
   .select-grid {
     --cols: 2;
     --rows: 2;
-    --extra: 16px;
+    /* Nothing sits under a print (the number is on it): the only extra height is the tile's own
+       edge, 2 × (4 px padding + 4 px border) = 16 px, less the 12 px those same 16 px of width
+       already give the 4:3 picture. 16 here left 12 px of every row empty (2026-11-28). */
+    --extra: 4px;
   }
   .select-grid.has-extra {
     --rows: 4;
@@ -1688,6 +1696,24 @@ body {
      was 5 px too tall again at 768 × 1024 and 23 px at 820 × 1060 (measured). */
   .select.has-looks .fit-stage {
     --fit-min: clamp(160px, 20.5 * var(--bh), 320px);
+  }
+  /* 2026-11-28 (a user request: "사진 셀렉할때 화면이 지나치게 작아서 안보여"): at 768 × 1024 each
+     photo was 122 × 95 px, smaller than the colour chips under it (155 px wide), because the
+     colour row and the gaps took the room the prints needed (measured). The prints are what the
+     guest chooses, so they come first: the screen's parts sit closer together and each chip shows
+     its look on a smaller picture of the same shot, still 4:3 (never another crop), centred above
+     its name; the chip itself keeps its width and stays a touch target. The wide composition sets
+     its own gap; its chips, under the prints there too, take the same smaller picture. */
+  .select {
+    --select-gap: var(--gap-s);
+  }
+  .select .look-chip img,
+  .select .look-chip-wait {
+    align-self: center;
+    width: auto;
+    max-width: 100%;
+    height: clamp(44px, 6.5 * var(--bh), 96px);
+    aspect-ratio: 4 / 3;
   }
   .select.has-looks.select-has-retouch .fit-stage {
     --fit-min: clamp(140px, 15 * var(--bh), 300px);

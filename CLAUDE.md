@@ -171,6 +171,12 @@ looks:measure`). `/looks` is the comparison
 - **Private photos.** Bucket stays private; guests only ever see `/p/[token]`,
   `/p/[token]/image` and `/p/[token]/video`. Never return `objectPath`, `tokenHash` or signed
   storage URLs to clients.
+- **The guest page saves the way each phone can** (2026-11-28, a user request: Galaxy guests got
+  lost). `lib/guest/save-env.ts` reads the user agent on `/p/[token]` only (never on the booth):
+  iPhone saves through the share sheet («이미지 저장»); Android never uses the share sheet to save
+  (it has no gallery entry) and downloads straight away, then says where the file is; inside an
+  app's own browser (KakaoTalk, NAVER, Instagram …) the page offers to reopen in the real browser.
+  `e2e/guest-save.spec.ts`.
 - **Raw tokens are never stored or logged.** Only `sha256(token)`. Unknown/expired/deleted all
   return the same 404.
 - **No fake QR.** A QR is shown only after the server returned a real token.
