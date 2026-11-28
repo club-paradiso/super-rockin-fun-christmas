@@ -3,9 +3,18 @@ import { parseWallView, wallShapeCheck } from "@/lib/wall/embed";
 
 describe("wall inside another program", () => {
   it("is asked for in the address only", () => {
-    expect(parseWallView({})).toEqual({ embed: false, check: false });
-    expect(parseWallView({ embed: "1", check: "true" })).toEqual({ embed: true, check: true });
-    expect(parseWallView({ embed: "0", check: "yes" })).toEqual({ embed: false, check: false });
+    expect(parseWallView({})).toEqual({ embed: false, check: false, minPhotos: 0 });
+    expect(parseWallView({ embed: "1", check: "true", photos: "5" })).toEqual({
+      embed: true,
+      check: true,
+      minPhotos: 5,
+    });
+    expect(parseWallView({ embed: "0", check: "yes", photos: "many" })).toEqual({
+      embed: false,
+      check: false,
+      minPhotos: 0,
+    });
+    expect(parseWallView({ photos: "-3" }).minPhotos).toBe(0);
   });
 
   it("reports the size it was given and a shape that is not the LED's", () => {

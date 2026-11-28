@@ -222,6 +222,30 @@ test.describe("embed", () => {
   });
 });
 
+// /wall?photos=N: one screen is asked for more photos at once; the wall hangs every place the
+// picture has, smaller, and still nothing leaves the screen.
+test("photos=N hangs more places on a 16:9 screen than the automatic fit", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/wall");
+  const scene = page.getByTestId("wall-scene");
+  await expect(scene).toHaveAttribute("data-slots", /\d/);
+  const auto = Number(await scene.getAttribute("data-slots"));
+  const autoScale = Number(await page.getByTestId("wall").getAttribute("data-fit-scale"));
+  await page.goto("/wall?photos=9&check=1");
+  await expect
+    .poll(async () => Number(await page.getByTestId("wall-scene").getAttribute("data-slots")))
+    .toBeGreaterThan(auto);
+  expect(Number(await page.getByTestId("wall").getAttribute("data-fit-scale"))).toBeLessThan(
+    autoScale,
+  );
+  await expect(page.getByTestId("wall-check").locator('[data-row="사진 자리"]')).toContainText(
+    "photos=9",
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("a one-time code in the address is put in the box, never sent by itself", async ({ page }) => {
   await page.goto("/kiosk/enroll?next=wall&code=K7QM-3XRP");
   await expect(page.locator('input[name="code"]')).toHaveValue("K7QM-3XRP");

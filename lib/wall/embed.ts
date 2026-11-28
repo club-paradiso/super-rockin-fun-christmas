@@ -17,6 +17,13 @@
 export interface WallViewOptions {
   embed: boolean;
   check: boolean;
+  /**
+   * `?photos=N`: hang at least N photos on this screen (0 = let the fit decide). A person's choice
+   * for one screen: more of the picture and more guests at once, each photo smaller, with bands
+   * where the photos need the room (`minSlots` in lib/wall/fit.ts). Never more than the picture
+   * has places for.
+   */
+  minPhotos: number;
 }
 
 const on = (v: string | undefined | null) => v === "1" || v === "true";
@@ -24,8 +31,10 @@ const on = (v: string | undefined | null) => v === "1" || v === "true";
 export function parseWallView(q: {
   embed?: string | null;
   check?: string | null;
+  photos?: string | null;
 }): WallViewOptions {
-  return { embed: on(q.embed), check: on(q.check) };
+  const n = /^\d{1,2}$/.test(q.photos ?? "") ? Number(q.photos) : 0;
+  return { embed: on(q.embed), check: on(q.check), minPhotos: n };
 }
 
 export interface WallShapeCheck {

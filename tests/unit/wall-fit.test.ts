@@ -155,6 +155,35 @@ describe("planWallFit (D110)", () => {
     expect(near.key).toBe(best.key);
   });
 
+  // /wall?photos=N: a person asks one screen for more photos at once.
+  for (const theme of WALL_THEMES) {
+    it(`${theme.id}: asked for more photos on 16:9, hangs every place it has, all on screen`, () => {
+      const screen = { width: 1920, height: 1080 };
+      const auto = planWallFit(theme, screen)!;
+      const most = Math.max(...themeCuts(theme).map((c) => c.theme.scene.slots.length));
+      const plan = planWallFit(theme, screen, { minSlots: 99 })!;
+      expect(plan.slotIndexes.length).toBe(most);
+      expect(plan.slotIndexes.length).toBeGreaterThanOrEqual(auto.slotIndexes.length);
+      // Asking for no more than the fit already hangs changes nothing.
+      expect(planWallFit(theme, screen, { minSlots: auto.slotIndexes.length })!.key).toBe(auto.key);
+      expect(planWallFit(theme, screen, { minSlots: 0 })!.key).toBe(auto.key);
+      // Same rules as any plan: never past covering, photos and logo wholly on screen.
+      const { scene } = plan.theme;
+      const s = plan.scale;
+      expect(s).toBeLessThanOrEqual(
+        Math.max(screen.width / scene.width, screen.height / scene.height) + 1e-9,
+      );
+      const left = plan.offset.x + s * plan.safe.x;
+      const top = plan.offset.y + s * plan.safe.y;
+      expect(left).toBeGreaterThanOrEqual(-EPS);
+      expect(top).toBeGreaterThanOrEqual(-EPS);
+      expect(left + s * plan.safe.width).toBeLessThanOrEqual(screen.width + EPS);
+      expect(top + s * plan.safe.height).toBeLessThanOrEqual(screen.height + EPS);
+      // The photos never hang larger for it: the screen shows the picture at this size or smaller.
+      expect(plan.scale).toBeLessThanOrEqual(auto.scale + 1e-9);
+    });
+  }
+
   it("returns null for a screen with no size", () => {
     const theme = getWallTheme(DEFAULT_WALL_THEME);
     expect(planWallFit(theme, { width: 0, height: 1080 })).toBeNull();

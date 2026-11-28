@@ -130,7 +130,10 @@ export function WallApp({
   initialTheme = DEFAULT_WALL_THEME,
   embed = false,
   check = false,
+  minPhotos = 0,
 }: {
+  /** ?photos=N: hang at least this many on this screen (0 = the fit decides). */
+  minPhotos?: number;
   /** Inside another program's web view (?embed=1, lib/wall/embed.ts): no fullscreen, no frame watchdog. */
   embed?: boolean;
   /** Staff check (?check=1): numbers over the wall. */
@@ -176,10 +179,11 @@ export function WallApp({
             {
               lite,
               prefer: planKey,
+              minSlots: minPhotos,
             },
           )
         : null,
-    [baseTheme, shape, lite, planKey],
+    [baseTheme, shape, lite, planKey, minPhotos],
   );
   if (plan && plan.key !== planKey) setPlanKey(plan.key);
   // Before the first measurement: the closest cut, every slot (only for the server render).
@@ -758,6 +762,8 @@ export function WallApp({
           canvas={canvas}
           embed={embed}
           fit={plan?.key ?? null}
+          places={slotCount}
+          minPhotos={minPhotos}
           audience={feed?.audience ?? null}
           mode={feed?.mode ?? null}
           online={online}

@@ -244,6 +244,11 @@ looks:measure`). `/looks` is the comparison
   a photo id, never on by itself. The wall reloads itself only after the server answered
   (`reloadPage`): never into a "cannot connect" page. It measures its size without waiting for an
   animation frame. `/kiosk/enroll?code=` only fills the box; a person still presses the button.
+  `/wall?photos=N` (a user request the same day, at the venue: "배경이 많이 잘려 … 더 많은 사진")
+  asks one screen for at least N photos at once: `minSlots` in `planWallFit` then keeps only the
+  plans with that many, so more of the picture shows and each photo hangs smaller, with bands
+  where they need the room. Never more than the picture has places for; without it the fit is
+  exactly what it was (`tests/unit/wall-fit.test.ts`).
   Whether any of this works in Millumin is a person's check on that Mac, never claimed from a
   Chromium run.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the

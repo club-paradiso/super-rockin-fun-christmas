@@ -22,6 +22,9 @@ export function WallCheck(p: {
   canvas: { width: number; height: number } | null;
   embed: boolean;
   fit: string | null;
+  /** Photos this screen hangs at once, and the least asked for in the address (0 = none). */
+  places: number;
+  minPhotos: number;
   audience: WallAudience | null;
   mode: WallFeedMode | null;
   online: boolean;
@@ -56,6 +59,10 @@ export function WallCheck(p: {
   const rows: [string, string, boolean?][] = [
     ["화면 크기", `${shape.size} px · 비율 ${shape.ratio} : 1 · 배율 ${dpr}`],
     ["맞춤", p.fit ?? "계산 중"],
+    [
+      "사진 자리",
+      `한 번에 ${p.places}장${p.minPhotos ? ` (주소의 photos=${p.minPhotos})` : " (자동)"}`,
+    ],
     [
       "이 화면",
       p.audience === "display"
