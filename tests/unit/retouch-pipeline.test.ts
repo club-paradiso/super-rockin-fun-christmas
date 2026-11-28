@@ -671,6 +671,24 @@ describe("윤곽 다듬기: the cheek and jaw line comes in a little, and it is 
     expect(edge(after, JAW, true) - edge(before, JAW, true)).toBeGreaterThan(1);
   });
 
+  it("counts the copy of the cut-out it reads from in the memory it reports", async () => {
+    const peak = async (numbers: RetouchLevel) => {
+      const { retoucher, spy } = setup([meshFace(FACE)]);
+      const before = drawSyntheticFaces(320, 320, [FACE]);
+      const { results, metrics } = await retoucher.retouchBatch([asImage(before)], "glow", {
+        level: numbers,
+      });
+      spy.mockRestore();
+      const [roi] = results[0]!.regions;
+      return { bytes: metrics.peakBytes, cutOut: roi!.width * roi!.height * 4 };
+    };
+    const still = await peak(contourOnly("glow"));
+    const moved = await peak(outlineOnly("glow"));
+    // The same face and cut-out; the move holds one more full-size copy of it.
+    expect(moved.cutOut).toBe(still.cutOut);
+    expect(moved.bytes - still.bytes).toBe(moved.cutOut);
+  });
+
   it("the whole level is still one face: skin work, light and outline together", async () => {
     const { result, stats } = await retouchOne("glow");
     expect(result.metrics).toMatchObject({ facesRetouched: 1, error: null });

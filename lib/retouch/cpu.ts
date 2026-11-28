@@ -362,6 +362,17 @@ export function combine(
   return out;
 }
 
+/** Whether this job draws the outline in: its level moves something and it is not the mask view. */
+export function outlineMoves(job: FaceJob): boolean {
+  return (
+    job.warp !== null &&
+    job.view !== "mask" &&
+    (job.level.slim > 0 || job.level.size > 0) &&
+    job.strength > 0 &&
+    job.faceWidth > 0
+  );
+}
+
 /** Catmull-Rom: the weight of a sample `x` pixels from where the value is wanted. */
 export function cubicWeight(x: number): number {
   const a = x < 0 ? -x : x;
@@ -389,7 +400,7 @@ export function finalPass(
   // The level's shares as pixels of this cut-out (a small face gets less, like everything else).
   const slimPx = level.slim * job.strength * job.faceWidth;
   const sizePx = level.size * job.strength * job.faceWidth;
-  const moves = warp !== null && !maskView && (slimPx > 0 || sizePx > 0);
+  const moves = warp !== null && outlineMoves(job);
   // The photo as it came in: a moved pixel is read from it, not from what is being written.
   const from = moves ? pixels.slice() : pixels;
   const s = new Float32Array(8);
@@ -539,8 +550,9 @@ export class CpuEngine implements RetouchEngine {
     );
     const comb = combine([c0, c1, c2, c3, c4], act, around, job);
     finalPass(pixels, comb, c0, job);
-    // Ten work images at most; the cut-out itself belongs to the caller.
-    this.peak = Math.max(this.peak, lw * lh * 4 * 10);
+    // Ten work images at most; the cut-out itself belongs to the caller. Where the outline
+    // moves, the final pass also holds the cut-out as it came in, at full size.
+    this.peak = Math.max(this.peak, lw * lh * 4 * 10 + (outlineMoves(job) ? w * h * 4 : 0));
   }
 
   peakBytes(): number {
