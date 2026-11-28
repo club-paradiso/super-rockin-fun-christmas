@@ -199,3 +199,39 @@ export function phoneCardBox(place: SlotPlace): Rect {
   const height = PHONE_CARD.margin + PHONE_CARD.photoHeight + PHONE_CARD.caption;
   return { x: place.x - PHONE_CARD.width / 2, y: place.box.y, width: PHONE_CARD.width, height };
 }
+
+/**
+ * Two tall strips sharing one slot (2026-11-28, "세로로 길쭉한 템플릿은 맥시멈 8개까지"): side by
+ * side, centred on the slot's clip, together never wider than the widest photo the slot is sized
+ * for (`slotEnvelope`: the theme's `wideMax`, the phone card or the strip) and never taller than a
+ * strip, so a pair reaches no further than any single photo in that slot. They hang and swing as
+ * one, about the slot's clip. A strip is made narrower only when the pair would not fit at full
+ * size.
+ */
+export function stripPairBoxes(
+  place: SlotPlace,
+  strip: WallSceneConfig["strip"],
+  wideMax: number = PHONE_CARD.width,
+): [Rect, Rect] {
+  const room = Math.max(wideMax, PHONE_CARD.width, strip.width);
+  const gap = Math.round(strip.width * STRIP_PAIR_GAP);
+  const width = Math.min(strip.width, (room - gap) / 2);
+  const height = (width * strip.height) / strip.width;
+  const left = place.x - width - gap / 2;
+  const y = place.box.y;
+  return [
+    { x: left, y, width, height },
+    { x: left + width + gap, y, width, height },
+  ];
+}
+
+/** Space between the two strips of a pair, as a share of a strip's width. */
+export const STRIP_PAIR_GAP = 0.1;
+
+/** A frame of the strip's own shape (1:3): such photos may hang two to a slot. */
+export function isStripShape(
+  frame: { width: number; height: number },
+  strip: WallSceneConfig["strip"],
+): boolean {
+  return Math.abs(frame.width / frame.height - strip.width / strip.height) < 0.05;
+}

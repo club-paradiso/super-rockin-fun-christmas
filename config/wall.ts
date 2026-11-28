@@ -21,6 +21,12 @@ export const WALL_CONFIG = {
   tickMs: 1_000,
   /** Photos on screen at once (the Figma scene has five; simulations use this too). */
   slots: 5,
+  /**
+   * Most photos on the wall at once (2026-11-28, a user request: "세로로 길쭉한 템플릿은 맥시멈
+   * 8개까지"). Two tall strips share one slot (lib/wall/scheduler.ts `partner`), so a wall of
+   * four or five places hangs up to eight of them.
+   */
+  maxPhotos: 8,
   enterMs: 1_500,
   visibleMs: 14_000,
   exitMs: 1_500,

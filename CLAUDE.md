@@ -553,7 +553,13 @@ looks:measure`). `/looks` is the comparison
   `WALL_CONFIG.debutWindowMs`, after show-now in the order, listed in the feed's `debut`, and the
   wall makes room for it (`debutYieldAfterMs`, never pushing out show-now or another debut). An
   enrolled display asks every `WALL_CONFIG.pollMs` (2 s since D123), the public audience every
-  `publicPollMs` (5 s). Changing rotation means keeping F1–F6
+  `publicPollMs` (5 s). Tall strips (the 1:3 frames, `isStripShape`) may hang two to a slot (D124,
+  2026-11-28, a user request: "세로로 길쭉한 템플릿은 맥시멈 8개까지"): the scheduler's `partner`, a
+  pair that enters, swings and leaves as one about the slot's clip, drawn by `stripPairBoxes`
+  inside what any single photo of that slot may cover (`slotEnvelope`, so every theme and fit
+  rule holds). A pair is taken only while the wall stays within `WALL_CONFIG.maxPhotos` (8) with
+  every other empty slot still getting a photo; a hidden photo leaves at once and its partner
+  stays. Never in low-spec mode (`tests/unit/wall-pairs.test.ts`). Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
 
 ## The user's words
