@@ -175,18 +175,13 @@ test("v2: no extra photo, no second frame choice, no retake, the steps are dots 
   await expect(page.locator(".booth-steps-dot")).toHaveCount(5);
 });
 
-test("screen flash can be toggled before shooting and lights the display only when enabled", async ({
+test("the screen flash lights every shot, with no switch (2026-11-28, a user decision)", async ({
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
-  await startSession(page);
-  const toggle = page.getByTestId("flash-toggle");
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await expect(toggle).toHaveText("화면 플래시 끄기");
   // The flash is lit for a fraction of a second before each shot, so polling for it can miss it
-  // (the rhythm of countdown + rest decides): count each time it appears instead.
+  // (the rhythm of countdown + rest decides): count each time it appears instead. Watched from
+  // the cover on, because shooting starts by itself once the camera is on.
   await page.evaluate(() => {
     const root = document.querySelector(".kiosk-root")!;
     let on = false;
@@ -197,15 +192,14 @@ test("screen flash can be toggled before shooting and lights the display only wh
       on = now;
     }).observe(document.body, { childList: true, subtree: true });
   });
-  await page.getByTestId("shoot-free").click();
+  await startSession(page);
+  // Nothing to switch: no flash toggle, no start button, no pose guide.
+  for (const id of ["flash-toggle", "shoot-free", "shoot-guide", "pose-guide"])
+    await expect(page.getByTestId(id)).toHaveCount(0);
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   // One flash for every shot, and none left on the photo choice.
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-test-flash-count", "4");
   await expect(page.getByTestId("screen-flash")).toHaveCount(0);
-  await page.getByTestId("go-home").click();
-  await page.getByTestId("confirm-home-yes").click();
-  await startSession(page);
-  await expect(page.getByTestId("flash-toggle")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("unknown photo link: friendly page with a 404 status", async ({ page }) => {
@@ -214,36 +208,17 @@ test("unknown photo link: friendly page with a 404 status", async ({ page }) => 
   await expect(page.getByText("사진을 찾을 수 없어요")).toBeVisible();
 });
 
-test("pose guide (D71): one primary and one secondary start; poses only when asked for", async ({
+test("choosing the frame starts shooting: the countdown runs with no touch, and no pose is shown", async ({
   page,
 }) => {
   await page.goto("/kiosk?camera=mock");
   await startSession(page);
-  // Exactly one filled button; both are large touch targets.
-  const free = page.getByTestId("shoot-free");
-  const guide = page.getByTestId("shoot-guide");
-  await expect(free).toHaveText("자유 포즈로 찍기");
-  await expect(guide).toHaveText("포즈 추천받고 찍기");
-  await expect(page.locator('[data-testid="screen-ready"] .booth-btn-primary')).toHaveCount(1);
-  for (const button of [free, guide])
-    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(64);
-  await expect(page.getByTestId("shoot-plan")).toContainText("한 컷씩, 모두 4컷을 찍어요");
-
-  await guide.click();
-  const pose = page.getByTestId("pose-guide");
-  await expect(pose).toContainText("추천 포즈");
-  await expect(pose).toContainText("서로 마주 보기");
-  await expect(pose).toHaveAttribute("data-pose", "arms-on-shoulders", { timeout: 15_000 });
-  await expect(pose).toContainText("어깨동무");
-  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
-  await expect(pose).toHaveCount(0);
-  // Free poses: nothing extra during the countdown.
-  await page.getByTestId("go-home").click();
-  await page.getByTestId("confirm-home-yes").click();
-  await startSession(page);
-  await free.click();
+  // The first countdown is already running: the screen before shooting is gone (2026-11-28).
+  await expect(page.getByTestId("screen-ready")).toHaveCount(0);
   await expect(page.getByTestId("countdown-number")).toBeVisible();
-  await expect(pose).toHaveCount(0);
+  await expect(page.getByTestId("shot-label")).toHaveText("1번째 사진");
+  await expect(page.getByTestId("pose-guide")).toHaveCount(0);
+  await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 });
 
 test("the breather between shots: a rest after every shot but the last, then the next countdown", async ({
@@ -265,7 +240,6 @@ test("the breather between shots: a rest after every shot but the last, then the
       resting = now;
     }).observe(root, { childList: true, subtree: true, characterData: true });
   });
-  await page.getByTestId("shoot-free").click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   // Three rests for four shots, each one before the next shot's countdown; none after the last.
   expect((await page.locator(".kiosk-root").getAttribute("data-test-rests"))!.split("|")).toEqual([

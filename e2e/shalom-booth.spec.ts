@@ -47,16 +47,14 @@ test("이전: frame pick → cover, camera → options → frame pick, never dur
   await expect(page.getByTestId("screen-attract")).toBeVisible();
   await expect(page.getByTestId("go-back")).toHaveCount(0);
 
-  await startSession(page);
-  // 필름 has options: back from the camera is the options screen, then the picker.
-  await page.getByTestId("go-back").click();
+  // 필름 has options: back from the options screen is the picker.
+  await openPicker(page);
+  await page.getByTestId("confirm-pick").click();
   await expect(page.getByTestId("screen-options")).toBeVisible();
   await page.getByTestId("go-back").click();
   await expect(page.getByTestId("screen-pick")).toBeVisible();
+  // Once the frame is final shooting starts by itself (2026-11-28): no way back from it.
   await confirmFrame(page);
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
-
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-shooting")).toBeVisible();
   await expect(page.getByTestId("go-back")).toHaveCount(0);
 });
@@ -132,7 +130,6 @@ test("다시 찍기 is gone (2026-11-27): no button and no dialog on any screen 
       root.setAttribute("data-test-countdowns", [...seen].join("|"));
     }).observe(root, { childList: true, subtree: true, characterData: true });
   });
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await noRetake("shooting");
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
   expect(
@@ -178,7 +175,6 @@ test("English: the whole booth in English, the next guest back in Korean", async
   await page.getByTestId("option-color-mono").click();
   await expect(page.getByTestId("option-color-sepia")).toHaveText("Sepia");
   await page.getByRole("button", { name: "Start shooting" }).click();
-  await page.getByRole("button", { name: "Pose freely" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Pick 3 of your 4 photos", { exact: true })).toBeVisible();
   await expect(page.getByTestId("select-change-hint")).toHaveText(
@@ -246,9 +242,9 @@ test("Chinese: the booth in Simplified Chinese, the next guest back in Korean", 
   await page.getByTestId("option-color-blue").click();
   await expect(page.getByTestId("option-color-blue")).toContainText("蓝色");
   await page.getByRole("button", { name: "就这样拍" }).click();
-  await page.getByRole("button", { name: "给我姿势建议" }).click();
-  // The recommended pose is shown in Chinese during the countdown.
-  await expect(page.getByTestId("pose-guide")).toContainText("面对面");
+  // Shooting starts by itself: no start button, no pose guide (2026-11-28).
+  await expect(page.getByTestId("countdown-number")).toBeVisible();
+  await expect(page.getByTestId("pose-guide")).toHaveCount(0);
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("请从 4 张中选 2 张", { exact: true })).toBeVisible();
   await expect(page.getByTestId("select-change-hint")).toHaveText(

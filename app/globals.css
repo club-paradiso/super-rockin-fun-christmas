@@ -1283,7 +1283,7 @@ body {
     }
   }
 
-  /* 2 · Camera: ready, countdown, capture. The preview is 4:3 (KIOSK_CONFIG.captureAspect, set
+  /* 2 · Camera: countdown, capture, rest (no ready screen since 2026-11-28). The preview is 4:3 (KIOSK_CONFIG.captureAspect, set
      inline) and as large as the stage allows; never stretched. */
   .shoot {
     gap: var(--gap-m);
@@ -1300,18 +1300,6 @@ body {
     .shoot .shoot-stage {
       align-self: stretch;
       margin-inline: calc(var(--gap-s) - var(--booth-pad) - var(--sheet-pad-x, 24px));
-    }
-    /* Before the first shot the panel under the picture gives up height: the two-line lead runs
-       on as one line (it wraps again where a language's words do not fit) and the gaps close
-       up, so the picture is larger before shooting too. */
-    .shoot:not(.shoot-live) {
-      gap: var(--gap-s);
-    }
-    .shoot:not(.shoot-live) .shoot-panel {
-      gap: var(--gap-xs);
-    }
-    .shoot:not(.shoot-live) .shoot-panel > .booth-lead br {
-      display: none;
     }
     /* While shooting the picture runs edge to edge (a user decision, 2026-11-28: "거의 전체
        화면 느낌으로"): a 1 px gutter (a fraction of a pixel more would be off the screen), the paper's side margins are given up too. */
@@ -1372,7 +1360,8 @@ body {
       font-size: clamp(80px, 56cqh, 360px);
     }
   }
-  .pose-guide {
+  /* The session-video line (D72) over the bottom of the picture during the first countdown. */
+  .shoot-video-note {
     position: absolute;
     inset-inline: 0;
     bottom: 0;
@@ -1394,12 +1383,10 @@ body {
     min-width: 0;
     text-align: center;
   }
-  /* Tall screen (a user request, 2026-11-27: the camera before shooting was too small): the
-     shot's name beside the strip, and the flash switch beside its two notes, each one line, so
-     the preview above takes the height they gave up. They wrap back to stacked lines when a
-     language's words do not fit. On a wide screen both wrappers are display: contents. */
-  .shoot-head,
-  .shoot-foot {
+  /* Tall screen (a user request, 2026-11-27: the camera was too small): the shot's name beside
+     the strip, one line, so the preview above takes the height it gave up. It wraps back to
+     stacked lines when a language's words do not fit. On a wide screen it is display: contents. */
+  .shoot-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1408,27 +1395,6 @@ body {
     row-gap: var(--gap-xs);
     max-width: 100%;
     min-width: 0;
-  }
-  .shoot-notes {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-xs);
-    min-width: 0;
-    text-align: center;
-  }
-  .shoot-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--gap-s);
-    width: 100%;
-    min-width: 0;
-    margin-block: var(--gap-xs);
-  }
-  .shoot-actions > * {
-    flex: 1 1 9.5em;
-    min-width: 0;
-    max-width: 26rem;
   }
   .shot-strip {
     display: flex;
@@ -2264,9 +2230,7 @@ body {
       row-gap: var(--gap-xs);
       text-align: left;
     }
-    .shoot-head,
-    .shoot-foot,
-    .shoot-notes {
+    .shoot-head {
       display: contents;
     }
     .shoot-panel {
@@ -2274,14 +2238,6 @@ body {
       align-items: flex-start;
       justify-content: center;
       text-align: left;
-    }
-    .shoot-actions {
-      flex-direction: column;
-      flex-wrap: nowrap;
-      align-items: stretch;
-    }
-    .shoot-actions > * {
-      flex: none;
     }
     .review,
     .select {
@@ -2656,14 +2612,6 @@ main input:focus-visible,
     .kiosk-root .shoot-live .camera-preview {
       width: min(100%, calc(68 * var(--bh) * var(--aspect, 1.3333)));
       max-width: none;
-    }
-  }
-  /* Before shooting on a tall screen the panel under the preview takes about 60 % of the
-     booth's height; 37 % is what is left for the preview, checked from 960 to 1366 px tall
-     against the container version. */
-  @media not all and (min-aspect-ratio: 5/4) {
-    .kiosk-root .shoot:not(.shoot-live) .camera-preview {
-      max-width: min(100%, calc(37 * var(--bh) * var(--aspect, 1.3333)));
     }
   }
   .kiosk-root .fit-grid {

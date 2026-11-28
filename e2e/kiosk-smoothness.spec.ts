@@ -69,8 +69,7 @@ test("kiosk smoothness (4× CPU slowdown)", async ({ page }) => {
       6000,
     );
     await page.getByTestId("confirm-options").click();
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
     // The photo choice appears by itself after the last shot (no review screen): measured from
     // the last shot's countdown to the choice on screen.
     await expect(page.getByTestId("shot-label")).toHaveText("4번째 사진", {

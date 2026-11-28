@@ -42,7 +42,7 @@ test("shoot → QR → the guest page offers the video and the server serves it 
   await page.goto("/kiosk?camera=mock");
   await openPicker(page);
   await confirmFrame(page);
-  // The guest is told before shooting, in one line.
+  // The guest is told while the first shot counts down (shooting starts by itself), in one line.
   await expect(page.getByTestId("video-notice")).toHaveText(
     "촬영 과정은 소리 없이 짧은 영상으로도 저장돼요.",
   );
@@ -139,7 +139,7 @@ test("no MediaRecorder: the same photo flow, no video notice, no video button, 4
   await page.goto("/kiosk?camera=mock");
   await openPicker(page);
   await confirmFrame(page);
-  await expect(page.getByTestId("shoot-plan")).toBeVisible();
+  await expect(page.getByTestId("countdown-number")).toBeVisible();
   await expect(page.getByTestId("video-notice")).toHaveCount(0);
 
   await shootAllWithMock(page);

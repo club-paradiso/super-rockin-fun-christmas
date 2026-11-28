@@ -369,7 +369,6 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
       // 2026-11-25; the two rows together are the test further down ("with the colour looks on").
       await page.goto("/kiosk?camera=mock&looks=0&retouch=natural");
       await startSession(page);
-      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
       const row = page.getByTestId("retouch-row");
@@ -430,7 +429,6 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
     const urls: string[] = [];
     await page.goto("/kiosk?camera=mock&retouch=glow&retouchHud=1");
     await startSession(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expect(page.getByTestId("retouch-glow")).toHaveAttribute("aria-checked", "true");
     await page.getByTestId("retouch-off").click();
@@ -458,7 +456,6 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
     await openPicker(page);
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Start shooting" }).click();
-    await page.getByRole("button", { name: "Pose freely" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     const row = page.getByTestId("retouch-row");
     await expect(row).toContainText("Skin retouch");
@@ -484,7 +481,6 @@ test.describe("피부 보정 on the photo-selection screen (Figma 「4 · 사진
       await enrollKiosk(page);
       await page.goto("/kiosk?camera=mock&looks=1&retouch=natural");
       await startSession(page, "film");
-      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
       const looks = page.getByTestId("look-row");
@@ -576,7 +572,6 @@ test.describe("the booth", () => {
     });
     await page.goto("/kiosk?camera=mock&retouch=natural&retouchHud=1");
     await startSession(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await selectDefaultPhotos(page);
     await expect(page.getByTestId("final-image")).toBeVisible({ timeout: 30_000 });
@@ -604,7 +599,6 @@ test.describe("the booth", () => {
     });
     await page.goto("/kiosk?camera=mock&retouch=natural&retouchHud=1");
     await startSession(page);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     // The model never loaded: the guest is not offered a choice that would do nothing.
     await expect(page.getByTestId("retouch-row")).toHaveCount(0);

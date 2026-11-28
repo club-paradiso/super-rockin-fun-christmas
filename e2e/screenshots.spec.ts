@@ -43,10 +43,9 @@ test("booth 1280×800: every screen of one session, phone page, and the result",
   await page.waitForTimeout(800); // preview
   await shot(page, "booth-1280x800-02b-options");
   await page.getByTestId("confirm-options").click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible();
   await page.waitForTimeout(800); // mock camera's first frames
   await shot(page, "booth-1280x800-03-ready");
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("countdown-number")).toBeVisible();
   await shot(page, "booth-1280x800-04-countdown");
   // The photo choice, the first photos already chosen (no review screen before it).

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { POSE_SEQUENCE } from "@/config/poses";
 import { getFrame } from "@/config/frames";
 import { HAND_FONTS } from "@/config/hand-fonts";
 import {
@@ -17,7 +16,6 @@ import {
   needsCamera,
   capturedCount,
   createInitialState as attractState,
-  currentPose,
   kioskReducer,
   progressStep,
   sessionAsksConsent,
@@ -51,15 +49,16 @@ function run(state: S, ...actions: KioskAction<string>[]): S {
   return actions.reduce(kioskReducer<string>, state);
 }
 
-/** 필름 (the default card) in 흑백, the three-photo strip → the camera. */
-const toReady = (s = init()) =>
+/** 필름 (the default card) in 흑백, the three-photo strip → the camera starting. */
+const toCamera = (s = init()) =>
   run(
     s,
     { type: "CONFIRM_PICK", random: 0 },
     { type: "SET_OPTION", key: "color", value: "mono" },
     { type: "CONFIRM_OPTIONS", random: 0 },
-    { type: "CAMERA_READY" },
   );
+/** The camera gave a picture: the first countdown runs at once (no start button, 2026-11-28). */
+const toReady = (s = init()) => run(toCamera(s), { type: "CAMERA_READY" });
 const ticks = (n: number) => Array.from({ length: n }, () => ({ type: "TICK" }) as const);
 
 /** Count down and capture one shot. */
@@ -67,7 +66,7 @@ const shoot = (s: S, label: string) =>
   run(s, ...ticks(s.remaining), { type: "SHOT_CAPTURED", shot: label });
 
 function shootAll(ready: S): S {
-  let s = run(ready, { type: "BEGIN_SHOOTING", guide: false });
+  let s = run(ready);
   for (let i = 0; i < SHOTS; i++) s = shoot(s, `shot-${i}`);
   return s;
 }
@@ -98,7 +97,7 @@ const cleared = (s: S): S =>
 
 describe("countdown", () => {
   it("counts 3 → 2 → 1 → capturing", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let s = run(toReady());
     expect(s.phase).toBe("countdown");
     expect(s.remaining).toBe(3);
     s = run(s, { type: "TICK" });
@@ -110,12 +109,12 @@ describe("countdown", () => {
   });
 
   it("ignores ticks outside the countdown", () => {
-    const ready = toReady();
-    expect(run(ready, { type: "TICK" })).toBe(ready);
+    const starting = toCamera();
+    expect(run(starting, { type: "TICK" })).toBe(starting);
   });
 
   it("restarts the countdown for every shot", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let s = run(toReady());
     s = shoot(s, "a");
     expect([s.phase, s.shotIndex, s.remaining]).toEqual(["countdown", 1, 3]);
   });
@@ -129,7 +128,6 @@ describe("the breather between two shots (2026-11-27, a user decision)", () => {
       { type: "CONFIRM_PICK", random: 0 },
       { type: "CONFIRM_OPTIONS", random: 0 },
       { type: "CAMERA_READY" },
-      { type: "BEGIN_SHOOTING", guide: false },
     );
 
   it("after a shot the booth rests, then counts down the next one", () => {
@@ -171,23 +169,9 @@ describe("the breather between two shots (2026-11-27, a user decision)", () => {
     );
   });
 
-  it("the pose guide shows the next shot's pose during the rest", () => {
-    const guided = run(
-      createInitialState<string>({ shotCount: SHOTS, countdownSeconds: 3, restSeconds: 2 }),
-      { type: "CONFIRM_PICK", random: 0 },
-      { type: "CONFIRM_OPTIONS", random: 0 },
-      { type: "CAMERA_READY" },
-      { type: "BEGIN_SHOOTING", guide: true },
-      ...ticks(3),
-      { type: "SHOT_CAPTURED", shot: "a" },
-    );
-    expect(guided.phase).toBe("rest");
-    expect(currentPose(guided)).toEqual(POSE_SEQUENCE[1]);
-  });
-
   it("restSeconds 0 (or absent) means no rest: straight on, as before", () => {
     const s = run(init(), ...[]);
-    const taken = shoot(run(toReady(s), { type: "BEGIN_SHOOTING", guide: false }), "a");
+    const taken = shoot(run(toReady(s)), "a");
     expect(taken.phase).toBe("countdown");
     expect(taken.restSeconds).toBe(0);
   });
@@ -239,7 +223,7 @@ describe("exactly four captures (2026-11-27, a user decision)", () => {
   });
 
   it("the countdown runs exactly four times", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let s = run(toReady());
     const countdowns: number[] = [];
     for (let i = 0; i < SHOTS; i++) {
       expect(s.phase).toBe("countdown");
@@ -256,12 +240,12 @@ describe("exactly four captures (2026-11-27, a user decision)", () => {
   });
 
   it("does not accept a shot while still counting down", () => {
-    const s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    const s = run(toReady());
     expect(run(s, { type: "SHOT_CAPTURED", shot: "early" })).toBe(s);
   });
 
   it("the photo choice opens only when all four exist: three shots are still shooting", () => {
-    let partial = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let partial = run(toReady());
     for (let i = 0; i < SHOTS - 1; i++) partial = shoot(partial, `p-${i}`);
     expect(partial.phase).toBe("countdown");
     expect(partial.selectedShotIndices).toEqual([]);
@@ -353,7 +337,7 @@ describe("이전 where nothing is lost (2026-11-25, 2026-11-27)", () => {
   });
 
   it("never during shooting, after it or on the camera error", () => {
-    const counting = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    const counting = run(toReady());
     expect(canGoBack(counting)).toBe(false);
     expect(canGoBack(toShot())).toBe(false);
     const error = run(toReady(), { type: "CAMERA_FAILED", kind: "failed" });
@@ -365,7 +349,7 @@ describe("no retake (2026-11-27, a user decision: 5 shots, no retake)", () => {
   it("nothing shoots again: an old RETAKE action changes nothing on any screen", () => {
     const select = toShot();
     const consent = selectAll(select, true);
-    const shooting = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    const shooting = run(toReady());
     for (const state of [select, consent, shooting])
       expect(run(state, { type: "RETAKE" } as never)).toBe(state);
     // And the shots are still the guest's.
@@ -394,7 +378,7 @@ describe("no retake (2026-11-27, a user decision: 5 shots, no retake)", () => {
 
 describe("failures", () => {
   it("retries a failed capture, then gives up to the camera error screen", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false }, ...ticks(3));
+    let s = run(toReady(), ...ticks(3));
     s = run(s, { type: "CAPTURE_FAILED" });
     expect([s.phase, s.shotIndex]).toEqual(["countdown", 0]);
     for (let i = 1; i < MAX_CAPTURE_FAILURES; i++)
@@ -403,17 +387,12 @@ describe("failures", () => {
   });
 
   it("keeps earlier shots across a camera reconnect", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let s = run(toReady());
     s = shoot(s, "a");
     s = shoot(s, "b");
     s = run(s, { type: "CAMERA_FAILED", kind: "missing" });
     expect(s.phase).toBe("camera-error");
-    s = run(
-      s,
-      { type: "CAMERA_RETRY" },
-      { type: "CAMERA_READY" },
-      { type: "BEGIN_SHOOTING", guide: false },
-    );
+    s = run(s, { type: "CAMERA_RETRY" }, { type: "CAMERA_READY" });
     expect([s.phase, s.shotIndex]).toEqual(["countdown", 2]);
     expect(s.shots.slice(0, 2)).toEqual(["a", "b"]);
   });
@@ -500,9 +479,12 @@ describe("틀 선택 v2: the cards, options before shooting", () => {
     let s = run(init(), { type: "CONFIRM_PICK", random: 0 });
     expect(s.phase).toBe("options");
     expect(run(s, { type: "BACK" }).phase).toBe("pick");
-    s = run(s, { type: "CONFIRM_OPTIONS", random: 0 }, { type: "CAMERA_READY" });
+    s = run(s, { type: "CONFIRM_OPTIONS", random: 0 });
     expect(run(s, { type: "BACK" }).phase).toBe("options");
-    const shot = shoot(run(s, { type: "BEGIN_SHOOTING", guide: false }), "a");
+    s = run(s, { type: "CAMERA_READY" });
+    // Counting down: the footer is hidden and there is no way back (it is shooting).
+    expect(canGoBack(s)).toBe(false);
+    const shot = shoot(s, "a");
     expect(canGoBack(shot)).toBe(false);
   });
 
@@ -631,7 +613,7 @@ describe("progress", () => {
     expect(progressStep("mobile", true)).toBeNull();
     expect(progressStep("pick", true)).toEqual({ step: 1, total: 5 });
     expect(progressStep("options", true)).toEqual({ step: 1, total: 5 });
-    for (const phase of ["camera", "ready", "countdown", "capturing", "camera-error"] as const)
+    for (const phase of ["camera", "countdown", "capturing", "rest", "camera-error"] as const)
       expect(progressStep(phase, true), phase).toEqual({ step: 2, total: 5 });
     expect(progressStep("select", true)).toEqual({ step: 3, total: 5 });
     expect(progressStep("consent", true)).toEqual({ step: 4, total: 5 });
@@ -772,7 +754,7 @@ describe("the colour look a guest chooses with the photos", () => {
 
   it("is fixed with the photos: never before the choice screen, never after it", () => {
     // Shooting the last shot: not yet.
-    let last = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let last = run(toReady());
     for (let i = 0; i < SHOTS - 1; i++) last = shoot(last, `shot-${i}`);
     expect(run(last, { type: "SET_LOOK", lookId: "ink" })).toBe(last);
     const done = run(
@@ -932,54 +914,39 @@ describe("내 사진으로 참여하기 (D66) on the booth", () => {
   });
 });
 
-describe("pose guide (D71): a choice on the ready screen, not a second flow", () => {
-  const begin = (guide: boolean, s = toReady()) => run(s, { type: "BEGIN_SHOOTING", guide });
-
-  it("is off by default and in free mode no pose is ever shown", () => {
-    expect(init().poseGuide).toBe(false);
-    let s = begin(false);
-    expect(s.poseGuide).toBe(false);
-    for (let i = 0; i < SHOTS; i++) {
-      expect(currentPose(s)).toBeNull();
-      s = shoot(s, `f-${i}`);
-    }
-    expect(s.phase).toBe("select");
+describe("straight into shooting (2026-11-28, a user request: 템플릿을 고르면 바로 촬영)", () => {
+  it("the frame is final → the camera starts → the first countdown runs, with no touch between", () => {
+    const starting = toCamera();
+    expect(starting.phase).toBe("camera");
+    const counting = run(starting, { type: "CAMERA_READY" });
+    expect([counting.phase, counting.shotIndex, counting.remaining]).toEqual(["countdown", 0, 3]);
+    // A second CAMERA_READY (a late start) does not start the count again.
+    expect(run(counting, { type: "CAMERA_READY" })).toBe(counting);
   });
 
-  it("guide mode shows the pose of the shot being counted down, four shots as always", () => {
-    let s = begin(true);
-    expect(currentPose(toReady())).toBeNull(); // not before shooting starts
-    for (let i = 0; i < SHOTS; i++) {
-      expect([s.phase, s.shotIndex]).toEqual(["countdown", i]);
-      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i]);
-      s = run(s, ...ticks(s.remaining));
-      expect(s.phase).toBe("capturing");
-      expect(currentPose(s)).toEqual(POSE_SEQUENCE[i]);
-      s = run(s, { type: "SHOT_CAPTURED", shot: `g-${i}` });
-    }
-    expect(s.phase).toBe("select");
-    expect(capturedCount(s)).toBe(SHOTS);
-    expect(currentPose(s)).toBeNull();
+  it("the pose guide is gone: no state for it, and its old action changes nothing", () => {
+    expect("poseGuide" in init()).toBe(false);
+    expect("poseGuide" in toReady()).toBe(false);
+    const starting = toCamera();
+    for (const state of [starting, toReady(), toShot()])
+      expect(run(state, { type: "BEGIN_SHOOTING", guide: true } as never)).toBe(state);
   });
 
-  it("the guide changes nothing about the countdown", () => {
-    expect(begin(true).remaining).toBe(begin(false).remaining);
-    expect(currentPose(begin(true))).toEqual(POSE_SEQUENCE[0]);
+  it("a camera taken again while counting down keeps the shots and counts that shot again", () => {
+    let s = shoot(toReady(), "a");
+    s = run(s, ...ticks(1));
+    expect([s.phase, s.shotIndex, s.remaining]).toEqual(["countdown", 1, 2]);
+    s = run(s, { type: "CAMERA_RESTART" });
+    expect([s.phase, s.shots[0]]).toEqual(["camera", "a"]);
+    s = run(s, { type: "CAMERA_READY" });
+    expect([s.phase, s.shotIndex, s.remaining]).toEqual(["countdown", 1, 3]);
   });
 
-  it("the choice is asked again after a camera reconnect, and RESET clears it", () => {
-    let s = begin(true);
-    s = shoot(s, "a");
-    s = run(s, { type: "CAMERA_FAILED", kind: "missing" }, { type: "CAMERA_RETRY" });
-    s = run(s, { type: "CAMERA_READY" }, { type: "BEGIN_SHOOTING", guide: false });
-    expect([s.shotIndex, s.poseGuide, currentPose(s)]).toEqual([1, false, null]);
-    expect(run(begin(true), { type: "RESET" }).poseGuide).toBe(false);
-  });
-
-  it("a custom sequence is read by index (poses are data)", () => {
-    const s = begin(true);
-    expect(currentPose(s, [{ id: "x", label: "엑스" }])).toEqual({ id: "x", label: "엑스" });
-    expect(currentPose(s, [])).toBeNull();
+  it("never mid-capture: the shot being taken settles itself", () => {
+    const capturing = run(toReady(), ...ticks(3));
+    expect(capturing.phase).toBe("capturing");
+    expect(run(capturing, { type: "CAMERA_RESTART" })).toBe(capturing);
+    expect(run(toCamera(), { type: "CAMERA_RESTART" }).phase).toBe("camera");
   });
 });
 
@@ -999,7 +966,7 @@ describe("language (D78): a view, per guest", () => {
     const ko = toShot();
     const en = run(init(), { type: "SET_LANG", lang: "en" });
     let s = toReady(en);
-    s = run(s, { type: "BEGIN_SHOOTING", guide: false });
+    s = run(s);
     for (let i = 0; i < SHOTS; i++) s = shoot(s, `shot-${i}`);
     expect({ ...s, lang: "ko" }).toEqual(ko);
   });
@@ -1057,13 +1024,13 @@ describe("back (D78): one step, never losing what the guest made", () => {
   });
 
   it("camera before the first shot → the options (the font is drawn again on the way back in)", () => {
-    const s = toReady();
+    const s = toCamera();
     expect(canGoBack(s)).toBe(true);
     expect(run(s, { type: "BACK" }).phase).toBe("options");
   });
 
   it("not once a shot exists, not while shooting, not after the frame is final", () => {
-    let s = run(toReady(), { type: "BEGIN_SHOOTING", guide: false });
+    let s = run(toReady());
     expect(canGoBack(s)).toBe(false);
     expect(run(s, { type: "BACK" })).toBe(s);
     s = shoot(s, "shot-0");
@@ -1074,7 +1041,7 @@ describe("back (D78): one step, never losing what the guest made", () => {
       { type: "CAMERA_RETRY" },
       { type: "CAMERA_READY" },
     );
-    expect([reconnected.phase, canGoBack(reconnected)]).toEqual(["ready", false]);
+    expect([reconnected.phase, canGoBack(reconnected)]).toEqual(["countdown", false]);
     const select = toShot();
     expect(canGoBack(select)).toBe(false);
     const consent = selectAll(select, true);
@@ -1120,30 +1087,30 @@ describe("attract screen (D80): 화면을 눌러 시작", () => {
     expect(run(s, { type: "SET_LANG", lang: "zh" }, { type: "RESET" }).lang).toBe("ko");
   });
 
-  it("the shortest way through a session is six touches", () => {
+  it("the shortest way through a session is five touches", () => {
     // Each line is one touch; the shots themselves need none.
     const touches: KioskAction<string>[] = [
       { type: "OPEN", sessionId: SESSION }, // 1 · 화면을 눌러 시작
       { type: "PICK_CARD", cardId: "film", random: 0 }, // 2 · a frame
-      { type: "CONFIRM_OPTIONS", random: 0 }, // 3 · 이대로 찍기
-      { type: "BEGIN_SHOOTING", guide: false }, // 4 · 자유 포즈로 찍기
-      { type: "CONFIRM_SELECTION", askConsent: true }, // 5 · 이 사진으로 완성하기
-      { type: "SET_CONSENT", consent: "no" }, // 6 · the wall answer
+      { type: "CONFIRM_OPTIONS", random: 0 }, // 3 · 이대로 찍기 (shooting starts by itself)
+      { type: "CONFIRM_SELECTION", askConsent: true }, // 4 · 이 사진으로 완성하기
+      { type: "SET_CONSENT", consent: "no" }, // 5 · the wall answer
     ];
     let state = fresh();
     for (const touch of touches) {
       const before = state;
-      // What the booth does by itself between touches: the camera coming on, the five shots.
-      if (touch.type === "BEGIN_SHOOTING") state = run(state, { type: "CAMERA_READY" });
       state = run(state, touch);
       expect(state, touch.type).not.toBe(before);
-      if (touch.type === "BEGIN_SHOOTING")
+      // What the booth does by itself between touches: the camera coming on, the four shots.
+      if (touch.type === "CONFIRM_OPTIONS") {
+        state = run(state, { type: "CAMERA_READY" });
         for (let i = 0; i < SHOTS; i++) state = shoot(state, `shot-${i}`);
+      }
     }
     expect(state.phase).toBe("delivery");
-    expect(touches).toHaveLength(6);
-    // The cards without options (five touches) were all taken down on 2026-11-27: every card
-    // offered today has an options screen, so six is the shortest way.
+    expect(touches).toHaveLength(5);
+    // Six until 2026-11-28, when the start button went. Every card offered today has an
+    // options screen, so five is the shortest way.
     expect(OFFERED_CARDS.every((c) => c.options.length > 0)).toBe(true);
   });
 

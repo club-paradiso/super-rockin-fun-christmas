@@ -37,7 +37,7 @@ describe("the booth's engine hook", () => {
   });
 
   it("takes a changed setting up between guests, never under one", () => {
-    const { result, rerender } = mount(OFF, "ready");
+    const { result, rerender } = mount(OFF, "camera");
     act(() => result.current.heard(MANUAL));
     // A guest is at the camera: nothing changes for them.
     expect(result.current.engine).toBeNull();
@@ -48,7 +48,7 @@ describe("the booth's engine hook", () => {
     rerender({ phase: "attract" });
     expect(result.current.engine).not.toBeNull();
     // And off again the same way, telling the server once that its status is gone.
-    rerender({ phase: "ready" });
+    rerender({ phase: "camera" });
     expect(result.current.heartbeatStatus()).toMatchObject({ state: "manual" });
     act(() => result.current.heard(OFF));
     expect(result.current.engine).not.toBeNull();
@@ -61,7 +61,7 @@ describe("the booth's engine hook", () => {
   it("fixes the correction from the first countdown until the guest is gone, a camera reconnect included", () => {
     const { result, rerender } = mount(MANUAL);
     const engine = result.current.engine!;
-    for (const phase of ["pick", "options", "camera", "ready"] as KioskPhase[]) {
+    for (const phase of ["pick", "options", "camera"] as KioskPhase[]) {
       rerender({ phase });
       expect(engine.isLocked()).toBe(false);
     }
@@ -72,7 +72,6 @@ describe("the booth's engine hook", () => {
       // The camera dropped out mid-session and came back (there is no 「다시 찍기」, 2026-11-27).
       "camera-error",
       "camera",
-      "ready",
       "countdown",
       "select",
       "consent",

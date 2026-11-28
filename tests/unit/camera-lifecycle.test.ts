@@ -195,10 +195,14 @@ describe("BrowserCamera stream lifecycle", () => {
 describe("camera recovery when the page is shown again", () => {
   const base = { cameraError: null, active: true, stalled: false } as const;
 
-  it("ready screen: takes the camera again when the stream is gone or muted", () => {
-    expect(cameraRecovery({ ...base, phase: "ready" })).toBeNull();
-    expect(cameraRecovery({ ...base, phase: "ready", active: false })).toBe("restart");
-    expect(cameraRecovery({ ...base, phase: "ready", stalled: true })).toBe("restart");
+  it("countdown or rest: takes the camera again when the stream is gone or muted", () => {
+    for (const phase of ["countdown", "rest"] as const) {
+      expect(cameraRecovery({ ...base, phase })).toBeNull();
+      expect(cameraRecovery({ ...base, phase, active: false })).toBe("restart");
+      expect(cameraRecovery({ ...base, phase, stalled: true })).toBe("restart");
+    }
+    // A capture under way takes the camera again by itself.
+    expect(cameraRecovery({ ...base, phase: "capturing", active: false })).toBeNull();
   });
 
   it("error screen: retries a camera that was lost, not one that was refused", () => {
@@ -216,7 +220,6 @@ describe("camera recovery when the page is shown again", () => {
       "mobile",
       "pick",
       "camera",
-      "countdown",
       "capturing",
       "options",
       "select",

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enrollKiosk, openPicker } from "./helpers";
+import { SHOOT_TIMEOUT, enrollKiosk, openPicker } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await enrollKiosk(page);
@@ -56,7 +56,10 @@ test("fullscreen gesture never starts a shoot or swallows the selected controls"
   // A tap on a card is its options (no second press), and one more the camera.
   await picker.getByTestId("frame-option-polaroid1").click();
   await page.getByTestId("confirm-options").click();
-  const ready = page.getByTestId("screen-ready");
+  // Shooting starts by itself and its footer is hidden (2026-11-28): the next screen with the
+  // usual footer is the photo choice.
+  const ready = page.getByTestId("screen-select");
+  await expect(ready).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(ready.getByTestId("fullscreen-toggle")).toBeVisible();
   await expect(ready.getByTestId("go-home")).toBeVisible();
   const controls = await Promise.all([
@@ -99,7 +102,8 @@ test("once fullscreen is on, no guest screen shows a fullscreen control", async 
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
   await picker.getByTestId("frame-option-polaroid1").click();
   await page.getByTestId("confirm-options").click();
-  const ready = page.getByTestId("screen-ready");
+  const ready = page.getByTestId("screen-select");
+  await expect(ready).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(ready.getByTestId("go-home")).toBeVisible();
   await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
 });

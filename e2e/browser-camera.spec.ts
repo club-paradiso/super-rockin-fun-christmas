@@ -22,7 +22,6 @@ test("getUserMedia path reaches the photo choice with four captures", async ({ p
   await expect
     .poll(() => page.getByTestId("camera-preview").evaluate((v: HTMLVideoElement) => v.videoWidth))
     .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: 45_000 });
   for (let i = 0; i < 4; i++) {
     await expect(page.getByTestId(`select-shot-${i}`).locator("img")).toBeVisible();

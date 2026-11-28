@@ -129,7 +129,7 @@ looks:measure`). `/looks` is the comparison
   the black one, is left out by a user decision; every card offered today has options; a card with options (colour, logo, meme) has an options screen,
   and an option may have two answers or more (필름 35mm: 컬러 / 흑백 / 세피아; 밈 4컷: five, three
   to a line; 필름: four on one line); the picker shows them three to a row in large print, and a tap on a card goes on with it (below); the guest
-  then shoots four, each one a 5 s countdown → the flash (when the guest switched it on) → a short rest (`KIOSK_CONFIG.restSeconds`, phase `rest`, 2026-11-27, a user decision; none after the last shot) → the next countdown, and chooses the photos
+  then shoots four, each one a 5 s countdown → the flash (on every shot, no switch: 2026-11-28, a user decision) → a short rest (`KIOSK_CONFIG.restSeconds`, phase `rest`, 2026-11-27, a user decision; none after the last shot) → the next countdown, and chooses the photos
   (2026-11-27, a user decision, final: 4 shots × 5 s, no retake; `KIOSK_CONFIG.shotsPerSession`, six and five before;
   no frame holds more than four photos, so the choice is the order, not leaving one out).
   There is no "one more shot", no second frame choice and no second round after shooting
@@ -305,17 +305,22 @@ looks:measure`). `/looks` is the comparison
 - **There is one booth screen** (D89 removed easy mode, D67). No second "easy" or "large" variant:
   a new per-guest option is a view in `lib/kiosk/machine.ts`, never a copy of the shooting,
   selection, consent or upload rules.
-- **The pose guide is a view too** (D71): `poseGuide` + `currentPose` in `lib/kiosk/machine.ts` only
-  decide what the countdown shows. Poses are data in `config/poses.ts` (one per shot, five since
-  2026-11-27, text only; no invented art). Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26), and the booth rests `KIOSK_CONFIG.restSeconds` between two shots (phase `rest`, `REST_DONE`; the pose guide then shows the next shot's pose).
+- **Choosing the frame starts shooting** (D122, 2026-11-28, a user request: "템플릿을 고르면 바로
+  촬영들어갈 수 있게. 포즈 추천 기능 삭제, 플래시는 필수"): there is no screen waiting for a start
+  button. `CAMERA_READY` goes straight to the first countdown (phase `ready` and `BEGIN_SHOOTING`
+  are gone); the screen flash lights every shot (no switch); the pose guide (D71) is removed with
+  `config/poses.ts`: do not bring back a pose choice or a flash switch. The session-video line
+  (D72) is shown over the picture during the first countdown (`.shoot-video-note`). A camera
+  taken again while counting down or resting (`CAMERA_RESTART`, page shown again, staff device
+  change) keeps the shots and counts that shot again. Every shot counts `KIOSK_CONFIG.countdownSeconds` (5 s, a user decision 2026-11-26), and the booth rests `KIOSK_CONFIG.restSeconds` between two shots (phase `rest`, `REST_DONE`).
   `NEXT_PUBLIC_KIOSK_COUNTDOWN_SECONDS` and `NEXT_PUBLIC_KIOSK_REST_SECONDS` are for the E2E build only.
 - **The booth language is a view too** (D78, D89): `lang` in `lib/kiosk/machine.ts` (Korean,
   English or Simplified Chinese; every guest starts in Korean). Every guest string lives in
   `lib/kiosk/copy.ts` in all three languages; never hard-code booth copy in a component. A frame
-  or pose carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
+  carries `label`, `labelEn` and `labelZh`; read them with `localizedLabel`. Chinese needs
   `:lang(zh-Hans)` (own font, no `word-break: keep-all`): keep `<html lang>` on `HTML_LANG`. Korean copy is the user's wording (D76). "이전" exists only
   where `canGoBack` allows it, a step that loses nothing: frame pick → cover, options → pick,
-  camera before the first shot → options, phone QR → cover; never during shooting or after it
+  the camera starting before the first shot → options, phone QR → cover; never during shooting or after it
   (2026-11-27: the photo choice is the first screen after the shots and has no way back). It sits in the
   footer beside "처음으로" (a user decision, 2026-11-25; Figma `Kiosk/Footer` Type=HomeBack),
   never in the header.
@@ -348,8 +353,9 @@ looks:measure`). `/looks` is the comparison
 - **The booth opens on "화면을 눌러 시작"** (D80): phase `attract` in `lib/kiosk/machine.ts` is the
   initial state and where every reset lands; `OPEN` (a session id with it) leaves it for the
   frame picker, `START_MOBILE` for the phone QR.
-- **Fewer touches, the same rules** (2026-11-27, a user request; about 13 touches → 6; every card
-  offered today has options, so the five-touch path went with the cards taken down: start · frame · (options) · shoot · finish · wall answer;
+- **Fewer touches, the same rules** (2026-11-27, a user request; about 13 touches → 6, then 5 on
+  2026-11-28 when the start button went, D122; every card offered today has options: start ·
+  frame · options · finish · wall answer;
   `tests/unit/kiosk-machine.test.ts` and `e2e/kiosk-touches.spec.ts` count them). One touch on
   the cover starts a session at the picker: there is no welcome screen, and the language, the
   sound switch and "내 사진으로 참여하기" are small controls on the cover (`.attract-options`; a
@@ -636,7 +642,7 @@ scripts                hub-start.mjs (launcher), hub-restore.mjs, event-check.mj
 ops                    desktop-icon wrappers: start-hub / restore-backup / event-check (.bat/.command),
                        start-wall
 config/moderation.ts   AI review knobs, category codes and their staff Korean (D95)
-config/                kiosk knobs, frame definitions, pose guide sequence (poses.ts, D71),
+config/                kiosk knobs, frame definitions,
                        wall themes (wall-themes.ts, D85), looks (looks/index.ts, frame-looks.json)
 design/                Figma source link, Figma -> code mapping (README), page previews
 tests/unit             Vitest (jsdom/node; FakeCanvas; fake-indexeddb)

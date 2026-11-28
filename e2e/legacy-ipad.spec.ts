@@ -42,12 +42,9 @@ test("iPadOS 15 profile: 필름 세피아 (3 photos), 4 shots, small composite +
   expect(scripts).toContain("/kiosk-legacy-assets/entry.js");
   expect(scripts.some((path) => path.startsWith("/_next/"))).toBe(false);
   // The sepia tone is pixel arithmetic (no ctx.filter on Safari 15), at the 1× budget.
-  await startSession(page, "film", { color: "sepia" });
-  const flash = page.getByTestId("flash-toggle");
-  await flash.click();
-  await expect(flash).toHaveAttribute("aria-pressed", "true");
-  // The 250 ms flash can land between Playwright polls. Count actual DOM insertions and
-  // confirm they cover the viewport and leave touch events available.
+  // The 250 ms flash (on for every shot since 2026-11-28) can land between Playwright polls.
+  // Count actual DOM insertions and confirm they cover the viewport and leave touch events
+  // available. Watched before the frame is chosen: shooting starts by itself.
   await page.evaluate(() => {
     const root = document.querySelector(".kiosk-root")!;
     let visibleFlashes = 0;
@@ -66,7 +63,7 @@ test("iPadOS 15 profile: 필름 세피아 (3 photos), 4 shots, small composite +
       }
     }).observe(root, { childList: true });
   });
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+  await startSession(page, "film", { color: "sepia" });
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await expect(page.locator(".kiosk-root")).toHaveAttribute("data-legacy-ios15", "true");
   const root = page.locator(".kiosk-root");

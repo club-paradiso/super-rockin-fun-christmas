@@ -645,6 +645,8 @@ reproduced by tests that fail on the old code:
 
 ## D71 · Optional pose guide; every shot counts 10 seconds
 
+> Superseded on 2026-11-28 by D122: the pose guide and the ready screen are gone.
+
 Product decision (user, 2026-11-11): "포즈 가이드를 선택하면 추천 포즈를 안내하고, 그렇지 않으면 자유
 포즈로 10초 카운트다운 해서 한 컷씩 총 6컷 촬영".
 
@@ -2028,3 +2030,27 @@ and "the engine may fail, the booth may not". Design and limits: `docs/CAMERA_EN
 - **Not done, on purpose:** face detection and content-aware mesh warps (unmeasured on the
   device, and geometry alone stays inside the limits); a perspective drawn with a 2D canvas
   mesh; a corrected session video (the raw stream is recorded; the mini 4 records none).
+
+## D122 · Choosing the frame starts shooting; the flash is always on; no pose guide (2026-11-28)
+
+User: "템플릿을 고르면 바로 촬영들어갈 수 있게 기능 변경. 포즈 추천 기능 삭제, 플래시는 필수로 들어가게
+변경." Replaces the ready screen of D71 and the guest's flash switch.
+
+- **No screen before shooting.** 「이대로 찍기」 on the options screen is the last touch before the
+  shots: the camera starts (`camera`, the 「카메라를 켜는 중」 screen) and `CAMERA_READY` goes
+  straight to the first countdown, at the first empty slot. Phase `ready` and the action
+  `BEGIN_SHOOTING` are gone. The options screen stays: it is part of choosing the frame (every
+  offered card has one).
+- **The flash lights every shot.** The white screen goes up 250 ms before each frame is grabbed,
+  as the switched-on flash did; there is no switch and no setting.
+- **The pose guide (D71) is removed**: `poseGuide`, `currentPose`, `config/poses.ts`, its copy and
+  its styles. No pose is shown during the countdown.
+- **What moved.** The session-video line (D72) is shown over the bottom of the picture during the
+  first countdown, so the guest is still told while it is recorded and the preview keeps its size.
+  The guest's camera choice for booths without staff help mode moved to the camera error screen.
+  The 「N초마다 한 컷씩」 line is gone (the strip of shots shows how many are left).
+- **Back.** Only while the camera is starting (the footer is hidden once it counts down): back to
+  the options. A camera taken again while counting down or resting (`CAMERA_RESTART`: page shown
+  again, staff device change) keeps the shots and counts that shot again; never mid-capture.
+- **Touches.** The shortest way to the QR is five (cover · frame · options · finish · wall answer),
+  six before.

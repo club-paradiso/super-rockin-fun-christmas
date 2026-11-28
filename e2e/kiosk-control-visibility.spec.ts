@@ -64,11 +64,8 @@ for (const viewport of [
     await expectTouchable(page.getByTestId("confirm-options"));
     await page.getByTestId("confirm-options").click();
 
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
-    await expectTouchable(page.getByTestId("shoot-free"));
-    await expectTouchable(page.getByTestId("shoot-guide"));
-    await expectTouchable(page.getByTestId("flash-toggle"));
-    await page.getByTestId("shoot-free").click();
+    // Shooting starts by itself (2026-11-28): nothing to touch until the photo choice.
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
     // Straight on the photo choice, with the first three chosen and the finish button live.
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expectTouchable(page.getByTestId("confirm-selection"));

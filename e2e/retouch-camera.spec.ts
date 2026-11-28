@@ -47,7 +47,6 @@ test("촬영 → 현상 중 → 보정 → 합성 → QR: the faces are retouche
   await expect
     .poll(() => page.getByTestId("camera-preview").evaluate((v: HTMLVideoElement) => v.videoWidth))
     .toBeGreaterThan(0);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(page);
   await expect(page.getByTestId("final-image")).toBeVisible({ timeout: 30_000 });

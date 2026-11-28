@@ -368,7 +368,6 @@ test.describe("the booth with looks", () => {
   ) {
     await page.goto(url);
     await startSession(page, card, options);
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     if (look) {
       await page.getByTestId(`look-${look}`).click();
@@ -470,7 +469,6 @@ test.describe("the booth with looks", () => {
     // Heard, and not applied: nothing changes under a guest.
     await page.waitForTimeout(500);
     await expect(page.getByTestId("camera-preview")).toHaveAttribute("data-look-view", "mono");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expect(page.getByTestId("select-shot-0").locator("img")).toHaveAttribute(
       "src",
@@ -495,7 +493,6 @@ test.describe("the booth with looks", () => {
     await page.goto("/kiosk?camera=mock&looks=1");
     await startSession(page, "film");
     await expect(page.getByTestId("camera-preview")).not.toHaveAttribute("data-look-view");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     // 원본: the shots as taken (no graded copy is made).
     for (const index of [0, 3])
@@ -558,7 +555,6 @@ test.describe("the booth with looks", () => {
       await enrollKiosk(page);
       await page.goto("/kiosk?camera=mock&looks=1");
       await startSession(page, "film");
-      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
       // 원본 and the eight looks, four at a time, opening on 원본, which is chosen (no frame
@@ -656,7 +652,6 @@ test.describe("the booth with looks", () => {
     };
     const shootToSelect = async () => {
       await startSession(page, "film");
-      await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
       await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     };
 
@@ -688,7 +683,6 @@ test.describe("the booth with looks", () => {
     await enrollKiosk(page);
     await page.goto("/kiosk?camera=mock&looks=0");
     await startSession(page, "film");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expect(page.getByTestId("select-shot-0")).toBeVisible();
     await expect(page.getByTestId("look-row")).toHaveCount(0);
@@ -725,7 +719,6 @@ test.describe("the booth with looks", () => {
     await expect(page.getByTestId("screen-attract")).toBeVisible();
     // A colour frame does ask for it: the session still finishes, with no colour row, and says why.
     await startSession(page, "film");
-    await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
     await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
     await expect(page.getByTestId("look-row")).toHaveCount(0);
     await selectDefaultPhotos(page);

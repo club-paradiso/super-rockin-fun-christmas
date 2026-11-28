@@ -19,7 +19,6 @@ type Beat = { perf?: Record<string, Record<string, unknown>>; perfProfile?: stri
 /** One whole session with the mock camera, to the QR and back to the first screen. */
 async function oneSession(page: Page) {
   await startSession(page);
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await toConsent(page);
   await answerForQr(page, "no");

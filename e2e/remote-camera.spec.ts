@@ -80,7 +80,7 @@ async function liveBooth(page: Page) {
   // connect plus retries (lib/camera/remote-camera.ts), more than the 5 s startSession allows a
   // local webcam. Wait for either outcome, then insist on the right one, so a booth that falls
   // to the camera error screen still fails here, at once and by name.
-  const ready = page.getByTestId("screen-ready");
+  const ready = page.getByTestId("screen-shooting");
   await expect(ready.or(page.getByTestId("screen-camera-error"))).toBeVisible({ timeout: 25_000 });
   await expect(ready, "booth fell to the camera error screen").toBeVisible({ timeout: 1 });
   // The preview is the remote stream: it has real pixels once WebRTC delivers video.
@@ -125,7 +125,6 @@ test("pair from /admin, preview, shoot four, choose, consent, QR", async ({ brow
   const previewMs = Date.now() - previewStart;
   await expect(phone.getByTestId("status-panel")).toHaveAttribute("data-state", "live");
 
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   const sizes: Array<[number, number]> = [];
   for (let i = 0; i < 4; i++) {
@@ -227,8 +226,7 @@ test("the phone page reloads mid-session: the booth shows the camera error, then
   });
 
   await page.getByRole("button", { name: "다시 시도" }).click();
-  await expect(page.getByTestId("screen-ready")).toBeVisible({ timeout: 25_000 });
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
+  await expect(page.getByTestId("screen-shooting")).toBeVisible({ timeout: 25_000 });
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 
   // Leave nothing paired behind for the next spec.

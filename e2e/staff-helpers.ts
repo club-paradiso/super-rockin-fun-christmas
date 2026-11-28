@@ -85,7 +85,6 @@ export async function kioskPhotoToQr(kiosk: Page, answer: "yes" | "no" = "no") {
   await kiosk.goto("/kiosk?camera=mock");
   await openPicker(kiosk);
   await confirmFrame(kiosk);
-  await kiosk.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(kiosk.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
   await selectDefaultPhotos(kiosk);
   const consent = kiosk.getByTestId("screen-consent");

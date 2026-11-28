@@ -20,7 +20,6 @@ function toSelect(state: KioskState<Shot>): KioskState<Shot> {
     { type: "CONFIRM_PICK", random: 0 },
     { type: "CONFIRM_OPTIONS", random: 0 },
     { type: "CAMERA_READY" },
-    { type: "BEGIN_SHOOTING", guide: false },
   );
   for (let shot = 0; shot < 5; shot++) {
     for (let tick = 0; tick < 3; tick++) s = run(s, { type: "TICK" });

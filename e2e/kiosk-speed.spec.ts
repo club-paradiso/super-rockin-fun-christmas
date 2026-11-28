@@ -36,7 +36,6 @@ const frameArt = (paths: string[]) =>
 
 /** The four shots: ends on the photo choice, the first photos already chosen. */
 async function shootToChoice(page: Page) {
-  await page.getByRole("button", { name: "자유 포즈로 찍기" }).click();
   await expect(page.getByTestId("screen-select")).toBeVisible({ timeout: SHOOT_TIMEOUT });
 }
 
@@ -70,7 +69,7 @@ test.describe("iPadOS 15 profile (the iPad mini 4 render budget)", () => {
 
     // 밈 4컷: its base picture and overlay come now, as their 1× files, and only this frame's.
     await confirmFrame(page, "meme4");
-    await expect(page.getByTestId("screen-ready")).toBeVisible();
+    await expect(page.getByTestId("screen-shooting")).toBeVisible();
     await expect
       .poll(() => frameArt(paths).some((p) => p === "/frames/v2/meme4-yaho-base@1x.png"))
       .toBe(true);

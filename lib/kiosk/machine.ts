@@ -15,7 +15,6 @@ import { getHandFont, pickHandFont } from "@/config/hand-fonts";
 import { LOOK_IDS, NO_LOOK } from "@/config/looks";
 import { frameToneIsFixed } from "@/lib/looks/config";
 import { parseRetouchLevel, type RetouchLevelId } from "@/config/retouch";
-import { POSE_SEQUENCE, type Pose } from "@/config/poses";
 import type { KioskLang } from "@/lib/kiosk/copy";
 
 /**
@@ -29,7 +28,7 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  *
  * 「틀 선택 v2」 (2026-11-22), with fewer touches (2026-11-27, a user request):
  * attract ("화면을 눌러 시작", D80) → pick (one of nine cards; a tap on a card goes on) → options
- *         (only for a card with options: colour, logo) → camera → ready → countdown ⇄ capturing
+ *         (only for a card with options: colour, logo) → camera → countdown ⇄ capturing
  *         → select (the photos for the frame, the first ones already chosen) → consent →
  *         delivery (QR) → (reset) attract
  *
@@ -38,6 +37,11 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * card chooses it and goes on (PICK_CARD; the bottom bar's button still confirms the card
  * marked); the review screen is gone: after the last shot the guest is on the photo choice with
  * the first photos already chosen, and one press finishes.
+ *
+ * Straight into shooting (2026-11-28, a user request: "템플릿을 고르면 바로 촬영들어갈 수 있게"):
+ * there is no screen waiting for a start button. As soon as the camera gives a picture
+ * (CAMERA_READY) the first countdown runs; the screen flash goes off for every shot (no switch),
+ * and the pose guide (D71) is gone.
  *
  * The frame, its colour and its logo are final once shooting starts (turnover): there is no
  * "one more shot", no second frame choice and no second round after shooting. The handwriting
@@ -51,19 +55,15 @@ import type { KioskLang } from "@/lib/kiosk/copy";
  * Release 2.0:
  *  - attract → mobile: "내 사진으로 참여하기" (D66). The booth shows a QR for the guest's phone and
  *    waits for the photo; no camera, no upload from the booth itself.
- *  - Pose guide (D71): on the ready screen the guest chooses free poses or recommended ones
- *    (BEGIN_SHOOTING guide). It only changes what is shown during the countdown (currentPose);
- *    the shots, countdown and every later step are the same.
  *
  * STUDIO SHALOM booth flow (D78):
  *  - Language: the guest picks Korean, English or Chinese on the cover (SET_LANG). A view: no
  *    rule changes with it. Every new guest starts in Korean (RESET).
  *  - Back: one step back where nothing is lost (canGoBack): frame pick → cover, options →
- *    frame pick, the camera before the first shot → options (or the pick), the phone QR →
- *    cover. Never once a shot is taken: the photo choice has no way back.
+ *    frame pick, the camera starting before the first shot → options (or the pick), the phone
+ *    QR → cover. Never once a shot is taken: the photo choice has no way back.
  *
- * D89: the easy screen mode (D67) is gone. There is one booth screen; the guest's only per-guest
- * choice besides the language is the pose guide.
+ * D89: the easy screen mode (D67) is gone. There is one booth screen.
  */
 
 export type KioskPhase =
@@ -71,7 +71,6 @@ export type KioskPhase =
   | "pick" // choose a frame before shooting
   | "camera" // requesting permission / starting the camera
   | "camera-error"
-  | "ready" // live preview, waiting for the guest to press start
   | "countdown"
   | "capturing"
   | "rest" // the breather between two shots (restSeconds): camera on, no number
@@ -113,8 +112,6 @@ export interface KioskState<Shot> {
   shots: (Shot | null)[];
   /** Index of the shot the countdown / capture is for. */
   shotIndex: number;
-  /** The guest asked for recommended poses (D71). False = free poses. Per guest. */
-  poseGuide: boolean;
   remaining: number;
   /** The card on the picker (one of seven) and its options; `frameId` follows from both. */
   cardId: FrameCardId;
@@ -173,10 +170,8 @@ export type KioskAction<Shot> =
   | { type: "CAMERA_READY" }
   | { type: "CAMERA_FAILED"; kind: CameraErrorKind }
   | { type: "CAMERA_RETRY" }
-  /** Switch device / reconnect from the live preview. */
+  /** Switch device / reconnect while counting down or resting: the camera is taken again. */
   | { type: "CAMERA_RESTART" }
-  /** guide: show a recommended pose during each countdown (D71). */
-  | { type: "BEGIN_SHOOTING"; guide: boolean }
   | { type: "TICK" }
   | { type: "SHOT_CAPTURED"; shot: Shot }
   /** The rest between two shots is over: the next countdown starts. */
@@ -242,7 +237,6 @@ export function createInitialState<Shot>(init: KioskInit): KioskState<Shot> {
     restSeconds: init.restSeconds ?? 0,
     shots: Array.from({ length: init.shotCount }, () => null),
     shotIndex: 0,
-    poseGuide: false,
     remaining: init.countdownSeconds,
     cardId: card.id,
     frameOptions,
@@ -351,12 +345,11 @@ export function kioskReducer<Shot>(
         case "mobile":
           // The QR on screen is simply left; the phone page stops working when it expires.
           return { ...state, phase: "attract", mobile: { status: "idle" } };
-        case "ready":
+        case "camera":
           // Nothing is shot yet: the frame may change again, and the font is drawn again then.
           return {
             ...state,
             phase: getCard(state.cardId).options.length ? "options" : "pick",
-            poseGuide: false,
             handFont: null,
           };
         default:
@@ -427,11 +420,25 @@ export function kioskReducer<Shot>(
       return state.phase === "options" ? lockFrame(state, action.random) : state;
 
     case "CAMERA_READY":
-      return state.phase === "camera" ? { ...state, phase: "ready", cameraError: null } : state;
+      // The picture is there: shooting starts at once, at the first empty slot (after a
+      // reconnect the earlier shots are kept). No start button (2026-11-28).
+      if (state.phase !== "camera") return state;
+      {
+        const firstEmpty = state.shots.findIndex((s) => s === null);
+        if (firstEmpty === -1) return toSelect({ ...state, cameraError: null });
+        return {
+          ...state,
+          phase: "countdown",
+          cameraError: null,
+          shotIndex: firstEmpty,
+          remaining: state.countdownSeconds,
+          captureFailures: 0,
+        };
+      }
 
     case "CAMERA_FAILED":
       // A camera can fail at any point while it is in use (unplugged mid-countdown).
-      return ["camera", "ready", "countdown", "capturing", "rest"].includes(state.phase)
+      return ["camera", "countdown", "capturing", "rest"].includes(state.phase)
         ? { ...state, phase: "camera-error", cameraError: action.kind }
         : state;
 
@@ -441,23 +448,10 @@ export function kioskReducer<Shot>(
         : state;
 
     case "CAMERA_RESTART":
-      return state.phase === "ready" ? { ...state, phase: "camera" } : state;
-
-    case "BEGIN_SHOOTING":
-      if (state.phase !== "ready") return state;
-      {
-        // Resume at the first empty slot (after a reconnect, earlier shots are kept).
-        const firstEmpty = state.shots.findIndex((s) => s === null);
-        if (firstEmpty === -1) return toSelect(state);
-        return {
-          ...state,
-          phase: "countdown",
-          poseGuide: action.guide,
-          shotIndex: firstEmpty,
-          remaining: state.countdownSeconds,
-          captureFailures: 0,
-        };
-      }
+      // Never mid-capture: that shot is being taken and settles itself (SHOT_CAPTURED / FAILED).
+      return state.phase === "countdown" || state.phase === "rest"
+        ? { ...state, phase: "camera", remaining: state.countdownSeconds }
+        : state;
 
     case "TICK":
       if (state.phase !== "countdown") return state;
@@ -591,8 +585,8 @@ export function kioskReducer<Shot>(
 
 /**
  * Where "이전" is offered (D78): only a step back that loses nothing the guest made. The picker
- * goes back to the cover; the camera screen before the first shot goes back to the options (or
- * the pick); after a shot it does not (a reconnect keeps earlier shots, and going back would
+ * goes back to the cover; the camera starting before the first shot goes back to the options
+ * (or the pick); after a shot it does not (a reconnect keeps earlier shots, and going back would
  * drop them). Once the shots are taken there is no step back at all: the photo choice is the
  * first screen after them (2026-11-27: no review screen, no retake), and the frame stays fixed
  * (v2). "처음으로" ends the session instead, after asking.
@@ -602,7 +596,8 @@ export function canGoBack<Shot>(state: KioskState<Shot>): boolean {
     case "pick":
     case "options":
       return true;
-    case "ready":
+    case "camera":
+      // The screen while the camera starts. Once it counts down the footer is hidden (quiet).
       return capturedCount(state) === 0;
     case "mobile":
       // Once the phone's photo is in, the guest is done: that screen has its own way home.
@@ -653,31 +648,13 @@ export function progressStep(
     case "delivery":
       return { step: total, total };
     default:
-      return { step: 2, total }; // camera, ready, countdown, capturing, camera-error
+      return { step: 2, total }; // camera, countdown, capturing, rest, camera-error
   }
-}
-
-/**
- * The recommended pose for the shot being counted down or captured (D71). Null in free mode and
- * outside shooting. A shot taken again after a failed capture shows its pose again.
- */
-export function currentPose<Shot>(
-  state: KioskState<Shot>,
-  sequence: readonly Pose[] = POSE_SEQUENCE,
-): Pose | null {
-  if (!state.poseGuide || !isShooting(state.phase) || sequence.length === 0) return null;
-  return sequence[state.shotIndex % sequence.length] ?? null;
 }
 
 /** Phases where the camera must be running. */
 export function needsCamera(phase: KioskPhase): boolean {
-  return (
-    phase === "camera" ||
-    phase === "ready" ||
-    phase === "countdown" ||
-    phase === "capturing" ||
-    phase === "rest"
-  );
+  return phase === "camera" || phase === "countdown" || phase === "capturing" || phase === "rest";
 }
 
 /** Phases where the guest is mid-shoot; idle reset must not interrupt them. */
