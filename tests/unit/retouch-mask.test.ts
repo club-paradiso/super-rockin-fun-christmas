@@ -130,6 +130,91 @@ describe("the face mask (lib/retouch/mask.ts)", () => {
     for (let i = 0; i < mask.length; i += 4) expect(mask[i + 1]!).toBeLessThanOrEqual(mask[i]!);
   });
 
+  describe.each([
+    ["the mesh", meshFace(FACE)],
+    ["the six points", keypointFace(FACE)],
+  ] as const)("윤곽 조명 from %s", (_name, face) => {
+    const plan = planOne(face);
+    const mask = rasterMask(plan);
+    const { cx, cy, iod } = FACE;
+    const SHADE = 2;
+    const LIGHT = 3;
+
+    it("shades the cheek and jaw edges and the temples, and nothing in the middle of the face", () => {
+      for (const side of [-1, 1]) {
+        expect(maskAt(plan, mask, cx + side * iod * 0.9, cy + iod * 0.75, SHADE)).toBeGreaterThan(
+          150,
+        );
+        expect(maskAt(plan, mask, cx + side * iod * 0.78, cy + iod * 1.25, SHADE)).toBeGreaterThan(
+          120,
+        );
+        // The temples (beside the brows, above the eyes) get less than the cheeks.
+        const temple = maskAt(plan, mask, cx + side * iod * 0.72, cy - iod * 0.6, SHADE);
+        expect(temple).toBeGreaterThan(30);
+        expect(temple).toBeLessThan(
+          maskAt(plan, mask, cx + side * iod * 0.9, cy + iod * 0.75, SHADE),
+        );
+      }
+      // The centre line from forehead to chin, and the middle of each cheek: no shade.
+      for (const dy of [-0.8, -0.3, 0.3, 0.8, 1.6, 1.85])
+        expect(maskAt(plan, mask, cx, cy + iod * dy, SHADE)).toBe(0);
+      expect(maskAt(plan, mask, cx - iod * 0.35, cy + iod * 0.9, SHADE)).toBe(0);
+      expect(maskAt(plan, mask, cx + iod * 0.35, cy + iod * 0.9, SHADE)).toBe(0);
+    });
+
+    it("lights the forehead, the nose bridge, the cheekbone tops and the chin, and not the edges", () => {
+      expect(maskAt(plan, mask, cx, cy - iod * 0.55, LIGHT)).toBeGreaterThan(80);
+      expect(maskAt(plan, mask, cx, cy + iod * 0.28, LIGHT)).toBeGreaterThan(80);
+      expect(maskAt(plan, mask, cx - iod * 0.6, cy + iod * 0.6, LIGHT)).toBeGreaterThan(50);
+      expect(maskAt(plan, mask, cx + iod * 0.6, cy + iod * 0.6, LIGHT)).toBeGreaterThan(50);
+      expect(maskAt(plan, mask, cx, cy + iod * 1.7, LIGHT)).toBeGreaterThan(30);
+      // The edges are for the shade: none on the jaw, only the tail of the cheekbone's on the cheek.
+      for (const side of [-1, 1]) {
+        expect(maskAt(plan, mask, cx + side * iod * 0.8, cy + iod * 1.25, LIGHT)).toBe(0);
+        expect(maskAt(plan, mask, cx + side * iod * 0.95, cy + iod * 0.75, LIGHT)).toBeLessThan(
+          maskAt(plan, mask, cx + side * iod * 0.95, cy + iod * 0.75, SHADE) / 4,
+        );
+      }
+      // None on the eyes or the lips: there is no skin there to light.
+      expect(maskAt(plan, mask, cx - iod / 2, cy, LIGHT)).toBe(0);
+      expect(maskAt(plan, mask, cx, cy + iod * 1.25, LIGHT)).toBe(0);
+    });
+
+    it("has its full strength somewhere under the mask, and never more light than shade", () => {
+      let shadePeak = 0;
+      let shadeSum = 0;
+      let lightSum = 0;
+      for (let i = 0; i < mask.length; i += 4) {
+        const m = mask[i]! / 255;
+        shadePeak = Math.max(shadePeak, m * mask[i + SHADE]!);
+        shadeSum += m * mask[i + SHADE]!;
+        lightSum += m * mask[i + LIGHT]!;
+      }
+      // 255 but for the rounding of the two bytes it is the product of.
+      expect(shadePeak).toBeGreaterThan(235);
+      expect(lightSum).toBeGreaterThan(shadeSum * 0.25);
+      // One level of rounding per pixel is not a brighter face.
+      expect(lightSum).toBeLessThanOrEqual(shadeSum * 1.01);
+    });
+  });
+
+  it("the contour light turns with the head: a tilted face is shaded on its own edges", () => {
+    // The same face turned a quarter turn: its eyes one above the other.
+    const turned = meshFace(FACE).landmarks!.map((p) => ({
+      x: FACE.cx - (p.y - FACE.cy),
+      y: FACE.cy + (p.x - FACE.cx),
+    }));
+    const { plans } = planFaces([{ landmarks: turned }], 320, 320);
+    const plan = plans[0]!;
+    const mask = rasterMask(plan);
+    const { cx, cy, iod } = FACE;
+    // What was the cheek edge (to the side, below the eyes) is now above and below the middle.
+    expect(maskAt(plan, mask, cx - iod * 0.75, cy - iod * 0.9, 2)).toBeGreaterThan(150);
+    expect(maskAt(plan, mask, cx - iod * 0.75, cy + iod * 0.9, 2)).toBeGreaterThan(150);
+    // And the nose bridge lies along the turned nose.
+    expect(maskAt(plan, mask, cx - iod * 0.28, cy, 3)).toBeGreaterThan(80);
+  });
+
   it("has no geometry for points it cannot use", () => {
     expect(faceGeometry({})).toBeNull();
     expect(faceGeometry({ keypoints: [{ x: 1, y: 1 }] })).toBeNull();

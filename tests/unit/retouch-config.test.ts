@@ -39,6 +39,12 @@ describe("skin retouch settings (config/retouch.ts)", () => {
       for (const share of level.bands) expect(share).toBeLessThan(1);
     expect(natural.redness).toBeLessThan(glow.redness);
     expect(natural.underEye).toBeLessThan(glow.underEye);
+    // 윤곽 조명: both levels have it, 뽀샤시 more; and never more light than shade (no whitening).
+    expect(natural.contourShade).toBeGreaterThan(0);
+    expect(natural.contourShade).toBeLessThan(glow.contourShade);
+    expect(natural.contourLight).toBeLessThan(glow.contourLight);
+    for (const level of [natural, glow])
+      expect(level.contourLight).toBeLessThanOrEqual(level.contourShade);
   });
 
   it("refuses numbers that are out of range", () => {
@@ -51,6 +57,16 @@ describe("skin retouch settings (config/retouch.ts)", () => {
       "keepAbove[0] must be 0–0.5",
     );
     expect(retouchLevelProblems({ ...base, lift: 0.4 })).toContain("lift must be 0–0.15");
+    expect(retouchLevelProblems({ ...base, contourShade: 0.3 })).toContain(
+      "contourShade must be 0–0.2",
+    );
+    expect(retouchLevelProblems({ ...base, contourLight: -0.1 })).toContain(
+      "contourLight must be 0–0.2",
+    );
+    // More light than shade would be a brightening of the face on balance.
+    expect(retouchLevelProblems({ ...base, contourShade: 0.05, contourLight: 0.08 })).toContain(
+      "contourLight must not be above contourShade",
+    );
     expect(retouchLevelProblems({ ...base, strength: Number.NaN })).toContain(
       "strength must be 0–2",
     );
@@ -68,9 +84,13 @@ describe("skin retouch settings (config/retouch.ts)", () => {
     expect([zero.fine, ...zero.bands, zero.underEye, zero.redness, zero.lift]).toEqual([
       0, 0, 0, 0, 0, 0, 0, 0,
     ]);
+    expect([zero.contourShade, zero.contourLight]).toEqual([0, 0]);
+    expect(half.contourShade).toBeCloseTo(RETOUCH_LEVELS.glow.contourShade * 0.5);
+    expect(half.contourLight).toBeCloseTo(RETOUCH_LEVELS.glow.contourLight * 0.5);
     const double = scaledLevel(RETOUCH_LEVELS.glow, 2);
     for (const share of double.bands) expect(share).toBeLessThanOrEqual(1);
     expect(double.lift).toBeLessThanOrEqual(0.15);
+    expect(double.contourShade).toBeLessThanOrEqual(0.2);
     // A slider value that is not a number leaves the level as written.
     expect(scaledLevel(RETOUCH_LEVELS.natural, Number.NaN).bands).toEqual(
       RETOUCH_LEVELS.natural.bands,

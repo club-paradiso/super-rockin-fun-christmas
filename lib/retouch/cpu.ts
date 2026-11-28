@@ -11,7 +11,8 @@ import type { FaceJob, RetouchEngine } from "./types";
  *  2. à trous:  four edge-stopped 5 × 5 B3-spline passes with growing steps → c1…c4
  *               (Dammertz et al. 2010, "Edge-Avoiding À-Trous Wavelet Transform")
  *  3. activity: how strong the skin's own mid-size detail is around each pixel
- *  4. combine:  the correction (what to take out of each band) and the final mask
+ *  4. combine:  the correction (what to take out of each band, and the contour light as a gain
+ *               on the smoothed colour) and the final mask
  *  5. final:    at full size, photo − mask × correction
  */
 
@@ -154,6 +155,7 @@ export function combine(
   const [invCb, invCr] = job.invChroma;
   const [dark0, dark1] = job.darkGate;
   const margin = job.rednessMargin;
+  const [roll0, roll1] = job.contourRollOff;
   const d = [0, 0, 0];
 
   for (let i = 0; i < lw * lh; i++) {
@@ -208,6 +210,19 @@ export function combine(
         cr += 1.402 * pull;
         cg -= 0.714 * pull;
       }
+    }
+
+    // Contour light (윤곽 조명): shade and highlight as a gain on the smoothed colour, so the
+    // skin keeps its hue and its texture is not amplified. The correction is subtracted later.
+    const shade = (mask[p + 2]! / 255) * level.contourShade;
+    const brightest = Math.max(c[2][p]!, c[2][p + 1]!, c[2][p + 2]!) / 255;
+    const light =
+      (mask[p + 3]! / 255) * level.contourLight * (1 - smoothstep(roll0, roll1, brightest));
+    const gain = light - shade;
+    if (gain !== 0) {
+      cr -= (c[2][p]! / 255) * gain;
+      cg -= (c[2][p + 1]! / 255) * gain;
+      cb -= (c[2][p + 2]! / 255) * gain;
     }
 
     // Is this pixel skin of this face? Colour against the face's model, and not too dark.

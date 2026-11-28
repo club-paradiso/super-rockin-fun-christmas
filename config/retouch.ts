@@ -7,6 +7,13 @@
  * as it is; the middle bands (blotches, uneven tone, shallow shadows) are partly taken out; edges
  * and anything with strong contrast (deep wrinkles, moles, stubble, spectacle rims) are kept.
  * There is no face reshaping anywhere in this feature.
+ *
+ * 윤곽 조명 (contour light, 2026-11-28, a user request: "얼굴 윤곽 등 얼굴 보정 효과도 좀 드러날 수
+ * 있게"): the face's shape is brought out the way a photographer does it, with light. A soft shade
+ * along the cheek and jaw edges and the temples, a soft highlight on the forehead, the bridge of
+ * the nose, the top of each cheekbone and the chin. Both are gains on the skin's own smoothed
+ * colour: no pixel moves, no outline changes, the texture is not amplified, and on balance the
+ * face is never brighter for it (the highlights never outweigh the shade).
  */
 
 export type RetouchLevelId = "off" | "natural" | "glow";
@@ -50,6 +57,17 @@ export interface RetouchLevel {
    * rolled off to nothing in highlights so light skin does not clip.
    */
   lift: number;
+  /**
+   * 윤곽 조명, the shade: skin along the cheek and jaw edges and the temples is at most this
+   * share darker (a gain, so it keeps its colour). 0 = none.
+   */
+  contourShade: number;
+  /**
+   * 윤곽 조명, the highlight: forehead, nose bridge, cheekbone tops and chin are at most this
+   * share brighter (a gain, rolled off in highlights like `lift`). Never above `contourShade`:
+   * the light a contour adds is taken from its own shade, so it is not a whitening.
+   */
+  contourLight: number;
 }
 
 /**
@@ -68,6 +86,11 @@ export interface RetouchLevel {
  * their shape. The lift stays at 0.035: at 0.045 and 0.05 the two hard-lit samples (older-woman,
  * glasses-man) gained clipped highlights beyond the limit of e2e/retouch.spec.ts (the roll-off
  * looks at luma, and on skin the red channel clips first).
+ *
+ * 윤곽 조명 (2026-11-28): chosen from side-by-side sheets of the same fifteen samples (desktop
+ * Chromium, 960 × 720). 자연스럽게 is the amount that shows next to the original and not on its
+ * own; 뽀샤시 is the amount a guest sees on the print. Still to be confirmed by a person on the
+ * lab page and on the iPad mini 4.
  */
 export const RETOUCH_LEVELS: Record<Exclude<RetouchLevelId, "off">, RetouchLevel> = {
   natural: {
@@ -78,6 +101,8 @@ export const RETOUCH_LEVELS: Record<Exclude<RetouchLevelId, "off">, RetouchLevel
     underEye: 0.3,
     redness: 0.25,
     lift: 0,
+    contourShade: 0.08,
+    contourLight: 0.055,
   },
   glow: {
     strength: 1,
@@ -87,6 +112,8 @@ export const RETOUCH_LEVELS: Record<Exclude<RetouchLevelId, "off">, RetouchLevel
     underEye: 0.4,
     redness: 0.35,
     lift: 0.035,
+    contourShade: 0.14,
+    contourLight: 0.1,
   },
 };
 
@@ -194,6 +221,40 @@ export const RETOUCH_CONFIG = {
     liftRollOff: [0.6, 0.95] as const,
   },
 
+  /**
+   * 윤곽 조명: where the shade and the highlights sit. Lengths are shares of the face width
+   * (cheek to cheek) unless they say IOD (the distance between the eyes). The spots follow the
+   * face's own points, so they turn and tilt with the head.
+   */
+  contour: {
+    /** The shade reaches this far in from the face outline before it has faded to nothing. */
+    shadeReach: 0.24,
+    /**
+     * Sideways, from the face's centre line (0) to its edge (1): no shade nearer the centre line
+     * than the first number, full shade from the second. Keeps it off the chin and the forehead.
+     */
+    shadeSide: [0.3, 0.72] as const,
+    /** The temples (above the eyes) get this share of what the cheeks and jaw get. */
+    templeShare: 0.5,
+    /**
+     * The highlight fades out between these values of the skin's brightest channel (on skin
+     * that is red, and red is the channel that clips first: measured 2026-11-28 on the two
+     * hard-lit samples, a roll-off on luma added clipped pixels beyond the limit of
+     * e2e/retouch.spec.ts). Skin that is already lit gets no more light.
+     */
+    lightRollOff: [0.75, 0.95] as const,
+    /** Softening of a highlight spot, at most (a narrow spot is softened by its own width). */
+    spotFeather: 0.085,
+    /** Forehead: between the eyes and the hairline, this far up; half sizes in IOD. */
+    forehead: { up: 0.5, rx: 0.46, ry: 0.22, weight: 0.75 },
+    /** Nose bridge: along the line from between the eyes to the tip; half width in IOD. */
+    bridge: { from: 0.08, to: 0.86, rx: 0.1, weight: 1 },
+    /** Cheekbone tops: below each eye and a little outward, in IOD. */
+    cheekbone: { down: 0.6, out: 0.12, rx: 0.34, ry: 0.15, weight: 0.6 },
+    /** Chin: between the lower lip and the tip of the chin; half sizes in IOD. */
+    chin: { rx: 0.19, ry: 0.12, weight: 0.5 },
+  },
+
   mask: {
     /** Feather of the face outline, inward, as a share of the face width. */
     outlineFeather: 0.06,
@@ -261,6 +322,10 @@ export function retouchLevelProblems(level: RetouchLevel): string[] {
   share("underEye", level.underEye);
   share("redness", level.redness);
   share("lift", level.lift, 0.15);
+  share("contourShade", level.contourShade, 0.2);
+  share("contourLight", level.contourLight, 0.2);
+  if (level.contourLight > level.contourShade)
+    problems.push("contourLight must not be above contourShade");
   return problems;
 }
 
@@ -281,5 +346,7 @@ export function scaledLevel(level: RetouchLevel, strength = level.strength): Ret
     underEye: share(level.underEye),
     redness: share(level.redness),
     lift: share(level.lift, 0.15),
+    contourShade: share(level.contourShade, 0.2),
+    contourLight: share(level.contourLight, 0.2),
   };
 }

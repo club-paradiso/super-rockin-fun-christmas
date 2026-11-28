@@ -106,7 +106,11 @@ as it is. Change each rule in the same PR that changes the behaviour it describe
   context is released), and `newSession()` on "화면을 눌러 시작" tries WebGL again for the next
   guest, so one lost context (iPad sleep, memory pressure) cannot hide the colour row all day.
   Every look keeps the bars in `tests/unit/looks-engine.test.ts` (skin hue within 6°, reds and
-  greens never more vivid, white short of clipping, black 2–12 levels) and stays plain to tell
+  greens never more vivid, white short of clipping, black 2–12 levels, and since 2026-11-28, a
+  user request to finish the looks: **the light reaches the face first**, no skin tone, light or
+  deep, comes out more than 3 levels darker than it went in; a look that wants a deep room or a
+  hard black takes it from the tones under the skin and gives the skin its light back with
+  `skinLight`; grain at most 0.024 and never coarser than 600 across) and stays plain to tell
   from the others (`tests/unit/looks-distinct.test.ts`: every pair at least 4.5 ΔE00 apart on the samples; `npm run
 looks:measure`). `/looks` is the comparison
   sheet, a stand-alone bundle (`looks-sheet/`) so it opens on Safari 15; its samples are synthetic
@@ -389,9 +393,21 @@ looks:measure`). `/looks` is the comparison
   progress dots do not change. The chosen answer is filled like the frame options' (a state, not
   a second action). If the model has not loaded, the choice is not offered. Every
   number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. Never add a
-  mesh warp (eyes, jaw, nose). Never smooth the finest band at 자연스럽게 (`fine: 0`), never
-  whiten (the only brightening is 뽀샤시's `lift`, a gain with a highlight roll-off), and never
-  judge skin by a fixed colour range: the colour model is each face's own (`lib/retouch/skin.ts`).
+  mesh warp (eyes, jaw, nose). **The face's shape is brought out by light, never by moving a
+  pixel** (윤곽 조명, 2026-11-28, a user request: "얼굴 윤곽 등 얼굴 보정 효과도 좀 드러날 수 있게"):
+  both levels shade the cheek and jaw edges and the temples (`contourShade`) and light the
+  forehead, the nose bridge, the cheekbone tops and the chin (`contourLight`), as gains on the
+  skin's own smoothed colour, from a map drawn on the face's own points (`contourFields` in
+  `lib/retouch/mask.ts`, mask channels B and A). The outline, the features and the skin's grain
+  stay where they were (`tests/unit/retouch-pipeline.test.ts` 「윤곽 조명」). A request to slim or
+  reshape a face is still a mesh warp and still needs the user to lift this rule in so many words.
+  Never smooth the finest band at 자연스럽게 (`fine: 0`), never whiten: the only brightening is
+  뽀샤시's `lift` (a gain with a highlight roll-off) and the contour's highlight, which is never
+  more than its own shade (`contourLight` ≤ `contourShade`, and under the mask the light never
+  sums to more than the shade), so no face is brighter on balance for its contour, and which
+  gives skin that is already lit no more light (`contour.lightRollOff`, on the brightest
+  channel). Never judge skin by a fixed colour range: the colour model is each face's own
+  (`lib/retouch/skin.ts`).
   The live preview is never retouched. Face points, masks and regions stay in the page: never
   send, store or log them (failures reach the server as a code and a count through the
   heartbeat). A photo that fails or runs over its time goes on unretouched, whole, and says so on

@@ -122,6 +122,8 @@ uniform vec3 uSkin;      // y, cb, cr of this face
 uniform vec2 uInvChroma; // 1 / (tolerance × sigma) for cb, cr
 uniform vec2 uDark;      // dark gate, in luma
 uniform float uStrength;
+uniform vec2 uContour;   // contour light: shade, highlight
+uniform vec2 uRoll;      // the highlight fades out between these values of the brightest channel
 
 vec3 take(vec3 d, float share, float keep) {
   float q = max(abs(d.r), max(abs(d.g), abs(d.b))) / keep;
@@ -161,6 +163,10 @@ void main() {
       c.g -= 0.714 * pull;
     }
   }
+
+  float brightest = max(c2.r, max(c2.g, c2.b));
+  float gain = mask.a * uContour.y * (1.0 - smoothstep(uRoll.x, uRoll.y, brightest)) - mask.b * uContour.x;
+  c -= c2.rgb * gain;
 
   vec2 dc = (vec2((c1.b - c1.a) * ${f(CB_SCALE)} + 0.5, (c1.r - c1.a) * ${f(CR_SCALE)} + 0.5) - uSkin.yz) * uInvChroma;
   float conf = exp(-0.5 * dot(dc, dc)) * smoothstep(uDark.x, uDark.y, c1.a);

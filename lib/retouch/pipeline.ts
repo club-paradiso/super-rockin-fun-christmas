@@ -278,6 +278,10 @@ export class SkinRetoucher {
             this.config.filter.rednessSigmas * skin.sigmaCr,
           ),
           liftRollOff: [this.config.filter.liftRollOff[0], this.config.filter.liftRollOff[1]],
+          contourRollOff: [
+            this.config.contour.lightRollOff[0],
+            this.config.contour.lightRollOff[1],
+          ],
           view: options.view ?? "result",
         };
         try {

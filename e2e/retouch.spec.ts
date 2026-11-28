@@ -164,13 +164,17 @@ test.describe("the quality rules on every sample (CPU engine: the same numbers o
           level === "natural" ? 0.9 : 0.78,
         );
         expect(s.fineRetention).toBeLessThan(1.06);
-        // It does something, and it never repaints: small changes only.
-        expect(s.meanAbsDiff).toBeLessThan(level === "natural" ? 3 : 6);
+        // It does something, and it never repaints: small changes only. 자연스럽게 was under 3
+        // until the contour light (윤곽 조명, 2026-11-28): its shade along the cheek and jaw is
+        // a change of its own, measured at 1.7 to 3.8 on these samples.
+        expect(s.meanAbsDiff).toBeLessThan(level === "natural" ? 4.5 : 6);
         expect(s.maxAbsDiff).toBeLessThan(level === "natural" ? 40 : 60);
-        // No whitening, no greying (dark skin), no blown highlights (light skin).
-        expect(Math.abs(s.lumaShift), "brightness shift").toBeLessThan(
-          level === "natural" ? 1.5 : 6,
-        );
+        // No whitening, no greying (dark skin), no blown highlights (light skin). The whitening
+        // side is where it was. The other side has room for the contour's shade: on a face that
+        // is already bright the highlight is rolled off and only the shade is left (measured
+        // −2.6 at most, on the fairest sample).
+        expect(s.lumaShift, "no whitening").toBeLessThan(level === "natural" ? 1.5 : 6);
+        expect(s.lumaShift, "the contour's shade, and no more than that").toBeGreaterThan(-3.5);
         expect(s.saturationRatio, "colour kept").toBeGreaterThan(0.94);
         expect(s.saturationRatio).toBeLessThan(1.06);
         expect(s.clippedAfter, "no new clipping").toBeLessThanOrEqual(s.clippedBefore * 1.2 + 200);

@@ -223,6 +223,8 @@ export class GlEngine implements RetouchEngine {
           uInvChroma: job.invChroma,
           uDark: job.darkGate,
           uStrength: job.strength,
+          uContour: [level.contourShade, level.contourLight],
+          uRoll: job.contourRollOff,
         },
       );
       this.draw(
