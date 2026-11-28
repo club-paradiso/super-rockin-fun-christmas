@@ -18,6 +18,18 @@ export const WALL_CONFIG = {
   exitMs: 1_500,
   /** A photo that just left waits this long before it can come back. */
   cooldownMs: 60_000,
+  /**
+   * Debut (a user request, 2026-11-28): a photo taken this recently that the wall has never shown
+   * goes up as soon as the wall knows it may (lib/wall/rotation.ts, lib/wall/scheduler.ts), so the
+   * guest who said yes sees it while still at the booth. Older never-shown photos (a late staff
+   * approval of a backlog) wait for a free slot as before; staff can still use 바로 띄우기.
+   */
+  debutWindowMs: 30 * 60_000,
+  /**
+   * A debut never pushes out a photo that has been fully visible for less than this, so nothing
+   * flashes past. 바로 띄우기 (show-now) does not wait for it.
+   */
+  debutYieldAfterMs: 5_000,
   /** Cloud fallback only (no exposure history): newest eligible photos the wall rotates through. */
   feedLimit: 60,
   /**

@@ -54,6 +54,11 @@ export interface WallFeed {
   photos: { id: string; frameId: string; createdAt: string }[];
   /** Staff asked for these now: the wall makes room for them at once. */
   showNow: string[];
+  /**
+   * Just approved and never shown (lib/wall/rotation.ts `debutIds`): the wall makes room for
+   * them as soon as one it shows has been up a few seconds. Absent from an older server.
+   */
+  debut?: string[];
   /** Staff pace settings (D92): how long a photo stays up, and the half-life (0 = off). */
   pace: { visibleMs: number; halfLifeMs: number };
   /** `closed` only: when the wall opens again ("HH:MM"), if there are opening hours. */

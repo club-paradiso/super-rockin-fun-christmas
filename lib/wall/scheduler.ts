@@ -1,4 +1,4 @@
-import type { WallTimings } from "@/config/wall";
+import { WALL_CONFIG, type WallTimings } from "@/config/wall";
 import type { WallPhotoPhase } from "./states";
 
 /**
@@ -11,12 +11,19 @@ import type { WallPhotoPhase } from "./states";
  * Which photo goes up next is the hub's decision (`ordering: "fair"`, lib/wall/rotation.ts): the
  * wall takes the first usable photo in the order it was given. Show-now photos skip the cooldown
  * and, when no slot is about to free up, push the longest-visible photo into its exit.
+ *
+ * Debuts (photos just approved that this wall has never shown, lib/wall/rotation.ts) go next:
+ * they too push out the longest-visible photo, but only one that has been fully visible for
+ * `debutYieldAfterMs`, never a show-now photo and never another debut on its first turn. A debut
+ * stays up for its whole turn.
  */
 export interface WallSlot {
   photoId: string | null;
   phase: Exclude<WallPhotoPhase, "COOLDOWN"> | null;
   /** When the current phase (or emptiness) started, ms. */
   since: number;
+  /** This is the photo's first turn on this wall, taken as a debut: nothing pushes it out early. */
+  debut?: boolean;
 }
 
 export interface WallSchedule {
@@ -50,6 +57,10 @@ export interface StepInput {
   ordering?: "fair" | "newest";
   /** Staff asked for these now. */
   showNow?: ReadonlySet<string>;
+  /** Just approved, never shown (the feed's `debut`). Only those this wall has not shown count. */
+  debut?: ReadonlySet<string>;
+  /** A debut only pushes out a photo fully visible this long. Default `WALL_CONFIG`'s. */
+  debutYieldAfterMs?: number;
   /**
    * `newest` ordering only (D92): each photo's share of the wall (lib/wall/rotation.ts
    * `ageWeight`). A photo with half the share is picked half as often. Absent = all equal.
@@ -89,12 +100,17 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
     return slot;
   });
 
-  makeRoomForShowNow(slots, input);
+  makeRoom(slots, input, lastShown);
 
   const free = slots.findIndex((s) => !s.photoId);
   if (free >= 0) {
     const next = pickNext({ ...input, slots, lastShown, turns });
-    if (next) slots[free] = { photoId: next, phase: "ENTER", since: now };
+    if (next) {
+      const debut = !input.showNow?.has(next) && isDebut(next, input, lastShown);
+      slots[free] = debut
+        ? { photoId: next, phase: "ENTER", since: now, debut: true }
+        : { photoId: next, phase: "ENTER", since: now };
+    }
     if (next && input.weights) {
       // A photo new to the count starts level with the least-shown one, not at zero: it must
       // not get a burst of turns to "catch up" with photos that were here all along.
@@ -108,25 +124,41 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
     : { slots, lastShown };
 }
 
+/** A debut this wall has not shown yet (it may be on screen right now, taking that turn). */
+function isDebut(id: string, input: StepInput, lastShown: Record<string, number>) {
+  return !!input.debut?.has(id) && lastShown[id] === undefined;
+}
+
 /**
- * When show-now photos are waiting and no slot is empty or already leaving, send the photo that
- * has been fully visible the longest into its exit (one per step). Show-now photos are never
- * pushed out, and nothing is cut short before it has finished entering.
+ * When show-now photos or debuts are waiting and no slot is empty or already leaving, send the
+ * photo that has been fully visible the longest into its exit (one per step). Show-now photos are
+ * never pushed out, and nothing is cut short before it has finished entering. A show-now photo
+ * pushes out anything else, a debut on its first turn last of all; a debut only pushes out a
+ * photo that is neither, once it has been visible `debutYieldAfterMs`.
  */
-function makeRoomForShowNow(slots: WallSlot[], input: StepInput) {
+function makeRoom(slots: WallSlot[], input: StepInput, lastShown: Record<string, number>) {
   const { now, ready, showNow = new Set() } = input;
-  if (!showNow.size) return;
+  if (!showNow.size && !input.debut?.size) return;
   const onWall = new Set(slots.map((s) => s.photoId));
-  const waiting = input.eligible.filter(
-    (id) => showNow.has(id) && ready.has(id) && !onWall.has(id),
-  ).length;
+  const waiting = input.eligible.filter((id) => ready.has(id) && !onWall.has(id));
+  const urgent = waiting.filter((id) => showNow.has(id)).length;
+  const debuts = waiting.filter((id) => !showNow.has(id) && isDebut(id, input, lastShown)).length;
   const freeing = slots.filter((s) => !s.photoId || s.phase === "EXIT").length;
-  if (waiting <= freeing) return;
-  let victim = -1;
-  slots.forEach((s, i) => {
-    if (s.phase !== "VISIBLE" || showNow.has(s.photoId!)) return;
-    if (victim < 0 || s.since < slots[victim]!.since) victim = i;
-  });
+  if (urgent + debuts <= freeing) return;
+  const yieldAfter = input.debutYieldAfterMs ?? WALL_CONFIG.debutYieldAfterMs;
+  const longest = (ok: (s: WallSlot) => boolean) => {
+    let victim = -1;
+    slots.forEach((s, i) => {
+      if (s.phase !== "VISIBLE" || showNow.has(s.photoId!) || !ok(s)) return;
+      if (victim < 0 || s.since < slots[victim]!.since) victim = i;
+    });
+    return victim;
+  };
+  let victim = longest((s) => !s.debut && now - s.since >= yieldAfter);
+  if (victim < 0 && urgent > freeing) {
+    victim = longest((s) => !s.debut);
+    if (victim < 0) victim = longest(() => true);
+  }
   if (victim >= 0) slots[victim] = { ...slots[victim]!, phase: "EXIT", since: now };
 }
 
@@ -145,6 +177,8 @@ function pickNext(
 
   const urgent = candidates.find((id) => showNow.has(id));
   if (urgent) return urgent;
+  const debut = candidates.find((id) => isDebut(id, input, lastShown));
+  if (debut) return debut;
   if (input.ordering === "fair") return candidates.find((id) => !resting(id)) ?? null;
 
   // Cloud fallback: never-shown photos first (newest first), then the one that has rested longest.

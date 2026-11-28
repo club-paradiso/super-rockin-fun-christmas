@@ -294,6 +294,11 @@ export function WallApp({
     () => new Set(fresh && feed?.mode === "live" ? feed.showNow : []),
     [fresh, feed],
   );
+  // Just approved, never shown: the wall makes room for them (lib/wall/scheduler.ts).
+  const debut = useMemo(
+    () => new Set(fresh && feed?.mode === "live" ? (feed.debut ?? []) : []),
+    [fresh, feed],
+  );
 
   // What is on screen right now, and what went up since the last report (read by the poller).
   const onWallRef = useRef<string[]>([]);
@@ -401,6 +406,15 @@ export function WallApp({
   useEffect(() => {
     allowedNow.current = allowed;
   }, [allowed]);
+  // A download that outlives one feed poll is still kept (a just-approved photo must not wait
+  // for the next poll to be fetched again); only leaving the page throws it away.
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -426,10 +440,10 @@ export function WallApp({
           const blob = await res.blob();
           // Eligibility can change while the request is in flight. Never cache a
           // withdrawn photo, even if React schedules this state update later.
-          if (cancelled || !allowedNow.current.has(id)) continue;
+          if (unmounted.current || !allowedNow.current.has(id)) continue;
           const url = URL.createObjectURL(blob);
           setImages((prev) => {
-            if (cancelled || !allowedNow.current.has(id) || prev.has(id)) {
+            if (unmounted.current || !allowedNow.current.has(id) || prev.has(id)) {
               URL.revokeObjectURL(url);
               return prev;
             }
@@ -457,7 +471,7 @@ export function WallApp({
     () => new Map((feed?.photos ?? []).map((p) => [p.id, Date.parse(p.createdAt)])),
     [feed],
   );
-  const pace = { eligible, images, showNow, ordering: feed?.ordering ?? "fair" } as const;
+  const pace = { eligible, images, showNow, debut, ordering: feed?.ordering ?? "fair" } as const;
   const latest = useRef({ ...pace, visibleMs, halfLifeMs, taken });
   useEffect(() => {
     latest.current = { ...pace, visibleMs, halfLifeMs, taken };
@@ -475,6 +489,7 @@ export function WallApp({
           timings: { ...WALL_CONFIG, visibleMs: latest.current.visibleMs },
           ordering: latest.current.ordering,
           showNow: latest.current.showNow,
+          debut: latest.current.debut,
           sharesKey: latest.current.halfLifeMs,
           weights: latest.current.halfLifeMs
             ? new Map(

@@ -3,7 +3,7 @@ import { WALL_CONFIG } from "@/config/wall";
 import { DEFAULT_WALL_THEME, WALL_THEMES } from "@/config/wall-themes";
 import { getBackend, getPhotoService } from "@/lib/storage/server";
 import { wallOpen } from "./hours";
-import { feedSize, rotationOrder } from "./rotation";
+import { debutIds, feedSize, rotationOrder } from "./rotation";
 import type { WallAudience, WallFeed } from "./states";
 import { activeThemeId, normalizeLook } from "./themes";
 
@@ -43,6 +43,7 @@ export async function wallFeed(
     ordering: "fair" as const,
     photos: [],
     showNow: [],
+    debut: [],
   };
   if (settings.showHoldingScreen) return { ...base, mode: "holding" };
   if (settings.pauseWall) return { ...base, mode: "paused" };
@@ -53,12 +54,16 @@ export async function wallFeed(
   if (publicOnly && !settings.wallPublic) return { ...base, mode: "live", ordering: "newest" };
 
   if (publicOnly) {
-    const photos = await getPhotoService().wallPhotos(MAX_ELIGIBLE, true);
+    const photos = (await getPhotoService().wallPhotos(MAX_ELIGIBLE, true)).slice(
+      0,
+      WALL_CONFIG.feedLimit,
+    );
     return {
       ...base,
       mode: "live",
       ordering: "newest",
-      photos: photos.slice(0, WALL_CONFIG.feedLimit),
+      photos,
+      debut: debutIds(photos, null, now.getTime(), WALL_CONFIG.debutWindowMs),
     };
   }
 
@@ -79,28 +84,34 @@ export async function wallFeed(
   };
 
   if (!exposures) {
+    const photos = withOnWall(eligible.slice(0, WALL_CONFIG.feedLimit).map((p) => p.id));
     return {
       ...base,
       mode: "live",
       ordering: "newest",
-      photos: withOnWall(eligible.slice(0, WALL_CONFIG.feedLimit).map((p) => p.id)),
+      photos,
       showNow: [],
+      debut: debutIds(photos, null, now.getTime(), WALL_CONFIG.debutWindowMs),
     };
   }
   const showNow = queue.map((r) => r.photoId).filter((id) => byId.has(id));
+  const exposureMap = new Map(exposures.map((e) => [e.photoId, e]));
   const order = rotationOrder({
     eligible,
-    exposures: new Map(exposures.map((e) => [e.photoId, e])),
+    exposures: exposureMap,
     showNow,
     halfLifeMs: pace.halfLifeMs,
     nowMs: now.getTime(),
+    debutWindowMs: WALL_CONFIG.debutWindowMs,
   });
+  const photos = withOnWall(order.slice(0, feedSize(slots)));
   return {
     ...base,
     mode: "live",
     ordering: "fair",
-    photos: withOnWall(order.slice(0, feedSize(slots))),
+    photos,
     showNow,
+    debut: debutIds(photos, exposureMap, now.getTime(), WALL_CONFIG.debutWindowMs),
   };
 }
 

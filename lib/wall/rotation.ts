@@ -4,9 +4,14 @@
  *
  * Order:
  *   1. show-now requests, oldest request first;
- *   2. photos never shown yet, in capture order (a new photo never jumps a photo that was
- *      already waiting for its first turn);
- *   3. everything else: fewest exposures first, then the one shown longest ago.
+ *   2. debuts (a user request, 2026-11-28: a guest who said yes should see the photo go up while
+ *      still at the booth): photos never shown yet that were taken within
+ *      `WALL_CONFIG.debutWindowMs`, in capture order. The wall also makes room for them
+ *      (lib/wall/scheduler.ts) instead of waiting for a slot to come free;
+ *   3. the other photos never shown yet, in capture order (a new photo never jumps a photo that
+ *      was already waiting for its first turn, except that a debut goes before one that has
+ *      waited longer than the debut window);
+ *   4. everything else: fewest exposures first, then the one shown longest ago.
  *
  * With a half-life (D92, off by default) step 3 compares exposures divided by the photo's share
  * (`ageWeight`): a photo one half-life older is due half as often. Steps 1 and 2 do not change,
@@ -30,8 +35,32 @@ export interface RotationInput {
   showNow: readonly string[];
   /** Half-life of a photo's share, ms since it was taken. Absent or 0 = every photo equal. */
   halfLifeMs?: number;
-  /** The clock for the half-life. Required when `halfLifeMs` is set. */
+  /** The clock for the half-life and the debut window. Required when either is set. */
   nowMs?: number;
+  /** Debut window (ms since capture). Absent or 0 = no debuts: step 2 is empty. */
+  debutWindowMs?: number;
+}
+
+/**
+ * Debuts (step 2): never shown yet and taken within the window, in capture order. Without an
+ * exposure log (`exposures` null: the public audience and the cloud fallback) the wall's own
+ * memory says what it has shown, so the window alone decides.
+ */
+export function debutIds(
+  eligible: readonly RotationPhoto[],
+  exposures: ReadonlyMap<string, RotationExposure> | null,
+  nowMs: number,
+  windowMs: number | undefined,
+): string[] {
+  if (!windowMs || windowMs <= 0) return [];
+  return eligible
+    .filter((p) => {
+      if ((exposures?.get(p.id)?.shownCount ?? 0) > 0) return false;
+      const at = Date.parse(p.createdAt);
+      return Number.isFinite(at) && nowMs - at <= windowMs && at <= nowMs + 60_000;
+    })
+    .sort((a, b) => cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id))
+    .map((p) => p.id);
 }
 
 /**
@@ -49,6 +78,10 @@ export function rotationOrder(input: RotationInput): string[] {
   const allowed = new Set(eligible.map((p) => p.id));
   const first = input.showNow.filter((id, i, all) => allowed.has(id) && all.indexOf(id) === i);
   const urgent = new Set(first);
+  const debut = debutIds(eligible, exposures, input.nowMs ?? 0, input.debutWindowMs).filter(
+    (id) => !urgent.has(id),
+  );
+  for (const id of debut) urgent.add(id);
   const decays = !!input.halfLifeMs && input.halfLifeMs > 0;
   const nowMs = input.nowMs ?? 0;
   /** Exposures so far, measured against the photo's share: the lowest is the most overdue. */
@@ -71,7 +104,7 @@ export function rotationOrder(input: RotationInput): string[] {
       );
     })
     .map((p) => p.id);
-  return [...first, ...rest];
+  return [...first, ...debut, ...rest];
 }
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);

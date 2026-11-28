@@ -357,3 +357,49 @@ test("staff turn the wall off and back on from /admin; the wall follows within a
   await expect(staff.getByTestId("audit-item").first()).toContainText("현장 책임자");
   await page.close();
 });
+
+test("a photo just approved goes up at once, even on a full wall (D121)", async () => {
+  test.setTimeout(240_000);
+  const page = await wallCtx.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/wall?canvas=1920x1080");
+  const slots = Number(await page.getByTestId("wall-scene").getAttribute("data-slots"));
+  // A full wall, and no other new photo waiting ahead: the photo below is the only debut.
+  await expect(page.getByTestId("wall-photo")).toHaveCount(slots, { timeout: 30_000 });
+  await expect
+    .poll(
+      async () => {
+        const feed = await page.request.get(`/api/wall/feed?slots=${slots}`);
+        return ((await feed.json()) as { debut?: string[] }).debut?.length;
+      },
+      { timeout: 180_000, intervals: [2_000] },
+    )
+    .toBe(0);
+
+  const sessionId = randomUUID();
+  const up = await kiosk.request.post("/api/photos", {
+    data: await syntheticStrip(42),
+    headers: {
+      "content-type": "image/jpeg",
+      "x-session-id": sessionId,
+      "x-frame-id": "navy-strip",
+      origin: ORIGIN,
+    },
+  });
+  expect(up.status()).toBe(201);
+  const consent = await kiosk.request.post("/api/photos/consent", {
+    data: { sessionId, consent: true },
+    headers: { origin: ORIGIN },
+  });
+  expect(consent.status()).toBe(200);
+  await approve(staff.request, sessionId);
+  const approvedAt = Date.now();
+  const id = await photoIdForSession(sessionId);
+  // Every slot is busy, so it only gets on by pushing a photo out.
+  await expect(page.getByTestId("wall-photo")).toHaveCount(slots);
+  await expect(page.locator(`[data-testid="wall-photo"][data-photo-id="${id}"]`)).toBeVisible({
+    timeout: 15_000,
+  });
+  console.log(`approved → on the wall: ${Date.now() - approvedAt} ms (full wall, ${slots} slots)`);
+  await page.close();
+});

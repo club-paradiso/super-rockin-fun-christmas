@@ -539,7 +539,10 @@ looks:measure`). `/looks` is the comparison
   into a 404. Route names must not contain "ai" or "review" (`tests/unit/ai-api.test.ts` guards that:
   hence `/link`, not `/pair`).
 - **Wall rotation is decided on the hub** by the pure `rotationOrder` (`lib/wall/rotation.ts`); the
-  wall only picks the first usable id. Changing rotation means keeping F1–F6
+  wall only picks the first usable id. A photo just approved and never shown is a debut (D121,
+  2026-11-28, a user request: the guest sees it go up at once): taken within
+  `WALL_CONFIG.debutWindowMs`, after show-now in the order, listed in the feed's `debut`, and the
+  wall makes room for it (`debutYieldAfterMs`, never pushing out show-now or another debut). Changing rotation means keeping F1–F6
   (`docs/ARCHITECTURE.md` 1.7) green in `tests/unit/rotation.test.ts`.
 
 ## The user's words
