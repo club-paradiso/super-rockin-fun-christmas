@@ -717,7 +717,7 @@ export function WallApp({
                 <span className="wall-logo-mark" />
               </p>
               <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
-                잠시 후 다시 불을 밝힐게요
+                잠시만 기다려주세요!
               </p>
             </div>
           ) : feed?.mode === "closed" ? (
