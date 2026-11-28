@@ -29,11 +29,16 @@ export function PhotoCard({
   photo,
   showRecovery = false,
   primaryOnly = false,
+  selected,
+  onSelect,
 }: {
   photo: StaffPhotoView;
   showRecovery?: boolean;
   /** Moderation queue: just approve / reject, as big as possible. */
   primaryOnly?: boolean;
+  /** 「게시 중」: the card can be ticked for taking several photos down at once. */
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ModerationAction | null>(null);
@@ -88,8 +93,34 @@ export function PhotoCard({
       data-photo-id={photo.id}
       data-status={photo.status}
       data-source={photo.source}
+      data-selected={onSelect ? String(Boolean(selected)) : undefined}
     >
-      <div className="flex h-72 items-center justify-center bg-backdrop">
+      <div className="relative flex h-72 items-center justify-center bg-backdrop">
+        {onSelect && (
+          // The whole picture is the target: easy to tick many in a row on a phone.
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={Boolean(selected)}
+            aria-label={`${photo.sessionShort} 사진 선택`}
+            onClick={() => onSelect(photo.id)}
+            className={`absolute inset-0 z-10 flex items-start justify-start p-3 ${
+              selected ? "ring-4 ring-inset ring-danger" : ""
+            }`}
+            data-testid="photo-select"
+          >
+            <span
+              aria-hidden
+              className={`flex size-10 items-center justify-center rounded-lg border-2 text-xl font-bold ${
+                selected
+                  ? "border-danger bg-danger text-button-text"
+                  : "border-ink/60 bg-paper/90 text-transparent"
+              }`}
+            >
+              ✓
+            </span>
+          </button>
+        )}
         {photo.deleted ? (
           <p className="text-base text-ink/75">이미지 삭제됨</p>
         ) : (

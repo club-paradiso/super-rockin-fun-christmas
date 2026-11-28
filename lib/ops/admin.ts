@@ -206,12 +206,19 @@ export async function pendingQueue(limit = 60, source?: PhotoSource): Promise<St
   return [...flagged, ...rest].slice(0, limit);
 }
 
-export const MODERATION_VIEWS = ["queue", "flagged", "ai-approved", "rejected", "hidden"] as const;
+export const MODERATION_VIEWS = [
+  "queue",
+  "wall",
+  "flagged",
+  "ai-approved",
+  "rejected",
+  "hidden",
+] as const;
 export type ModerationView = (typeof MODERATION_VIEWS)[number];
 
 /** The sections of the review page other than the queue (D95). Newest first, bounded. */
 export async function moderationSection(
-  view: Exclude<ModerationView, "queue">,
+  view: Exclude<ModerationView, "queue" | "wall">,
   limit = 60,
 ): Promise<StaffPhotoView[]> {
   switch (view) {
@@ -228,6 +235,52 @@ export async function moderationSection(
       return listStaffPhotos({ statuses: ["REJECTED"], limit });
     case "hidden":
       return listStaffPhotos({ statuses: ["HIDDEN"], limit });
+  }
+}
+
+/** One page of 「게시 중」 at a time: enough to look through, bounded for the iPad and the server. */
+export const WALL_PAGE_SIZE = 120;
+
+export interface WallPage {
+  photos: StaffPhotoView[];
+  /** Every photo the wall may show right now (approved by a person or by the AI, with consent). */
+  total: number;
+  /** Pass as `before` for the next (older) page; null on the last page. */
+  nextBefore: string | null;
+}
+
+/**
+ * 「게시 중」: every photo the venue wall may show right now, newest first, a page at a time
+ * (`before` = the createdAt of the last photo already seen). Only wall-eligible photos
+ * (`isWallEligible`); the one thing staff do here is take them down (hide), so a page offers
+ * nothing else in bulk.
+ */
+export async function wallSection(
+  opts: { before?: string; source?: PhotoSource; limit?: number } = {},
+): Promise<WallPage> {
+  const limit = Math.min(Math.max(opts.limit ?? WALL_PAGE_SIZE, 1), 200);
+  const before = opts.before && !Number.isNaN(Date.parse(opts.before)) ? opts.before : undefined;
+  const [rows, labels, total] = await Promise.all([
+    // One extra row says whether an older page exists.
+    getPhotoService().list({ statuses: ["APPROVED"], wallConsent: true, before, limit: limit + 1 }),
+    kioskLabelMap(),
+    countWallEligible(),
+  ]);
+  const more = rows.length > limit;
+  const page = rows.slice(0, limit);
+  const views = page
+    .filter((r) => isWallEligible(r))
+    .map((r) => toStaffPhotoView(r, labels))
+    .filter((v) => !opts.source || v.source === opts.source);
+  return { photos: views, total, nextBefore: more ? page[page.length - 1]!.createdAt : null };
+}
+
+/** Approved photos still on the wall; never throws (a count is not worth a broken page). */
+async function countWallEligible(): Promise<number> {
+  try {
+    return (await getPhotoService().stats()).byStatus.APPROVED;
+  } catch {
+    return 0;
   }
 }
 
