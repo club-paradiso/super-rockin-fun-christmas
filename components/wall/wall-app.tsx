@@ -732,6 +732,8 @@ export function WallApp({
                 <span className="wall-logo-mark" />
               </p>
               <p className="font-bold text-(--wall-cream)" style={{ fontSize: unit * 64 }}>
+                키오스크 점검중입니다.
+                <br />
                 잠시만 기다려주세요!
               </p>
             </div>
