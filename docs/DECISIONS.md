@@ -1972,6 +1972,33 @@ brass nail) and asked for it in code.
   the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
   the garland) / 3190 (the right post's wooden face).
 
+## D121 · A just-approved photo goes up at once: the debut (2026-11-28)
+
+User: "사람들이 미디어월로 송출하기를 선택하면, 사진이 문제 없이 승인될 경우에는 즉시 사진이
+미디어월에 올라가는걸 볼 수 있도록". The AI approves within seconds (D95), but the wall still
+waited for a slot to come free (one every few seconds, up to a whole turn) and, behind a backlog,
+for every older new photo.
+
+- **What a debut is.** Never shown (no exposure on the hub; on the public address and the cloud
+  fallback, never shown by that browser) and taken within `WALL_CONFIG.debutWindowMs` (30 min).
+  No approval time is stored (D54), so the capture time stands in; the AI approves seconds after
+  it. A late staff approval of an old photo is not a debut: 바로 띄우기 is there for that.
+- **Order.** After show-now, before other never-shown photos (`rotationOrder`). The feed lists
+  them as `debut` (`debutIds`).
+- **The wall makes room.** Like show-now, but gentler: a debut only pushes out a photo that has
+  been fully visible `debutYieldAfterMs` (5 s), never a show-now photo, never a debut on its first
+  turn; a debut keeps its whole turn. Show-now still comes first and pushes a debut only when
+  nothing else is on the wall.
+- **Image downloads survive a poll.** A wall image still in flight when the next feed arrives is
+  kept (it used to be dropped and fetched again 5 s later). A withdrawn photo is still never cached.
+- **Measured (virtual clock, `tests/unit/rotation.test.ts`):** a new photo with none waiting ahead
+  is up within 6 s of approval (13 s before); bound `P + 2 + 5 + 2 + 1 = 15 s` (F2). On a real
+  wall the image download adds to that. In Chromium against a local hub, a full four-slot wall
+  showed the new photo 5.9 s after approval (`e2e/wall-scene.spec.ts`); the venue PC and LED: not
+  measured.
+- **Unchanged:** the booth's wall status line (올라갔어요 on the server's APPROVED), consent,
+  moderation, F1 and F3–F6.
+
 ## D120 · The camera engine: the tablet's own tilt is turned back, people before geometry (2026-11-27)
 
 User: the 3D-printed housing holds the iPad mini 4 at an angle; photos lean and converge. The

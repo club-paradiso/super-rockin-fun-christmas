@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { WALL_CONFIG, type WallTimings } from "@/config/wall";
-import { ageWeight, feedSize, rotationOrder, type RotationExposure } from "@/lib/wall/rotation";
+import {
+  ageWeight,
+  debutIds,
+  feedSize,
+  rotationOrder,
+  type RotationExposure,
+} from "@/lib/wall/rotation";
 import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
 
 /**
@@ -50,6 +56,32 @@ describe("rotationOrder", () => {
     expect(
       rotationOrder({ eligible: photos, exposures, showNow: ["mid", "ghost", "new", "mid"] }),
     ).toEqual(["mid", "new", "old", "x"]);
+  });
+
+  it("debuts (never shown, taken within the window) go before older never-shown photos", () => {
+    const window = 10_000;
+    const exposures = new Map([["x", exp(1, 0)]]);
+    // At 11 s: "old" (0 s) has waited longer than the window; "mid" and "new" are debuts.
+    expect(
+      rotationOrder({
+        eligible: [...photos].reverse(),
+        exposures,
+        showNow: ["new"],
+        nowMs: Date.parse(iso(11_000)),
+        debutWindowMs: window,
+      }),
+    ).toEqual(["new", "mid", "old", "x"]);
+    expect(debutIds(photos, exposures, Date.parse(iso(11_000)), window)).toEqual(["mid", "new"]);
+    // Without an exposure log, the window alone decides.
+    expect(debutIds(photos, null, Date.parse(iso(11_000)), window)).toEqual(["mid", "new", "x"]);
+    // Off: the order is the one before debuts existed.
+    expect(debutIds(photos, null, Date.parse(iso(11_000)), 0)).toEqual([]);
+    expect(rotationOrder({ eligible: photos, exposures, showNow: [] })).toEqual([
+      "old",
+      "mid",
+      "new",
+      "x",
+    ]);
   });
 
   it("feed size keeps every slot busy between polls", () => {
@@ -269,6 +301,74 @@ describe("scheduler with fair ordering", () => {
     expect(onWall(s)).toEqual(["c", "b"]);
   });
 
+  it("debut: pushes out the longest-visible photo once it has been up long enough", () => {
+    let s = emptySchedule(2);
+    const base = {
+      ready: new Set(["a", "b", "c"]),
+      timings: { ...T, visibleMs: 20_000 },
+      ordering: "fair" as const,
+      debutYieldAfterMs: 3000,
+    };
+    for (let now = 0; now <= 2000; now += 1000)
+      s = stepSchedule(s, { ...base, now, eligible: ["a", "b"] });
+    expect(onWall(s)).toEqual(["a", "b"]); // a visible since 1 s, b since 2 s
+    const step = (now: number) =>
+      (s = stepSchedule(s, { ...base, now, eligible: ["c", "a", "b"], debut: new Set(["c"]) }));
+    step(3000);
+    expect(s.slots.map((x) => x.phase)).toEqual(["VISIBLE", "VISIBLE"]); // a up only 2 s
+    step(4000);
+    expect(s.slots[0]!.phase).toBe("EXIT"); // a: 3 s, the longest
+    expect(s.slots[1]!.phase).toBe("VISIBLE");
+    step(5000);
+    expect(onWall(s)).toEqual(["c", "b"]);
+    expect(s.slots[0]!.debut).toBe(true);
+    // A debut on its first turn is never pushed out by another debut, and stays its whole turn.
+    s = stepSchedule(s, {
+      ...base,
+      now: 9000,
+      eligible: ["d", "c", "b"],
+      ready: new Set(["b", "c", "d"]),
+      debut: new Set(["c", "d"]),
+    });
+    expect(s.slots[0]).toMatchObject({ photoId: "c", phase: "VISIBLE" });
+    expect(s.slots[1]!.phase).toBe("EXIT"); // b goes for d
+  });
+
+  it("debut: a photo this wall has already shown is not a debut again", () => {
+    let s = emptySchedule(1);
+    const base = { ready: new Set(["a", "b"]), timings: T, ordering: "fair" as const };
+    for (let now = 0; now <= 8000; now += 1000)
+      s = stepSchedule(s, { ...base, now, eligible: ["a", "b"], debut: new Set(["a"]) });
+    expect(s.lastShown.a).toBeDefined(); // a had its turn, b is up now
+    expect(onWall(s)).toEqual(["b"]);
+    for (let now = 9000; now <= 13_000; now += 1000)
+      s = stepSchedule(s, {
+        ...base,
+        now,
+        eligible: ["a", "b"],
+        debut: new Set(["a"]),
+        debutYieldAfterMs: 0,
+      });
+    expect(onWall(s)).toEqual(["b"]); // a is not pushed back in
+  });
+
+  it("show-now still gets in when every photo on the wall is a debut", () => {
+    let s = emptySchedule(1);
+    const base = { ready: new Set(["a", "z"]), timings: T, ordering: "fair" as const };
+    for (let now = 0; now <= 2000; now += 1000)
+      s = stepSchedule(s, { ...base, now, eligible: ["a"], debut: new Set(["a"]) });
+    expect(s.slots[0]).toMatchObject({ photoId: "a", phase: "VISIBLE", debut: true });
+    for (let now = 3000; now <= 5000; now += 1000)
+      s = stepSchedule(s, {
+        ...base,
+        now,
+        eligible: ["z", "a"],
+        debut: new Set(["a"]),
+        showNow: new Set(["z"]),
+      });
+    expect(onWall(s)).toEqual(["z"]);
+  });
+
   it("show-now ignores the cooldown and never pushes out another show-now photo", () => {
     let s = emptySchedule(1);
     const base = { ready: new Set(["a", "b"]), timings: T, ordering: "fair" as const };
@@ -332,6 +432,8 @@ function simulate(opts: {
   slots: number;
   durationMs: number;
   events?: SimEvent[];
+  /** false: the wall before debuts (2026-11-28), for comparison. */
+  debuts?: boolean;
 }): SimResult {
   const { pollMs, tickMs } = WALL_CONFIG;
   const timings: WallTimings = WALL_CONFIG;
@@ -365,7 +467,11 @@ function simulate(opts: {
   }
 
   let schedule = emptySchedule(opts.slots);
-  let feed: { ids: string[]; showNow: Set<string> } = { ids: [], showNow: new Set() };
+  let feed: { ids: string[]; showNow: Set<string>; debut: Set<string> } = {
+    ids: [],
+    showNow: new Set(),
+    debut: new Set(),
+  };
   let unreported: string[] = [];
   let prevOnWall: string[] = [];
   const hides: { id: string; at: number }[] = [];
@@ -390,10 +496,19 @@ function simulate(opts: {
       // GET /api/wall/feed?on=… (lib/wall/server.ts)
       const photos = [...eligible].map((id) => ({ id, createdAt: iso(created.get(id)!) }));
       const showNow = showNowQueue.map((r) => r.id).filter((id) => eligible.has(id));
-      const order = rotationOrder({ eligible: photos, exposures, showNow });
+      const debutWindowMs = opts.debuts === false ? 0 : WALL_CONFIG.debutWindowMs;
+      const order = rotationOrder({
+        eligible: photos,
+        exposures,
+        showNow,
+        nowMs: Date.parse(iso(now)),
+        debutWindowMs,
+      });
       const ids = order.slice(0, feedSize(opts.slots));
       for (const id of prevOnWall) if (eligible.has(id) && !ids.includes(id)) ids.push(id);
-      feed = { ids, showNow: new Set(showNow) };
+      const inFeed = photos.filter((p) => ids.includes(p.id));
+      const debut = debutIds(inFeed, exposures, Date.parse(iso(now)), debutWindowMs);
+      feed = { ids, showNow: new Set(showNow), debut: new Set(debut) };
       result.maxFeed = Math.max(result.maxFeed, ids.length);
       // POST /api/wall/shown (MemoryWallRepository.report)
       for (const id of unreported) {
@@ -413,6 +528,7 @@ function simulate(opts: {
       timings,
       ordering: "fair",
       showNow: feed.showNow,
+      debut: feed.debut,
     });
     const ids = schedule.slots.map((s) => s.photoId).filter((id): id is string => !!id);
     for (const slot of schedule.slots) {
@@ -579,6 +695,26 @@ describe("fairness simulation (real WALL_CONFIG timings)", { timeout: 180_000 },
       );
       if (waitingAhead <= slots) expect(delay).toBeLessThanOrEqual(30_000);
     }
+    // Debut (2026-11-28): with no other new photo waiting ahead, a new photo is up within one
+    // poll + its slot's photo finishing its entrance + `debutYieldAfterMs` + one exit + 1 s.
+    const alone = r.firstShowDelays.filter((d) => d.waitingAhead === 0).map((d) => d.delay);
+    const debutBound = P + 2000 + WALL_CONFIG.debutYieldAfterMs + 2000 + 1000;
+    expect(alone.length).toBeGreaterThan(100);
+    expect(Math.max(...alone)).toBeLessThanOrEqual(debutBound);
+    // The same evening on the wall before debuts, for the record: slower, never faster.
+    const before = simulate({ initial: 40, slots, durationMs: end, events, debuts: false });
+    const old = before.firstShowDelays.map((d) => d.delay).sort((a, b) => a - b);
+    const oldAlone = before.firstShowDelays.filter((d) => d.waitingAhead === 0);
+    report("busy evening 6h, debuts", {
+      aloneMaxS: Math.max(...alone) / 1000,
+      boundS: debutBound / 1000,
+      beforeAloneMaxS: Math.max(...oldAlone.map((d) => d.delay)) / 1000,
+      beforeP50S: old[Math.floor(old.length * 0.5)]! / 1000,
+      beforeP95S: old[Math.floor(old.length * 0.95)]! / 1000,
+    });
+    expect(firsts[Math.floor(firsts.length * 0.95)]!).toBeLessThanOrEqual(
+      old[Math.floor(old.length * 0.95)]!,
+    );
     // Plan target: 95% of first showings within 90 s.
     const sorted = r.firstShowDelays.map((d) => d.delay).sort((a, b) => a - b);
     expect(sorted[Math.floor(sorted.length * 0.95)]!).toBeLessThanOrEqual(90_000);
