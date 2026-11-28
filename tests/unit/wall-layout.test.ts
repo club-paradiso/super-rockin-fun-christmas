@@ -79,6 +79,10 @@ describe("wall watchdog", () => {
     expect(shouldReload(base)).toBe(false);
     expect(shouldReload({ ...base, lastFrameAt: 89_000 })).toBe(true);
     expect(shouldReload({ ...base, errored: true })).toBe(true);
+    // Inside another program's web view the host decides when the page draws: silence is not a
+    // stall there, but an error still reloads.
+    expect(shouldReload({ ...base, lastFrameAt: 89_000, watchFrames: false })).toBe(false);
+    expect(shouldReload({ ...base, errored: true, watchFrames: false })).toBe(true);
   });
   it("a hidden tab is not a stall; never reloads twice within a minute", () => {
     expect(shouldReload({ ...base, lastFrameAt: 0, visible: false })).toBe(false);

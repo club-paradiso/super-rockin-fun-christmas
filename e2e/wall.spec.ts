@@ -147,3 +147,85 @@ test("a window already as large as the screen (--kiosk, F11) never shows the but
   await page.mouse.move(300, 300);
   await expect(page.getByTestId("wall-fullscreen")).toHaveCount(0);
 });
+
+// Inside another program's web view (Millumin's browser media, docs/MILLUMIN.md): fullscreen is
+// that program's, so the wall offers no button and asks for nothing; the page takes the size it
+// is rendered at, whatever the shape, and the staff check says what the page was given.
+test.describe("embed", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  test("no 전체화면 button, no fullscreen request, and the wall fills each render size", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { __asked: number };
+      w.__asked = 0;
+      Object.defineProperty(Screen.prototype, "width", { configurable: true, get: () => 3840 });
+      Object.defineProperty(Screen.prototype, "height", { configurable: true, get: () => 2160 });
+      Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: true });
+      Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+        configurable: true,
+        value: () => {
+          w.__asked += 1;
+          return Promise.resolve();
+        },
+      });
+    });
+    await page.goto("/wall?embed=1");
+    const wall = page.getByTestId("wall");
+    await expect(wall).toHaveAttribute("data-wall-embed", "1");
+    await expect(page.getByTestId("wall-background")).toBeVisible();
+    await page.mouse.move(400, 300);
+    await page.mouse.move(600, 400);
+    await expect(page.getByTestId("wall-fullscreen")).toHaveCount(0);
+    await expect(wall).toHaveClass(/cursor-none/);
+    await wall.dblclick();
+    await page.keyboard.press("f");
+    expect(await page.evaluate(() => (window as unknown as { __asked: number }).__asked)).toBe(0);
+    await expect(page.getByTestId("wall-check")).toHaveCount(0);
+
+    // The render sizes a show program is likely to be set to: the stage is exactly that size.
+    for (const size of [
+      { width: 1920, height: 1080 },
+      { width: 1920, height: 540 },
+      { width: 1600, height: 667 },
+      { width: 1080, height: 1920 },
+    ]) {
+      await page.setViewportSize(size);
+      const box = page.getByTestId("wall-stage-box");
+      await expect
+        .poll(async () => {
+          const b = await box.boundingBox();
+          return (
+            b &&
+            `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}x${Math.round(b.height)}`
+          );
+        })
+        .toBe(`0,0,${size.width}x${size.height}`);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+    }
+  });
+
+  test("the staff check says what the page was given", async ({ page }) => {
+    await page.goto("/wall?embed=1&check=1&canvas=3840x1080");
+    const check = page.getByTestId("wall-check");
+    await expect(check).toContainText("1280 × 720");
+    await expect(check).toContainText("등록 안 됨");
+    await expect(check).toContainText("embed=1");
+    // A 16:9 render for a 32:9 LED is called out.
+    await expect(check.locator('[data-row="비율 경고"]')).toContainText("3840 × 1080");
+    await expect(check.locator('[data-row="화면 그리기"]')).toContainText("초당");
+    await page.goto("/wall?check=1");
+    await expect(page.getByTestId("wall-check").locator('[data-row="비율 경고"]')).toHaveCount(0);
+  });
+});
+
+test("a one-time code in the address is put in the box, never sent by itself", async ({ page }) => {
+  await page.goto("/kiosk/enroll?next=wall&code=K7QM-3XRP");
+  await expect(page.locator('input[name="code"]')).toHaveValue("K7QM-3XRP");
+  await expect(page).toHaveURL(/\/kiosk\/enroll/);
+  await page.goto("/kiosk/enroll?next=wall&code=%3Cscript%3E");
+  await expect(page.locator('input[name="code"]')).toHaveValue("");
+});

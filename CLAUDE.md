@@ -235,6 +235,17 @@ looks:measure`). `/looks` is the comparison
   the wall ever leaves fullscreen (no toggle): Escape, the browser's own, is the only way out. While
   the wall covers the screen (Fullscreen API, `--kiosk`, F11) nothing is drawn over it and the
   cursor is hidden. Keep `e2e/wall.spec.ts` 「전체화면」 green.
+- **Inside another program the wall asks for nothing** (2026-11-28, a user request: Millumin 4,
+  `docs/MILLUMIN.md`, `lib/wall/embed.ts`). `/wall?embed=1` is the wall in a show program's web
+  view: no 「전체화면」 button, no fullscreen request from a key or a double-click (fullscreen is the
+  host's), and a silent animation-frame clock is not a stall (`watchFrames` in `shouldReload`).
+  Asked for in the address only: never guess it from the window or the user agent. `?check=1` is
+  the staff check (`components/wall/wall-check.tsx`): sizes, counts and times over the wall, never
+  a photo id, never on by itself. The wall reloads itself only after the server answered
+  (`reloadPage`): never into a "cannot connect" page. It measures its size without waiting for an
+  animation frame. `/kiosk/enroll?code=` only fills the box; a person still presses the button.
+  Whether any of this works in Millumin is a person's check on that Mac, never claimed from a
+  Chromium run.
 - **The wall's pace is a staff setting** (D92): `showSeconds` and `halfLifeMinutes` live inside the
   audited `wallLook`, reach the wall as the feed's `pace`, and are changed with
   `{"wallPace"}` (saving a background keeps them). The half-life only changes how often a photo

@@ -14,17 +14,42 @@ import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
 import { Clip, WallScene } from "./wall-scene";
 import { WallFullscreenButton, useFullscreenButton } from "./fullscreen-button";
 import { enterWallFullscreen } from "@/lib/wall/fullscreen";
+import { WallCheck } from "./wall-check";
 
 const RELOAD_KEY = "ftl-wall-reloaded-at";
 
-/** Reload the page, remembering when, so the watchdog never loops faster than once a minute. */
-function reloadPage() {
+/**
+ * Reload the page, remembering when, so the watchdog never loops faster than once a minute.
+ * Only when the server answers: a reload while the hub cannot be reached leaves the browser's own
+ * "cannot connect" page, which nothing brings back (and inside a show program nobody sees why).
+ * False = not reloaded; the caller tries again later.
+ */
+let reloading = false;
+async function reloadPage(): Promise<boolean> {
+  if (reloading) return false;
+  reloading = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const res = await fetch(window.location.href, {
+      method: "HEAD",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) return false;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    reloading = false;
+  }
   try {
     sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
   } catch {
     // Storage unavailable: the reload still helps.
   }
   window.location.reload();
+  return true;
 }
 
 interface ScreenSize {
@@ -37,14 +62,21 @@ interface ScreenSize {
  * entering and leaving fullscreen, the window moving to another monitor, rotation, the iPad/phone
  * address bar (visual viewport). Measured
  * on the wall element itself, once per animation frame at most, and only set when it changed.
+ * A host that draws the page off screen may not run animation frames (lib/wall/embed.ts), so a
+ * short timer measures when the frame does not come, and a slow one catches a size change that
+ * sent no event at all: the wall must never keep the shape of a size it no longer has.
  * Null until mounted, so the server render and the first client render agree.
  */
 function useScreenSize(ref: React.RefObject<HTMLElement | null>): ScreenSize | null {
   const [size, setSize] = useState<ScreenSize | null>(null);
   useEffect(() => {
     let raf = 0;
+    let timer = 0;
     const read = () => {
+      if (raf) cancelAnimationFrame(raf);
+      if (timer) window.clearTimeout(timer);
       raf = 0;
+      timer = 0;
       const el = ref.current;
       const rect = el?.getBoundingClientRect();
       const width = Math.round(rect?.width || window.innerWidth);
@@ -54,9 +86,12 @@ function useScreenSize(ref: React.RefObject<HTMLElement | null>): ScreenSize | n
       );
     };
     const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(read);
+      if (raf || timer) return;
+      raf = requestAnimationFrame(read);
+      timer = window.setTimeout(read, 250);
     };
     read();
+    const slow = window.setInterval(schedule, 2_000);
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
     if (ref.current) observer?.observe(ref.current);
     window.addEventListener("resize", schedule);
@@ -65,6 +100,8 @@ function useScreenSize(ref: React.RefObject<HTMLElement | null>): ScreenSize | n
     window.visualViewport?.addEventListener("resize", schedule);
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      if (timer) window.clearTimeout(timer);
+      window.clearInterval(slow);
       observer?.disconnect();
       window.removeEventListener("resize", schedule);
       window.removeEventListener("orientationchange", schedule);
@@ -91,7 +128,13 @@ export function WallApp({
   canvas = null,
   lite = false,
   initialTheme = DEFAULT_WALL_THEME,
+  embed = false,
+  check = false,
 }: {
+  /** Inside another program's web view (?embed=1, lib/wall/embed.ts): no fullscreen, no frame watchdog. */
+  embed?: boolean;
+  /** Staff check (?check=1): numbers over the wall. */
+  check?: boolean;
   /** The LED's input size (WALL_CANVAS / ?canvas=); null = this screen. The scene is fitted into it. */
   canvas?: { width: number; height: number } | null;
   /** Low-spec mode: fades only, fewer photos. */
@@ -102,15 +145,17 @@ export function WallApp({
   const mainRef = useRef<HTMLElement>(null);
   const viewport = useScreenSize(mainRef);
   // 전체화면: the button, a double-click or F go in; only Escape (the browser's own) comes out.
-  const showFullscreenButton = useFullscreenButton();
+  // Inside another program fullscreen is that program's: no button, no key, no double-click.
+  const showFullscreenButton = useFullscreenButton(!embed);
   useEffect(() => {
+    if (embed) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey)
         enterWallFullscreen();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [embed]);
   const [feed, setFeed] = useState<WallFeed | null>(null);
   // Screen-adaptive fit (D110): the wall measures the screen it is on (or the LED's input size,
   // WALL_CANVAS / ?canvas=) and lib/wall/fit.ts picks the theme's cut (D91), the run of slots and
@@ -196,13 +241,19 @@ export function WallApp({
           lastReloadAt,
           stallMs: WALL_CONFIG.watchdog.stallMs,
           minReloadGapMs: WALL_CONFIG.watchdog.minReloadGapMs,
+          watchFrames: !embed,
         })
       )
-        reloadPage();
+        void reloadPage();
       errored = false;
     }, 2_000);
-    const daily = setTimeout(
-      reloadPage,
+    // The planned reload waits for the server: tried again every minute until it answers.
+    let daily = setTimeout(
+      function planned() {
+        void reloadPage().then((done) => {
+          if (!done) daily = setTimeout(planned, 60_000);
+        });
+      },
       msUntilDaily(new Date(), WALL_CONFIG.watchdog.dailyReloadAt),
     );
     return () => {
@@ -212,7 +263,7 @@ export function WallApp({
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onError);
     };
-  }, []);
+  }, [embed]);
 
   const fresh = lastOkAt !== null && now - lastOkAt <= WALL_CONFIG.offlineGraceMs;
   const eligible = useMemo(
@@ -493,9 +544,10 @@ export function WallApp({
       data-fit={plan?.key ?? ""}
       data-fit-scale={plan ? plan.scale.toFixed(4) : ""}
       data-fit-coverage={plan ? plan.coverage.toFixed(4) : ""}
+      data-wall-embed={embed ? "1" : undefined}
       style={{ background: theme.fallbackColor }}
       className={`wall-stage relative h-dvh w-full overflow-hidden ${showFullscreenButton ? "cursor-default" : "cursor-none"}`}
-      onDoubleClick={() => enterWallFullscreen()}
+      onDoubleClick={embed ? undefined : () => enterWallFullscreen()}
     >
       {viewport && stage && plan && (
         <div
@@ -700,6 +752,24 @@ export function WallApp({
         </p>
       )}
       {showFullscreenButton && <WallFullscreenButton />}
+      {check && viewport && (
+        <WallCheck
+          viewport={viewport}
+          canvas={canvas}
+          embed={embed}
+          fit={plan?.key ?? null}
+          audience={feed?.audience ?? null}
+          mode={feed?.mode ?? null}
+          online={online}
+          answeredSecondsAgo={
+            lastOkAt === null ? null : Math.max(0, Math.round((now - lastOkAt) / 1000))
+          }
+          eligible={eligible.length}
+          loaded={images.size}
+          hanging={schedule.slots.filter((s) => s.photoId).length}
+          now={now}
+        />
+      )}
     </main>
   );
 }
