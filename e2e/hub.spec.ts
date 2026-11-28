@@ -183,6 +183,17 @@ test("「게시 중」: every wall photo in one place, several taken down at onc
   );
   for (const id of ids) await expect.poll(() => status(id)).toBe("APPROVED");
   for (const card of cards) await expect(card).toBeVisible();
+
+  // Taking down everything on the page empties it, and the undo must still be there.
+  await staff.getByTestId("wall-select-all").click();
+  await staff.getByTestId("wall-hide-selected").click();
+  await staff.locator("dialog[open]").getByTestId("confirm-dialog-confirm").click();
+  await expect(staff.getByTestId("queue-empty")).toBeVisible();
+  await expect(staff.getByTestId("wall-undo")).toBeVisible();
+  for (const id of ids) await expect.poll(() => status(id)).toBe("HIDDEN");
+  await staff.getByTestId("wall-undo").click();
+  for (const id of ids) await expect.poll(() => status(id)).toBe("APPROVED");
+  for (const card of cards) await expect(card).toBeVisible();
 });
 
 async function holdCorner(page: Page, ms: number) {

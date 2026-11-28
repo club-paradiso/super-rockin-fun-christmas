@@ -210,4 +210,40 @@ describe("wallSection (「게시 중」)", () => {
     }
     expect(seen).toEqual(all.photos.map((p) => p.id));
   });
+
+  it("never skips photos taken in the same millisecond at a page boundary", async () => {
+    const { wallSection } = await import("@/lib/ops/admin");
+    // Five photos stored at one instant: every page boundary falls inside the tie.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(Date.now() - (Date.now() % 1000)));
+    const tied: string[] = [];
+    try {
+      for (let i = 0; i < 5; i++) tied.push(await onWall());
+    } finally {
+      vi.useRealTimers();
+    }
+    const all = await wallSection({ limit: 200 });
+    for (const limit of [1, 2, 3]) {
+      const seen: string[] = [];
+      let before: string | undefined;
+      for (let i = 0; i < 100; i++) {
+        const page = await wallSection({ before, limit });
+        seen.push(...page.photos.map((p) => p.id));
+        if (!page.nextBefore) break;
+        before = page.nextBefore;
+      }
+      expect(new Set(seen).size, `limit ${limit}`).toBe(seen.length);
+      expect([...seen].sort(), `limit ${limit}`).toEqual(all.photos.map((p) => p.id).sort());
+      for (const id of tied) expect(seen).toContain(id);
+    }
+  });
+
+  it("ignores a cursor it did not make", async () => {
+    const { wallSection } = await import("@/lib/ops/admin");
+    const all = await wallSection({ limit: 200 });
+    for (const before of ["2026-12-24T12:00:00.000Z", "x~y", "<script>", ""])
+      expect((await wallSection({ before, limit: 200 })).photos.map((p) => p.id)).toEqual(
+        all.photos.map((p) => p.id),
+      );
+  });
 });

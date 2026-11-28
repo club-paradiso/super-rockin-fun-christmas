@@ -17,7 +17,7 @@ interface BulkAnswer {
  * one go. Taking down is `hide` (can be undone); the last batch can be put back with one press.
  * Each card keeps its own buttons (숨기기, 지금 띄우기, 삭제) for one photo at a time.
  */
-export function WallBulk({ photos }: { photos: StaffPhotoView[] }) {
+export function WallBulk({ photos, empty }: { photos: StaffPhotoView[]; empty: string }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState(false);
@@ -118,11 +118,17 @@ export function WallBulk({ photos }: { photos: StaffPhotoView[] }) {
           )}
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="moderation-queue">
-        {photos.map((p) => (
-          <PhotoCard key={p.id} photo={p} selected={selected.has(p.id)} onSelect={toggle} />
-        ))}
-      </div>
+      {photos.length === 0 ? (
+        <p className="admin-card p-8 text-center text-base text-ink/75" data-testid="queue-empty">
+          {empty}
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="moderation-queue">
+          {photos.map((p) => (
+            <PhotoCard key={p.id} photo={p} selected={selected.has(p.id)} onSelect={toggle} />
+          ))}
+        </div>
+      )}
       <ConfirmDialog
         open={confirm}
         title={`사진 ${chosen.length}장을 미디어월에서 내릴까요?`}

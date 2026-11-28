@@ -250,29 +250,57 @@ export interface WallPage {
 }
 
 /**
- * 「게시 중」: every photo the venue wall may show right now, newest first, a page at a time
- * (`before` = the createdAt of the last photo already seen). Only wall-eligible photos
- * (`isWallEligible`); the one thing staff do here is take them down (hide), so a page offers
- * nothing else in bulk.
+ * 「게시 중」: every photo the venue wall may show right now, newest first, a page at a time.
+ * Only wall-eligible photos (`isWallEligible`); the one thing staff do here is take them down
+ * (hide), so a page offers nothing else in bulk.
+ *
+ * The cursor is `<ms>~<id>,<id>…`: the boundary photo's time in whole milliseconds plus the ids on
+ * this page taken in that same millisecond. The next page asks for everything up to and including
+ * that millisecond and leaves those ids out, so photos sharing a timestamp are never skipped
+ * (backends only know "strictly before", and Supabase keeps microseconds).
  */
 export async function wallSection(
   opts: { before?: string; source?: PhotoSource; limit?: number } = {},
 ): Promise<WallPage> {
   const limit = Math.min(Math.max(opts.limit ?? WALL_PAGE_SIZE, 1), 200);
-  const before = opts.before && !Number.isNaN(Date.parse(opts.before)) ? opts.before : undefined;
+  const cursor = parseWallCursor(opts.before);
   const [rows, labels, total] = await Promise.all([
-    // One extra row says whether an older page exists.
-    getPhotoService().list({ statuses: ["APPROVED"], wallConsent: true, before, limit: limit + 1 }),
+    // One extra row says whether an older page exists; the seen ids may come back and are dropped.
+    getPhotoService().list({
+      statuses: ["APPROVED"],
+      wallConsent: true,
+      before: cursor ? new Date(cursor.ms + 1).toISOString() : undefined,
+      limit: limit + 1 + (cursor?.seen.size ?? 0),
+    }),
     kioskLabelMap(),
     countWallEligible(),
   ]);
-  const more = rows.length > limit;
-  const page = rows.slice(0, limit);
+  const fresh = cursor ? rows.filter((r) => !cursor.seen.has(r.id)) : rows;
+  const more = fresh.length > limit;
+  const page = fresh.slice(0, limit);
   const views = page
     .filter((r) => isWallEligible(r))
     .map((r) => toStaffPhotoView(r, labels))
     .filter((v) => !opts.source || v.source === opts.source);
-  return { photos: views, total, nextBefore: more ? page[page.length - 1]!.createdAt : null };
+  return { photos: views, total, nextBefore: more ? wallCursor(page, cursor) : null };
+}
+
+function wallCursor(
+  page: { id: string; createdAt: string }[],
+  previous: { ms: number; seen: Set<string> } | null,
+): string {
+  const ms = Date.parse(page[page.length - 1]!.createdAt);
+  const tied = page.filter((r) => Date.parse(r.createdAt) === ms).map((r) => r.id);
+  // A millisecond that spans pages keeps the ids already left out before.
+  if (previous && previous.ms === ms) tied.push(...previous.seen);
+  return `${ms}~${[...new Set(tied)].join(",")}`;
+}
+
+function parseWallCursor(raw: string | undefined): { ms: number; seen: Set<string> } | null {
+  const m = raw ? /^(\d{1,15})~([0-9a-f,-]{0,8000})$/i.exec(raw) : null;
+  if (!m) return null;
+  const seen = new Set(m[2]!.split(",").filter((id) => /^[0-9a-f-]{36}$/i.test(id)));
+  return { ms: Number(m[1]), seen };
 }
 
 /** Approved photos still on the wall; never throws (a count is not worth a broken page). */

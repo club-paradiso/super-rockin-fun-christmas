@@ -148,12 +148,13 @@ export default async function ModerationPage({
           {nextBefore ? " · 아래 「더 오래된 사진 보기」로 나머지" : ""}
         </p>
       )}
-      {photos.length === 0 ? (
+      {view === "wall" ? (
+        // Stays mounted when the page empties, so the undo for the batch just taken down remains.
+        <WallBulk photos={photos} empty={meta.empty} />
+      ) : photos.length === 0 ? (
         <p className="admin-card p-8 text-center text-base text-ink/75" data-testid="queue-empty">
           {meta.empty}
         </p>
-      ) : view === "wall" ? (
-        <WallBulk photos={photos} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="moderation-queue">
           {photos.map((p) => (
