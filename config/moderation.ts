@@ -43,7 +43,7 @@ export const MODERATION_CONFIG = {
    * stops asking after `kioskStatusGiveUpMs`.
    */
   kioskStatusDelayedMs: 12_000,
-  kioskStatusPollMs: 2_500,
+  kioskStatusPollMs: 1_500,
   kioskStatusGiveUpMs: 90_000,
 } as const;
 

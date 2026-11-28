@@ -1,3 +1,5 @@
+import { getWallTheme } from "../config/wall-themes";
+import { planWallFit } from "../lib/wall/fit";
 import { expect, test } from "@playwright/test";
 import { enrollKiosk } from "./helpers";
 
@@ -222,22 +224,24 @@ test.describe("embed", () => {
   });
 });
 
-// /wall?photos=N: one screen is asked for more photos at once; the wall hangs every place the
-// picture has, smaller, and still nothing leaves the screen.
-test("photos=N hangs more places on a 16:9 screen than the automatic fit", async ({ page }) => {
+// 2026-11-28 ("가급적 많은 사진을 한번에"): a 16:9 screen hangs as many photos as the limits allow
+// (every place of the default picture); /wall?photos=N asks no fewer and nothing leaves the screen.
+test("a 16:9 screen hangs the most photos the fit allows; photos=N never fewer", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/wall");
   const scene = page.getByTestId("wall-scene");
-  await expect(scene).toHaveAttribute("data-slots", /\d/);
-  const auto = Number(await scene.getAttribute("data-slots"));
-  const autoScale = Number(await page.getByTestId("wall").getAttribute("data-fit-scale"));
+  await expect(scene).toHaveAttribute("data-theme", /.+/);
+  // Whichever picture staff left on: the plan for it, and the most places that picture has.
+  const theme = getWallTheme(await scene.getAttribute("data-theme"));
+  const places = planWallFit(theme, { width: 1920, height: 1080 })!.slotIndexes.length;
+  await expect(scene).toHaveAttribute("data-slots", String(places));
+  if (theme.id === "peace-wall") expect(places).toBe(theme.scene.slots.length);
   await page.goto("/wall?photos=9&check=1");
   await expect
     .poll(async () => Number(await page.getByTestId("wall-scene").getAttribute("data-slots")))
-    .toBeGreaterThan(auto);
-  expect(Number(await page.getByTestId("wall").getAttribute("data-fit-scale"))).toBeLessThan(
-    autoScale,
-  );
+    .toBeGreaterThanOrEqual(places);
   await expect(page.getByTestId("wall-check").locator('[data-row="사진 자리"]')).toContainText(
     "photos=9",
   );

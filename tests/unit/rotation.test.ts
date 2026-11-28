@@ -582,8 +582,9 @@ describe("fairness simulation (real WALL_CONFIG timings)", { timeout: 180_000 },
     expect([WALL_CONFIG.enterMs, WALL_CONFIG.visibleMs, WALL_CONFIG.exitMs]).toEqual([
       1500, 14_000, 1500,
     ]);
+    // 2 s since 2026-11-28 (체감속도); the criteria were set at 5 s and still hold.
     expect([WALL_CONFIG.pollMs, WALL_CONFIG.tickMs, WALL_CONFIG.cooldownMs]).toEqual([
-      5000, 1000, 60_000,
+      2000, 1000, 60_000,
     ]);
   });
 

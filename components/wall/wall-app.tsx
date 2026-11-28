@@ -6,9 +6,23 @@ import { DEFAULT_WALL_THEME, getWallTheme } from "@/config/wall-themes";
 import { fitTheme, wallPhotoShadow } from "@/lib/wall/themes";
 import { planWallFit } from "@/lib/wall/fit";
 import { framedPhotoFrame, MOBILE_FRAME_ID } from "@/config/mobile";
-import { PHONE_CARD, framedPhotoBox, phoneCardBox, wallLayout } from "@/lib/wall/layout";
+import {
+  PHONE_CARD,
+  framedPhotoBox,
+  isStripShape,
+  phoneCardBox,
+  stripPairBoxes,
+  wallLayout,
+  type Rect,
+} from "@/lib/wall/layout";
 import { ageWeight } from "@/lib/wall/rotation";
-import { emptySchedule, stepSchedule, type WallSchedule } from "@/lib/wall/scheduler";
+import {
+  emptySchedule,
+  photosOnWall,
+  slotPhotos,
+  stepSchedule,
+  type WallSchedule,
+} from "@/lib/wall/scheduler";
 import { wallScreenState, type WallFeed } from "@/lib/wall/states";
 import { msUntilDaily, shouldReload } from "@/lib/wall/watchdog";
 import { Clip, WallScene } from "./wall-scene";
@@ -294,6 +308,20 @@ export function WallApp({
     () => new Set(fresh && feed?.mode === "live" ? feed.showNow : []),
     [fresh, feed],
   );
+  // Tall strips may hang two to a slot (up to `maxPhotos`), never in low-spec mode.
+  const stripShape = theme.scene.strip;
+  const pairable = useMemo(() => {
+    if (lite || feed?.mode !== "live") return new Set<string>();
+    return new Set(
+      feed.photos
+        .filter((p) => {
+          if (p.frameId === MOBILE_FRAME_ID) return false;
+          const f = framedPhotoFrame(p.frameId);
+          return isStripShape({ width: f.outputWidth, height: f.outputHeight }, stripShape);
+        })
+        .map((p) => p.id),
+    );
+  }, [feed, lite, stripShape]);
   // Just approved, never shown: the wall makes room for them (lib/wall/scheduler.ts).
   const debut = useMemo(
     () => new Set(fresh && feed?.mode === "live" ? (feed.debut ?? []) : []),
@@ -304,10 +332,12 @@ export function WallApp({
   const onWallRef = useRef<string[]>([]);
   const unreported = useRef<string[]>([]);
   useEffect(() => {
-    const ids = schedule.slots.map((s) => s.photoId).filter((id): id is string => !!id);
+    const ids = photosOnWall(schedule);
     for (const slot of schedule.slots) {
-      if (slot.photoId && slot.phase === "ENTER" && !onWallRef.current.includes(slot.photoId))
-        unreported.current = [...unreported.current, slot.photoId].slice(-50);
+      if (slot.phase !== "ENTER") continue;
+      for (const id of slotPhotos(slot))
+        if (!onWallRef.current.includes(id))
+          unreported.current = [...unreported.current, id].slice(-50);
     }
     onWallRef.current = ids;
   }, [schedule]);
@@ -316,16 +346,20 @@ export function WallApp({
   useEffect(() => {
     let stopped = false;
     let inFlight = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A display asks every `pollMs`, the public audience every `publicPollMs` (it is told which
+    // it is by the answer; until then, the display pace).
+    let pace: number = WALL_CONFIG.pollMs;
+    const next = () => {
+      if (!stopped) timer = setTimeout(() => void poll().finally(next), pace);
+    };
     async function poll() {
       // Only one request may be active. A slow earlier poll must never overwrite
       // a newer PAUSE WALL or SHOW HOLDING SCREEN response.
       if (stopped || inFlight) return;
       inFlight = true;
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        Math.min(8_000, WALL_CONFIG.pollMs - 1_000),
-      );
+      const timeout = setTimeout(() => controller.abort(), WALL_CONFIG.pollTimeoutMs);
       try {
         const q = new URLSearchParams();
         if (onWallRef.current.length) q.set("on", onWallRef.current.join(","));
@@ -338,6 +372,7 @@ export function WallApp({
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as WallFeed;
         if (stopped) return;
+        pace = body.audience === "public" ? WALL_CONFIG.publicPollMs : WALL_CONFIG.pollMs;
         setFeed(body);
         setOnline(true);
         setLastOkAt(Date.now());
@@ -365,11 +400,10 @@ export function WallApp({
         // Retried after the next successful poll.
       }
     }
-    void poll();
-    const id = setInterval(poll, WALL_CONFIG.pollMs);
+    void poll().finally(next);
     return () => {
       stopped = true;
-      clearInterval(id);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -471,7 +505,14 @@ export function WallApp({
     () => new Map((feed?.photos ?? []).map((p) => [p.id, Date.parse(p.createdAt)])),
     [feed],
   );
-  const pace = { eligible, images, showNow, debut, ordering: feed?.ordering ?? "fair" } as const;
+  const pace = {
+    eligible,
+    images,
+    showNow,
+    debut,
+    pairable,
+    ordering: feed?.ordering ?? "fair",
+  } as const;
   const latest = useRef({ ...pace, visibleMs, halfLifeMs, taken });
   useEffect(() => {
     latest.current = { ...pace, visibleMs, halfLifeMs, taken };
@@ -490,6 +531,7 @@ export function WallApp({
           ordering: latest.current.ordering,
           showNow: latest.current.showNow,
           debut: latest.current.debut,
+          pairable: latest.current.pairable,
           sharesKey: latest.current.halfLifeMs,
           weights: latest.current.halfLifeMs
             ? new Map(
@@ -671,6 +713,57 @@ export function WallApp({
                   );
                 }
                 // A phone photo put in a booth frame (D93) hangs exactly like that booth frame.
+                const hung = (id: string, box: Rect, originX: number, src: string) => {
+                  const frame = framedPhotoFrame(photoFrames.get(id) ?? "");
+                  return (
+                    <figure
+                      key={`${i}-${id}`}
+                      data-testid="wall-photo"
+                      data-photo-id={id}
+                      data-phase={slot.phase}
+                      data-frame-id={frame.id}
+                      data-pair={slot.partner ? "" : undefined}
+                      className="absolute"
+                      style={{
+                        left: box.x,
+                        top: place.y,
+                        width: box.width,
+                        height: box.height + (box.y - place.y),
+                        transform: `rotate(${place.tilt}deg)`,
+                        // A pair turns as one, about the slot's clip.
+                        transformOrigin: `${originX - box.x}px 0`,
+                      }}
+                    >
+                      <div
+                        className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
+                        style={{ transformOrigin: `${originX - box.x}px 0` }}
+                      >
+                        <Clip theme={theme} slot={i} />
+                        {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt=""
+                          data-testid="wall-photo-image"
+                          className="h-full w-full object-contain object-top"
+                          style={{
+                            paddingTop: box.y - place.y,
+                            filter: wallPhotoShadow("filter"),
+                          }}
+                        />
+                      </div>
+                    </figure>
+                  );
+                };
+                const partnerUrl =
+                  slot.partner && allowed.has(slot.partner) ? images.get(slot.partner) : null;
+                if (slot.partner && partnerUrl) {
+                  const [a, b] = stripPairBoxes(place, theme.scene.strip, theme.wideMax);
+                  return [
+                    hung(slot.photoId, a, place.x, url),
+                    hung(slot.partner, b, place.x, partnerUrl),
+                  ];
+                }
                 const frame = framedPhotoFrame(photoFrames.get(slot.photoId) ?? "");
                 const box =
                   framedPhotoBox(
@@ -678,42 +771,7 @@ export function WallApp({
                     { width: frame.outputWidth, height: frame.outputHeight },
                     theme.wideMax,
                   ) ?? place.box;
-                return (
-                  <figure
-                    key={`${i}-${slot.photoId}`}
-                    data-testid="wall-photo"
-                    data-photo-id={slot.photoId}
-                    data-phase={slot.phase}
-                    data-frame-id={frame.id}
-                    className="absolute"
-                    style={{
-                      left: box.x,
-                      top: place.y,
-                      width: box.width,
-                      height: box.height + (box.y - place.y),
-                      transform: `rotate(${place.tilt}deg)`,
-                      transformOrigin: "50% 0",
-                    }}
-                  >
-                    <div
-                      className={`relative h-full w-full ${slot.phase === "EXIT" ? "wall-photo-exit" : "wall-photo-enter"}`}
-                    >
-                      <Clip theme={theme} slot={i} />
-                      {/* Object URL of bytes from our own server; next/image cannot optimise blob: URLs. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt=""
-                        data-testid="wall-photo-image"
-                        className="h-full w-full object-contain object-top"
-                        style={{
-                          paddingTop: box.y - place.y,
-                          filter: wallPhotoShadow("filter"),
-                        }}
-                      />
-                    </div>
-                  </figure>
-                );
+                return hung(slot.photoId, box, place.x, url);
               })}
             </WallScene>
           </div>
@@ -789,7 +847,7 @@ export function WallApp({
           }
           eligible={eligible.length}
           loaded={images.size}
-          hanging={schedule.slots.filter((s) => s.photoId).length}
+          hanging={photosOnWall(schedule).length}
           now={now}
         />
       )}

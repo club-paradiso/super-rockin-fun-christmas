@@ -363,8 +363,10 @@ test("a photo just approved goes up at once, even on a full wall (D121)", async 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/wall?canvas=1920x1080");
   const slots = Number(await page.getByTestId("wall-scene").getAttribute("data-slots"));
-  // A full wall, and no other new photo waiting ahead: the photo below is the only debut.
-  await expect(page.getByTestId("wall-photo")).toHaveCount(slots, { timeout: 30_000 });
+  // A full wall (every place busy; strips may hang two to a place), and no other new photo
+  // waiting ahead: the photo below is the only debut.
+  const places = page.getByTestId("wall-scene").locator('[data-testid="wall-photo"]');
+  await expect.poll(() => places.count(), { timeout: 30_000 }).toBeGreaterThanOrEqual(slots);
   await expect
     .poll(
       async () => {
@@ -395,10 +397,44 @@ test("a photo just approved goes up at once, even on a full wall (D121)", async 
   const approvedAt = Date.now();
   const id = await photoIdForSession(sessionId);
   // Every slot is busy, so it only gets on by pushing a photo out.
-  await expect(page.getByTestId("wall-photo")).toHaveCount(slots);
+  expect(await places.count()).toBeGreaterThanOrEqual(slots);
   await expect(page.locator(`[data-testid="wall-photo"][data-photo-id="${id}"]`)).toBeVisible({
     timeout: 15_000,
   });
   console.log(`approved → on the wall: ${Date.now() - approvedAt} ms (full wall, ${slots} slots)`);
+  await page.close();
+});
+
+test("tall strips hang two to a place, at most eight at once (2026-11-28)", async () => {
+  test.setTimeout(120_000);
+  const page = await wallCtx.newPage();
+  await page.setViewportSize({ width: 1920, height: 540 });
+  await page.goto("/wall?canvas=3840x1080");
+  const photos = page.getByTestId("wall-photo");
+  await expect
+    .poll(() => page.locator('[data-pair][data-phase="VISIBLE"]').count(), {
+      timeout: 60_000,
+    })
+    .toBeGreaterThanOrEqual(2);
+  const slots = Number(await page.getByTestId("wall-scene").getAttribute("data-slots"));
+  let most = 0;
+  for (let k = 0; k < 20; k++) {
+    const n = await photos.count();
+    most = Math.max(most, n);
+    expect(n).toBeLessThanOrEqual(8);
+    await page.waitForTimeout(500);
+  }
+  expect(most).toBeGreaterThan(slots);
+  // A pair: two strips side by side, apart, the same size, on screen.
+  const pair = page.locator('[data-pair][data-phase="VISIBLE"] [data-testid="wall-photo-image"]');
+  const boxes = (await pair.all()).slice(0, 2);
+  const [a, b] = await Promise.all(boxes.map(async (el) => (await el.boundingBox())!));
+  expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(2);
+  for (const r of [a!, b!]) {
+    expect(r.x).toBeGreaterThanOrEqual(-1);
+    expect(r.x + r.width).toBeLessThanOrEqual(1921);
+  }
+  if (process.env.PAIR_SHOT)
+    await page.screenshot({ path: process.env.PAIR_SHOT, type: "jpeg", quality: 85 });
   await page.close();
 });

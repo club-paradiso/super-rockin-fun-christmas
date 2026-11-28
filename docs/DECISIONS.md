@@ -1974,6 +1974,53 @@ brass nail) and asked for it in code.
   the left post) / 3430 (the right post under the garland), winter sea 518 (the left post under
   the garland) / 3190 (the right post's wooden face).
 
+## D124 · Tall strips hang two to a place, up to eight photos at once (2026-11-28)
+
+User: "세로로 길쭉한 템플릿은 맥시멈 8개까지 올릴 수 있도록 개선 필요함". Each place on the line
+is sized for the widest photo it may hold (a 2×2 or polaroid frame, `wideMax`, or the phone card),
+so a 1:3 strip used less than half of it, and the pictures have four or five places.
+
+- **Two strips to a place.** When the next photo in line is a strip, the next strip in line hangs
+  beside it (`partner` in `lib/wall/scheduler.ts`, picked by the same fair order). The pair enters,
+  swings about the place's clip and leaves as one; both count as shown and both rest.
+- **Inside the place.** `stripPairBoxes`: side by side with a gap of a tenth of a strip, together
+  never wider than the widest photo of that place and never taller than a strip (a strip is
+  narrowed only when the pair would not fit at full size), so the pair reaches no further than
+  any single photo there. Checked at every swing for every theme and cut
+  (`tests/unit/wall-pairs.test.ts`); the fit and theme tests are unchanged.
+- **At most eight.** A pair is taken only while the wall stays within `WALL_CONFIG.maxPhotos` (8)
+  and every other empty place can still get a photo: five places give three pairs and two
+  singles. A wall with more places than that still fills every place, one photo each.
+- **Safety unchanged.** A photo that may no longer be shown leaves on the next step; its partner
+  stays where it hangs. Fairness with every photo a strip (N=60, five places, 3 h): eight up at
+  once, counts within one, nothing back within the cooldown.
+- **Not in low-spec mode** (fewer images to decode on a weak PC). A photo that is not a strip
+  (polaroid, 2×2, phone card) always hangs alone.
+
+## D123 · Faster to the wall, and as many photos at once as the picture allows (2026-11-28)
+
+User: "체감속도 개선해주고, 가급적 많은 사진을 한번에 보일 수 있게 조정 부탁". After D121 the
+remaining wait after approval was the wall's own: a 5 s feed poll and a 5 s wait before a debut
+may push a photo out. The AI review already sends every shot at once and starts at the consent.
+
+- **Speed.** An enrolled display polls every 2 s (`WALL_CONFIG.pollMs`); the public audience
+  stays at 5 s (`publicPollMs`, told by the answer's `audience`). A feed request gives up after
+  4 s (`pollTimeoutMs`); polls are chained, never stacked. A debut may push out a photo fully
+  visible 3 s (`debutYieldAfterMs`, was 5 s). The booth's status line asks every 1.5 s
+  (`kioskStatusPollMs`, was 2.5 s), so "올라갔어요" comes sooner. Display feed limit 30 → 90 a
+  minute. Virtual clock, busy evening: approval → photo starting to go up, median 3 → 1 s,
+  95 % 6 → 3 s, worst with none ahead 6 → 4 s; 바로 띄우기 6 → 3 s; a hidden photo leaves within
+  1 s (was 4 s). The 1.5 s entrance comes on top.
+- **More photos.** `planWallFit` no longer stops at the best-scored plan: it hangs the most
+  photos whose size stays at least 70 % of that plan's (`morePhotosMinScale`) and whose picture
+  still covers half the screen, or as much as that plan does (`morePhotosMinCoverage`). The
+  2.4:1 board: 4 → 5 for the two five-place pictures (photos 3 % larger), 3 → 4 for festive
+  lights; 16:9 TVs: +1–2 photos at 74–82 % size, with blurred bands where the photos need the
+  room; the 32:9 LED: no change (every place already); portrait screens keep two large photos.
+  `/wall?photos=N` still asks for at least N. More places than a picture has would need new
+  places drawn into the pictures: not done.
+- **Unchanged:** the order (F1–F6 hold), the debut rules, consent, moderation, every theme rule.
+
 ## D121 · A just-approved photo goes up at once: the debut (2026-11-28)
 
 User: "사람들이 미디어월로 송출하기를 선택하면, 사진이 문제 없이 승인될 경우에는 즉시 사진이

@@ -16,6 +16,11 @@ import type { WallPhotoPhase } from "./states";
  * they too push out the longest-visible photo, but only one that has been fully visible for
  * `debutYieldAfterMs`, never a show-now photo and never another debut on its first turn. A debut
  * stays up for its whole turn.
+ *
+ * Tall strips (2026-11-28, a user request: "세로로 길쭉한 템플릿은 맥시멈 8개까지"): a strip is
+ * narrower than the widest photo a slot is sized for, so two strips may hang side by side in one
+ * slot (`partner`), as one hung pair that enters and leaves together, up to `maxPhotos` on the
+ * wall. Which photos are strips is the caller's (`pairable`); without it nothing pairs.
  */
 export interface WallSlot {
   photoId: string | null;
@@ -24,6 +29,19 @@ export interface WallSlot {
   since: number;
   /** This is the photo's first turn on this wall, taken as a debut: nothing pushes it out early. */
   debut?: boolean;
+  /** A second strip hanging beside `photoId` in the same slot, in the same phase. */
+  partner?: string;
+}
+
+/** Every photo a slot holds (none, one, or a pair of strips). */
+export function slotPhotos(slot: WallSlot): string[] {
+  if (!slot.photoId) return [];
+  return slot.partner ? [slot.photoId, slot.partner] : [slot.photoId];
+}
+
+/** Every photo on the wall, slot by slot, left photo first. */
+export function photosOnWall(state: Pick<WallSchedule, "slots">): string[] {
+  return state.slots.flatMap(slotPhotos);
 }
 
 export interface WallSchedule {
@@ -61,6 +79,13 @@ export interface StepInput {
   debut?: ReadonlySet<string>;
   /** A debut only pushes out a photo fully visible this long. Default `WALL_CONFIG`'s. */
   debutYieldAfterMs?: number;
+  /** Photos that may share a slot with another of them (tall strips). Absent = none pair. */
+  pairable?: ReadonlySet<string>;
+  /**
+   * Pairs are taken only while the wall stays within this many photos (a pair counts as two).
+   * Every slot still gets its own photo. Default `WALL_CONFIG.maxPhotos`.
+   */
+  maxPhotos?: number;
   /**
    * `newest` ordering only (D92): each photo's share of the wall (lib/wall/rotation.ts
    * `ageWeight`). A photo with half the share is picked half as often. Absent = all equal.
@@ -85,16 +110,22 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
     for (const [id, n] of Object.entries(state.turns ?? {})) if (allowed.has(id)) turns[id] = n;
 
   const empty = (): WallSlot => ({ photoId: null, phase: null, since: now });
-  const slots = state.slots.map((slot): WallSlot => {
-    if (!slot.photoId) return slot;
-    if (!allowed.has(slot.photoId)) return empty();
+  const slots = state.slots.map((given): WallSlot => {
+    if (!given.photoId) return given;
+    let slot = given;
+    // A photo that may no longer be shown leaves at once; its pair partner stays where it hangs.
+    if (slot.partner && !allowed.has(slot.partner)) slot = withoutPartner(slot);
+    if (!allowed.has(given.photoId)) {
+      if (!slot.partner) return empty();
+      slot = { ...withoutPartner(slot), photoId: slot.partner };
+    }
     const age = now - slot.since;
     if (slot.phase === "ENTER" && age >= timings.enterMs)
       return { ...slot, phase: "VISIBLE", since: now };
     if (slot.phase === "VISIBLE" && age >= timings.visibleMs)
       return { ...slot, phase: "EXIT", since: now };
     if (slot.phase === "EXIT" && age >= timings.exitMs) {
-      lastShown[slot.photoId] = now;
+      for (const id of slotPhotos(slot)) lastShown[id] = now;
       return empty();
     }
     return slot;
@@ -103,25 +134,54 @@ export function stepSchedule(state: WallSchedule, input: StepInput): WallSchedul
   makeRoom(slots, input, lastShown);
 
   const free = slots.findIndex((s) => !s.photoId);
+  const max = input.maxPhotos ?? WALL_CONFIG.maxPhotos;
+  const hanging = photosOnWall({ slots }).length;
   if (free >= 0) {
     const next = pickNext({ ...input, slots, lastShown, turns });
+    // A strip takes the next strip in line beside it, while the wall has room for one more and
+    // every other empty slot can still get a photo of its own.
+    const otherEmpty = slots.filter((s, i) => !s.photoId && i !== free).length;
+    const pairs = input.pairable;
+    const partner =
+      next && pairs?.has(next) && hanging + 2 + otherEmpty <= max
+        ? pickNext({
+            ...input,
+            slots: [...slots, { photoId: next, phase: "ENTER", since: now }],
+            lastShown,
+            turns,
+            only: pairs,
+          })
+        : null;
     if (next) {
-      const debut = !input.showNow?.has(next) && isDebut(next, input, lastShown);
-      slots[free] = debut
-        ? { photoId: next, phase: "ENTER", since: now, debut: true }
-        : { photoId: next, phase: "ENTER", since: now };
+      const debut = [next, partner].some(
+        (id) => !!id && !input.showNow?.has(id) && isDebut(id, input, lastShown),
+      );
+      slots[free] = {
+        photoId: next,
+        phase: "ENTER",
+        since: now,
+        ...(debut ? { debut: true } : {}),
+        ...(partner ? { partner } : {}),
+      };
     }
-    if (next && input.weights) {
+    for (const id of [next, partner]) {
+      if (!id || !input.weights) continue;
       // A photo new to the count starts level with the least-shown one, not at zero: it must
       // not get a burst of turns to "catch up" with photos that were here all along.
       const floor = Math.min(...Object.values(turns), Infinity);
-      const start = Math.max(turns[next] ?? 0, Number.isFinite(floor) ? floor : 0);
-      turns[next] = start + 1 / Math.max(input.weights.get(next) ?? 1, 1e-12);
+      const start = Math.max(turns[id] ?? 0, Number.isFinite(floor) ? floor : 0);
+      turns[id] = start + 1 / Math.max(input.weights.get(id) ?? 1, 1e-12);
     }
   }
   return input.weights
     ? { slots, lastShown, turns, sharesKey: input.sharesKey }
     : { slots, lastShown };
+}
+
+function withoutPartner(slot: WallSlot): WallSlot {
+  const { partner: _gone, ...rest } = slot;
+  void _gone;
+  return rest;
 }
 
 /** A debut this wall has not shown yet (it may be on screen right now, taking that turn). */
@@ -139,7 +199,7 @@ function isDebut(id: string, input: StepInput, lastShown: Record<string, number>
 function makeRoom(slots: WallSlot[], input: StepInput, lastShown: Record<string, number>) {
   const { now, ready, showNow = new Set() } = input;
   if (!showNow.size && !input.debut?.size) return;
-  const onWall = new Set(slots.map((s) => s.photoId));
+  const onWall = new Set(slots.flatMap(slotPhotos));
   const waiting = input.eligible.filter((id) => ready.has(id) && !onWall.has(id));
   const urgent = waiting.filter((id) => showNow.has(id)).length;
   const debuts = waiting.filter((id) => !showNow.has(id) && isDebut(id, input, lastShown)).length;
@@ -149,7 +209,7 @@ function makeRoom(slots: WallSlot[], input: StepInput, lastShown: Record<string,
   const longest = (ok: (s: WallSlot) => boolean) => {
     let victim = -1;
     slots.forEach((s, i) => {
-      if (s.phase !== "VISIBLE" || showNow.has(s.photoId!) || !ok(s)) return;
+      if (s.phase !== "VISIBLE" || slotPhotos(s).some((id) => showNow.has(id)) || !ok(s)) return;
       if (victim < 0 || s.since < slots[victim]!.since) victim = i;
     });
     return victim;
@@ -167,11 +227,15 @@ function pickNext(
     slots: WallSlot[];
     lastShown: Record<string, number>;
     turns: Record<string, number>;
+    /** Only these may be picked (a strip's partner). */
+    only?: ReadonlySet<string>;
   },
 ) {
   const { now, eligible, ready, timings, slots, lastShown, turns, showNow = new Set() } = input;
-  const onWall = new Set(slots.map((s) => s.photoId));
-  const candidates = eligible.filter((id) => ready.has(id) && !onWall.has(id));
+  const onWall = new Set(slots.flatMap(slotPhotos));
+  const candidates = eligible.filter(
+    (id) => ready.has(id) && !onWall.has(id) && (!input.only || input.only.has(id)),
+  );
   const resting = (id: string) =>
     lastShown[id] !== undefined && now - lastShown[id]! < timings.cooldownMs;
 
@@ -207,7 +271,7 @@ export function photoPhase(
   now: number,
   timings: WallTimings,
 ): WallPhotoPhase | null {
-  const slot = state.slots.find((s) => s.photoId === photoId);
+  const slot = state.slots.find((s) => slotPhotos(s).includes(photoId));
   if (slot?.phase) return slot.phase;
   const at = state.lastShown[photoId];
   return at !== undefined && now - at < timings.cooldownMs ? "COOLDOWN" : null;
