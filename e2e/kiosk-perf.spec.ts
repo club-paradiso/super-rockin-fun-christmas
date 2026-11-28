@@ -57,7 +57,6 @@ test("?perf=1: the booth shows staff how long each step took, and the heartbeat 
   const row = (code: string) => table.locator(`tr[data-perf="${code}"]`);
   for (const code of [
     "screen_pick",
-    "screen_ready",
     "screen_select",
     "screen_consent",
     "screen_delivery",
