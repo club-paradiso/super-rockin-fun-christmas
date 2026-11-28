@@ -1,26 +1,34 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ANDROID_SAVED_HINT, longPressHint, prefersShareToSave } from "@/lib/guest/save-env";
+import { useSaveEnv } from "./use-save-env";
 
 const noSubscribe = () => () => {};
 
 /**
  * One big "save" action that does the best thing the phone allows:
- *  - Web Share with files (iOS Safari, Android Chrome): opens the share sheet, where iPhone shows
- *    "이미지 저장" (save to Photos). JavaScript cannot save to the Photos library by itself.
- *  - Otherwise a normal file download (Android saves to Downloads/Gallery; iOS to Files).
- * The image itself also supports long-press → "사진 앱에 저장" on iPhone.
+ *  - iPhone: Web Share with files opens the share sheet, where iPhone shows "이미지 저장"
+ *    (save to Photos). JavaScript cannot save to the Photos library by itself.
+ *  - Android (Galaxy included): a plain download, which lands in the gallery's Download album.
+ *    Its share sheet has no "save" entry, so it is never the main action there.
+ *  - Elsewhere: share where it is offered, a download otherwise.
+ * Long-press on the image also saves (wording per phone: `longPressHint`).
  */
 export function SavePhoto({ imageUrl, mime }: { imageUrl: string; mime: string }) {
-  const shareApi = useSyncExternalStore(
+  const env = useSaveEnv();
+  const shareSupported = useSyncExternalStore(
     noSubscribe,
     () => typeof navigator.canShare === "function" && typeof navigator.share === "function",
     () => false,
   );
+  const shareApi = shareSupported && prefersShareToSave(env);
+  const android = env.os === "android";
   // Fetch ahead of time: Safari only allows share() right after the tap, so the file must be
   // ready before the guest presses the button.
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
     if (!shareApi) return;
@@ -42,7 +50,10 @@ export function SavePhoto({ imageUrl, mime }: { imageUrl: string; mime: string }
   const downloadHref = `${imageUrl}?download=1`;
 
   async function save(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (!file) return; // fall through to the plain download link
+    if (!file) {
+      setDownloaded(true); // the plain download link goes on by itself
+      return;
+    }
     event.preventDefault();
     try {
       await navigator.share({ files: [file] });
@@ -70,12 +81,21 @@ export function SavePhoto({ imageUrl, mime }: { imageUrl: string; mime: string }
         </p>
       )}
       {notice && <p className="text-center text-sm text-ink">{notice}</p>}
-      <a href={downloadHref} download className="btn-quiet" data-testid="file-download">
-        파일로 받기
-      </a>
-      <p className="text-center text-sm text-ink/75">
-        사진을 길게 눌러 ‘사진 앱에 저장’도 할 수 있어요.
-      </p>
+      {android && downloaded && (
+        <p
+          className="text-center text-sm text-ink [word-break:keep-all]"
+          role="status"
+          data-testid="android-saved-hint"
+        >
+          {ANDROID_SAVED_HINT}
+        </p>
+      )}
+      {!android && (
+        <a href={downloadHref} download className="btn-quiet" data-testid="file-download">
+          파일로 받기
+        </a>
+      )}
+      <p className="text-center text-sm text-ink/75 [word-break:keep-all]">{longPressHint(env)}</p>
     </div>
   );
 }

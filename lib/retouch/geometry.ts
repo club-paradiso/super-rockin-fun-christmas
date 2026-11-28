@@ -1,4 +1,5 @@
-import type { DetectedFace, FaceGeometry, Point, Rect } from "./types";
+import { RETOUCH_CONFIG, type RetouchConfig } from "@/config/retouch";
+import type { DetectedFace, FaceFrame, FaceGeometry, LightSpot, Point, Rect } from "./types";
 
 /**
  * A detected face as polygons. Two sources:
@@ -30,6 +31,11 @@ export const MESH = {
   noseBase: 2,
   rightNoseWing: 98,
   leftNoseWing: 327,
+  betweenEyes: 168,
+  noseTip: 4,
+  foreheadTop: 10,
+  lowerLip: 17,
+  chinTip: 152,
 } as const;
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -77,11 +83,78 @@ function underEye(eyeCenter: Point, eyeWidth: number, across: Point, down: Point
   return ellipse(center, eyeWidth * 0.62, eyeWidth * 0.27, across);
 }
 
+/**
+ * 윤곽 조명: where the highlights of one face sit, from a few of its own points. The same
+ * arithmetic for the mesh and for the six-point model (which estimates the points it lacks).
+ */
+function lightSpots(
+  frame: FaceFrame,
+  iod: number,
+  eyes: readonly [Point, Point],
+  at: { betweenEyes: Point; noseTip: Point; foreheadTop: Point; lowerLip: Point; chinTip: Point },
+  config: RetouchConfig,
+): LightSpot[] {
+  const { forehead, bridge, cheekbone, chin } = config.contour;
+  const { across, down } = frame;
+  const along = (a: Point, b: Point, t: number): Point => ({
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  });
+  const spots: LightSpot[] = [
+    {
+      centre: along(at.betweenEyes, at.foreheadTop, forehead.up),
+      rx: iod * forehead.rx,
+      ry: iod * forehead.ry,
+      axis: across,
+      weight: forehead.weight,
+    },
+  ];
+  // The bridge lies along the nose itself, so it turns with the head.
+  const length = dist(at.betweenEyes, at.noseTip);
+  if (length > 0) {
+    const dir = {
+      x: (at.noseTip.x - at.betweenEyes.x) / length,
+      y: (at.noseTip.y - at.betweenEyes.y) / length,
+    };
+    spots.push({
+      centre: along(at.betweenEyes, at.noseTip, (bridge.from + bridge.to) / 2),
+      rx: iod * bridge.rx,
+      ry: (length * (bridge.to - bridge.from)) / 2,
+      // `ellipse` puts `ry` along (-axis.y, axis.x): that is `dir`.
+      axis: { x: dir.y, y: -dir.x },
+      weight: bridge.weight,
+    });
+  }
+  eyes.forEach((eye, i) => {
+    const out = i === 0 ? -1 : 1;
+    spots.push({
+      centre: {
+        x: eye.x + (down.x * cheekbone.down + across.x * out * cheekbone.out) * iod,
+        y: eye.y + (down.y * cheekbone.down + across.y * out * cheekbone.out) * iod,
+      },
+      rx: iod * cheekbone.rx,
+      ry: iod * cheekbone.ry,
+      axis: across,
+      weight: cheekbone.weight,
+    });
+  });
+  spots.push({
+    centre: along(at.lowerLip, at.chinTip, 0.5),
+    rx: iod * chin.rx,
+    ry: iod * chin.ry,
+    axis: across,
+    weight: chin.weight,
+  });
+  return spots.filter(
+    (spot) => finite([spot.centre, spot.axis]) && spot.rx > 0 && spot.ry > 0 && spot.weight > 0,
+  );
+}
+
 function finite(points: readonly Point[]): boolean {
   return points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
 }
 
-function fromMesh(lm: readonly Point[]): FaceGeometry | null {
+function fromMesh(lm: readonly Point[], config: RetouchConfig): FaceGeometry | null {
   const pick = (indices: readonly number[]) => indices.map((i) => lm[i]!);
   const outline = pick(MESH.outline);
   const rightEye = pick(MESH.rightEye);
@@ -119,10 +192,25 @@ function fromMesh(lm: readonly Point[]): FaceGeometry | null {
 
   const rWidth = dist(lm[MESH.rightEyeOuter]!, lm[MESH.rightEyeInner]!);
   const lWidth = dist(lm[MESH.leftEyeInner]!, lm[MESH.leftEyeOuter]!);
+  const frame: FaceFrame = { centre: eyesMid, across, down };
   return {
     outline,
     features,
     underEyes: [underEye(rCenter, rWidth, across, down), underEye(lCenter, lWidth, across, down)],
+    frame,
+    highlights: lightSpots(
+      frame,
+      iod,
+      [rCenter, lCenter],
+      {
+        betweenEyes: lm[MESH.betweenEyes]!,
+        noseTip: lm[MESH.noseTip]!,
+        foreheadTop: lm[MESH.foreheadTop]!,
+        lowerLip: lm[MESH.lowerLip]!,
+        chinTip: lm[MESH.chinTip]!,
+      },
+      config,
+    ),
     width,
     box: boundsOf(outline),
   };
@@ -133,7 +221,7 @@ function fromMesh(lm: readonly Point[]): FaceGeometry | null {
  * distance between the eyes (IOD): face width ≈ 2.2 IOD, forehead to chin ≈ 3.1 IOD. The skin
  * colour model trims whatever of the ellipse lands on hair or background.
  */
-function fromKeypoints(kp: readonly Point[]): FaceGeometry | null {
+function fromKeypoints(kp: readonly Point[], config: RetouchConfig): FaceGeometry | null {
   const [rEye, lEye, nose, mouth] = kp;
   if (!rEye || !lEye || !nose || !mouth || !finite([rEye, lEye, nose, mouth])) return null;
   const iod = dist(rEye, lEye);
@@ -160,18 +248,37 @@ function fromKeypoints(kp: readonly Point[]): FaceGeometry | null {
     ellipse(at(nose, 0.15, 0.17), iod * 0.09, iod * 0.06, across, 12),
   ];
   const eyeWidth = iod * 0.46;
+  const frame: FaceFrame = { centre: eyesMid, across, down };
   return {
     outline,
     features,
     underEyes: [underEye(rEye, eyeWidth, across, down), underEye(lEye, eyeWidth, across, down)],
+    frame,
+    highlights: lightSpots(
+      frame,
+      iod,
+      [rEye, lEye],
+      {
+        betweenEyes: eyesMid,
+        noseTip: nose,
+        // The top and the tip of the outline ellipse above; the lower edge of the mouth ellipse.
+        foreheadTop: at(eyesMid, 0, -1.1),
+        lowerLip: at(mouth, 0, 0.22),
+        chinTip: at(eyesMid, 0, 2),
+      },
+      config,
+    ),
     width,
     box: boundsOf(outline),
   };
 }
 
 /** Null when the points are unusable (too few, not finite, zero size). */
-export function faceGeometry(face: DetectedFace): FaceGeometry | null {
-  if (face.landmarks && face.landmarks.length >= 468) return fromMesh(face.landmarks);
-  if (face.keypoints && face.keypoints.length >= 4) return fromKeypoints(face.keypoints);
+export function faceGeometry(
+  face: DetectedFace,
+  config: RetouchConfig = RETOUCH_CONFIG,
+): FaceGeometry | null {
+  if (face.landmarks && face.landmarks.length >= 468) return fromMesh(face.landmarks, config);
+  if (face.keypoints && face.keypoints.length >= 4) return fromKeypoints(face.keypoints, config);
   return null;
 }

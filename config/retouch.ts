@@ -6,7 +6,25 @@
  * detail bands by size. The finest band (pores, fine lines, hair, lashes, camera grain) is left
  * as it is; the middle bands (blotches, uneven tone, shallow shadows) are partly taken out; edges
  * and anything with strong contrast (deep wrinkles, moles, stubble, spectacle rims) are kept.
- * There is no face reshaping anywhere in this feature.
+ *
+ * The measure of all of it (2026-11-28, the user's words: "본인 그대로의 고유의 매력을 살리고 과도한
+ * 보정은 지양", after the portrait studio 시현하다): the person in the print is the person who
+ * stood in the booth. Blemishes and skin trouble go, the tone is evened, and that is the skin
+ * work; moles, freckles, lines and the skin's own grain stay.
+ *
+ * 윤곽 다듬기 (2026-11-28, a user decision that lifted "never reshape a face": "얼굴 갸름하게, 크기
+ * 조정 이런 부분도 규칙을 풀어서 추가해줘. 너무 과하면 안돼"): the cheek and jaw line is drawn in by a
+ * small, fixed share of the face's own width (`slim`, `size`). Three things keep it the same
+ * person: only the outline band moves, so eyes, brows, nose and lips keep every pixel; every face
+ * gets the same share, so nothing is pulled toward an ideal shape; and the shares are capped here
+ * (`WARP_LIMITS`), not left to a slider.
+ *
+ * 윤곽 조명 (contour light, 2026-11-28, a user request: "얼굴 윤곽 등 얼굴 보정 효과도 좀 드러날 수
+ * 있게"): the face's shape is brought out the way a photographer does it, with light. A soft shade
+ * along the cheek and jaw edges and the temples, a soft highlight on the forehead, the bridge of
+ * the nose, the top of each cheekbone and the chin. Both are gains on the skin's own smoothed
+ * colour: no pixel moves, no outline changes, the texture is not amplified, and on balance the
+ * face is never brighter for it (the highlights never outweigh the shade).
  */
 
 export type RetouchLevelId = "off" | "natural" | "glow";
@@ -50,7 +68,41 @@ export interface RetouchLevel {
    * rolled off to nothing in highlights so light skin does not clip.
    */
   lift: number;
+  /**
+   * 윤곽 조명, the shade: skin along the cheek and jaw edges and the temples is at most this
+   * share darker (a gain, so it keeps its colour). 0 = none.
+   */
+  contourShade: number;
+  /**
+   * 윤곽 조명, the highlight: forehead, nose bridge, cheekbone tops and chin are at most this
+   * share brighter (a gain, rolled off in highlights like `lift`). Never above `contourShade`:
+   * the light a contour adds is taken from its own shade, so it is not a whitening.
+   */
+  contourLight: number;
+  /**
+   * 트러블: a small spot that is redder than the skin around it (a pimple, a patch of irritation)
+   * has this share of it taken out, where the bands alone would leave most of it. Moles and
+   * freckles are darker, not redder: they are not touched by this.
+   */
+  trouble: number;
+  /**
+   * 윤곽 다듬기, 갸름하게: the cheek and jaw line moves toward the face's centre line by this
+   * share of the face's width, on each side. At most `WARP_LIMITS.slim`.
+   */
+  slim: number;
+  /**
+   * 윤곽 다듬기, 작게: the cheek, jaw and chin line moves toward the middle of the face by this
+   * share of the face's width. At most `WARP_LIMITS.size`.
+   */
+  size: number;
 }
+
+/**
+ * The most the outline may ever move, as shares of the face's width. Not tuning values: the
+ * line between "the same person, a little tidier" and another face. A level or a lab slider
+ * above them is refused (`retouchLevelProblems`) and clamped (`scaledLevel`).
+ */
+export const WARP_LIMITS = { slim: 0.025, size: 0.015 } as const;
 
 /**
  * The two levels, chosen 2026-11-24 from side-by-side sheets of the fifteen samples (three
@@ -68,25 +120,54 @@ export interface RetouchLevel {
  * their shape. The lift stays at 0.035: at 0.045 and 0.05 the two hard-lit samples (older-woman,
  * glasses-man) gained clipped highlights beyond the limit of e2e/retouch.spec.ts (the roll-off
  * looks at luma, and on skin the red channel clips first).
+ *
+ * 2026-11-28, the user's measure ("과하게 하면 절대 안돼. 자연스러운 잡티 제거 및 피부 트러블 제거랑
+ * 얼굴 톤 다듬는 정도 … 과한 포토샵 느낌은 지양"): both levels were pulled back where they smoothed
+ * a face's own shape. On the sheets 뽀샤시 had all but removed a smile line: the two widest
+ * bands carry those, so they came down (자연스럽게 0.7 / 0.2 → 0.5 / 0.12, 뽀샤시 0.75 / 0.25 →
+ * 0.6 / 0.16), 뽀샤시's share of the finest band went from 0.1 to 0.04 and its `keepAbove` back
+ * to nearly 자연스럽게's. What a guest should see go is trouble, and that has its own share
+ * now (`trouble`), measured against the skin around the spot instead of by blurring harder.
+ *
+ * 윤곽 조명: the amount that shows next to the original and not on its own. It was 0.08 / 0.14
+ * for a day, as the only thing that brought the face's shape out; with the outline itself drawn
+ * in a little (below) it does not have to carry that, and came down.
+ *
+ * 윤곽 다듬기: 자연스럽게 moves the jaw line by at most 1.6 % of the face width a side (slim +
+ * size), 뽀샤시 by at most 2.8 %: on the sheets the first is found only by flicking between the
+ * two pictures, the second is seen side by side and not without the original.
+ *
+ * All chosen from side-by-side sheets of the same fifteen samples (desktop Chromium, 960 × 720)
+ * and still to be confirmed by a person on the lab page and on the iPad mini 4.
  */
 export const RETOUCH_LEVELS: Record<Exclude<RetouchLevelId, "off">, RetouchLevel> = {
   natural: {
     strength: 1,
     fine: 0,
-    bands: [0.42, 0.75, 0.7, 0.2],
+    bands: [0.42, 0.7, 0.5, 0.12],
     keepAbove: [0.03, 0.045, 0.06, 0.08],
     underEye: 0.3,
     redness: 0.25,
     lift: 0,
+    contourShade: 0.05,
+    contourLight: 0.035,
+    trouble: 0.8,
+    slim: 0.01,
+    size: 0.006,
   },
   glow: {
     strength: 1,
-    fine: 0.1,
-    bands: [0.6, 0.85, 0.75, 0.25],
-    keepAbove: [0.04, 0.055, 0.07, 0.09],
+    fine: 0.04,
+    bands: [0.5, 0.78, 0.6, 0.16],
+    keepAbove: [0.032, 0.048, 0.062, 0.08],
     underEye: 0.4,
     redness: 0.35,
     lift: 0.035,
+    contourShade: 0.08,
+    contourLight: 0.055,
+    trouble: 0.9,
+    slim: 0.018,
+    size: 0.01,
   },
 };
 
@@ -194,6 +275,82 @@ export const RETOUCH_CONFIG = {
     liftRollOff: [0.6, 0.95] as const,
   },
 
+  /**
+   * 윤곽 조명: where the shade and the highlights sit. Lengths are shares of the face width
+   * (cheek to cheek) unless they say IOD (the distance between the eyes). The spots follow the
+   * face's own points, so they turn and tilt with the head.
+   */
+  contour: {
+    /** The shade reaches this far in from the face outline before it has faded to nothing. */
+    shadeReach: 0.24,
+    /**
+     * Sideways, from the face's centre line (0) to its edge (1): no shade nearer the centre line
+     * than the first number, full shade from the second. Keeps it off the chin and the forehead.
+     */
+    shadeSide: [0.3, 0.72] as const,
+    /** The temples (above the eyes) get this share of what the cheeks and jaw get. */
+    templeShare: 0.5,
+    /**
+     * The highlight fades out between these values of the skin's brightest channel (on skin
+     * that is red, and red is the channel that clips first: measured 2026-11-28 on the two
+     * hard-lit samples, a roll-off on luma added clipped pixels beyond the limit of
+     * e2e/retouch.spec.ts). Skin that is already lit gets no more light.
+     */
+    lightRollOff: [0.75, 0.95] as const,
+    /** Softening of a highlight spot, at most (a narrow spot is softened by its own width). */
+    spotFeather: 0.085,
+    /** Forehead: between the eyes and the hairline, this far up; half sizes in IOD. */
+    forehead: { up: 0.5, rx: 0.46, ry: 0.22, weight: 0.75 },
+    /** Nose bridge: along the line from between the eyes to the tip; half width in IOD. */
+    bridge: { from: 0.08, to: 0.86, rx: 0.1, weight: 1 },
+    /** Cheekbone tops: below each eye and a little outward, in IOD. */
+    cheekbone: { down: 0.6, out: 0.12, rx: 0.34, ry: 0.15, weight: 0.6 },
+    /** Chin: between the lower lip and the tip of the chin; half sizes in IOD. */
+    chin: { rx: 0.19, ry: 0.12, weight: 0.5 },
+  },
+
+  /**
+   * 윤곽 다듬기: where the outline moves. Lengths are shares of the face width; positions are in
+   * the face's own axes, in half face widths from the middle of the eyes (sideways 0–1, down).
+   */
+  warp: {
+    /**
+     * The move is full on the outline and fades to nothing this far inside it and this far
+     * outside it (the background takes up the slack there; must fit in `face.roiMargin`).
+     */
+    reach: 0.2,
+    /** 갸름하게 acts beside the centre line only: nothing nearer than the first, full from the second. */
+    slimSide: [0.3, 0.75] as const,
+    /** 갸름하게 acts on the cheek and jaw: nothing above the first (down from the eyes), full from the second. */
+    slimLower: [0.05, 0.6] as const,
+    /** 작게 acts below the brows: nothing above the first, full from the second. */
+    sizeLower: [-0.3, 0.2] as const,
+    /** The middle of the face that 작게 moves toward: this far down from the eyes. */
+    centreDown: 0.55,
+    /** Nothing moves within this of the cut-out's edge (a face cut by the photo's edge has no seam). */
+    borderFade: 0.06,
+  },
+
+  /**
+   * 트러블: how much redder than its surroundings a spot must be, in the face's own spread of
+   * Cr: nothing below the first, the whole share from the second; and never less than
+   * `minExcess` (a very even face must not have its faintest warmth taken for trouble).
+   */
+  trouble: {
+    sigmas: [0.4, 1.3] as const,
+    minExcess: 0.006,
+    /**
+     * A spot is trouble only while its red is about the skin's own: the whole share up to the
+     * first difference in the red channel (a share of the surroundings' red), none from the
+     * second. Inflamed skin keeps its red and loses green and blue; a deep crease, a nostril's
+     * shadow, a mole or a spectacle rim loses red too (or gains it, as a glint), and must stay.
+     * Measured 2026-11-28: with no such gate the frown line of the elderly sample was half
+     * filled in (64 levels at its deepest); with a gate on brightness instead of red, a painted
+     * dark-red spot (22 % darker, red 7 % lower) was left as it was.
+     */
+    redGate: [0.06, 0.14] as const,
+  },
+
   mask: {
     /** Feather of the face outline, inward, as a share of the face width. */
     outlineFeather: 0.06,
@@ -261,6 +418,13 @@ export function retouchLevelProblems(level: RetouchLevel): string[] {
   share("underEye", level.underEye);
   share("redness", level.redness);
   share("lift", level.lift, 0.15);
+  share("contourShade", level.contourShade, 0.2);
+  share("contourLight", level.contourLight, 0.2);
+  if (level.contourLight > level.contourShade)
+    problems.push("contourLight must not be above contourShade");
+  share("trouble", level.trouble);
+  share("slim", level.slim, WARP_LIMITS.slim);
+  share("size", level.size, WARP_LIMITS.size);
   return problems;
 }
 
@@ -281,5 +445,10 @@ export function scaledLevel(level: RetouchLevel, strength = level.strength): Ret
     underEye: share(level.underEye),
     redness: share(level.redness),
     lift: share(level.lift, 0.15),
+    contourShade: share(level.contourShade, 0.2),
+    contourLight: share(level.contourLight, 0.2),
+    trouble: share(level.trouble),
+    slim: share(level.slim, WARP_LIMITS.slim),
+    size: share(level.size, WARP_LIMITS.size),
   };
 }
