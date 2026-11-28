@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PhotoCard } from "@/components/admin/photo-card";
 import { STATUS_LABEL } from "@/components/admin/labels";
 import { kioskLabelMap, listStaffPhotos, PHOTO_WINDOWS, type PhotoWindow } from "@/lib/ops/admin";
@@ -19,16 +20,19 @@ export default async function PhotosPage({
     typeof sp.status === "string" && (MODERATION_STATES as readonly string[]).includes(sp.status)
       ? (sp.status as ModerationStatus)
       : "";
-  const window =
-    typeof sp.window === "string" && sp.window in PHOTO_WINDOWS
-      ? (sp.window as PhotoWindow)
-      : "24h";
+  // "all": no time limit (still the newest 120), so nothing on the wall is out of reach.
+  const window: PhotoWindow | "all" =
+    sp.window === "all"
+      ? "all"
+      : typeof sp.window === "string" && sp.window in PHOTO_WINDOWS
+        ? (sp.window as PhotoWindow)
+        : "24h";
   const kiosk = typeof sp.kiosk === "string" && isUuid(sp.kiosk) ? sp.kiosk : "";
   const session = typeof sp.session === "string" ? sp.session.trim() : "";
   const [photos, kiosks] = await Promise.all([
     listStaffPhotos({
       statuses: status ? [status] : undefined,
-      window,
+      window: window === "all" ? undefined : window,
       kioskId: kiosk || undefined,
       sessionShort: session || undefined,
       limit: 120,
@@ -62,6 +66,7 @@ export default async function PhotosPage({
                 최근 {PHOTO_WINDOWS[w]}시간
               </option>
             ))}
+            <option value="all">전체 기간</option>
           </select>
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-sm text-ink/75">
@@ -83,7 +88,12 @@ export default async function PhotosPage({
           적용
         </button>
       </form>
-      <p className="text-base text-ink/75">{photos.length}장 (최대 120장)</p>
+      <p className="text-base text-ink/75">
+        {photos.length}장 (최대 120장) ·{" "}
+        <Link href="/admin/moderation?view=on-wall" className="underline">
+          미디어월에 올라간 사진 전부 보고 내리기
+        </Link>
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="photo-library">
         {photos.map((p) => (
           <PhotoCard key={p.id} photo={p} />

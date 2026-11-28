@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AiReviewPanel } from "@/components/admin/ai-review-panel";
+import { OnWallBoard } from "@/components/admin/on-wall-board";
 import { PhotoCard } from "@/components/admin/photo-card";
 import type { PhotoSource } from "@/config/mobile";
 import { sweepAiReviewSoon } from "@/lib/moderation/server";
@@ -7,6 +8,7 @@ import {
   MODERATION_VIEWS,
   getAiOverview,
   moderationSection,
+  onWallCount,
   pendingQueue,
   type ModerationView,
 } from "@/lib/ops/admin";
@@ -14,6 +16,9 @@ import { requireStaff } from "@/lib/staff-auth/page";
 import { getBackend } from "@/lib/storage/server";
 
 export const dynamic = "force-dynamic";
+
+/** One page of a section; the "on the wall" list pages back with `before`. */
+const PAGE = 60;
 
 const FILTERS: { key: PhotoSource | "all"; label: string }[] = [
   { key: "all", label: "전체" },
@@ -26,10 +31,16 @@ const VIEWS: Record<ModerationView, { label: string; tab?: string; lead: string;
   {
     queue: {
       label: "검수 대기",
-      // Five tabs share a phone's width: the short word keeps each on one line.
+      // Short words keep each tab on one line (three to a row on a phone).
       tab: "대기",
       lead: "미디어월 동의 + 검수 대기 · AI 주의 먼저, 그다음 오래된 순",
       empty: "검수할 사진이 없어요.",
+    },
+    "on-wall": {
+      label: "미디어월 게시 중",
+      tab: "게시 중",
+      lead: "지금 미디어월에 나갈 수 있는 사진 전부 · 골라서 한 번에 내리기",
+      empty: "미디어월에 올라간 사진이 없어요.",
     },
     flagged: {
       label: "AI 주의",
@@ -65,7 +76,7 @@ export default async function ModerationPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireStaff();
-  const { source, view: rawView } = await searchParams;
+  const { source, view: rawView, before: rawBefore } = await searchParams;
   const view: ModerationView = (MODERATION_VIEWS as readonly string[]).includes(String(rawView))
     ? (rawView as ModerationView)
     : "queue";
@@ -73,23 +84,29 @@ export default async function ModerationPage({
     source === "mobile" ? "mobile" : source === "booth" ? "booth" : undefined;
   // A staff member looking at the queue is a good moment to push it along.
   sweepAiReviewSoon();
-  const [photos, ai, settings] = await Promise.all([
-    view === "queue" ? pendingQueue(60, filter) : moderationSection(view),
+  const before =
+    view === "on-wall" && typeof rawBefore === "string" && !Number.isNaN(Date.parse(rawBefore))
+      ? new Date(rawBefore).toISOString()
+      : undefined;
+  const [photos, ai, settings, wallTotal] = await Promise.all([
+    view === "queue" ? pendingQueue(60, filter) : moderationSection(view, PAGE, before),
     getAiOverview(),
     getBackend().settings.get(),
+    view === "on-wall" ? onWallCount() : Promise.resolve(0),
   ]);
   const meta = VIEWS[view];
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="admin-h1">
-          {meta.label} {photos.length}건
+          {meta.label} {view === "on-wall" ? wallTotal : photos.length}건
         </h1>
         <p className="text-base text-ink/75">{meta.lead}</p>
       </div>
       <AiReviewPanel ai={ai} settings={settings} />
       <nav
-        className="admin-seg md:w-fit md:grid-flow-col md:auto-cols-[7.5rem]"
+        // Six sections: two rows of three on a phone, one row from a tablet up.
+        className="admin-seg max-md:grid-flow-row max-md:grid-cols-3 md:w-fit md:grid-flow-col md:auto-cols-[7.5rem]"
         aria-label="검수 구역"
       >
         {MODERATION_VIEWS.map((v) => (
@@ -125,7 +142,16 @@ export default async function ModerationPage({
           })}
         </nav>
       )}
-      {photos.length === 0 ? (
+      {view === "on-wall" ? (
+        <OnWallBoard
+          // A new page starts with nothing ticked.
+          key={before ?? "first"}
+          photos={photos}
+          total={wallTotal}
+          nextBefore={photos.length === PAGE ? photos[photos.length - 1]!.createdAt : null}
+          isFirstPage={!before}
+        />
+      ) : photos.length === 0 ? (
         <p className="admin-card p-8 text-center text-base text-ink/75" data-testid="queue-empty">
           {meta.empty}
         </p>
