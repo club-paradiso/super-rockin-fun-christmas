@@ -3097,6 +3097,16 @@ main input:focus-visible,
   display: none;
 }
 
+/* The shooting screen gives the picture the paper's top and bottom margins (a user request,
+   2026-11-28: "촬영 화면을 더욱 크게"). The picture is width-bound on a tall screen and
+   height-bound on a wide one; this is height it takes back from empty paper: about 25 px more
+   on a tablet. Tape is hidden on the journal sheet, so nothing lies on the picture. The ruled
+   lines keep their start (`--sheet-pad-y` in the background position), so only the sheet's
+   padding changes. */
+.journal-sheet.shoot {
+  padding-block: var(--gap-s);
+}
+
 /* Only the first screen is a closed, leather-look journal cover. Keep the original
    brand lockup, translated start labels and full-screen tap target on its inset plaque. */
 .journal-sheet.attract {
