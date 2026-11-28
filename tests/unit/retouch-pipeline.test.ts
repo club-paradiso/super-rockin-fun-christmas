@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   RETOUCH_CONFIG,
   RETOUCH_LEVELS,
+  WARP_LIMITS,
   type RetouchConfig,
   type RetouchLevel,
 } from "@/config/retouch";
@@ -31,21 +32,39 @@ const CPU: RetouchConfig = { ...RETOUCH_CONFIG, engine: "cpu" };
 /** A patch of plain skin on the cheek, well inside the mask: x, y, size. */
 const CHEEK = [FACE.cx - 55, FACE.cy + 25, 50] as const;
 /**
- * A level without its contour light, and a level with nothing but it: the smoothing and the
- * light are two things, and each has its own rules below.
+ * The skin work, the contour light and the outline are three things, and each has its own rules
+ * below: a level with only the skin work, one with only the light, one with only the outline.
  */
+const NOTHING = {
+  fine: 0,
+  bands: [0, 0, 0, 0] as [number, number, number, number],
+  underEye: 0,
+  redness: 0,
+  lift: 0,
+  contourShade: 0,
+  contourLight: 0,
+  trouble: 0,
+  slim: 0,
+  size: 0,
+};
 const smoothingOnly = (id: "natural" | "glow"): RetouchLevel => ({
   ...RETOUCH_LEVELS[id],
   contourShade: 0,
   contourLight: 0,
+  slim: 0,
+  size: 0,
 });
 const contourOnly = (id: "natural" | "glow"): RetouchLevel => ({
   ...RETOUCH_LEVELS[id],
-  fine: 0,
-  bands: [0, 0, 0, 0],
-  underEye: 0,
-  redness: 0,
-  lift: 0,
+  ...NOTHING,
+  contourShade: RETOUCH_LEVELS[id].contourShade,
+  contourLight: RETOUCH_LEVELS[id].contourLight,
+});
+const outlineOnly = (id: "natural" | "glow"): RetouchLevel => ({
+  ...RETOUCH_LEVELS[id],
+  ...NOTHING,
+  slim: RETOUCH_LEVELS[id].slim,
+  size: RETOUCH_LEVELS[id].size,
 });
 
 function finderOf(faces: DetectedFace[] | (() => DetectedFace[])): FaceFinder {
@@ -407,6 +426,255 @@ describe("윤곽 조명: the face's shape by light, never by moving a pixel (CPU
     expect(stats.changedOutside).toBe(0);
     expect(patch(after, ...EDGE)).toBeLessThan(patch(before, ...EDGE) - 4);
     expect(patch(after, ...BRIDGE)).toBeGreaterThan(patch(before, ...BRIDGE) + 2);
+  });
+});
+
+describe("트러블: a spot redder than the skin around it goes; a mole stays (CPU engine)", () => {
+  const { cx, cy, iod } = FACE;
+  /** A soft red spot, about 3 % of the face across, painted on the cheek. */
+  const SPOT = [cx - iod * 0.55, cy + iod * 0.8] as const;
+  const withSpot = (skin: [number, number, number], at = SPOT) => {
+    const canvas = drawSyntheticFaces(320, 320, [FACE], { skin, blotch: 0, grain: 0.004 });
+    for (let y = -6; y <= 6; y++)
+      for (let x = -6; x <= 6; x++) {
+        const share = 0.55 * Math.exp(-(x * x + y * y) / (2 * 2.2 * 2.2));
+        const p = ((Math.round(at[1]) + y) * 320 + Math.round(at[0]) + x) * 4;
+        // Toward an inflamed red: redder, and only a little darker (about 6 % at its centre).
+        canvas.data[p] = canvas.data[p]! * (1 - share * 0.02);
+        canvas.data[p + 1] = canvas.data[p + 1]! * (1 - share * 0.16);
+        canvas.data[p + 2] = canvas.data[p + 2]! * (1 - share * 0.14);
+      }
+    return canvas;
+  };
+  /**
+   * How much redder than its surroundings the spot is: R − G over its middle (3 × 3, so one
+   * level of rounding or grain does not decide it) against the same patch a little way off.
+   */
+  const redness = (canvas: PixelCanvas, at = SPOT) => {
+    const rg = (x0: number, y0: number) => {
+      let sum = 0;
+      for (let y = -1; y <= 1; y++)
+        for (let x = -1; x <= 1; x++) {
+          const p = ((Math.round(y0) + y) * 320 + Math.round(x0) + x) * 4;
+          sum += canvas.data[p]! - canvas.data[p + 1]!;
+        }
+      return sum / 9;
+    };
+    return rg(at[0], at[1]) - rg(at[0] + 14, at[1]);
+  };
+  const run = async (before: PixelCanvas, id: "natural" | "glow") => {
+    const { retoucher, errors, spy } = setup([meshFace(FACE)]);
+    const result = await retoucher.retouchPhoto(asImage(before), id, {
+      level: smoothingOnly(id),
+    });
+    spy.mockRestore();
+    expect(errors).toEqual([]);
+    return result.image.source as PixelCanvas;
+  };
+
+  it.each([
+    ["a light face", [225, 185, 165]],
+    ["a mid face", [170, 120, 95]],
+    ["a dark face", [96, 62, 48]],
+  ] as [string, [number, number, number]][])("on %s most of the spot goes", async (_name, skin) => {
+    for (const id of ["natural", "glow"] as const) {
+      const before = withSpot(skin);
+      const after = await run(before, id);
+      // A spot of the same share on every skin tone: fewer levels on a dark face.
+      expect(redness(before)).toBeGreaterThan(3);
+      // Measured 2026-11-28: 12.2 → 3.1 levels on the light face, 7.7 → 3.6 on the mid one,
+      // 3.6 → 1.4 on the dark one. What is left is a few levels: not a spot any more.
+      expect(redness(after) / redness(before)).toBeLessThan(0.6);
+      expect(redness(after)).toBeLessThan(4);
+      // What is left in its place is the skin around it: not a dark or a pale patch.
+      const p = (Math.round(SPOT[1]) * 320 + Math.round(SPOT[0])) * 4;
+      const q = p + 14 * 4;
+      for (let c = 0; c < 3; c++)
+        expect(Math.abs(after.data[p + c]! - after.data[q + c]!)).toBeLessThan(
+          Math.abs(before.data[p + c]! - before.data[q + c]!) * 0.6 + 4,
+        );
+    }
+  });
+
+  it("is what removes it: without the share the same spot stays", async () => {
+    const before = withSpot([225, 185, 165]);
+    const { retoucher, spy } = setup([meshFace(FACE)]);
+    const result = await retoucher.retouchPhoto(asImage(before), "natural", {
+      level: { ...smoothingOnly("natural"), trouble: 0 },
+    });
+    spy.mockRestore();
+    expect(redness(result.image.source as PixelCanvas) / redness(before)).toBeGreaterThan(0.6);
+  });
+
+  it("a mole next to it is kept: darker than the skin, not redder", async () => {
+    const before = withSpot([205, 160, 135]);
+    const after = await run(before, "glow");
+    const p = (Math.round(cy + iod * 0.75) * 320 + Math.round(cx + iod * 0.7)) * 4;
+    const contrast = (c: PixelCanvas) => c.data[p + 12 * 4]! - c.data[p]!;
+    expect(contrast(before)).toBeGreaterThan(100);
+    expect(contrast(after) / contrast(before)).toBeGreaterThan(0.85);
+  });
+
+  it("skin beside a brow or the lips is not taken for a spot (they are not skin to compare with)", async () => {
+    const before = drawSyntheticFaces(320, 320, [FACE], { blotch: 0, grain: 0.004 });
+    const after = await run(before, "glow");
+    // Just above a brow, just under an eye, beside the mouth: within the lift's own brightening.
+    for (const [x, y] of [
+      [cx - iod / 2, cy - iod * 0.48],
+      [cx + iod / 2, cy - iod * 0.48],
+      [cx - iod * 0.5, cy + iod * 0.22],
+      [cx - iod * 0.55, cy + iod * 1.25],
+      [cx, cy + iod * 1.02],
+    ] as const) {
+      const p = (Math.round(y) * 320 + Math.round(x)) * 4;
+      for (let c = 0; c < 3; c++)
+        expect(Math.abs(after.data[p + c]! - before.data[p + c]!)).toBeLessThan(12);
+    }
+  });
+});
+
+describe("윤곽 다듬기: the cheek and jaw line comes in a little, and it is the same person (CPU engine)", () => {
+  const { cx, cy, iod } = FACE;
+  const WIDTH = iod * 2.16;
+  const flat = { blotch: 0, grain: 0.004 } as const;
+  /** Where the skin begins on a row, from the left or from the right, to a fraction of a pixel. */
+  const edge = (canvas: PixelCanvas, y: number, fromLeft: boolean) => {
+    const r = (x: number) => canvas.data[(Math.round(y) * 320 + x) * 4]!;
+    const mid = (205 + 70) / 2;
+    if (fromLeft) {
+      for (let x = 1; x < 320; x++)
+        if (r(x) >= mid) return x - (r(x) - mid) / Math.max(1, r(x) - r(x - 1));
+    } else {
+      for (let x = 318; x >= 0; x--)
+        if (r(x) >= mid) return x + (r(x) - mid) / Math.max(1, r(x) - r(x + 1));
+    }
+    return Number.NaN;
+  };
+  const JAW = cy + iod * 1.2;
+
+  it("moves the jaw line in by the level's share of the face width, the same on both sides", async () => {
+    for (const id of ["natural", "glow"] as const) {
+      const { before, after } = await retouchOne(id, flat, meshFace(FACE), outlineOnly(id));
+      const left = edge(after, JAW, true) - edge(before, JAW, true);
+      const right = edge(before, JAW, false) - edge(after, JAW, false);
+      const most = (RETOUCH_LEVELS[id].slim + RETOUCH_LEVELS[id].size) * WIDTH;
+      expect(left).toBeGreaterThan(most * 0.5);
+      expect(left).toBeLessThan(most + 0.8);
+      expect(Math.abs(left - right)).toBeLessThan(0.8);
+    }
+  });
+
+  it("뽀샤시 moves it more than 자연스럽게, and both stay under the limits", () => {
+    const { natural, glow } = RETOUCH_LEVELS;
+    expect(natural.slim).toBeGreaterThan(0);
+    expect(glow.slim).toBeGreaterThan(natural.slim);
+    expect(glow.size).toBeGreaterThan(natural.size);
+    for (const level of [natural, glow]) {
+      expect(level.slim).toBeLessThanOrEqual(WARP_LIMITS.slim);
+      expect(level.size).toBeLessThanOrEqual(WARP_LIMITS.size);
+    }
+    // The limits themselves: the outline never moves more than 4 % of the face width.
+    expect(WARP_LIMITS.slim + WARP_LIMITS.size).toBeLessThanOrEqual(0.04);
+  });
+
+  it("only the outline moves: eyes, brows, nose, lips and the middle of the face keep every pixel", async () => {
+    const { before, after, stats } = await retouchOne(
+      "glow",
+      {},
+      meshFace(FACE),
+      outlineOnly("glow"),
+    );
+    expect(stats.affected).toBeGreaterThan(500);
+    expect(stats.changedOutside).toBe(0);
+    // The middle of the face: everything further inside the outline than the move reaches.
+    let compared = 0;
+    for (let y = Math.round(cy - iod * 0.5); y < cy + iod * 1.25; y++)
+      for (let x = Math.round(cx - iod * 0.4); x <= cx + iod * 0.4; x++) {
+        const p = (y * 320 + x) * 4;
+        for (let c = 0; c < 3; c++) expect(after.data[p + c]).toBe(before.data[p + c]);
+        compared++;
+      }
+    // And the features whole, out to their edges: both eyes, both brows, the lips.
+    const same = (x: number, y: number) => {
+      const p = (Math.round(y) * 320 + Math.round(x)) * 4;
+      for (let c = 0; c < 3; c++) expect(after.data[p + c]).toBe(before.data[p + c]);
+    };
+    for (const side of [-1, 1])
+      for (const t of [-0.2, -0.1, 0, 0.1, 0.2]) {
+        same(cx + side * (iod / 2 + t * iod), cy);
+        same(cx + side * (iod / 2 + t * iod), cy - iod * 0.33);
+        same(cx + side * t * 1.8 * iod, cy + iod * 1.25);
+      }
+    expect(compared).toBeGreaterThan(5_000);
+  });
+
+  it("the forehead and the hairline stay where they are", async () => {
+    const { before, after } = await retouchOne("glow", flat, meshFace(FACE), outlineOnly("glow"));
+    for (const y of [cy - iod * 0.9, cy - iod * 0.6]) {
+      expect(Math.abs(edge(after, y, true) - edge(before, y, true))).toBeLessThan(0.15);
+      expect(Math.abs(edge(after, y, false) - edge(before, y, false))).toBeLessThan(0.15);
+    }
+  });
+
+  it("the skin that moved kept its grain, and nothing was folded or torn", async () => {
+    const { before, after } = await retouchOne("glow", {}, meshFace(FACE), outlineOnly("glow"));
+    // Across the jaw row the picture is still skin, then background: one edge on each side.
+    const crossings = (canvas: PixelCanvas) => {
+      let n = 0;
+      for (let x = 1; x < 320; x++) {
+        const a = canvas.data[(Math.round(JAW) * 320 + x - 1) * 4]! > 137;
+        const b = canvas.data[(Math.round(JAW) * 320 + x) * 4]! > 137;
+        if (a !== b) n++;
+      }
+      return n;
+    };
+    expect(crossings(after)).toBe(crossings(before));
+    // The grain of a patch on the moved cheek edge: most of it is still there (a bicubic read).
+    const rms = (canvas: PixelCanvas) => {
+      let sum = 0;
+      let n = 0;
+      for (let y = Math.round(JAW) - 10; y < JAW + 10; y++)
+        for (let x = Math.round(cx - iod * 0.86); x < cx - iod * 0.7; x++) {
+          const at = (dx: number, dy: number) => canvas.data[((y + dy) * 320 + x + dx) * 4]!;
+          const mean = (at(-1, 0) + at(1, 0) + at(0, -1) + at(0, 1)) / 4;
+          sum += (at(0, 0) - mean) ** 2;
+          n++;
+        }
+      return Math.sqrt(sum / n);
+    };
+    expect(rms(after) / rms(before)).toBeGreaterThan(0.6);
+  });
+
+  it("a face cut by the photo's edge is left whole at that edge: no seam", async () => {
+    const face: SyntheticFace = { cx: 60, cy: 130, iod: 70 };
+    const before = drawSyntheticFaces(320, 320, [face]);
+    const { retoucher, errors, spy } = setup([meshFace(face)]);
+    const result = await retoucher.retouchPhoto(asImage(before), "glow", {
+      level: outlineOnly("glow"),
+    });
+    spy.mockRestore();
+    expect(errors).toEqual([]);
+    const after = result.image.source as PixelCanvas;
+    for (let y = 0; y < 320; y++)
+      for (let c = 0; c < 3; c++)
+        expect(after.data[y * 320 * 4 + c]).toBe(before.data[y * 320 * 4 + c]);
+  });
+
+  it("works from the six-point model too", async () => {
+    const { before, after, stats } = await retouchOne(
+      "glow",
+      flat,
+      keypointFace(FACE),
+      outlineOnly("glow"),
+    );
+    expect(stats.changedOutside).toBe(0);
+    expect(edge(after, JAW, true) - edge(before, JAW, true)).toBeGreaterThan(1);
+  });
+
+  it("the whole level is still one face: skin work, light and outline together", async () => {
+    const { result, stats } = await retouchOne("glow");
+    expect(result.metrics).toMatchObject({ facesRetouched: 1, error: null });
+    expect(stats.changedOutside).toBe(0);
   });
 });
 

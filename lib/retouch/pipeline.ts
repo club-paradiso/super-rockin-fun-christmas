@@ -10,7 +10,7 @@ import { get2d, type CanvasFactory, type CanvasLike } from "@/lib/canvas";
 import { CpuEngine } from "./cpu";
 import type { FaceFinder } from "./detector";
 import { findFaces } from "./find";
-import { rasterMask } from "./mask";
+import { rasterFace } from "./mask";
 import { planFaces } from "./plan";
 import { skinModel, toneScale } from "./skin";
 import {
@@ -240,7 +240,8 @@ export class SkinRetoucher {
       for (const plan of plans) {
         const { roi } = plan;
         const data = ctx.getImageData(roi.x, roi.y, roi.width, roi.height);
-        const mask = rasterMask(plan, this.config);
+        const moves = level.slim > 0 || level.size > 0;
+        const { mask, warp } = rasterFace(plan, this.config, moves);
         const skin = skinModel(data.data, plan, mask, this.config);
         if (!skin) {
           skips.push("no-skin");
@@ -282,6 +283,20 @@ export class SkinRetoucher {
             this.config.contour.lightRollOff[0],
             this.config.contour.lightRollOff[1],
           ],
+          // A dark face's spot is fewer levels redder than a light face's: the bar comes down
+          // with the face's brightness (never up: a bright face keeps the bar as written).
+          troubleExcess: [
+            Math.min(1, tone) *
+              Math.max(this.config.trouble.minExcess, this.config.trouble.sigmas[0] * skin.sigmaCr),
+            Math.min(1, tone) *
+              Math.max(
+                this.config.trouble.minExcess * 2,
+                this.config.trouble.sigmas[1] * skin.sigmaCr,
+              ),
+          ],
+          troubleRed: [this.config.trouble.redGate[0], this.config.trouble.redGate[1]],
+          warp,
+          faceWidth: plan.geometry.width,
           view: options.view ?? "result",
         };
         try {

@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import sharp from "sharp";
+import { RETOUCH_LEVELS, type RetouchLevel } from "../config/retouch";
 import {
   SHOOT_TIMEOUT,
   answerForQr,
@@ -95,6 +96,7 @@ function retouchSample(
     model?: "landmarker" | "detector";
     size?: number;
     strength?: number;
+    numbers?: RetouchLevel;
   } = {},
 ): Promise<Processed> {
   return page.evaluate(
@@ -148,33 +150,48 @@ test.describe("the quality rules on every sample (CPU engine: the same numbers o
       measured[sample.id] = {} as Record<Level, Stats & { faces: number }>;
       const shots: Partial<Record<Level, Processed>> = {};
       for (const level of ["natural", "glow"] as Level[]) {
-        const r = await retouchSample(page, sample.file, level, { engine: "cpu" });
+        // The level as the guest gets it: skin work, contour light and the outline drawn in.
+        const whole = await retouchSample(page, sample.file, level, { engine: "cpu" });
+        shots[level] = whole;
+        expect(whole.metrics.error, "no failure").toBeNull();
+        expect(whole.metrics.facesRetouched, "faces retouched").toBeGreaterThanOrEqual(
+          sample.faces,
+        );
+        // Never more than six, never anything outside the faces (the outline's move included).
+        expect(whole.metrics.facesRetouched).toBeLessThanOrEqual(6);
+        expect(whole.stats.changedOutside, "pixels changed outside the faces").toBe(0);
+
+        // The numbers below are of the skin work and the light alone. Where the outline moves,
+        // a pixel takes its neighbour's place, and "how much did this pixel change" says
+        // nothing about a retouch there; that move has its own rules in the unit tests
+        // (tests/unit/retouch-pipeline.test.ts 「윤곽 다듬기」).
+        const r = await retouchSample(page, sample.file, level, {
+          engine: "cpu",
+          numbers: { ...RETOUCH_LEVELS[level], slim: 0, size: 0 },
+        });
         const s = r.stats;
         measured[sample.id]![level] = { ...s, faces: r.metrics.facesRetouched };
-        shots[level] = r;
         expect(r.metrics.error, "no failure").toBeNull();
-        expect(r.metrics.facesRetouched, "faces retouched").toBeGreaterThanOrEqual(sample.faces);
-        // Never more than six, never anything outside the faces.
-        expect(r.metrics.facesRetouched).toBeLessThanOrEqual(6);
+        expect(r.metrics.facesRetouched).toBe(whole.metrics.facesRetouched);
         expect(s.changedOutside, "pixels changed outside the faces").toBe(0);
         if (r.metrics.facesRetouched === 0) continue;
 
-        // "매끈하지만 사람 피부": the skin's fine texture stays.
+        // "매끈하지만 사람 피부": the skin's fine texture stays. Raised 2026-11-28 with the
+        // user's measure (과한 포토샵 느낌은 지양): 0.9 and 0.78 before, measured 0.95 and 0.93
+        // at the least.
         expect(s.fineRetention, "fine texture kept").toBeGreaterThan(
-          level === "natural" ? 0.9 : 0.78,
+          level === "natural" ? 0.93 : 0.9,
         );
         expect(s.fineRetention).toBeLessThan(1.06);
-        // It does something, and it never repaints: small changes only. 자연스럽게 was under 3
-        // until the contour light (윤곽 조명, 2026-11-28): its shade along the cheek and jaw is
-        // a change of its own, measured at 1.7 to 3.8 on these samples.
-        expect(s.meanAbsDiff).toBeLessThan(level === "natural" ? 4.5 : 6);
-        expect(s.maxAbsDiff).toBeLessThan(level === "natural" ? 40 : 60);
-        // No whitening, no greying (dark skin), no blown highlights (light skin). The whitening
-        // side is where it was. The other side has room for the contour's shade: on a face that
-        // is already bright the highlight is rolled off and only the shade is left (measured
-        // −2.6 at most, on the fairest sample).
-        expect(s.lumaShift, "no whitening").toBeLessThan(level === "natural" ? 1.5 : 6);
-        expect(s.lumaShift, "the contour's shade, and no more than that").toBeGreaterThan(-3.5);
+        // It does something, and it never repaints: small changes only. Tightened the same day
+        // (3 / 6 and 40 / 60 before; measured 3.0 / 4.0 and 23 / 30 at the most).
+        expect(s.meanAbsDiff).toBeLessThan(level === "natural" ? 3.5 : 5);
+        expect(s.maxAbsDiff).toBeLessThan(level === "natural" ? 30 : 40);
+        // No whitening, no greying (dark skin), no blown highlights (light skin). The other
+        // side has room for the contour light's shade: on a face that is already bright the
+        // highlight is rolled off and only the shade is left (measured −1.8 at most).
+        expect(s.lumaShift, "no whitening").toBeLessThan(level === "natural" ? 1.5 : 4);
+        expect(s.lumaShift, "the contour's shade, and no more than that").toBeGreaterThan(-2.5);
         expect(s.saturationRatio, "colour kept").toBeGreaterThan(0.94);
         expect(s.saturationRatio).toBeLessThan(1.06);
         expect(s.clippedAfter, "no new clipping").toBeLessThanOrEqual(s.clippedBefore * 1.2 + 200);
@@ -270,7 +287,20 @@ test("the lighter six-point model also finds and retouches the face", async ({ p
   test.setTimeout(120_000);
   await openLab(page);
   const sample = samples.find((s) => s.faces === 1)!;
-  const r = await retouchSample(page, sample.file, "natural", { engine: "cpu", model: "detector" });
+  // The whole level, outline included: it runs, and stays inside the face's cut-out.
+  const whole = await retouchSample(page, sample.file, "natural", {
+    engine: "cpu",
+    model: "detector",
+  });
+  expect(whole.metrics.error).toBeNull();
+  expect(whole.metrics.facesRetouched).toBe(1);
+  expect(whole.stats.changedOutside).toBe(0);
+  // The skin's texture is measured on the skin work alone (see the quality rules above).
+  const r = await retouchSample(page, sample.file, "natural", {
+    engine: "cpu",
+    model: "detector",
+    numbers: { ...RETOUCH_LEVELS.natural, slim: 0, size: 0 },
+  });
   expect(r.metrics.error).toBeNull();
   expect(r.metrics.facesRetouched).toBe(1);
   expect(r.stats.changedOutside).toBe(0);

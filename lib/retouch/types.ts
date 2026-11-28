@@ -122,6 +122,18 @@ export interface FaceJob {
   liftRollOff: [number, number];
   /** The contour highlight fades out between these values of the brightest channel. */
   contourRollOff: [number, number];
+  /** 트러블: the Cr excess of a spot over its surroundings at which it starts, and is full. */
+  troubleExcess: [number, number];
+  /** 트러블: the relative difference in red up to which it is full, and from which none. */
+  troubleRed: [number, number];
+  /**
+   * 윤곽 다듬기: `lowWidth × lowHeight × 4` bytes, each (value − 128) ÷ 127 = −1…1. R, G = where
+   * a pixel of the result is read from for a `slim` of 1 (x, y, in face widths); B, A = the same
+   * for `size`. Null when the level moves nothing.
+   */
+  warp: Uint8Array | null;
+  /** Cheek to cheek, in pixels of the cut-out. */
+  faceWidth: number;
   /** "mask": paint the mask over the photo instead of retouching (lab page). */
   view: "result" | "mask";
 }

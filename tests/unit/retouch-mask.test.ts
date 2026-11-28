@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { RETOUCH_CONFIG } from "@/config/retouch";
+import { RETOUCH_CONFIG, WARP_LIMITS } from "@/config/retouch";
 import { faceGeometry } from "@/lib/retouch/geometry";
-import { boxBlur, fillPolygon, rasterMask } from "@/lib/retouch/mask";
+import { boxBlur, fillPolygon, rasterFace, rasterMask } from "@/lib/retouch/mask";
 import { planFaces } from "@/lib/retouch/plan";
 import { skinModel, toneScale } from "@/lib/retouch/skin";
 import {
@@ -213,6 +213,89 @@ describe("the face mask (lib/retouch/mask.ts)", () => {
     expect(maskAt(plan, mask, cx - iod * 0.75, cy + iod * 0.9, 2)).toBeGreaterThan(150);
     // And the nose bridge lies along the turned nose.
     expect(maskAt(plan, mask, cx - iod * 0.28, cy, 3)).toBeGreaterThan(80);
+  });
+
+  describe.each([
+    ["the mesh", meshFace(FACE)],
+    ["the six points", keypointFace(FACE)],
+  ] as const)("윤곽 다듬기 from %s: where a pixel is read from", (_name, face) => {
+    const plan = planOne(face);
+    const { warp } = rasterFace(plan, RETOUCH_CONFIG, true);
+    const { cx, cy, iod } = FACE;
+    /** One component of the field at a photo position, −1…1. */
+    const at = (x: number, y: number, channel: number) =>
+      (maskAt(plan, warp!, x, y, channel) - 128) / 127;
+
+    it("is made only when asked for", () => {
+      expect(rasterFace(plan).warp).toBeNull();
+      expect(warp).toHaveLength(plan.lowWidth * plan.lowHeight * 4);
+    });
+
+    it("갸름하게 reads from further out sideways on the cheek and jaw line, the same on both sides", () => {
+      const y = cy + iod * 1.2;
+      const half = iod * 0.946;
+      // Left edge of the jaw: further left. Right edge: further right. Nearly the whole share.
+      expect(at(cx - half, y, 0)).toBeLessThan(-0.7);
+      expect(at(cx + half, y, 0)).toBeGreaterThan(0.7);
+      expect(Math.abs(at(cx - half, y, 0) + at(cx + half, y, 0))).toBeLessThan(0.12);
+      // Sideways only, on a face that is upright.
+      expect(Math.abs(at(cx - half, y, 1))).toBeLessThan(0.02);
+    });
+
+    it("작게 reads from further out from the middle of the face, below the brows", () => {
+      // The tip of the chin: straight down. The jaw corner: down and out.
+      expect(at(cx, cy + iod * 1.98, 3)).toBeGreaterThan(0.6);
+      expect(Math.abs(at(cx, cy + iod * 1.98, 2))).toBeLessThan(0.05);
+      expect(at(cx - iod * 0.946, cy + iod * 1.2, 2)).toBeLessThan(-0.4);
+      expect(at(cx - iod * 0.946, cy + iod * 1.2, 3)).toBeGreaterThan(0.2);
+    });
+
+    it("moves nothing in the middle of the face, on the features, on the forehead or at the cut-out's edge", () => {
+      const still = (x: number, y: number) => {
+        for (let c = 0; c < 4; c++) expect(maskAt(plan, warp!, x, y, c)).toBe(128);
+      };
+      // Nose, between the eyes, cheeks well inside.
+      still(cx, cy + iod * 0.5);
+      still(cx, cy);
+      still(cx - iod * 0.35, cy + iod * 0.8);
+      // Eyes, brows, lips: to their edges.
+      for (const side of [-1, 1])
+        for (const t of [-0.2, 0, 0.2]) {
+          still(cx + side * (iod / 2 + t * iod), cy);
+          still(cx + side * (iod / 2 + t * iod), cy - iod * 0.33);
+          still(cx + side * t * 1.8 * iod, cy + iod * 1.25);
+        }
+      // The top of the forehead, on the outline itself.
+      still(cx, cy - iod * 1.08);
+      // The outermost work pixels all round.
+      const { lowWidth: w, lowHeight: h } = plan;
+      for (let x = 0; x < w; x++)
+        for (const y of [0, h - 1])
+          for (let c = 0; c < 4; c++) expect(warp![(y * w + x) * 4 + c]).toBe(128);
+      for (let y = 0; y < h; y++)
+        for (const x of [0, w - 1])
+          for (let c = 0; c < 4; c++) expect(warp![(y * w + x) * 4 + c]).toBe(128);
+    });
+
+    it("never folds the picture: at the largest shares allowed, places stay in order along every row and column", () => {
+      const { lowWidth: w, lowHeight: h, k } = plan;
+      const width = plan.geometry.width;
+      const moved = (x: number, y: number, axis: 0 | 1) => {
+        const o = (y * w + x) * 4;
+        const d =
+          (WARP_LIMITS.slim * (warp![o + axis]! - 128) +
+            WARP_LIMITS.size * (warp![o + 2 + axis]! - 128)) /
+          127;
+        return (axis === 0 ? x : y) * k + d * width;
+      };
+      for (let y = 0; y < h; y++)
+        for (let x = 1; x < w; x++)
+          // Neighbours are k apart; they must stay in order and at least two thirds of that apart.
+          expect(moved(x, y, 0) - moved(x - 1, y, 0)).toBeGreaterThan(k * 0.66);
+      for (let x = 0; x < w; x++)
+        for (let y = 1; y < h; y++)
+          expect(moved(x, y, 1) - moved(x, y - 1, 1)).toBeGreaterThan(k * 0.66);
+    });
   });
 
   it("has no geometry for points it cannot use", () => {

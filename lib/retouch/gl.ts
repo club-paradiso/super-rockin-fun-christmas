@@ -1,4 +1,4 @@
-import { ACTIVITY, ATROUS, COMBINE, DOWN, FINAL, VERTEX } from "./shaders";
+import { ACTIVITY, AROUND, ATROUS, COMBINE, DOWN, FINAL, VERTEX, WEIGH } from "./shaders";
 import { RetouchError, type FaceJob, type RetouchEngine } from "./types";
 
 /**
@@ -23,7 +23,10 @@ export interface GlCanvas {
 
 export class GlEngine implements RetouchEngine {
   readonly kind = "webgl" as const;
-  private readonly programs: Record<"down" | "atrous" | "activity" | "combine" | "final", Program>;
+  private readonly programs: Record<
+    "down" | "atrous" | "activity" | "weigh" | "around" | "combine" | "final",
+    Program
+  >;
   private readonly quad: WebGLBuffer;
   private readonly fbo: WebGLFramebuffer;
   private peak = 0;
@@ -49,6 +52,8 @@ export class GlEngine implements RetouchEngine {
       down: this.link(DOWN),
       atrous: this.link(ATROUS),
       activity: this.link(ACTIVITY),
+      weigh: this.link(WEIGH),
+      around: this.link(AROUND),
       combine: this.link(COMBINE),
       final: this.link(FINAL),
     };
@@ -192,6 +197,9 @@ export class GlEngine implements RetouchEngine {
       const low = () => keep(this.texture(lw, lh, null, true));
       const [c0, c1, c2, c3, c4, act, comb] = [low(), low(), low(), low(), low(), low(), low()];
       const texel = [1 / lw, 1 / lh];
+      // 윤곽 다듬기: the level's shares as pixels of this cut-out; nothing moves in the mask view.
+      const moves = job.warp !== null && job.view !== "mask";
+      const warp = keep(this.texture(lw, lh, moves ? job.warp : new Uint8Array(lw * lh * 4), true));
 
       this.draw("down", c0, lw, lh, { uSrc: src }, { uSrcSize: [w, h], uLowSize: [lw, lh], uK: k });
       const levels = [c0, c1, c2, c3, c4] as const;
@@ -206,12 +214,24 @@ export class GlEngine implements RetouchEngine {
         );
       }
       this.draw("activity", act, lw, lh, { uC0: c0, uC2: c2 }, { uTexel: texel, uStep: steps[1] });
+      // What the skin around each pixel looks like: skin only, no edge stop, two widths.
+      const [weighed, aroundA, around] = [low(), low(), low()];
+      this.draw(
+        "weigh",
+        weighed,
+        lw,
+        lh,
+        { uC0: c0, uMask: mask },
+        { uSkin: [skin.y, skin.cb, skin.cr], uInvChroma: job.invChroma, uDark: job.darkGate },
+      );
+      this.draw("around", aroundA, lw, lh, { uTex: weighed }, { uTexel: texel, uStep: steps[1] });
+      this.draw("around", around, lw, lh, { uTex: aroundA }, { uTexel: texel, uStep: steps[2] });
       this.draw(
         "combine",
         comb,
         lw,
         lh,
-        { uC0: c0, uC1: c1, uC2: c2, uC3: c3, uC4: c4, uAct: act, uMask: mask },
+        { uC0: c0, uC1: c1, uC2: c2, uC3: c3, uC4: c4, uAct: act, uMask: mask, uAround: around },
         {
           uBands: level.bands,
           uKeep: job.keepAbove,
@@ -225,6 +245,9 @@ export class GlEngine implements RetouchEngine {
           uStrength: job.strength,
           uContour: [level.contourShade, level.contourLight],
           uRoll: job.contourRollOff,
+          uTrouble: level.trouble,
+          uSpot: job.troubleExcess,
+          uEven: job.troubleRed,
         },
       );
       this.draw(
@@ -232,8 +255,12 @@ export class GlEngine implements RetouchEngine {
         null,
         w,
         h,
-        { uSrc: src, uComb: comb, uC0: c0 },
+        { uSrc: src, uComb: comb, uC0: c0, uWarp: warp },
         {
+          uMove: moves
+            ? [level.slim * job.strength * job.faceWidth, level.size * job.strength * job.faceWidth]
+            : [0, 0],
+          uSrcSize: [w, h],
           uLowScale: [w / (k * lw), h / (k * lh)],
           uFine: level.fine,
           uLift: level.lift,
@@ -255,7 +282,7 @@ export class GlEngine implements RetouchEngine {
       for (let p = 3; p < pixels.length; p += 4) pixels[p] = 255;
       this.peak = Math.max(
         this.peak,
-        w * h * 4 * 2 + lw * lh * 4 * 8 + this.canvas.width * this.canvas.height * 4,
+        w * h * 4 * 2 + lw * lh * 4 * 12 + this.canvas.width * this.canvas.height * 4,
       );
     } finally {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);

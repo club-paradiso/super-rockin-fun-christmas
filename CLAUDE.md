@@ -378,8 +378,10 @@ looks:measure`). `/looks` is the comparison
   16 px dots) on every booth screen. The width of a space differs between browsers with the same
   font: `lib/kiosk/space.ts` measures it and `--space-fix` corrects it; never hard-code a
   `word-spacing` for one engine.
-- **Skin retouch is off by default, on the device, and never reshapes a face** (「피부 보정」,
-  2026-11-24, `docs/research/skin-retouch-audit.md`). It is one photo stage,
+- **Skin retouch is off by default, on the device, and the person in the print is the person
+  who stood in the booth** (「피부 보정」, 2026-11-24, `docs/research/skin-retouch-audit.md`; the
+  measure is the user's, 2026-11-28: "본인 그대로의 고유의 매력을 살리고 과도한 보정은 지양", after
+  the portrait studio 시현하다; "과하게 하면 절대 안돼 … 과한 포토샵 느낌은 지양"). It is one photo stage,
   `runPhotoStages` in `lib/kiosk/photo-stages.ts`, called once right before `composeFrame`:
   촬영 완료 → [피부 보정] → [색감] → 틀 합성. The colour look is not a photo stage: it is
   `composeFrame`'s `grade` (lib/looks, above), applied to each photo as it is drawn, so it always
@@ -392,22 +394,37 @@ looks:measure`). `/looks` is the comparison
   once the photos are chosen and never carries over to the next guest. No new step: the
   progress dots do not change. The chosen answer is filled like the frame options' (a state, not
   a second action). If the model has not loaded, the choice is not offered. Every
-  number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. Never add a
-  mesh warp (eyes, jaw, nose). **The face's shape is brought out by light, never by moving a
-  pixel** (윤곽 조명, 2026-11-28, a user request: "얼굴 윤곽 등 얼굴 보정 효과도 좀 드러날 수 있게"):
-  both levels shade the cheek and jaw edges and the temples (`contourShade`) and light the
-  forehead, the nose bridge, the cheekbone tops and the chin (`contourLight`), as gains on the
-  skin's own smoothed colour, from a map drawn on the face's own points (`contourFields` in
-  `lib/retouch/mask.ts`, mask channels B and A). The outline, the features and the skin's grain
-  stay where they were (`tests/unit/retouch-pipeline.test.ts` 「윤곽 조명」). A request to slim or
-  reshape a face is still a mesh warp and still needs the user to lift this rule in so many words.
-  Never smooth the finest band at 자연스럽게 (`fine: 0`), never whiten: the only brightening is
-  뽀샤시's `lift` (a gain with a highlight roll-off) and the contour's highlight, which is never
-  more than its own shade (`contourLight` ≤ `contourShade`, and under the mask the light never
-  sums to more than the shade), so no face is brighter on balance for its contour, and which
-  gives skin that is already lit no more light (`contour.lightRollOff`, on the brightest
-  channel). Never judge skin by a fixed colour range: the colour model is each face's own
-  (`lib/retouch/skin.ts`).
+  number is in `config/retouch.ts`; nothing in `lib/retouch` carries a tuning value. A level does
+  three things, and each has its own tests in `tests/unit/retouch-pipeline.test.ts`:
+  **(1) the skin work**: blemishes, skin trouble and uneven tone go; moles, freckles, lines and
+  the skin's own grain stay. Uneven tone is the middle detail bands, reduced and never erased;
+  strong detail is kept (`keepAbove`). 트러블 (`trouble`, 2026-11-28) is a small spot redder than
+  the mean of the skin around it (`skinAverage`: skin only, so hair, brows and lips do not enter
+  it) with about the skin's own red (`trouble.redGate`): it is replaced by that mean. Never widen
+  it to what has lost its red too: that is a mole, a crease or a rim, and without that gate
+  it half filled an old man's frown line. Never smooth the finest band at 자연스럽게
+  (`fine: 0`), never whiten: the only brightening is 뽀샤시's `lift` (a gain with a highlight
+  roll-off) and the contour's highlight. Never judge skin by a fixed colour range: the colour
+  model is each face's own (`lib/retouch/skin.ts`).
+  **(2) the contour light** (윤곽 조명): a shade along the cheek and jaw edges and the temples
+  (`contourShade`) and a highlight on the forehead, nose bridge, cheekbone tops and chin
+  (`contourLight`), as gains on the skin's own smoothed colour, from a map drawn on the face's
+  own points (`contourFields`, mask channels B and A). The highlight is never more than its
+  shade (`contourLight` ≤ `contourShade`, and under the mask the light never sums to more than
+  the shade), so no face is brighter on balance for it, and skin that is already lit gets no
+  more light (`contour.lightRollOff`, on the brightest channel).
+  **(3) the outline** (윤곽 다듬기, 2026-11-28, a user decision that lifted "never reshape a face":
+  "얼굴 갸름하게, 크기 조정 이런 부분도 규칙을 풀어서 추가해줘 … 너무 과하면 안돼"): the cheek and jaw
+  line is drawn in by a small share of the face's own width, sideways (`slim`) and toward the
+  middle of the face (`size`), through a field of where each pixel is read from (`warpField`,
+  bicubic in both engines). What keeps it the same person, and must stay true: **only a band
+  along the outline moves**, so eyes, brows, nose, lips and the middle of the face keep every
+  pixel (never add eye enlarging, a nose or lip change, or any move of a feature); **every face
+  gets the same share**, so nothing is pulled toward an ideal shape (never fit a target face,
+  never slim one face more because it is wider); the forehead and hairline do not move; and the
+  shares are capped by `WARP_LIMITS` (2.5 % and 1.5 % of the face width), which a level or the
+  lab's slider cannot pass. `tests/unit/retouch-config.test.ts` 「과하지 않게」 holds the ceilings
+  of all three; raising one is the user's decision, not a tuning step.
   The live preview is never retouched. Face points, masks and regions stay in the page: never
   send, store or log them (failures reach the server as a code and a count through the
   heartbeat). A photo that fails or runs over its time goes on unretouched, whole, and says so on
